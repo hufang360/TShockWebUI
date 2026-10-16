@@ -199,7 +199,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Log in to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
@@ -214,7 +214,7 @@ jobs:
           ghcr="ghcr.io/$repo_lc"
           tags="$ghcr:$VERSION"
           if [ "$VERSION" = "${VERSION#*-}" ]; then tags="$tags"$'\n'"$ghcr:latest"; fi
-          if [ -n "$DOCKERHUB_USERNAME" ]; then
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
             dh="$DOCKERHUB_USERNAME/$(basename "$repo_lc")"
             tags="$tags"$'\n'"$dh:$VERSION"
             if [ "$VERSION" = "${VERSION#*-}" ]; then tags="$tags"$'\n'"$dh:latest"; fi
