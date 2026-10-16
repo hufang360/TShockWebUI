@@ -1,0 +1,739 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { BookOpen, Fish, Globe2, House, Plug, Terminal, Users } from 'lucide-react'
+import { AppShell, type NavItem } from '@/components/AppShell'
+import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
+import { LoginDialog } from '@/components/LoginDialog'
+import { SettingsMenu } from '@/components/SettingsMenu'
+import { SidebarAccountMenu } from '@/components/SidebarAccountMenu'
+import {
+  Alert,
+  AlertDescription,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Separator,
+  Spinner,
+} from '@/components/ui'
+import { useLocalState } from '@/hooks/useLocalState'
+import { loadLoginMemory, saveLoginMemory } from '@/lib/credentials'
+import { loadDataset, reconcileDataVersion, withRuntimeCommands } from '@/lib/dataset'
+import { CommandResultsProvider } from '@/lib/commandResults'
+import { DatasetProvider } from '@/lib/datasetContext'
+import { ExecutionQueueProvider } from '@/lib/executionQueue'
+import { I18nProvider, translate } from '@/lib/i18n'
+import {
+  DEFAULT_MODULES,
+  MODULE_BY_ID,
+  MODULE_DEFS,
+  isCustomModuleId,
+  isModuleEnabled,
+  sanitizeModules,
+  type ModulesPrefs,
+} from '@/lib/modules'
+import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
+import { StorageKeys, removeKey } from '@/lib/storage'
+import {
+  BUILTIN_ID,
+  addServerTarget,
+  loadServers as loadServerTargets,
+  maskHost,
+  maskedTargetLabel,
+  readActiveTargetId,
+  resolveTarget,
+  saveServers,
+  writeActiveTargetId,
+  type ServerTarget,
+} from '@/lib/servers'
+import { clearSelfAvatar } from '@/lib/selfAvatar'
+import {
+  createTransport,
+  type BackendTransport,
+  type RuntimeCommand,
+  type ServerInfo,
+  type ServerStatus,
+  type Session,
+} from '@/lib/tshock'
+import { CommandPage } from '@/pages/CommandPage'
+import { FishShopPage } from '@/pages/FishShopPage'
+import { HomePage } from '@/pages/HomePage'
+import { ItemsPage } from '@/pages/ItemsPage'
+import { PlayerManagerPage } from '@/pages/PlayerManagerPage'
+import { SettingsPage } from '@/pages/SettingsPage'
+import { CommandModulePage } from '@/pages/CommandModulePage'
+import { cn } from '@/lib/cn'
+import type { Dataset, Me, Settings, TabId, UiState } from '@/types'
+
+const DEFAULT_SETTINGS: Settings = {
+  theme: 'dark',
+  fontSize: 15,
+  showIcons: true,
+  insertWithCount: false,
+  liveMode: false,
+  language: 'zh',
+  compact: true,
+  commandInterval: 2000,
+  refreshInterval: 120000,
+  eventsRefreshInterval: 180000,
+}
+
+const DEFAULT_UI: UiState = { activeTab: 'home', sidebarCollapsed: false }
+
+const ANON: Session = { authenticated: false, username: null }
+
+const DEFAULT_SERVER_INFO: ServerInfo = { allowCustom: false, default: null }
+
+/**
+ * TShock /v2/server/status 的 serverversion 形如 "v1.4.5.8"（带前导 v），
+ * 而 data/meta.json 为 "1.4.5.8"。规范化后再比较，避免误报版本不一致。
+ */
+const normalizeVersion = (version: string) => version.trim().replace(/^v/i, '')
+
+interface AppProps {
+  /** 测试或嵌入时可注入；默认按 VITE_TRANSPORT 选择。 */
+  transport?: BackendTransport
+}
+
+export default function App({ transport: transportProp }: AppProps = {}) {
+  const transport = useMemo(() => transportProp ?? createTransport(), [transportProp])
+
+  const [dataset, setDataset] = useState<Dataset | null>(null)
+  // 运行时指令目录（登录后从信使插件拉取，补全插件指令）。
+  const [runtimeCommands, setRuntimeCommands] = useState<RuntimeCommand[]>([])
+  // 后端是否允许把 allowServer=false 的指令交给插件以真实玩家身份执行。
+  const [ingameAllowed, setIngameAllowed] = useState(false)
+  // 运行时补全数据（区域 / 传送点）——只在 TShock 运行时存在。
+  const [runtimeParams, setRuntimeParams] = useState<{ regions?: string[]; warps?: string[] }>({})
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // settings 里可能缺字段或残留旧值（如 theme='darker'），做一次归一化。
+  const [rawSettings, setSettings] = useLocalState(StorageKeys.settings, DEFAULT_SETTINGS)
+  const settings = useMemo(() => {
+    const merged: Settings = { ...DEFAULT_SETTINGS, ...rawSettings }
+    if (merged.theme !== 'light' && merged.theme !== 'dark') merged.theme = 'dark'
+    if (merged.language !== 'zh' && merged.language !== 'en') merged.language = 'zh'
+    if (typeof merged.compact !== 'boolean') merged.compact = true
+    if (
+      typeof merged.commandInterval !== 'number' ||
+      !Number.isFinite(merged.commandInterval) ||
+      merged.commandInterval < 0
+    ) {
+      merged.commandInterval = DEFAULT_SETTINGS.commandInterval
+    }
+    if (
+      typeof merged.refreshInterval !== 'number' ||
+      !Number.isFinite(merged.refreshInterval) ||
+      merged.refreshInterval < 0
+    ) {
+      merged.refreshInterval = DEFAULT_SETTINGS.refreshInterval
+    }
+    if (
+      typeof merged.eventsRefreshInterval !== 'number' ||
+      !Number.isFinite(merged.eventsRefreshInterval) ||
+      merged.eventsRefreshInterval <= 0
+    ) {
+      merged.eventsRefreshInterval = DEFAULT_SETTINGS.eventsRefreshInterval
+    }
+    return merged
+  }, [rawSettings])
+  const t = useMemo(
+    () => (key: string, vars?: Record<string, string | number>) =>
+      translate(settings.language, key, vars),
+    [settings.language],
+  )
+
+  const [ui, setUi] = useLocalState(StorageKeys.ui, DEFAULT_UI)
+  // 「指令 → 物品」里点「前往物品图鉴」时带上要展示的物品 id；物品图鉴消费后清空。
+  const [dexFocus, setDexFocus] = useState<number | null>(null)
+  const consumeDexFocus = useCallback(() => setDexFocus(null), [])
+  // 已激活模块（侧边栏入口）；「设置」里探测到插件并打开开关后写入。
+  const [rawModules, setModules] = useLocalState<ModulesPrefs>(StorageKeys.modules, DEFAULT_MODULES)
+  const modules = useMemo(() => sanitizeModules(rawModules), [rawModules])
+  // 用户自定义模块（名称 + 指令），存本机 `tswui:customModules`。
+  const [rawCustomModules, setCustomModules] = useLocalState<CustomModule[]>(
+    StorageKeys.customModules,
+    [],
+  )
+  const customModules = useMemo(() => sanitizeCustomModules(rawCustomModules), [rawCustomModules])
+
+  // 多服务器：列表与当前选中项（activeId 写入 localStorage，transport 每次请求读取）。
+  const [servers, setServers] = useState<ServerTarget[]>(() => loadServerTargets())
+  const [activeServerId, setActiveServerId] = useState<string>(() => readActiveTargetId())
+
+  // 侧边栏导航：固定项 + 已激活模块入口（玩家管理 / 鱼店）。
+  // 注意：必须在任何 early return 之前声明（Hooks 顺序稳定）；模块按服务器区分。
+  const nav = useMemo(() => {
+    const items: NavItem[] = [
+      { id: 'home', label: t('nav.home'), icon: House },
+      { id: 'editor', label: t('nav.editor'), icon: Terminal },
+      { id: 'items', label: t('nav.items'), icon: BookOpen },
+    ]
+    const icons: Record<string, typeof House> = { players: Users, store: Fish, world: Globe2 }
+    for (const def of MODULE_DEFS) {
+      if (!isModuleEnabled(modules, activeServerId, def.id)) continue
+      items.push({ id: def.id, label: t(def.titleKey), icon: icons[def.id] ?? House })
+    }
+    for (const mod of customModules) {
+      if (!isModuleEnabled(modules, activeServerId, mod.id)) continue
+      items.push({
+        id: mod.id,
+        label: mod.name || t('modules.custom.untitled'),
+        // 与「设置 → 激活模块」卡片同图标（lucide Plug）。
+        icon: Plug,
+      })
+    }
+    return items
+  }, [modules, activeServerId, t, customModules])
+
+  const [serverInfo, setServerInfo] = useState<ServerInfo>(DEFAULT_SERVER_INFO)
+  // 渲染缓存（不含 token）；真实登录态以 /api/session 为准。
+  const [me, setMe] = useLocalState<Me | null>(StorageKeys.me, null)
+
+  const [session, setSession] = useState<Session>(ANON)
+  const [loginOpen, setLoginOpen] = useState(false)
+  // 退出登录需要二次确认，避免误触。
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false)
+  // 登录框被动弹出时的说明 i18n key（token 失效 / 会话过期）。
+  const [loginReason, setLoginReason] = useState<string | null>(null)
+  const [players, setPlayers] = useState<string[]>([])
+  const [status, setStatus] = useState<ServerStatus | null>(null)
+  // 已通过登录动作建立会话；用于避免首屏 /api/session 的慢响应把登录态覆盖回未登录。
+  const authedRef = useRef(false)
+  // 等待登录结果的请求（token 失效时，指令执行会 await 它）。
+  const pendingAuthRef = useRef<((ok: boolean) => void) | null>(null)
+
+  const clearLocalUser = useCallback(() => {
+    authedRef.current = false
+    setSession(ANON)
+    setMe(null)
+    removeKey(StorageKeys.me)
+  }, [setMe])
+
+  /** 解析等待中的登录请求（成功 true / 取消 false）。 */
+  const settleAuth = useCallback((ok: boolean) => {
+    const resolve = pendingAuthRef.current
+    pendingAuthRef.current = null
+    resolve?.(ok)
+  }, [])
+
+  /**
+   * 被动要求重新登录：清本地会话、弹出登录框，并返回一个 Promise，
+   * 在玩家完成登录后 resolve(true)，取消登录则 resolve(false)。
+   * 供 CommandPage 在 token 失效时 await，登录成功后可自动重试指令。
+   */
+  const requireLogin = useCallback(
+    (reasonKey: string): Promise<boolean> => {
+      clearLocalUser()
+      setLoginReason(reasonKey)
+      setLoginOpen(true)
+      return new Promise<boolean>((resolve) => {
+        // 若有旧的等待者，先让它失败，避免悬挂。
+        pendingAuthRef.current?.(false)
+        pendingAuthRef.current = resolve
+      })
+    },
+    [clearLocalUser],
+  )
+
+  const load = useCallback(async () => {
+    setLoadError(null)
+    try {
+      const ds = await loadDataset(settings.language)
+      if (reconcileDataVersion(ds.meta)) {
+        setNotice(translate(settings.language, 'app.versionChanged'))
+      }
+      setDataset(ds)
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'data load failed')
+    }
+  }, [settings.language])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // 多服务器能力探测（是否允许自定义上游 + 后端默认地址）。
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const info = await transport.servers()
+      if (!cancelled) setServerInfo(info)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [transport])
+
+  // 启动时清理已废弃的 tswui:auth（旧版曾存 token），再探测真实会话（设计原则与约束 C15）。
+  useEffect(() => {
+    removeKey(StorageKeys.auth)
+    let cancelled = false
+    void (async () => {
+      const s = await transport.session()
+      if (cancelled) return
+      // 若期间用户已登录，忽略这个较早的未登录结果，避免把登录态覆盖掉。
+      if (authedRef.current && !s.authenticated) return
+      setSession(s)
+      if (s.authenticated && s.username) {
+        setMe({ username: s.username, savedAt: Date.now() })
+      } else if (!s.authenticated) {
+        // 本机记住了账密 → 说明玩家希望重启后自动重登，直接弹出登录框。
+        const memory = loadLoginMemory(readActiveTargetId())
+        if (memory.remember && memory.username && memory.password) {
+          setLoginReason('app.sessionExpired')
+          setLoginOpen(true)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [transport, setMe])
+
+  // 状态探测 + 玩家列表（在线玩家需要会话；未登录时后端返回 401，这里静默降级）。
+  useEffect(() => {
+    if (!dataset) return
+    let cancelled = false
+    void (async () => {
+      const s = await transport.serverStatus()
+      if (!cancelled) setStatus(s)
+      // 真实模式未登录时不请求在线玩家（避免无意义的 401）。
+      if (!transport.mock && !session.authenticated) {
+        if (!cancelled) setPlayers([])
+        return
+      }
+      try {
+        const list = await transport.playersList()
+        if (!cancelled) setPlayers(list)
+      } catch {
+        if (!cancelled) setPlayers([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [dataset, session.authenticated, transport, activeServerId])
+
+  // 登录后拉取运行时指令目录 + 游戏内执行能力；切换服务器 / 退出登录要重新拉取。
+  useEffect(() => {
+    if (!dataset || !session.authenticated) {
+      setRuntimeCommands([])
+      setIngameAllowed(false)
+      setRuntimeParams({})
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const cmds = await transport.runtimeCommands()
+        if (!cancelled) setRuntimeCommands(cmds)
+      } catch {
+        if (!cancelled) setRuntimeCommands([])
+      }
+      try {
+        const cap = await transport.batchCapabilities()
+        if (!cancelled) setIngameAllowed(cap.ingame === true)
+      } catch {
+        if (!cancelled) setIngameAllowed(false)
+      }
+      // 区域 / 传送点（插件缺失或权限不足时为空，不影响其它补全）。
+      try {
+        const [regions, warps] = await Promise.all([
+          transport.pluginData('regions').catch(() => []),
+          transport.pluginData('warps').catch(() => []),
+        ])
+        if (!cancelled) {
+          setRuntimeParams({
+            regions: regions.map((r) => r.name),
+            warps: warps.map((w) => w.name),
+          })
+        }
+      } catch {
+        if (!cancelled) setRuntimeParams({})
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [dataset, session.authenticated, transport, activeServerId])
+
+  // 静态数据集 + 运行时指令目录（仅补充本地没有的插件指令）。
+  const effectiveDataset = useMemo(
+    () => (dataset ? withRuntimeCommands(dataset, runtimeCommands) : null),
+    [dataset, runtimeCommands],
+  )
+
+  const handleTokenInvalid = useCallback(
+    () => requireLogin('app.tokenInvalid'),
+    [requireLogin],
+  )
+
+  const handleLogout = useCallback(async () => {
+    const name = session.username ?? me?.username ?? ''
+    try {
+      await transport.logout()
+    } catch {
+      /* 即使后端销毁失败也清除本地渲染缓存 */
+    }
+    clearLocalUser()
+    // 换账号 / 退出后不保留上一个用户的头像。
+    clearSelfAvatar()
+    setNotice(null)
+    // 主动退出时不再自动回填密码（保留用户名与「记住」偏好）；避免刷新后又被弹登录框。
+    saveLoginMemory(activeServerId, {
+      username: name,
+      password: '',
+      remember: loadLoginMemory(activeServerId).remember,
+    })
+  }, [transport, clearLocalUser, session.username, me?.username, activeServerId])
+
+  // ---- 多服务器切换 ----
+
+  /** 选中某个上游：旧 token 只对旧服务器有效，先尽力销毁并清会话，再要求重新登录。 */
+  const selectServer = useCallback(
+    async (id: string) => {
+      if (id === activeServerId) return
+      writeActiveTargetId(id)
+      setActiveServerId(id)
+      try {
+        // 此时请求头已指向新上游：销毁旧 token 会失败，但后端仍会删除本地会话。
+        await transport.logout()
+      } catch {
+        /* 忽略：本地会话仍会被清 */
+      }
+      clearLocalUser()
+      setLoginReason('servers.switched')
+      setNotice(translate(settings.language, 'servers.switched'))
+      setLoginOpen(true)
+    },
+    [activeServerId, transport, clearLocalUser, settings.language],
+  )
+
+  const addServer = useCallback(
+    (target: ServerTarget) => {
+      setServers((prev) => {
+        const next = addServerTarget(prev, target)
+        saveServers(next)
+        return next
+      })
+      void selectServer(target.id)
+    },
+    [selectServer],
+  )
+
+  const removeServer = useCallback(
+    (id: string) => {
+      setServers((prev) => {
+        const next = prev.filter((s) => s.id !== id)
+        saveServers(next)
+        return next
+      })
+      if (activeServerId === id) void selectServer(BUILTIN_ID)
+    },
+    [activeServerId, selectServer],
+  )
+
+  if (loadError) {
+    return (
+      <div className="grid min-h-screen place-items-center p-6">
+        <Card className="max-w-md">
+          <CardBody className="flex flex-col gap-3 pt-4">
+            <h1 className="text-base font-semibold text-destructive">{t('app.loadError')}</h1>
+            <p className="text-sm text-foreground/80">{loadError}</p>
+            <p className="text-xs text-foreground/60">{t('app.loadErrorHint')}</p>
+            <Button variant="primary" onClick={() => void load()}>
+              {t('app.retry')}
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!dataset) {
+    return (
+      <div className="grid min-h-screen place-items-center">
+        <div className="flex items-center gap-3 text-foreground/80">
+          <Spinner />
+          {t('app.loading')}
+        </div>
+      </div>
+    )
+  }
+
+  const username = session.username ?? me?.username ?? null
+  // 渲染统一使用「静态数据 + 运行时插件指令」的合并数据集。
+  const view = effectiveDataset ?? dataset
+  const versionMismatch =
+    status?.reachable === true &&
+    status.serverversion != null &&
+    normalizeVersion(status.serverversion) !== normalizeVersion(dataset.meta.gameVersion)
+
+  const banner = (
+    <div className="flex flex-col">
+      {transport.mock && (
+        <Alert variant="info" className="rounded-none px-4 py-1.5">
+          <AlertDescription className="flex flex-wrap items-center gap-2 text-[11px] text-foreground">
+            <Badge tone="mock">Mock</Badge>
+            <span>{t('app.mockBanner', { label: transport.label })}</span>
+          </AlertDescription>
+        </Alert>
+      )}
+      {versionMismatch && (
+        <Alert variant="warning" className="rounded-none px-4 py-1.5">
+          <AlertDescription className="text-[11px]">
+            {t('app.versionMismatch', {
+              server: status?.serverversion ?? '?',
+              data: dataset.meta.gameVersion,
+            })}
+          </AlertDescription>
+        </Alert>
+      )}
+      {notice && (
+        <Alert variant="default" className="rounded-none px-4 py-1.5">
+          <AlertDescription className="flex items-center justify-between gap-2 text-[11px] text-foreground">
+            <span>{notice}</span>
+            <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>
+              {t('app.gotIt')}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  )
+
+  // 兼容旧版持久化的 activeTab='history'（早期曾用该 id 表示收藏页）/ 'favorites'（收藏已并入编辑器）；
+  // 已停用模块的入口即使留存也不展示，回退到首页。
+  const activeTab: TabId = (() => {
+    const raw = ui.activeTab as string
+    if (raw === 'history' || raw === 'favorites') return 'editor'
+    if (
+      (raw === 'players' || raw === 'store' || raw === 'world' || isCustomModuleId(raw)) &&
+      !isModuleEnabled(modules, activeServerId, raw)
+    ) {
+      return 'home'
+    }
+    return ui.activeTab
+  })()
+
+  // 侧栏账号卡片上的服务器地址（遮挡展示；内置项不再显示「服务器默认」）。
+  const accountServerLabel =
+    activeServerId === BUILTIN_ID
+      ? serverInfo.default
+        ? `${maskHost(serverInfo.default.host)}:${serverInfo.default.port}`
+        : (status?.name ?? '—')
+      : maskedTargetLabel(resolveTarget(servers, activeServerId))
+
+  return (
+    <I18nProvider lang={settings.language}>
+      <DatasetProvider value={view}>
+        <ExecutionQueueProvider interval={settings.commandInterval}>
+        <CommandResultsProvider>
+        <div className={cn('h-full', settings.theme === 'dark' && 'dark')}>
+        <AppShell
+          activeTab={activeTab}
+          onTabChange={(activeTab) => setUi({ ...ui, activeTab })}
+          nav={nav}
+          sidebarCollapsed={ui.sidebarCollapsed}
+          onToggleSidebar={() => setUi({ ...ui, sidebarCollapsed: !ui.sidebarCollapsed })}
+          compact={settings.compact}
+          banner={banner}
+          sidebarExtra={<ExecutionQueuePanel />}
+          headerRight={
+            <>
+              <SettingsMenu onOpen={() => setUi({ ...ui, activeTab: 'settings' })} active={activeTab === 'settings'} />
+              <Separator />
+              <SidebarAccountMenu
+                serverId={activeServerId}
+                serverLabel={accountServerLabel}
+                serverOnline={status?.reachable === true}
+                username={username}
+                mock={transport.mock}
+                servers={servers}
+                activeId={activeServerId}
+                info={serverInfo}
+                onSelectServer={(id) => void selectServer(id)}
+                onAddServer={addServer}
+                onRemoveServer={removeServer}
+                onLogin={() => {
+                  setLoginReason(null)
+                  setLoginOpen(true)
+                }}
+                onLogout={() => setConfirmLogoutOpen(true)}
+              />
+            </>
+          }
+        >
+          {activeTab === 'home' && (
+            <HomePage
+              dataset={view}
+              transport={transport}
+              authenticated={session.authenticated}
+              username={username}
+              serverId={activeServerId}
+              refreshInterval={settings.refreshInterval}
+              eventsRefreshInterval={settings.eventsRefreshInterval}
+              onTokenInvalid={handleTokenInvalid}
+              onNavigate={(activeTab) => setUi({ ...ui, activeTab })}
+            />
+          )}
+          {activeTab === 'editor' && (
+            <CommandPage
+              dataset={view}
+              transport={transport}
+              authenticated={session.authenticated}
+              settings={settings}
+              serverId={activeServerId}
+              players={players}
+              ingameAllowed={ingameAllowed}
+              runtimeValues={runtimeParams}
+              onTokenInvalid={handleTokenInvalid}
+              onOpenInDex={(itemId) => {
+                setDexFocus(itemId)
+                setUi({ ...ui, activeTab: 'items' })
+              }}
+            />
+          )}
+          {activeTab === 'items' && (
+            <ItemsPage
+              dataset={view}
+              focusItemId={dexFocus}
+              onFocusConsumed={consumeDexFocus}
+            />
+          )}
+          {activeTab === 'players' && (
+            <PlayerManagerPage
+              key={activeServerId}
+              serverId={activeServerId}
+              transport={transport}
+              authenticated={session.authenticated}
+              username={username}
+              players={players}
+              onTokenInvalid={handleTokenInvalid}
+              onLogin={() => {
+                setLoginReason(null)
+                setLoginOpen(true)
+              }}
+            />
+          )}
+          {activeTab === 'store' && (
+            <FishShopPage
+              serverId={activeServerId}
+              transport={transport}
+              authenticated={session.authenticated}
+              refreshInterval={settings.refreshInterval}
+              onTokenInvalid={handleTokenInvalid}
+              onLogin={() => {
+                setLoginReason(null)
+                setLoginOpen(true)
+              }}
+            />
+          )}
+          {activeTab === 'world' && (
+            <CommandModulePage
+              dataset={view}
+              transport={transport}
+              authenticated={session.authenticated}
+              serverId={activeServerId}
+              refreshInterval={settings.refreshInterval}
+              onTokenInvalid={handleTokenInvalid}
+              moduleId="world"
+              keyPrefix="world:"
+              title={t('nav.world')}
+              desc={t('page.world.desc')}
+              fixedCards={MODULE_BY_ID.get('world')?.cards}
+            />
+          )}
+          {customModules
+            .filter((mod) => mod.id === activeTab)
+            .map((mod) => (
+              <CommandModulePage
+                key={mod.id}
+                dataset={view}
+                transport={transport}
+                authenticated={session.authenticated}
+                serverId={activeServerId}
+                refreshInterval={settings.refreshInterval}
+                onTokenInvalid={handleTokenInvalid}
+                moduleId={mod.id}
+                keyPrefix={`${mod.id}:`}
+                title={mod.name || t('modules.custom.untitled')}
+                desc={t('modules.custom.hint')}
+              />
+            ))}
+          {activeTab === 'settings' && (
+            <SettingsPage
+              settings={settings}
+              onChange={(patch) => setSettings({ ...settings, ...patch })}
+              serverId={activeServerId}
+              transport={transport}
+              authenticated={session.authenticated}
+              modules={modules}
+              onModulesChange={setModules}
+              customModules={customModules}
+              onCustomModulesChange={setCustomModules}
+              onTokenInvalid={handleTokenInvalid}
+              onLogin={() => {
+                setLoginReason(null)
+                setLoginOpen(true)
+              }}
+            />
+          )}
+        </AppShell>
+
+        <Dialog open={confirmLogoutOpen} onOpenChange={setConfirmLogoutOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>{t('logout.title')}</DialogTitle>
+              <DialogDescription>{t('logout.message')}</DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirmLogoutOpen(false)}>
+                {t('action.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setConfirmLogoutOpen(false)
+                  void handleLogout()
+                }}
+              >
+                {t('action.logout')}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <LoginDialog
+          open={loginOpen}
+          reason={loginReason ? t(loginReason) : undefined}
+          serverId={activeServerId}
+          onClose={() => {
+            setLoginOpen(false)
+            setLoginReason(null)
+            settleAuth(false)
+          }}
+          transport={transport}
+          onSuccess={(user) => {
+            const wasPending = pendingAuthRef.current != null
+            authedRef.current = true
+            setSession({ authenticated: true, username: user.username })
+            setMe({ username: user.username, savedAt: Date.now() })
+            setLoginReason(null)
+            setNotice(wasPending ? t('app.reloginOk') : null)
+            settleAuth(true)
+          }}
+        />
+        </div>
+        </CommandResultsProvider>
+        </ExecutionQueueProvider>
+      </DatasetProvider>
+    </I18nProvider>
+  )
+}

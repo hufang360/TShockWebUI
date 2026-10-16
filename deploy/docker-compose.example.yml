@@ -1,0 +1,66 @@
+# 示例：把 WebUI 与 TShock 放在同一台机器（同一 docker 网络）
+# 用法（在包含本文件的目录，且已有 TShock 的数据目录）：
+#   docker compose -f deploy/docker-compose.example.yml up -d
+#
+# 说明：
+# - WebUI 只暴露 8080；TShock 的 7878 不对外，仅容器网络内可达。
+# - 生产环境请在 WebUI 前面加一层 TLS 反代（Caddy/Nginx/Cloudflare），
+#   并把 COOKIE_SECURE 设为 "true"。
+# - 若 TShock 在别的机器：把 TSHOCK_URL 改成对应地址（必要时 https）。
+
+services:
+  webui:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: tshockwebui:latest
+    container_name: tshockwebui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      LISTEN: ":8080"
+      TSHOCK_URL: "http://tshock:7878"
+      # 调用 TShock REST 的 HTTP 方法：POST（默认）或 GET。
+      # TShock 不校验方法；默认 POST 用于规避机房对未备案域名明文 GET 的 302 劫持。
+      TSHOCK_METHOD: "POST"
+      COOKIE_SECURE: "false"      # 走 HTTPS 时改为 "true"
+      SESSION_TTL: "12h"
+      LOGIN_MAX_PER_MIN: "10"
+      # 每个已登录玩家每分钟可执行的指令数（按会话计数，经反代也不会互相影响）
+      COMMAND_MAX_PER_MIN: "60"
+      TRUST_PROXY: "false"        # 前面有自己可控的 TLS 反代时改为 "true"
+      # 允许浏览器在界面上新增/切换 TShock 上游（多服务器快速切换）。
+      # 仅自用/内网开启；公网部署建议 "false" 只允许 TSHOCK_URL。
+      TSHOCK_ALLOW_CUSTOM_TARGETS: "true"
+      # 「在线授权」登录：与 WebUI 信使插件共享的密钥（插件 Secret）。
+      # 两者一致时才允许后端调用插件；公网部署务必设置。
+      TSWUI_AUTH_SECRET: ""
+      # 等待玩家在游戏内确认的总时长
+      WEBAUTH_TIMEOUT: "60s"
+      # Tier B：允许 allowServer=false 的指令交给信使插件以真实在线玩家身份执行
+      # （默认 false；需与服务端插件 WebUI/config.json 的 AllowInGameOnlyCommands 同时开启）
+      TSWUI_ALLOW_INGAME_COMMANDS: "false"
+      LOG_LEVEL: "info"
+    depends_on:
+      - tshock
+
+  tshock:
+    image: ghcr.io/pryaxis/tshock:6.2.1
+    container_name: tshock
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "7777:7777"               # 游戏联机端口；7878 不对外
+    volumes:
+      - ../ts/tshock/:/tshock/
+      - ../ts/worlds/:/worlds/
+      - ../ts/plugins/:/plugins/
+    command: >
+      -lang 7
+      -world /worlds/world.wld
+      -autocreate 3
+      -difficulty 2

@@ -1,0 +1,17 @@
+{
+ "gameVersion": "1.4.5.8",
+ "tshockVersion": "6.1.0",
+ "itemCount": 6195,
+ "prefixCount": 97,
+ "npcCount": 694,
+ "buffCount": 400,
+ "commandCount": 95,
+ "spriteCount": 6134,
+ "textureCopyCount": 67,
+ "generatedBy": "tools/gen-data.mjs",
+ "sources": {
+  "trSrc": "../tr-code-1458",
+  "spriteDir": "../tr-sprite-1458/Content/Images",
+  "tshockSrc": "../TShock"
+ }
+}

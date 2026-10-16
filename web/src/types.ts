@@ -1,0 +1,378 @@
+/**
+ * 领域类型定义。
+ * 数据契约见 data/README.md 与 docs/设计原则与约束.md §3。
+ */
+
+export interface Item {
+  id: number
+  /** 内部名（ItemID 枚举名），如 Zenith；用于搜索与 TShock 英文名回退 */
+  key: string
+  /** 显示名（当前界面语言）；运行时由 `loc.<culture>.json` 的 `ItemName.<key>` 解析填充 */
+  name: string
+  /** 实际贴图 id（图集 regions 的键），多数等于 id */
+  icon: number
+  /** 贴图纵向帧数（1 = 静态） */
+  frames: number
+  /** 原始贴图尺寸 [宽, 高]（不是单帧尺寸） */
+  sprite: [number, number]
+  tags: string[]
+}
+
+export interface Prefix {
+  id: number
+  key: string
+  /** 显示名（当前界面语言）；运行时由 `loc.<culture>.json` 的 `Prefix.<key>` 解析填充 */
+  name: string
+}
+
+/** NPC（ID → 内部名；显示名从 loc.NPCName 解析）。 */
+export interface Npc {
+  id: number
+  key: string
+  name: string
+}
+
+/** Buff（ID → 内部名；显示名从 loc.BuffName 解析）。 */
+export interface Buff {
+  id: number
+  key: string
+  name: string
+}
+
+export interface RecipeIngredient {
+  id: number
+  stack: number
+  /** 属于某个配方组（如 Wood）时，id 是占位物品，实际可用 group.items 中任意一个。 */
+  group?: string
+}
+
+export interface Recipe {
+  result: { id: number; stack: number }
+  ingredients: RecipeIngredient[]
+  /** 制作站图格 id（-1 = 徒手）。 */
+  station: number
+  /** 制作站在物品表中的代表物品（用于显示图标）。 */
+  stationItems: number[]
+  /** 环境要求：water / honey / lava / snow / graveyard / torchGod / mechdusa */
+  env?: string[]
+  /** crimson / corruption / notDecraftable */
+  flags?: string[]
+  /** 嬗变（微光）结果 */
+  shimmer?: { id: number; stack: number }[]
+}
+
+export interface RecipeGroup {
+  /** 游戏本地化 key（如 `ItemName.Wood` / `NPCName.Turtle` / `Lang.misc[85]`） */
+  key: string
+  items: number[]
+}
+
+export interface RecipesData {
+  meta: {
+    gameVersion: string
+    count: number
+    groupCount: number
+    source: string
+    generatedBy: string
+  }
+  groups: Record<string, RecipeGroup>
+  recipes: Recipe[]
+  /** itemId -> 产出该物品的配方下标 */
+  byResult: Record<string, number[]>
+  /** itemId -> 以该物品（含配方组成员）为材料的配方下标 */
+  byIngredient: Record<string, number[]>
+}
+
+export interface ItemStatEntry {
+  /** 工具提示行（按游戏 MouseText_DrawItemTooltip_GetLinesInfo 顺序，不含物品名）。 */
+  tip?: string[]
+  /** 原始属性（只保留非默认值）。 */
+  stats?: Record<string, number | boolean>
+}
+
+export interface ItemStatsMeta {
+  gameVersion: string
+  itemCount: number
+  itemsWithTip: number
+  source: string
+  generatedBy: string
+  note: string
+}
+
+/** `data/item-stats.json`：只含与语言无关的 `stats`。 */
+export interface ItemStatsBaseData {
+  meta: ItemStatsMeta
+  items: Record<string, { stats?: Record<string, number | boolean> }>
+}
+
+/** `data/item-tips.<culture>.json`：只含当前语言的 `tip` 行。 */
+export interface ItemTipsData {
+  meta: ItemStatsMeta
+  items: Record<string, string[]>
+}
+
+/** 运行期合并后的物品属性（stats + 当前语言 tip）。 */
+export interface ItemStatsData {
+  meta: ItemStatsMeta
+  items: Record<string, ItemStatEntry>
+}
+
+/**
+ * 官方本地化文件（游戏原生两级格式 `{分类:{key:值}}`）。
+ * 当前只收录运行期用到的分类：ItemName / Prefix / Misc / LegacyMisc / NPCName。
+ */
+export type LocalizationBundle = Record<string, Record<string, string>>
+
+/**
+ * 参数补全来源。只声明本地确实有数据源的类型（见 tools/gen-data.mjs）：
+ * player → /api/players；item/prefix → data/*.json；command → 指令名；enum → 自带 values。
+ * number / text 没有候选，仅用于界面提示。
+ */
+export type ParamKind =
+  | 'player'
+  | 'item'
+  | 'prefix'
+  | 'enum'
+  | 'command'
+  | 'npc'
+  | 'buff'
+  | 'region'
+  | 'warp'
+  | 'number'
+  | 'text'
+
+/** 一条指令参数（来自 TShock 源码的用法串，best-effort；详见 tools/gen-data.mjs 顶部说明）。 */
+export interface CommandParam {
+  /** 字面子命令（如 group 的 addperm）；与 name 互斥 */
+  literal?: string
+  name?: string
+  required?: boolean
+  kind?: ParamKind
+  /** kind === 'enum' 时的合法取值 */
+  values?: string[]
+  /** 可变参数（如 <permissions...>） */
+  variadic?: boolean
+}
+
+/** 一组参数形态：同一指令的不同子命令写法（如 /group 的 add / addperm / del …）。 */
+export interface CommandParamSet {
+  /** TShock 源码里的用法串，直接展示给玩家 */
+  syntax: string
+  args: CommandParam[]
+  /** 手写条目的源码出处（如 Commands.cs:4626 Time()） */
+  source?: string
+}
+
+export interface CommandDef {
+  name: string
+  aliases: string[]
+  permission: string | null
+  help: string
+  /** 英文帮助原文（TShock GetString 的 msgid） */
+  helpEn?: string | null
+  /** 中文帮助（来自 TShock i18n/zh_CN） */
+  helpZh?: string | null
+  /**
+   * 是否允许经 /v3/server/rawcmd 执行。
+   * false 的指令在 TShock 端会被直接拒绝（C6），前端必须不发请求。
+   */
+  allowServer: boolean
+  doLog: boolean
+  /**
+   * 参数表。**只有**能从 TShock 源码可信提取时才存在（95 条里 69 条）；
+   * 没有该字段的指令保持自由输入，不做任何参数猜测。
+   */
+  paramSets?: CommandParamSet[]
+}
+
+export interface DatasetMeta {
+  gameVersion: string
+  tshockVersion: string
+  itemCount: number
+  prefixCount: number
+  commandCount: number
+  spriteCount: number
+  textureCopyCount: number
+  generatedBy: string
+  sources: Record<string, string>
+}
+
+export interface AtlasMeta {
+  gameVersion: string
+  width: number
+  height: number
+  limitWidth: number
+  padding: number
+  textures: number
+  items: number
+  sheet: string
+  generatedBy: string
+  note: string
+}
+
+/** regions[贴图id] = [x, y, 单帧宽, 单帧高] */
+export type AtlasRegions = Record<string, [number, number, number, number]>
+
+export interface Atlas {
+  meta: AtlasMeta
+  regions: AtlasRegions
+}
+
+/** 玩家角色图集：`b:<variant>:<part>:<role>` 为角色部件，`h:<hair>` 为发型。 */
+export interface PlayerAtlasMeta {
+  gameVersion: string
+  width: number
+  height: number
+  limitWidth: number
+  padding: number
+  frameWidth: number
+  frameHeight: number
+  variants: number
+  hairs: number
+  regions: number
+  sheet: string
+  generatedBy: string
+  note: string
+}
+
+export interface PlayerAtlas {
+  meta: PlayerAtlasMeta
+  regions: AtlasRegions
+}
+
+export interface Dataset {
+  meta: DatasetMeta
+  items: Item[]
+  prefixes: Prefix[]
+  npcs: Npc[]
+  buffs: Buff[]
+  commands: CommandDef[]
+  atlas: Atlas
+  recipes: RecipesData
+  itemStats: ItemStatsData
+  /** 当前语言的官方本地化（用于解析配方组名等）。 */
+  loc: LocalizationBundle
+  /** items.id -> item */
+  itemsById: Map<number, Item>
+  /** prefixes.id -> prefix */
+  prefixesById: Map<number, Prefix>
+  /** npcs.id -> npc */
+  npcsById: Map<number, Npc>
+  /** buffs.id -> buff */
+  buffsById: Map<number, Buff>
+  /** 小写 name / alias -> command */
+  commandsByToken: Map<string, CommandDef>
+}
+
+/** 前端统一的指令执行结果模型（设计原则与约束 §5）。 */
+export type CommandStatus =
+  | 'ok'
+  | 'command_error'
+  | 'no_permission'
+  | 'token_invalid'
+  | 'unavailable'
+  | 'timeout'
+  | 'bad_response'
+  | 'rate_limited'
+  | 'rejected'
+
+export interface CommandResult {
+  status: CommandStatus
+  /** TShock 返回的命令输出行 */
+  output: string[]
+  /** 面向玩家的提示 */
+  message?: string
+  /** 最近一次执行完成的时间（本地时间戳，ms）；由结果存储统一写入，不来自 TShock。 */
+  ts?: number
+}
+
+export interface HistoryEntry {
+  cmd: string
+  ts: number
+  ok: boolean
+  status: CommandStatus
+}
+
+/**
+ * 收藏的指令（localStorage `tswui:favorites`）。
+ * 只保存指令文本与收藏时间，不自动执行（设计原则与约束 §4.6）。
+ */
+export interface FavoriteEntry {
+  cmd: string
+  ts: number
+}
+
+/**
+ * 收藏的物品（localStorage `tswui:itemFavorites`）。
+ * 在物品图鉴里收藏后，会出现在「指令」模块的「收藏」tab。
+ */
+export interface ItemFavorite {
+  id: number
+  ts: number
+}
+
+/**
+ * 仅用于渲染缓存的本地用户信息（设计原则与约束 §4.6）。
+ * 绝不含 token；真实登录态以 `GET /api/session` 为准。
+ */
+export interface Me {
+  username: string
+  savedAt: number
+}
+
+/** 已解析出的物品标签（[i:...]）。 */
+export interface ParsedItemTag {
+  raw: string
+  start: number
+  end: number
+  itemId: number
+  stack?: number
+  prefixId?: number
+}
+
+export type ThemeName = 'light' | 'dark'
+
+/** 界面语言。 */
+export type Lang = 'zh' | 'en'
+
+export interface Settings {
+  theme: ThemeName
+  fontSize: number
+  showIcons: boolean
+  /** 插入标签时是否附带数量（[i/sN:ID]） */
+  insertWithCount: boolean
+  /** 是否处于真实服务器模式（阶段 1 恒为 false，Mock 必须显式标注） */
+  liveMode: boolean
+  /** 界面语言 */
+  language: Lang
+  /** 紧凑视图：收紧内容区间距（默认开）。 */
+  compact: boolean
+  /** 指令执行队列的间隔（毫秒，0 = 不间隔）。 */
+  commandInterval: number
+  /** 页面数据自动刷新间隔（毫秒，0 = 不自动刷新）；控制首页/鱼店卡片与货架。 */
+  refreshInterval: number
+  /** 服务器动态刷新间隔（毫秒）；1 分钟仅 GM / superadmin / vip 可选。 */
+  eventsRefreshInterval: number
+}
+
+export interface UiState {
+  activeTab: TabId
+  sidebarCollapsed: boolean
+}
+
+// 内置 tab + 自定义模块 id（`m:<uuid>`）；`(string & {})` 保留字面量提示。
+export type TabId =
+  | 'home'
+  | 'editor'
+  | 'items'
+  | 'players'
+  | 'store'
+  | 'world'
+  | 'settings'
+  | (string & {})
+
+export interface OnlinePlayer {
+  name: string
+  /** 阶段 1 为 Mock 数据 */
+  mock: boolean
+}

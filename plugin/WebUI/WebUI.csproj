@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>WebUI</AssemblyName>
+    <RootNamespace>WebUI</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Version>1.0.0</Version>
+    <AssemblyTitle>WebUI</AssemblyTitle>
+    <Product>WebUI</Product>
+    <Description>TShockWebUI 的「在线授权」信使插件：把网页端登录请求转达给在线玩家，由玩家在游戏内同意/拒绝。</Description>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 与目标服务端一致（TShock v6.2.1 / net9.0）。 -->
+    <PackageReference Include="TShock" Version="6.2.1" />
+  </ItemGroup>
+
+</Project>

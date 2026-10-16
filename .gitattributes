@@ -1,0 +1,16 @@
+# 默认按文本处理并统一为 LF；二进制文件显式声明，避免被当文本改坏。
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.plr binary
+*.dll binary
+
+# Windows 脚本保持 CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# 生成的数据：不计入语言统计，折叠 diff
+data/*.json linguist-generated=true
+server/internal/tshock/data/commands.json linguist-generated=true

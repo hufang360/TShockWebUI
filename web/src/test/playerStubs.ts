@@ -1,0 +1,88 @@
+import type {
+  BatchCapabilities,
+  EventsPage,
+  FishBuyResult,
+  FishCapabilities,
+  FishGood,
+  FishShop,
+  MeInfo,
+  NameItem,
+  PlayerCapabilities,
+  PlayerLook,
+  RuntimeCommand,
+  ServerInfoExtra,
+  SessionInfo,
+  WebAuthCapabilities,
+} from '@/lib/tshock'
+import { emptyPlayerLook } from '@/lib/tshock'
+import type { CommandResult } from '@/types'
+
+/**
+ * `BackendTransport` 的信使插件 / 登录相关测试桩。
+ * 各页面测试的 fakeTransport 用 `...playerStubs` 补齐接口，避免每个用例重复实现。
+ */
+export const playerStubs = {
+  loginOnline: async (username: string): Promise<{ username: string }> => ({ username }),
+  webauthCapabilities: async (): Promise<WebAuthCapabilities> => ({ plugin: true }),
+  batchCapabilities: async (): Promise<BatchCapabilities> => ({ plugin: true }),
+  runBatch: async (cmds: string[]): Promise<CommandResult[]> =>
+    cmds.map(() => ({ status: 'ok', output: [] })),
+  runtimeCommands: async (): Promise<RuntimeCommand[]> => [],
+  me: async (): Promise<MeInfo> => ({
+    username: 'test',
+    group: 'default',
+    permissions: [],
+    canUseApi: true,
+    canRunCommands: true,
+  }),
+  pluginData: async (): Promise<NameItem[]> => [],
+  serverInfoExtra: async (): Promise<ServerInfoExtra> => ({
+    name: 'test',
+    worldId: 1,
+    difficulty: 0,
+    hardMode: false,
+    dayTime: true,
+    time: 0,
+    bloodMoon: false,
+    eclipse: false,
+    invasionType: 0,
+    invasionSize: 0,
+    raining: false,
+    slimeRain: false,
+    players: 0,
+    npcCount: 0,
+    maxNpc: 200,
+    bosses: {},
+  }),
+  events: async (): Promise<EventsPage> => ({ events: [], lastSeq: 0 }),
+  sessions: async (): Promise<SessionInfo[]> => [],
+  revokeSessions: async (): Promise<number> => 0,
+  playerCapabilities: async (): Promise<PlayerCapabilities> => ({ plugin: true, permission: true }),
+  playerLook: async (name: string): Promise<PlayerLook> => emptyPlayerLook(name),
+  playerExport: async (name: string): Promise<{ filename: string; blob: Blob }> => ({
+    filename: `${name}.plr`,
+    blob: new Blob([]),
+  }),
+  importPlayer: async (): Promise<PlayerLook> => emptyPlayerLook('imported', false),
+  fishCapabilities: async (): Promise<FishCapabilities> => ({ plugin: true, permission: true }),
+  fishList: async (): Promise<FishShop> => ({ name: 'test', total: 0, goods: [] }),
+  fishAsk: async (serial: number): Promise<FishGood> => ({
+    serial,
+    name: 'test',
+    icon: '',
+    buyMax: 1,
+    needArgs: false,
+    map: [],
+    desc: '',
+    cost: '',
+    unlock: '',
+    comment: '',
+    refund: false,
+  }),
+  fishBuy: async (serial: number, amount: number): Promise<FishBuyResult> => ({
+    serial,
+    name: '',
+    amount,
+    cost: '',
+  }),
+}

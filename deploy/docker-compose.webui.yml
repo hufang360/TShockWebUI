@@ -1,0 +1,58 @@
+# 单容器部署：只跑 WebUI，TShock 在宿主机上（REST 7878）。
+#
+# 用法（服务器上，镜像由 tar 导入）：
+#   gunzip -c tswui-test-<版本>-linux-amd64.tar.gz | docker load
+#   docker compose -f deploy/docker-compose.webui.yml up -d
+#   docker compose -f deploy/docker-compose.webui.yml logs -f
+#
+# 可选覆盖（写进同目录 .env，或命令行前置）：
+#   TSWUI_IMAGE=tshockwebui:test     镜像 tag
+#   TSWUI_PORT=8080                  宿主机端口
+#   TSHOCK_URL=http://host.docker.internal:7878
+#
+# 与下面这条 docker run 等价：
+#   docker run -d --name tswui --restart unless-stopped -p 8080:8080 \
+#     --add-host host.docker.internal:host-gateway \
+#     -e TSHOCK_URL=http://host.docker.internal:7878 \
+#     -e TSHOCK_METHOD=POST \
+#     -e TSHOCK_ALLOW_CUSTOM_TARGETS=true \
+#     -e COOKIE_SECURE=false \
+#     tshockwebui:test
+#
+# 说明：
+# - image 直接引用导入的镜像，不在这里 build；要从源码构建请用 docker-compose.example.yml。
+# - extra_hosts 的 host-gateway 让容器里的 host.docker.internal 指向宿主机，
+#   Linux 上必需（Docker Desktop 自带该域名，写了也无害，保持两边命令一致）。
+# - TShock 若也在 Docker 里：TSHOCK_URL 改成 http://tshock:7878，并补上
+#   networks（同 deploy/docker-compose.example.yml 所在网络，通常是 tshock_default）。
+# - 前面有 HTTPS 反代时：COOKIE_SECURE 改 "true"、TRUST_PROXY 改 "true"。
+# - 公网部署建议 TSHOCK_ALLOW_CUSTOM_TARGETS 改 "false"，只允许 TSHOCK_URL。
+
+# 固定项目名，避免 compose 用目录名（deploy）当项目名而产生 deploy_default 之类的网络。
+name: tswui
+
+services:
+  webui:
+    image: ${TSWUI_IMAGE:-tshockwebui:test}
+    container_name: tswui
+    restart: unless-stopped
+    ports:
+      - "${TSWUI_PORT:-8080}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      LISTEN: ":8080"
+      TSHOCK_URL: "${TSHOCK_URL:-http://host.docker.internal:7878}"
+      # 调用 TShock REST 的 HTTP 方法：POST（默认）或 GET。
+      # TShock 不校验方法；默认 POST 用于规避机房对未备案域名明文 GET 的 302 劫持。
+      TSHOCK_METHOD: "POST"
+      COOKIE_SECURE: "false"      # 走 HTTPS 时改为 "true"
+      SESSION_TTL: "12h"
+      LOGIN_MAX_PER_MIN: "10"
+      # 每个已登录玩家每分钟可执行的指令数（按会话计数，经反代也不会互相影响）
+      COMMAND_MAX_PER_MIN: "60"
+      TRUST_PROXY: "false"        # 前面有自己可控的 TLS 反代时改为 "true"
+      # 允许浏览器在界面上新增/切换 TShock 上游（多服务器快速切换）。
+      # 仅自用/内网开启；公网部署建议 "false" 只允许 TSHOCK_URL。
+      TSHOCK_ALLOW_CUSTOM_TARGETS: "true"
+      LOG_LEVEL: "info"

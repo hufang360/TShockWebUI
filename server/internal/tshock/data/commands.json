@@ -1,0 +1,2501 @@
+{
+ "meta": {
+  "source": "TShockAPI/Commands.cs (核心指令, best-effort 解析) + i18n/zh_CN/TShockAPI.po",
+  "tshockVersion": "6.1.0",
+  "note": "插件指令和运行时别名不在此文件中，实际可用指令以目标服务器为准",
+  "paramNote": "paramSets 为 best-effort：仅来自 TShock 源码里可信的用法串/枚举常量或方法体不引用 args.Parameters 的机械判定；没有 paramSets 的指令请自由输入",
+  "count": 95,
+  "paramCount": 70
+ },
+ "commands": [
+  {
+   "name": "setup",
+   "aliases": [],
+   "permission": null,
+   "help": "Used to authenticate as superadmin when first setting up TShock.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Used to authenticate as superadmin when first setting up TShock.",
+   "helpZh": "首次设置 TShock时用作超级管理员身份验证。"
+  },
+  {
+   "name": "user",
+   "aliases": [],
+   "permission": "tshock.superadmin.user",
+   "help": "Manages user accounts.",
+   "allowServer": true,
+   "doLog": false,
+   "helpEn": "Manages user accounts.",
+   "helpZh": "管理用户账号。"
+  },
+  {
+   "name": "login",
+   "aliases": [],
+   "permission": "tshock.account.login",
+   "help": "Logs you into an account.",
+   "allowServer": false,
+   "doLog": false,
+   "helpEn": "Logs you into an account.",
+   "helpZh": "登录一个账号。"
+  },
+  {
+   "name": "logout",
+   "aliases": [],
+   "permission": "tshock.account.logout",
+   "help": "Logs you out of your current account.",
+   "allowServer": false,
+   "doLog": false,
+   "helpEn": "Logs you out of your current account.",
+   "helpZh": "从当前账号登出。",
+   "paramSets": [
+    {
+     "syntax": "logout",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "password",
+   "aliases": [],
+   "permission": "tshock.account.changepassword",
+   "help": "Changes your account's password.",
+   "allowServer": false,
+   "doLog": false,
+   "helpEn": "Changes your account's password.",
+   "helpZh": "更改你的密码。",
+   "paramSets": [
+    {
+     "syntax": "password <oldpassword> <newpassword>",
+     "args": [
+      {
+       "name": "oldpassword",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "newpassword",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "register",
+   "aliases": [],
+   "permission": "tshock.account.register",
+   "help": "Registers you an account.",
+   "allowServer": false,
+   "doLog": false,
+   "helpEn": "Registers you an account.",
+   "helpZh": "注册一个账号。",
+   "paramSets": [
+    {
+     "syntax": "register <password>",
+     "args": [
+      {
+       "name": "password",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "accountinfo",
+   "aliases": [
+    "ai"
+   ],
+   "permission": "tshock.accountinfo.check",
+   "help": "Shows information about a user.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows information about a user.",
+   "helpZh": "显示一个用户的信息。",
+   "paramSets": [
+    {
+     "syntax": "accountinfo <username>",
+     "args": [
+      {
+       "name": "username",
+       "required": true,
+       "kind": "player"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ban",
+   "aliases": [],
+   "permission": "tshock.admin.ban",
+   "help": "Manages player bans.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages player bans.",
+   "helpZh": "管理玩家封禁。"
+  },
+  {
+   "name": "broadcast",
+   "aliases": [
+    "bc",
+    "say"
+   ],
+   "permission": "tshock.admin.broadcast",
+   "help": "Broadcasts a message to everyone on the server.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Broadcasts a message to everyone on the server.",
+   "helpZh": "向所有在线玩家广播一条消息。",
+   "paramSets": [
+    {
+     "syntax": "broadcast <message>",
+     "args": [
+      {
+       "name": "message",
+       "required": true,
+       "kind": "text",
+       "variadic": true
+      }
+     ],
+     "source": "Commands.cs:2074 Broadcast()"
+    }
+   ]
+  },
+  {
+   "name": "displaylogs",
+   "aliases": [],
+   "permission": "tshock.admin.viewlogs",
+   "help": "Toggles whether you receive server logs.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Toggles whether you receive server logs.",
+   "helpZh": "开关是否接收服务器日志。",
+   "paramSets": [
+    {
+     "syntax": "displaylogs",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "group",
+   "aliases": [],
+   "permission": "tshock.admin.group",
+   "help": "Manages groups.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages groups.",
+   "helpZh": "管理用户组。",
+   "paramSets": [
+    {
+     "syntax": "group add <group name> [permissions]",
+     "args": [
+      {
+       "literal": "add"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "permissions",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "group addperm <group name> <permissions...>",
+     "args": [
+      {
+       "literal": "addperm"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "permissions",
+       "required": true,
+       "kind": "text",
+       "variadic": true
+      }
+     ]
+    },
+    {
+     "syntax": "group parent <group name> [new parent group name]",
+     "args": [
+      {
+       "literal": "parent"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "new parent group name",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "group suffix <group name> [new suffix]",
+     "args": [
+      {
+       "literal": "suffix"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "new suffix",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "group prefix <group name> [new prefix]",
+     "args": [
+      {
+       "literal": "prefix"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "new prefix",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "group color <group name> [new color(000,000,000)]",
+     "args": [
+      {
+       "literal": "color"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "new color(000,000,000)",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "group rename <group> <new name>",
+     "args": [
+      {
+       "literal": "rename"
+      },
+      {
+       "name": "group",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "new name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "group del <group name>",
+     "args": [
+      {
+       "literal": "del"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "group delperm <group name> <permissions...>",
+     "args": [
+      {
+       "literal": "delperm"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "permissions",
+       "required": true,
+       "kind": "text",
+       "variadic": true
+      }
+     ]
+    },
+    {
+     "syntax": "group listperm <group name> [page]",
+     "args": [
+      {
+       "literal": "listperm"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "page",
+       "required": false,
+       "kind": "number"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "itemban",
+   "aliases": [],
+   "permission": "tshock.admin.itemban",
+   "help": "Manages item bans.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages item bans.",
+   "helpZh": "管理物品封禁。",
+   "paramSets": [
+    {
+     "syntax": "itemban add <item name>",
+     "args": [
+      {
+       "literal": "add"
+      },
+      {
+       "name": "item name",
+       "required": true,
+       "kind": "item"
+      }
+     ]
+    },
+    {
+     "syntax": "itemban allow <item name> <group name>",
+     "args": [
+      {
+       "literal": "allow"
+      },
+      {
+       "name": "item name",
+       "required": true,
+       "kind": "item"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "itemban del <item name>",
+     "args": [
+      {
+       "literal": "del"
+      },
+      {
+       "name": "item name",
+       "required": true,
+       "kind": "item"
+      }
+     ]
+    },
+    {
+     "syntax": "itemban disallow <item name> <group name>",
+     "args": [
+      {
+       "literal": "disallow"
+      },
+      {
+       "name": "item name",
+       "required": true,
+       "kind": "item"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "projban",
+   "aliases": [],
+   "permission": "tshock.admin.projectileban",
+   "help": "Manages projectile bans.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages projectile bans.",
+   "helpZh": "管理弹幕封禁。",
+   "paramSets": [
+    {
+     "syntax": "projban add <proj id>",
+     "args": [
+      {
+       "literal": "add"
+      },
+      {
+       "name": "proj id",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    },
+    {
+     "syntax": "projban allow <id> <group>",
+     "args": [
+      {
+       "literal": "allow"
+      },
+      {
+       "name": "id",
+       "required": true,
+       "kind": "number"
+      },
+      {
+       "name": "group",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "projban del <id>",
+     "args": [
+      {
+       "literal": "del"
+      },
+      {
+       "name": "id",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    },
+    {
+     "syntax": "projban disallow <id> <group name>",
+     "args": [
+      {
+       "literal": "disallow"
+      },
+      {
+       "name": "id",
+       "required": true,
+       "kind": "number"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "tileban",
+   "aliases": [],
+   "permission": "tshock.admin.tileban",
+   "help": "Manages tile bans.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages tile bans.",
+   "helpZh": "管理物块封禁。",
+   "paramSets": [
+    {
+     "syntax": "tileban add <tile id>",
+     "args": [
+      {
+       "literal": "add"
+      },
+      {
+       "name": "tile id",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    },
+    {
+     "syntax": "tileban allow <id> <group>",
+     "args": [
+      {
+       "literal": "allow"
+      },
+      {
+       "name": "id",
+       "required": true,
+       "kind": "number"
+      },
+      {
+       "name": "group",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "tileban del <id>",
+     "args": [
+      {
+       "literal": "del"
+      },
+      {
+       "name": "id",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    },
+    {
+     "syntax": "tileban disallow <id> <group name>",
+     "args": [
+      {
+       "literal": "disallow"
+      },
+      {
+       "name": "id",
+       "required": true,
+       "kind": "number"
+      },
+      {
+       "name": "group name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "region",
+   "aliases": [],
+   "permission": "tshock.admin.region",
+   "help": "Manages regions.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages regions.",
+   "helpZh": "管理区域。",
+   "paramSets": [
+    {
+     "syntax": "region define <name>",
+     "args": [
+      {
+       "literal": "define"
+      },
+      {
+       "name": "name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "region protect <name> <true/false>",
+     "args": [
+      {
+       "literal": "protect"
+      },
+      {
+       "name": "name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "true/false",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "true",
+        "false"
+       ]
+      }
+     ]
+    },
+    {
+     "syntax": "region delete <name>",
+     "args": [
+      {
+       "literal": "delete"
+      },
+      {
+       "name": "name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "region allow <name> <region>",
+     "args": [
+      {
+       "literal": "allow"
+      },
+      {
+       "name": "name",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      }
+     ]
+    },
+    {
+     "syntax": "region remove <name> <region>",
+     "args": [
+      {
+       "literal": "remove"
+      },
+      {
+       "name": "name",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      }
+     ]
+    },
+    {
+     "syntax": "region allowg <group> <region>",
+     "args": [
+      {
+       "literal": "allowg"
+      },
+      {
+       "name": "group",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      }
+     ]
+    },
+    {
+     "syntax": "region removeg <group> <region>",
+     "args": [
+      {
+       "literal": "removeg"
+      },
+      {
+       "name": "group",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      }
+     ]
+    },
+    {
+     "syntax": "region info <region> [-d] [page]",
+     "args": [
+      {
+       "literal": "info"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      },
+      {
+       "name": "-d",
+       "required": false,
+       "kind": "enum",
+       "values": [
+        "-d"
+       ]
+      },
+      {
+       "name": "page",
+       "required": false,
+       "kind": "number"
+      }
+     ]
+    },
+    {
+     "syntax": "region z <name> <#>",
+     "args": [
+      {
+       "literal": "z"
+      },
+      {
+       "name": "name",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "#",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    },
+    {
+     "syntax": "region resize <region> <u/d/l/r> <amount>",
+     "args": [
+      {
+       "literal": "resize"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      },
+      {
+       "name": "u/d/l/r",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "u",
+        "d",
+        "l",
+        "r"
+       ]
+      },
+      {
+       "name": "amount",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    },
+    {
+     "syntax": "region rename <region> <new name>",
+     "args": [
+      {
+       "literal": "rename"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      },
+      {
+       "name": "new name",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "region tp <region>",
+     "args": [
+      {
+       "literal": "tp"
+      },
+      {
+       "name": "region",
+       "required": true,
+       "kind": "region"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "kick",
+   "aliases": [],
+   "permission": "tshock.admin.kick",
+   "help": "Removes a player from the server.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Removes a player from the server.",
+   "helpZh": "将一名玩家踢出服务器。",
+   "paramSets": [
+    {
+     "syntax": "kick <player> [reason]",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "reason",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "mute",
+   "aliases": [
+    "unmute"
+   ],
+   "permission": "tshock.admin.mute",
+   "help": "Prevents a player from talking.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Prevents a player from talking.",
+   "helpZh": "阻止一名玩家发言。",
+   "paramSets": [
+    {
+     "syntax": "mute <player> [reason]",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "reason",
+       "required": false,
+       "kind": "text"
+      }
+     ],
+     "source": "Commands.cs:5571 Mute()"
+    }
+   ]
+  },
+  {
+   "name": "overridessc",
+   "aliases": [
+    "ossc"
+   ],
+   "permission": "tshock.admin.savessi",
+   "help": "Overrides serverside characters for a player, temporarily.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Overrides serverside characters for a player, temporarily.",
+   "helpZh": "临时覆盖玩家的SSC存档。"
+  },
+  {
+   "name": "savessc",
+   "aliases": [],
+   "permission": "tshock.admin.savessi",
+   "help": "Saves all serverside characters.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Saves all serverside characters.",
+   "helpZh": "保存所有玩家的服务端存档。",
+   "paramSets": [
+    {
+     "syntax": "savessc",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "uploadssc",
+   "aliases": [],
+   "permission": "tshock.ssc.upload",
+   "help": "Upload the account information when you joined the server as your Server Side Character data.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Upload the account information when you joined the server as your Server Side Character data.",
+   "helpZh": "上传并使用加入服务器时的本地存档来覆盖服务器端存档。"
+  },
+  {
+   "name": "tempgroup",
+   "aliases": [],
+   "permission": "tshock.admin.tempgroup",
+   "help": "Temporarily sets another player's group.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Temporarily sets another player's group.",
+   "helpZh": "暂时设置另外的组。"
+  },
+  {
+   "name": "su",
+   "aliases": [],
+   "permission": "tshock.su",
+   "help": "Temporarily elevates you to Super Admin.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Temporarily elevates you to Super Admin.",
+   "helpZh": "暂时将你提升为超级管理员。",
+   "paramSets": [
+    {
+     "syntax": "su",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "sudo",
+   "aliases": [],
+   "permission": "tshock.su",
+   "help": "Executes a command as the super admin.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Executes a command as the super admin.",
+   "helpZh": "以超级管理员的身份执行指令。"
+  },
+  {
+   "name": "userinfo",
+   "aliases": [
+    "ui"
+   ],
+   "permission": "tshock.admin.userinfo",
+   "help": "Shows information about a player.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows information about a player.",
+   "helpZh": "显示一个玩家的信息。",
+   "paramSets": [
+    {
+     "syntax": "userinfo <player>",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "annoy",
+   "aliases": [],
+   "permission": "tshock.annoy",
+   "help": "Annoys a player for an amount of time.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Annoys a player for an amount of time.",
+   "helpZh": "骚扰一个玩家一段时间。"
+  },
+  {
+   "name": "rocket",
+   "aliases": [],
+   "permission": "tshock.annoy",
+   "help": "Rockets a player upwards. Requires SSC.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Rockets a player upwards. Requires SSC.",
+   "helpZh": "把一名玩家射上天。需要启用服务端存档。"
+  },
+  {
+   "name": "firework",
+   "aliases": [],
+   "permission": "tshock.annoy",
+   "help": "Spawns fireworks at a player.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Spawns fireworks at a player.",
+   "helpZh": "在一个玩家身上生成烟花。",
+   "paramSets": [
+    {
+     "syntax": "firework <player> [R|G|B|Y]",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "color",
+       "required": false,
+       "kind": "enum",
+       "values": [
+        "R",
+        "G",
+        "B",
+        "Y"
+       ]
+      }
+     ],
+     "source": "Commands.cs:5796 注释 // firework <player> [R|G|B|Y]"
+    }
+   ]
+  },
+  {
+   "name": "checkupdates",
+   "aliases": [],
+   "permission": "tshock.cfg.maintenance",
+   "help": "Checks for TShock updates.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Checks for TShock updates.",
+   "helpZh": "检查TShock更新。",
+   "paramSets": [
+    {
+     "syntax": "checkupdates",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "off",
+   "aliases": [
+    "exit",
+    "stop"
+   ],
+   "permission": "tshock.cfg.maintenance",
+   "help": "Shuts down the server while saving.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shuts down the server while saving.",
+   "helpZh": "保存并关闭服务器"
+  },
+  {
+   "name": "off-nosave",
+   "aliases": [
+    "exit-nosave",
+    "stop-nosave"
+   ],
+   "permission": "tshock.cfg.maintenance",
+   "help": "Shuts down the server without saving.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shuts down the server without saving.",
+   "helpZh": "关闭服务器但不保存数据。"
+  },
+  {
+   "name": "reload",
+   "aliases": [],
+   "permission": "tshock.cfg.reload",
+   "help": "Reloads the server configuration file.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Reloads the server configuration file.",
+   "helpZh": "重新加载服务器配置文件。",
+   "paramSets": [
+    {
+     "syntax": "reload",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "serverpassword",
+   "aliases": [],
+   "permission": "tshock.cfg.password",
+   "help": "Changes the server password.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Changes the server password.",
+   "helpZh": "更改服务器密码。",
+   "paramSets": [
+    {
+     "syntax": "serverpassword",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "version",
+   "aliases": [],
+   "permission": "tshock.cfg.maintenance",
+   "help": "Shows the TShock version.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows the TShock version.",
+   "helpZh": "显示TShock版本。",
+   "paramSets": [
+    {
+     "syntax": "version",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "whitelist",
+   "aliases": [],
+   "permission": "tshock.cfg.whitelist",
+   "help": "Manages the server whitelist.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages the server whitelist.",
+   "helpZh": "管理服务器白名单。"
+  },
+  {
+   "name": "give",
+   "aliases": [
+    "g"
+   ],
+   "permission": "tshock.item.give",
+   "help": "Gives another player an item.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Gives another player an item.",
+   "helpZh": "给另一位玩家一件物品。",
+   "paramSets": [
+    {
+     "syntax": "give <item type/id> <player> [item amount] [prefix id/name]",
+     "args": [
+      {
+       "name": "item type/id",
+       "required": true,
+       "kind": "item"
+      },
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "item amount",
+       "required": false,
+       "kind": "number"
+      },
+      {
+       "name": "prefix id/name",
+       "required": false,
+       "kind": "prefix"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "item",
+   "aliases": [
+    "i"
+   ],
+   "permission": "tshock.item.spawn",
+   "help": "Gives yourself an item.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Gives yourself an item.",
+   "helpZh": "给自己一件物品。",
+   "paramSets": [
+    {
+     "syntax": "item <item name/id> [item amount] [prefix id/name]",
+     "args": [
+      {
+       "name": "item name/id",
+       "required": true,
+       "kind": "item"
+      },
+      {
+       "name": "item amount",
+       "required": false,
+       "kind": "number"
+      },
+      {
+       "name": "prefix id/name",
+       "required": false,
+       "kind": "prefix"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "butcher",
+   "aliases": [],
+   "permission": "tshock.npc.butcher",
+   "help": "Kills hostile NPCs or NPCs of a certain type.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Kills hostile NPCs or NPCs of a certain type.",
+   "helpZh": "击杀敌对NPC或者一种指定类型的NPC。",
+   "paramSets": [
+    {
+     "syntax": "butcher [NPC name|ID]",
+     "args": [
+      {
+       "name": "NPC name|ID",
+       "required": false,
+       "kind": "npc"
+      }
+     ],
+     "source": "Commands.cs:6183 Butcher()"
+    }
+   ]
+  },
+  {
+   "name": "renamenpc",
+   "aliases": [],
+   "permission": "tshock.npc.rename",
+   "help": "Renames an NPC.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Renames an NPC.",
+   "helpZh": "重命名一个NPC",
+   "paramSets": [
+    {
+     "syntax": "renameNPC <guide, nurse, etc.> <newname>",
+     "args": [
+      {
+       "name": "guide, nurse, etc.",
+       "required": true,
+       "kind": "text"
+      },
+      {
+       "name": "newname",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "maxspawns",
+   "aliases": [],
+   "permission": "tshock.npc.maxspawns",
+   "help": "Sets the maximum number of NPCs.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Sets the maximum number of NPCs.",
+   "helpZh": "设置NPC的最大数量。"
+  },
+  {
+   "name": "spawnboss",
+   "aliases": [
+    "sb"
+   ],
+   "permission": "tshock.npc.spawnboss",
+   "help": "Spawns a number of bosses around you.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Spawns a number of bosses around you.",
+   "helpZh": "在你的周围生成一些Boss。",
+   "paramSets": [
+    {
+     "syntax": "spawnboss <boss type> [amount]",
+     "args": [
+      {
+       "name": "boss type",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "*",
+        "all",
+        "brain",
+        "brain of cthulhu",
+        "boc",
+        "destroyer",
+        "duke",
+        "duke fishron",
+        "fishron",
+        "eater",
+        "eater of worlds",
+        "eow",
+        "eye",
+        "eye of cthulhu",
+        "eoc",
+        "golem",
+        "king",
+        "king slime",
+        "ks",
+        "plantera",
+        "prime",
+        "skeletron prime",
+        "queen bee",
+        "qb",
+        "skeletron",
+        "twins",
+        "wof",
+        "wall of flesh",
+        "moon",
+        "moon lord",
+        "ml",
+        "empress",
+        "empress of light",
+        "eol",
+        "queen slime",
+        "qs",
+        "lunatic",
+        "lunatic cultist",
+        "cultist",
+        "lc",
+        "betsy",
+        "flying dutchman",
+        "flying",
+        "dutchman",
+        "mourning wood",
+        "pumpking",
+        "everscream",
+        "santa-nk1",
+        "santa",
+        "ice queen",
+        "martian saucer",
+        "solar pillar",
+        "nebula pillar",
+        "vortex pillar",
+        "stardust pillar",
+        "deerclops"
+       ]
+      },
+      {
+       "name": "amount",
+       "required": false,
+       "kind": "number"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "spawnmob",
+   "aliases": [
+    "sm"
+   ],
+   "permission": "tshock.npc.spawnmob",
+   "help": "Spawns a number of mobs around you.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Spawns a number of mobs around you.",
+   "helpZh": "在你的周围生成一些生物。",
+   "paramSets": [
+    {
+     "syntax": "spawnmob <mob type> [amount]",
+     "args": [
+      {
+       "name": "mob type",
+       "required": true,
+       "kind": "npc"
+      },
+      {
+       "name": "amount",
+       "required": false,
+       "kind": "number"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "spawnrate",
+   "aliases": [],
+   "permission": "tshock.npc.spawnrate",
+   "help": "Sets the spawn rate of NPCs.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Sets the spawn rate of NPCs.",
+   "helpZh": "设置NPC的生成率。"
+  },
+  {
+   "name": "clearangler",
+   "aliases": [],
+   "permission": "tshock.npc.clearanglerquests",
+   "help": "Resets the list of users who have completed an angler quest that day.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Resets the list of users who have completed an angler quest that day.",
+   "helpZh": "重置当天已完成渔夫任务的用户列表。"
+  },
+  {
+   "name": "home",
+   "aliases": [],
+   "permission": "tshock.tp.home",
+   "help": "Sends you to your spawn point.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Sends you to your spawn point.",
+   "helpZh": "将你传送到你的出生点。",
+   "paramSets": [
+    {
+     "syntax": "home",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "spawn",
+   "aliases": [],
+   "permission": "tshock.tp.spawn",
+   "help": "Sends you to the world's spawn point.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Sends you to the world's spawn point.",
+   "helpZh": "将你传送到世界的出生点。",
+   "paramSets": [
+    {
+     "syntax": "spawn",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "tp",
+   "aliases": [],
+   "permission": "tshock.tp.self",
+   "help": "Teleports a player to another player.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Teleports a player to another player.",
+   "helpZh": "将一个玩家传送至另一个玩家。",
+   "paramSets": [
+    {
+     "syntax": "tp <player> [player 2]",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "player 2",
+       "required": false,
+       "kind": "player"
+      }
+     ]
+    },
+    {
+     "syntax": "tp <player>",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "tphere",
+   "aliases": [],
+   "permission": "tshock.tp.others",
+   "help": "Teleports a player to yourself.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Teleports a player to yourself.",
+   "helpZh": "将一个玩家传送到你。",
+   "paramSets": [
+    {
+     "syntax": "tphere <player|*>",
+     "args": [
+      {
+       "name": "player|*",
+       "required": true,
+       "kind": "player"
+      }
+     ]
+    },
+    {
+     "syntax": "tphere <player>",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "tpnpc",
+   "aliases": [],
+   "permission": "tshock.tp.npc",
+   "help": "Teleports you to an npc.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Teleports you to an npc.",
+   "helpZh": "将你传送到一个npc。",
+   "paramSets": [
+    {
+     "syntax": "tpnpc <NPC>",
+     "args": [
+      {
+       "name": "NPC",
+       "required": true,
+       "kind": "npc"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "tppos",
+   "aliases": [],
+   "permission": "tshock.tp.pos",
+   "help": "Teleports you to tile coordinates.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Teleports you to tile coordinates.",
+   "helpZh": "将你传送到一个图格坐标。",
+   "paramSets": [
+    {
+     "syntax": "tppos <tile x> <tile y>",
+     "args": [
+      {
+       "name": "tile x",
+       "required": true,
+       "kind": "number"
+      },
+      {
+       "name": "tile y",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "pos",
+   "aliases": [],
+   "permission": "tshock.tp.getpos",
+   "help": "Returns the user's or specified user's current position.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Returns the user's or specified user's current position.",
+   "helpZh": "返回你或指定用户当前的位置。"
+  },
+  {
+   "name": "tpallow",
+   "aliases": [],
+   "permission": "tshock.tp.block",
+   "help": "Toggles whether other people can teleport you.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Toggles whether other people can teleport you.",
+   "helpZh": "是否允许他人传送至你。",
+   "paramSets": [
+    {
+     "syntax": "tpallow",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "worldmode",
+   "aliases": [
+    "gamemode"
+   ],
+   "permission": "tshock.world.toggleexpert",
+   "help": "Changes the world mode.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Changes the world mode.",
+   "helpZh": "更改世界模式。",
+   "paramSets": [
+    {
+     "syntax": "worldmode <mode>",
+     "args": [
+      {
+       "name": "mode",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "normal",
+        "expert",
+        "master",
+        "journey",
+        "creative"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "antibuild",
+   "aliases": [],
+   "permission": "tshock.admin.antibuild",
+   "help": "Toggles build protection.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Toggles build protection.",
+   "helpZh": "切换建造保护。",
+   "paramSets": [
+    {
+     "syntax": "antibuild",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "grow",
+   "aliases": [],
+   "permission": "tshock.world.grow",
+   "help": "Grows plants at your location.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Grows plants at your location.",
+   "helpZh": "在你的位置种下植物。"
+  },
+  {
+   "name": "forcehalloween",
+   "aliases": [],
+   "permission": "tshock.world.sethalloween",
+   "help": "Toggles halloween mode (goodie bags, pumpkins, etc).",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Toggles halloween mode (goodie bags, pumpkins, etc).",
+   "helpZh": "切换万圣节模式（口袋，南瓜，等）。",
+   "paramSets": [
+    {
+     "syntax": "forcehalloween",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "forcexmas",
+   "aliases": [],
+   "permission": "tshock.world.setxmas",
+   "help": "Toggles christmas mode (present spawning, santa, etc).",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Toggles christmas mode (present spawning, santa, etc).",
+   "helpZh": "切换圣诞模式（当前生成速度，圣诞老人，等）。",
+   "paramSets": [
+    {
+     "syntax": "forcexmas",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "worldevent",
+   "aliases": [],
+   "permission": "tshock.world.events",
+   "help": "Enables starting and stopping various world events.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Enables starting and stopping various world events.",
+   "helpZh": "允许你开始或停止各种世界事件。",
+   "paramSets": [
+    {
+     "syntax": "worldevent <event type>",
+     "args": [
+      {
+       "name": "event type",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "meteor",
+        "fullmoon",
+        "bloodmoon",
+        "eclipse",
+        "invasion",
+        "sandstorm",
+        "rain",
+        "lanternsnight",
+        "meteorshower",
+        "goblins",
+        "snowmen",
+        "pirates",
+        "pumpkinmoon",
+        "frostmoon",
+        "martians"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hardmode",
+   "aliases": [],
+   "permission": "tshock.world.hardmode",
+   "help": "Toggles the world's hardmode status.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Toggles the world's hardmode status.",
+   "helpZh": "启用或关闭困难模式。",
+   "paramSets": [
+    {
+     "syntax": "hardmode",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "evil",
+   "aliases": [],
+   "permission": "tshock.world.switchevil",
+   "help": "Switches the world's evil.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Switches the world's evil.",
+   "helpZh": "切换世界邪恶类型。",
+   "paramSets": [
+    {
+     "syntax": "evil",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "protectspawn",
+   "aliases": [],
+   "permission": "tshock.world.editspawn",
+   "help": "Toggles spawn protection.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Toggles spawn protection.",
+   "helpZh": "启用或关闭出生点保护。",
+   "paramSets": [
+    {
+     "syntax": "protectspawn",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "save",
+   "aliases": [],
+   "permission": "tshock.world.save",
+   "help": "Saves the world file.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Saves the world file.",
+   "helpZh": "保存世界文件。",
+   "paramSets": [
+    {
+     "syntax": "save",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "setspawn",
+   "aliases": [],
+   "permission": "tshock.world.setspawn",
+   "help": "Sets the world's spawn point to your location.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Sets the world's spawn point to your location.",
+   "helpZh": "将世界的出生点设置为你的位置。",
+   "paramSets": [
+    {
+     "syntax": "setspawn",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "setdungeon",
+   "aliases": [],
+   "permission": "tshock.world.setdungeon",
+   "help": "Sets the dungeon's position to your location.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Sets the dungeon's position to your location.",
+   "helpZh": "把地牢的位置设置为你的位置。",
+   "paramSets": [
+    {
+     "syntax": "setdungeon",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "settle",
+   "aliases": [],
+   "permission": "tshock.world.settleliquids",
+   "help": "Forces all liquids to update immediately.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Forces all liquids to update immediately.",
+   "helpZh": "立即强制更新所有液体。",
+   "paramSets": [
+    {
+     "syntax": "settle",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "time",
+   "aliases": [],
+   "permission": "tshock.world.time.set",
+   "help": "Sets the world time.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Sets the world time.",
+   "helpZh": "设置世界时间。",
+   "paramSets": [
+    {
+     "syntax": "time <day|night|noon|midnight|hh:mm>",
+     "args": [
+      {
+       "name": "time",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "day",
+        "night",
+        "noon",
+        "midnight"
+       ]
+      }
+     ],
+     "source": "Commands.cs:4626 Time()"
+    }
+   ]
+  },
+  {
+   "name": "wind",
+   "aliases": [],
+   "permission": "tshock.world.wind",
+   "help": "Changes the wind speed.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Changes the wind speed.",
+   "helpZh": "更改风速。",
+   "paramSets": [
+    {
+     "syntax": "wind <speed in mph>",
+     "args": [
+      {
+       "name": "speed in mph",
+       "required": true,
+       "kind": "number"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "worldinfo",
+   "aliases": [],
+   "permission": "tshock.world.info",
+   "help": "Shows information about the current world.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows information about the current world.",
+   "helpZh": "显示当前世界的信息。",
+   "paramSets": [
+    {
+     "syntax": "worldinfo",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "buff",
+   "aliases": [],
+   "permission": "tshock.buff.self",
+   "help": "Gives yourself a buff or debuff for an amount of time. Putting -1 for time will set it to 415 days.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Gives yourself a buff or debuff for an amount of time. Putting -1 for time will set it to 415 days.",
+   "helpZh": "给自己添加一段时间的Buff或Debuff。如果时间为-1会持续约415天。",
+   "paramSets": [
+    {
+     "syntax": "buff <buff name|ID> [duration]",
+     "args": [
+      {
+       "name": "buff",
+       "required": true,
+       "kind": "buff"
+      },
+      {
+       "name": "duration",
+       "required": false,
+       "kind": "number"
+      }
+     ],
+     "source": "Commands.cs:6546 Buff()"
+    }
+   ]
+  },
+  {
+   "name": "clear",
+   "aliases": [],
+   "permission": "tshock.clear",
+   "help": "Clears item drops or projectiles.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Clears item drops or projectiles.",
+   "helpZh": "清除掉落物或射弹。",
+   "paramSets": [
+    {
+     "syntax": "clear <item|npc|projectile> [radius]",
+     "args": [
+      {
+       "name": "item|npc|projectile",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "item",
+        "npc",
+        "projectile"
+       ]
+      },
+      {
+       "name": "radius",
+       "required": false,
+       "kind": "number"
+      }
+     ],
+     "source": "Commands.cs:5984 Clear()"
+    }
+   ]
+  },
+  {
+   "name": "gbuff",
+   "aliases": [
+    "buffplayer"
+   ],
+   "permission": "tshock.buff.others",
+   "help": "Gives another player a buff or debuff for an amount of time. Putting -1 for time will set it to 415 days.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Gives another player a buff or debuff for an amount of time. Putting -1 for time will set it to 415 days.",
+   "helpZh": "给另一位玩家添加一段时间的Buff或Debuff。如果时间为-1会持续约415天。",
+   "paramSets": [
+    {
+     "syntax": "gbuff <player> <buff> [duration]",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "buff",
+       "required": true,
+       "kind": "buff"
+      },
+      {
+       "name": "duration",
+       "required": false,
+       "kind": "number"
+      }
+     ],
+     "source": "Commands.cs:6597 GBuff()"
+    }
+   ]
+  },
+  {
+   "name": "godmode",
+   "aliases": [
+    "god"
+   ],
+   "permission": "tshock.godmode",
+   "help": "Toggles godmode on a player.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Toggles godmode on a player.",
+   "helpZh": "切换一个玩家的无敌模式。"
+  },
+  {
+   "name": "heal",
+   "aliases": [],
+   "permission": "tshock.heal",
+   "help": "Heals a player in HP and MP.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Heals a player in HP and MP.",
+   "helpZh": "治愈玩家的血量和魔力。",
+   "paramSets": [
+    {
+     "syntax": "heal <player> [amount]",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "amount",
+       "required": false,
+       "kind": "number"
+      }
+     ],
+     "source": "Commands.cs:6487 注释 // heal <player> [amount]"
+    }
+   ]
+  },
+  {
+   "name": "kill",
+   "aliases": [
+    "slay"
+   ],
+   "permission": "tshock.kill",
+   "help": "Kills another player.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Kills another player.",
+   "helpZh": "杀死另一名玩家。"
+  },
+  {
+   "name": "me",
+   "aliases": [],
+   "permission": "tshock.thirdperson",
+   "help": "Sends an action message to everyone.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Sends an action message to everyone.",
+   "helpZh": "向所有人发送一个动作消息。",
+   "paramSets": [
+    {
+     "syntax": "me <text>",
+     "args": [
+      {
+       "name": "text",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "party",
+   "aliases": [
+    "p"
+   ],
+   "permission": "tshock.partychat",
+   "help": "Sends a message to everyone on your team.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Sends a message to everyone on your team.",
+   "helpZh": "向你的团队中的每个人发送一条消息。",
+   "paramSets": [
+    {
+     "syntax": "p <team chat text>",
+     "args": [
+      {
+       "literal": "p"
+      },
+      {
+       "name": "team chat text",
+       "required": true,
+       "kind": "text"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "reply",
+   "aliases": [
+    "r"
+   ],
+   "permission": "tshock.whisper",
+   "help": "Replies to a PM sent to you.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Replies to a PM sent to you.",
+   "helpZh": "回复私聊。"
+  },
+  {
+   "name": "rest",
+   "aliases": [],
+   "permission": null,
+   "help": "Manages the REST API.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Manages the REST API.",
+   "helpZh": "管理REST API。"
+  },
+  {
+   "name": "slap",
+   "aliases": [],
+   "permission": "tshock.slap",
+   "help": "Slaps a player, dealing damage.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Slaps a player, dealing damage.",
+   "helpZh": "击打一名玩家，造成伤害。",
+   "paramSets": [
+    {
+     "syntax": "slap <player> [damage]",
+     "args": [
+      {
+       "name": "player",
+       "required": true,
+       "kind": "player"
+      },
+      {
+       "name": "damage",
+       "required": false,
+       "kind": "number"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "serverinfo",
+   "aliases": [],
+   "permission": "tshock.info",
+   "help": "Shows the server information.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows the server information.",
+   "helpZh": "显示服务器信息。",
+   "paramSets": [
+    {
+     "syntax": "serverinfo",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "warp",
+   "aliases": [],
+   "permission": "tshock.warp",
+   "help": "Teleports you to a warp point or manages warps.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Teleports you to a warp point or manages warps.",
+   "helpZh": "将你传送到一个传送点或者管理传送点。",
+   "paramSets": [
+    {
+     "syntax": "warp <warpname>",
+     "args": [
+      {
+       "name": "warpname",
+       "required": false,
+       "kind": "warp"
+      }
+     ]
+    },
+    {
+     "syntax": "warp [command] [arguments]",
+     "args": [
+      {
+       "name": "command",
+       "required": false,
+       "kind": "text"
+      },
+      {
+       "name": "arguments",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "warp add [name]",
+     "args": [
+      {
+       "literal": "add"
+      },
+      {
+       "name": "name",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "warp del [name]",
+     "args": [
+      {
+       "literal": "del"
+      },
+      {
+       "name": "name",
+       "required": false,
+       "kind": "text"
+      }
+     ]
+    },
+    {
+     "syntax": "warp hide [name] <true/false>",
+     "args": [
+      {
+       "literal": "hide"
+      },
+      {
+       "name": "name",
+       "required": false,
+       "kind": "text"
+      },
+      {
+       "name": "true/false",
+       "required": true,
+       "kind": "enum",
+       "values": [
+        "true",
+        "false"
+       ]
+      }
+     ]
+    },
+    {
+     "syntax": "warp send [player] [warpname]",
+     "args": [
+      {
+       "literal": "send"
+      },
+      {
+       "name": "player",
+       "required": false,
+       "kind": "player"
+      },
+      {
+       "name": "warpname",
+       "required": false,
+       "kind": "warp"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "whisper",
+   "aliases": [
+    "w",
+    "tell",
+    "pm",
+    "dm"
+   ],
+   "permission": "tshock.whisper",
+   "help": "Sends a PM to a player.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Sends a PM to a player.",
+   "helpZh": "给玩家发送一条私聊消息"
+  },
+  {
+   "name": "wallow",
+   "aliases": [
+    "wa"
+   ],
+   "permission": "tshock.whisper",
+   "help": "Toggles to either ignore or recieve whispers from other players.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Toggles to either ignore or recieve whispers from other players.",
+   "helpZh": "开关是否接收他人的私聊。",
+   "paramSets": [
+    {
+     "syntax": "wallow",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "dump-reference-data",
+   "aliases": [],
+   "permission": "tshock.cfg.createdumps",
+   "help": "Creates a reference tables for Terraria data types and the TShock permission system in the server folder.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Creates a reference tables for Terraria data types and the TShock permission system in the server folder.",
+   "helpZh": "在服务器目录下生成泰拉瑞亚和TShock权限的参考信息表。",
+   "paramSets": [
+    {
+     "syntax": "dump-reference-data",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "sync",
+   "aliases": [],
+   "permission": "tshock.synclocalarea",
+   "help": "Sends all tiles from the server to the player to resync the client with the actual world state.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Sends all tiles from the server to the player to resync the client with the actual world state.",
+   "helpZh": "重新发送玩家附近的物块信息，使玩家与服务器同步当前的地图状态。",
+   "paramSets": [
+    {
+     "syntax": "sync",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "respawn",
+   "aliases": [],
+   "permission": "tshock.respawn",
+   "help": "Respawn yourself or another player.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Respawn yourself or another player.",
+   "helpZh": "复活你自己或其他玩家。"
+  },
+  {
+   "name": "aliases",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows a command's aliases.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows a command's aliases.",
+   "helpZh": "显示指令的别名。",
+   "paramSets": [
+    {
+     "syntax": "aliases <command or alias>",
+     "args": [
+      {
+       "name": "command or alias",
+       "required": true,
+       "kind": "command"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "help",
+   "aliases": [],
+   "permission": null,
+   "help": "Lists commands or gives help on them.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Lists commands or gives help on them.",
+   "helpZh": "列出指令或显示指令的帮助信息。",
+   "paramSets": [
+    {
+     "syntax": "help <command/page>",
+     "args": [
+      {
+       "name": "command/page",
+       "required": true,
+       "kind": "command"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "motd",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows the message of the day.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows the message of the day.",
+   "helpZh": "显示MOTD。",
+   "paramSets": [
+    {
+     "syntax": "motd",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "playing",
+   "aliases": [
+    "online",
+    "who"
+   ],
+   "permission": null,
+   "help": "Shows the currently connected players.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows the currently connected players.",
+   "helpZh": "显示当前在线的玩家。"
+  },
+  {
+   "name": "rules",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows the server's rules.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows the server's rules.",
+   "helpZh": "显示服务器规则。",
+   "paramSets": [
+    {
+     "syntax": "rules",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "death",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows your number of deaths.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Shows your number of deaths.",
+   "helpZh": "显示你的的总死亡次数。",
+   "paramSets": [
+    {
+     "syntax": "death",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "pvpdeath",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows your number of PVP deaths.",
+   "allowServer": false,
+   "doLog": true,
+   "helpEn": "Shows your number of PVP deaths.",
+   "helpZh": "显示你的总PvP死亡次数。",
+   "paramSets": [
+    {
+     "syntax": "pvpdeath",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "alldeath",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows the number of deaths for all online players.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows the number of deaths for all online players.",
+   "helpZh": "显示服务器中所有在线玩家的死亡次数。",
+   "paramSets": [
+    {
+     "syntax": "alldeath",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "allpvpdeath",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows the number of PVP deaths for all online players.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows the number of PVP deaths for all online players.",
+   "helpZh": "显示服务器中所有在线玩家的PvP死亡次数。",
+   "paramSets": [
+    {
+     "syntax": "allpvpdeath",
+     "args": []
+    }
+   ]
+  },
+  {
+   "name": "bossdamage",
+   "aliases": [],
+   "permission": null,
+   "help": "Shows recent boss kill contribution.",
+   "allowServer": true,
+   "doLog": true,
+   "helpEn": "Shows recent boss kill contribution.",
+   "helpZh": "显示最近的Boss击杀贡献",
+   "paramSets": [
+    {
+     "syntax": "bossdamage",
+     "args": []
+    }
+   ]
+  }
+ ]
+}

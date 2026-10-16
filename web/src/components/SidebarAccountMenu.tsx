@@ -1,0 +1,151 @@
+import { useState } from 'react'
+import { ChevronsUpDown, LogIn, LogOut, Server, UserRound } from 'lucide-react'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
+import { ServerSwitcherDialog } from '@/components/ServerSwitcher'
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui'
+import { cn } from '@/lib/cn'
+import { useI18n } from '@/lib/i18n'
+import { useSelfAvatar } from '@/lib/selfAvatar'
+import type { ServerTarget } from '@/lib/servers'
+import type { ServerInfo } from '@/lib/tshock'
+
+interface SidebarAccountMenuProps {
+  /** 当前上游 id（用于取「自己」的外观缓存）。 */
+  serverId: string
+  /** 展示用的服务器地址（已遮挡；不再出现「服务器默认」文案）。 */
+  serverLabel: string
+  serverOnline: boolean
+  username: string | null
+  mock: boolean
+  servers: ServerTarget[]
+  activeId: string
+  info: ServerInfo
+  onSelectServer: (id: string) => void
+  onAddServer: (target: ServerTarget) => void
+  onRemoveServer: (id: string) => void
+  onLogin: () => void
+  onLogout: () => void
+}
+
+/**
+ * 侧栏底部账号卡片（NavUser 风格）：头像 + 用户名 + 服务器地址 + 展开箭头。
+ * 点击展开菜单：切换服务器 / 登录·退出。
+ * 头像联动「玩家管理」——查到当前登录账号本人时用其全身图。
+ */
+export function SidebarAccountMenu({
+  serverId,
+  serverLabel,
+  serverOnline,
+  username,
+  mock,
+  servers,
+  activeId,
+  info,
+  onSelectServer,
+  onAddServer,
+  onRemoveServer,
+  onLogin,
+  onLogout,
+}: SidebarAccountMenuProps) {
+  const { t } = useI18n()
+  const [serverOpen, setServerOpen] = useState(false)
+  const look = useSelfAvatar(serverId)
+
+  const avatar = look ? (
+    <span className="grid h-10 w-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-sidebar-accent">
+      <PlayerAvatar look={look} scale={1} fill className="[image-rendering:pixelated]" />
+    </span>
+  ) : (
+    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/15 text-muted-foreground">
+      <UserRound className="size-4" />
+    </span>
+  )
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={t('account.menu')}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+          >
+            {avatar}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-xs text-foreground">
+                  {username ?? t('account.notLoggedIn')}
+                </span>
+                {mock && <Badge tone="mock">Mock</Badge>}
+              </span>
+              <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span
+                  className={cn(
+                    'size-1.5 shrink-0 rounded-full',
+                    serverOnline ? 'bg-success' : 'bg-destructive',
+                  )}
+                />
+                <span className="truncate">{serverLabel}</span>
+              </span>
+            </span>
+            <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" className="w-60">
+          <DropdownMenuLabel className="flex items-center gap-2">
+            {avatar}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-xs font-semibold">
+                {username ?? t('account.notLoggedIn')}
+              </span>
+              <span className="truncate text-[10px] font-normal text-muted-foreground">
+                {serverLabel}
+              </span>
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem onSelect={() => setServerOpen(true)}>
+              <Server />
+              {t('servers.switch')}
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            {username ? (
+              <DropdownMenuItem variant="danger" onSelect={onLogout}>
+                <LogOut />
+                {t('action.logout')}
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onSelect={onLogin}>
+                <LogIn />
+                {t('action.login')}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <ServerSwitcherDialog
+        open={serverOpen}
+        onOpenChange={setServerOpen}
+        servers={servers}
+        activeId={activeId}
+        info={info}
+        onSelect={onSelectServer}
+        onAdd={onAddServer}
+        onRemove={onRemoveServer}
+      />
+    </>
+  )
+}

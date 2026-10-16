@@ -1,0 +1,1609 @@
+{
+ "meta": {
+  "gameVersion": "1.4.5.8",
+  "count": 400,
+  "source": "Terraria.ID/BuffID.cs + loc.BuffName"
+ },
+ "buffs": [
+  {
+   "id": 1,
+   "key": "ObsidianSkin"
+  },
+  {
+   "id": 2,
+   "key": "Regeneration"
+  },
+  {
+   "id": 3,
+   "key": "Swiftness"
+  },
+  {
+   "id": 4,
+   "key": "Gills"
+  },
+  {
+   "id": 5,
+   "key": "Ironskin"
+  },
+  {
+   "id": 6,
+   "key": "ManaRegeneration"
+  },
+  {
+   "id": 7,
+   "key": "MagicPower"
+  },
+  {
+   "id": 8,
+   "key": "Featherfall"
+  },
+  {
+   "id": 9,
+   "key": "Spelunker"
+  },
+  {
+   "id": 10,
+   "key": "Invisibility"
+  },
+  {
+   "id": 11,
+   "key": "Shine"
+  },
+  {
+   "id": 12,
+   "key": "NightOwl"
+  },
+  {
+   "id": 13,
+   "key": "Battle"
+  },
+  {
+   "id": 14,
+   "key": "Thorns"
+  },
+  {
+   "id": 15,
+   "key": "WaterWalking"
+  },
+  {
+   "id": 16,
+   "key": "Archery"
+  },
+  {
+   "id": 17,
+   "key": "Hunter"
+  },
+  {
+   "id": 18,
+   "key": "Gravitation"
+  },
+  {
+   "id": 19,
+   "key": "ShadowOrb"
+  },
+  {
+   "id": 20,
+   "key": "Poisoned"
+  },
+  {
+   "id": 21,
+   "key": "PotionSickness"
+  },
+  {
+   "id": 22,
+   "key": "Darkness"
+  },
+  {
+   "id": 23,
+   "key": "Cursed"
+  },
+  {
+   "id": 24,
+   "key": "OnFire"
+  },
+  {
+   "id": 25,
+   "key": "Tipsy"
+  },
+  {
+   "id": 26,
+   "key": "WellFed"
+  },
+  {
+   "id": 27,
+   "key": "FairyBlue"
+  },
+  {
+   "id": 28,
+   "key": "Werewolf"
+  },
+  {
+   "id": 29,
+   "key": "Clairvoyance"
+  },
+  {
+   "id": 30,
+   "key": "Bleeding"
+  },
+  {
+   "id": 31,
+   "key": "Confused"
+  },
+  {
+   "id": 32,
+   "key": "Slow"
+  },
+  {
+   "id": 33,
+   "key": "Weak"
+  },
+  {
+   "id": 34,
+   "key": "Merfolk"
+  },
+  {
+   "id": 35,
+   "key": "Silenced"
+  },
+  {
+   "id": 36,
+   "key": "BrokenArmor"
+  },
+  {
+   "id": 37,
+   "key": "Horrified"
+  },
+  {
+   "id": 38,
+   "key": "TheTongue"
+  },
+  {
+   "id": 39,
+   "key": "CursedInferno"
+  },
+  {
+   "id": 40,
+   "key": "PetBunny"
+  },
+  {
+   "id": 41,
+   "key": "BabyPenguin"
+  },
+  {
+   "id": 42,
+   "key": "PetTurtle"
+  },
+  {
+   "id": 43,
+   "key": "PaladinsShield"
+  },
+  {
+   "id": 44,
+   "key": "Frostburn"
+  },
+  {
+   "id": 45,
+   "key": "BabyEater"
+  },
+  {
+   "id": 46,
+   "key": "Chilled"
+  },
+  {
+   "id": 47,
+   "key": "Frozen"
+  },
+  {
+   "id": 48,
+   "key": "Honey"
+  },
+  {
+   "id": 49,
+   "key": "Pygmies"
+  },
+  {
+   "id": 50,
+   "key": "BabySkeletronHead"
+  },
+  {
+   "id": 51,
+   "key": "BabyHornet"
+  },
+  {
+   "id": 52,
+   "key": "TikiSpirit"
+  },
+  {
+   "id": 53,
+   "key": "PetLizard"
+  },
+  {
+   "id": 54,
+   "key": "PetParrot"
+  },
+  {
+   "id": 55,
+   "key": "BabyTruffle"
+  },
+  {
+   "id": 56,
+   "key": "PetSapling"
+  },
+  {
+   "id": 57,
+   "key": "Wisp"
+  },
+  {
+   "id": 58,
+   "key": "RapidHealing"
+  },
+  {
+   "id": 59,
+   "key": "ShadowDodge"
+  },
+  {
+   "id": 60,
+   "key": "LeafCrystal"
+  },
+  {
+   "id": 61,
+   "key": "BabyDinosaur"
+  },
+  {
+   "id": 62,
+   "key": "IceBarrier"
+  },
+  {
+   "id": 63,
+   "key": "Panic"
+  },
+  {
+   "id": 64,
+   "key": "BabySlime"
+  },
+  {
+   "id": 65,
+   "key": "EyeballSpring"
+  },
+  {
+   "id": 66,
+   "key": "BabySnowman"
+  },
+  {
+   "id": 67,
+   "key": "Burning"
+  },
+  {
+   "id": 68,
+   "key": "Suffocation"
+  },
+  {
+   "id": 69,
+   "key": "Ichor"
+  },
+  {
+   "id": 70,
+   "key": "Venom"
+  },
+  {
+   "id": 71,
+   "key": "WeaponImbueVenom"
+  },
+  {
+   "id": 72,
+   "key": "Midas"
+  },
+  {
+   "id": 73,
+   "key": "WeaponImbueCursedFlames"
+  },
+  {
+   "id": 74,
+   "key": "WeaponImbueFire"
+  },
+  {
+   "id": 75,
+   "key": "WeaponImbueGold"
+  },
+  {
+   "id": 76,
+   "key": "WeaponImbueIchor"
+  },
+  {
+   "id": 77,
+   "key": "WeaponImbueNanites"
+  },
+  {
+   "id": 78,
+   "key": "WeaponImbueConfetti"
+  },
+  {
+   "id": 79,
+   "key": "WeaponImbuePoison"
+  },
+  {
+   "id": 80,
+   "key": "Blackout"
+  },
+  {
+   "id": 81,
+   "key": "PetSpider"
+  },
+  {
+   "id": 82,
+   "key": "Squashling"
+  },
+  {
+   "id": 83,
+   "key": "Ravens"
+  },
+  {
+   "id": 84,
+   "key": "BlackCat"
+  },
+  {
+   "id": 85,
+   "key": "CursedSapling"
+  },
+  {
+   "id": 86,
+   "key": "WaterCandle"
+  },
+  {
+   "id": 87,
+   "key": "Campfire"
+  },
+  {
+   "id": 88,
+   "key": "ChaosState"
+  },
+  {
+   "id": 89,
+   "key": "HeartLamp"
+  },
+  {
+   "id": 90,
+   "key": "Rudolph"
+  },
+  {
+   "id": 91,
+   "key": "Puppy"
+  },
+  {
+   "id": 92,
+   "key": "BabyGrinch"
+  },
+  {
+   "id": 93,
+   "key": "AmmoBox"
+  },
+  {
+   "id": 94,
+   "key": "ManaSickness"
+  },
+  {
+   "id": 95,
+   "key": "BeetleEndurance1"
+  },
+  {
+   "id": 96,
+   "key": "BeetleEndurance2"
+  },
+  {
+   "id": 97,
+   "key": "BeetleEndurance3"
+  },
+  {
+   "id": 98,
+   "key": "BeetleMight1"
+  },
+  {
+   "id": 99,
+   "key": "BeetleMight2"
+  },
+  {
+   "id": 100,
+   "key": "BeetleMight3"
+  },
+  {
+   "id": 101,
+   "key": "FairyRed"
+  },
+  {
+   "id": 102,
+   "key": "FairyGreen"
+  },
+  {
+   "id": 103,
+   "key": "Wet"
+  },
+  {
+   "id": 104,
+   "key": "Mining"
+  },
+  {
+   "id": 105,
+   "key": "Heartreach"
+  },
+  {
+   "id": 106,
+   "key": "Calm"
+  },
+  {
+   "id": 107,
+   "key": "Builder"
+  },
+  {
+   "id": 108,
+   "key": "Titan"
+  },
+  {
+   "id": 109,
+   "key": "Flipper"
+  },
+  {
+   "id": 110,
+   "key": "Summoning"
+  },
+  {
+   "id": 111,
+   "key": "Dangersense"
+  },
+  {
+   "id": 112,
+   "key": "AmmoReservation"
+  },
+  {
+   "id": 113,
+   "key": "Lifeforce"
+  },
+  {
+   "id": 114,
+   "key": "Endurance"
+  },
+  {
+   "id": 115,
+   "key": "Rage"
+  },
+  {
+   "id": 116,
+   "key": "Inferno"
+  },
+  {
+   "id": 117,
+   "key": "Wrath"
+  },
+  {
+   "id": 118,
+   "key": "Minecart"
+  },
+  {
+   "id": 119,
+   "key": "Lovestruck"
+  },
+  {
+   "id": 120,
+   "key": "Stinky"
+  },
+  {
+   "id": 121,
+   "key": "Fishing"
+  },
+  {
+   "id": 122,
+   "key": "Sonar"
+  },
+  {
+   "id": 123,
+   "key": "Crate"
+  },
+  {
+   "id": 124,
+   "key": "Warmth"
+  },
+  {
+   "id": 125,
+   "key": "HornetMinion"
+  },
+  {
+   "id": 126,
+   "key": "ImpMinion"
+  },
+  {
+   "id": 127,
+   "key": "ZephyrFish"
+  },
+  {
+   "id": 128,
+   "key": "BunnyMount"
+  },
+  {
+   "id": 129,
+   "key": "PigronMount"
+  },
+  {
+   "id": 130,
+   "key": "SlimeMount"
+  },
+  {
+   "id": 131,
+   "key": "TurtleMount"
+  },
+  {
+   "id": 132,
+   "key": "BeeMount"
+  },
+  {
+   "id": 133,
+   "key": "SpiderMinion"
+  },
+  {
+   "id": 134,
+   "key": "TwinEyesMinion"
+  },
+  {
+   "id": 135,
+   "key": "PirateMinion"
+  },
+  {
+   "id": 136,
+   "key": "MiniMinotaur"
+  },
+  {
+   "id": 137,
+   "key": "Slimed"
+  },
+  {
+   "id": 138,
+   "key": "MinecartLegacyUnused"
+  },
+  {
+   "id": 139,
+   "key": "SharknadoMinion"
+  },
+  {
+   "id": 140,
+   "key": "UFOMinion"
+  },
+  {
+   "id": 141,
+   "key": "UFOMount"
+  },
+  {
+   "id": 142,
+   "key": "DrillMount"
+  },
+  {
+   "id": 143,
+   "key": "ScutlixMount"
+  },
+  {
+   "id": 144,
+   "key": "Electrified"
+  },
+  {
+   "id": 145,
+   "key": "MoonLeech"
+  },
+  {
+   "id": 146,
+   "key": "Sunflower"
+  },
+  {
+   "id": 147,
+   "key": "MonsterBanner"
+  },
+  {
+   "id": 148,
+   "key": "Rabies"
+  },
+  {
+   "id": 149,
+   "key": "Webbed"
+  },
+  {
+   "id": 150,
+   "key": "Bewitched"
+  },
+  {
+   "id": 151,
+   "key": "SoulDrain"
+  },
+  {
+   "id": 152,
+   "key": "MagicLantern"
+  },
+  {
+   "id": 153,
+   "key": "ShadowFlame"
+  },
+  {
+   "id": 154,
+   "key": "BabyFaceMonster"
+  },
+  {
+   "id": 155,
+   "key": "CrimsonHeart"
+  },
+  {
+   "id": 156,
+   "key": "Stoned"
+  },
+  {
+   "id": 157,
+   "key": "PeaceCandle"
+  },
+  {
+   "id": 158,
+   "key": "StarInBottle"
+  },
+  {
+   "id": 159,
+   "key": "Sharpened"
+  },
+  {
+   "id": 160,
+   "key": "Dazed"
+  },
+  {
+   "id": 161,
+   "key": "DeadlySphere"
+  },
+  {
+   "id": 162,
+   "key": "UnicornMount"
+  },
+  {
+   "id": 163,
+   "key": "Obstructed"
+  },
+  {
+   "id": 164,
+   "key": "VortexDebuff"
+  },
+  {
+   "id": 165,
+   "key": "DryadsWard"
+  },
+  {
+   "id": 166,
+   "key": "MinecartMech"
+  },
+  {
+   "id": 167,
+   "key": "MinecartMechLegacyUnused"
+  },
+  {
+   "id": 168,
+   "key": "CuteFishronMount"
+  },
+  {
+   "id": 169,
+   "key": "BoneJavelin"
+  },
+  {
+   "id": 170,
+   "key": "SolarShield1"
+  },
+  {
+   "id": 171,
+   "key": "SolarShield2"
+  },
+  {
+   "id": 172,
+   "key": "SolarShield3"
+  },
+  {
+   "id": 173,
+   "key": "NebulaUpLife1"
+  },
+  {
+   "id": 174,
+   "key": "NebulaUpLife2"
+  },
+  {
+   "id": 175,
+   "key": "NebulaUpLife3"
+  },
+  {
+   "id": 176,
+   "key": "NebulaUpMana1"
+  },
+  {
+   "id": 177,
+   "key": "NebulaUpMana2"
+  },
+  {
+   "id": 178,
+   "key": "NebulaUpMana3"
+  },
+  {
+   "id": 179,
+   "key": "NebulaUpDmg1"
+  },
+  {
+   "id": 180,
+   "key": "NebulaUpDmg2"
+  },
+  {
+   "id": 181,
+   "key": "NebulaUpDmg3"
+  },
+  {
+   "id": 182,
+   "key": "StardustMinion"
+  },
+  {
+   "id": 183,
+   "key": "StardustMinionBleed"
+  },
+  {
+   "id": 184,
+   "key": "MinecartWood"
+  },
+  {
+   "id": 185,
+   "key": "MinecartWoodLegacyUnused"
+  },
+  {
+   "id": 186,
+   "key": "DryadsWardDebuff"
+  },
+  {
+   "id": 187,
+   "key": "StardustGuardianMinion"
+  },
+  {
+   "id": 188,
+   "key": "StardustDragonMinion"
+  },
+  {
+   "id": 189,
+   "key": "Daybreak"
+  },
+  {
+   "id": 190,
+   "key": "SuspiciousTentacle"
+  },
+  {
+   "id": 191,
+   "key": "CompanionCube"
+  },
+  {
+   "id": 192,
+   "key": "SugarRush"
+  },
+  {
+   "id": 193,
+   "key": "BasiliskMount"
+  },
+  {
+   "id": 194,
+   "key": "WindPushed"
+  },
+  {
+   "id": 195,
+   "key": "WitheredArmor"
+  },
+  {
+   "id": 196,
+   "key": "WitheredWeapon"
+  },
+  {
+   "id": 197,
+   "key": "OgreSpit"
+  },
+  {
+   "id": 198,
+   "key": "ParryDamageBuff"
+  },
+  {
+   "id": 199,
+   "key": "NoBuilding"
+  },
+  {
+   "id": 200,
+   "key": "PetDD2Gato"
+  },
+  {
+   "id": 201,
+   "key": "PetDD2Ghost"
+  },
+  {
+   "id": 202,
+   "key": "PetDD2Dragon"
+  },
+  {
+   "id": 203,
+   "key": "BetsysCurse"
+  },
+  {
+   "id": 204,
+   "key": "Oiled"
+  },
+  {
+   "id": 205,
+   "key": "BallistaPanic"
+  },
+  {
+   "id": 206,
+   "key": "WellFed2"
+  },
+  {
+   "id": 207,
+   "key": "WellFed3"
+  },
+  {
+   "id": 208,
+   "key": "DesertMinecart"
+  },
+  {
+   "id": 209,
+   "key": "DesertMinecartLegacyUnused"
+  },
+  {
+   "id": 210,
+   "key": "FishMinecart"
+  },
+  {
+   "id": 211,
+   "key": "FishMinecartLegacyUnused"
+  },
+  {
+   "id": 212,
+   "key": "GolfCartMount"
+  },
+  {
+   "id": 213,
+   "key": "BatOfLight"
+  },
+  {
+   "id": 214,
+   "key": "VampireFrog"
+  },
+  {
+   "id": 215,
+   "key": "CatBast"
+  },
+  {
+   "id": 216,
+   "key": "BabyBird"
+  },
+  {
+   "id": 217,
+   "key": "UpbeatStar"
+  },
+  {
+   "id": 218,
+   "key": "SugarGlider"
+  },
+  {
+   "id": 219,
+   "key": "SharkPup"
+  },
+  {
+   "id": 220,
+   "key": "BeeMinecart"
+  },
+  {
+   "id": 221,
+   "key": "BeeMinecartLegacyUnused"
+  },
+  {
+   "id": 222,
+   "key": "LadybugMinecart"
+  },
+  {
+   "id": 223,
+   "key": "LadybugMinecartLegacyUnused"
+  },
+  {
+   "id": 224,
+   "key": "PigronMinecart"
+  },
+  {
+   "id": 225,
+   "key": "PigronMinecartLegacyUnused"
+  },
+  {
+   "id": 226,
+   "key": "SunflowerMinecart"
+  },
+  {
+   "id": 227,
+   "key": "SunflowerMinecartLegacyUnused"
+  },
+  {
+   "id": 228,
+   "key": "HellMinecart"
+  },
+  {
+   "id": 229,
+   "key": "HellMinecartLegacyUnused"
+  },
+  {
+   "id": 230,
+   "key": "WitchBroom"
+  },
+  {
+   "id": 231,
+   "key": "ShroomMinecart"
+  },
+  {
+   "id": 232,
+   "key": "ShroomMinecartLegacyUnused"
+  },
+  {
+   "id": 233,
+   "key": "AmethystMinecart"
+  },
+  {
+   "id": 234,
+   "key": "AmethystMinecartLegacyUnused"
+  },
+  {
+   "id": 235,
+   "key": "TopazMinecart"
+  },
+  {
+   "id": 236,
+   "key": "TopazMinecartLegacyUnused"
+  },
+  {
+   "id": 237,
+   "key": "SapphireMinecart"
+  },
+  {
+   "id": 238,
+   "key": "SapphireMinecartLegacyUnused"
+  },
+  {
+   "id": 239,
+   "key": "EmeraldMinecart"
+  },
+  {
+   "id": 240,
+   "key": "EmeraldMinecartLegacyUnused"
+  },
+  {
+   "id": 241,
+   "key": "RubyMinecart"
+  },
+  {
+   "id": 242,
+   "key": "RubyMinecartLegacyUnused"
+  },
+  {
+   "id": 243,
+   "key": "DiamondMinecart"
+  },
+  {
+   "id": 244,
+   "key": "DiamondMinecartLegacyUnused"
+  },
+  {
+   "id": 245,
+   "key": "AmberMinecart"
+  },
+  {
+   "id": 246,
+   "key": "AmberMinecartLegacyUnused"
+  },
+  {
+   "id": 247,
+   "key": "BeetleMinecart"
+  },
+  {
+   "id": 248,
+   "key": "BeetleMinecartLegacyUnused"
+  },
+  {
+   "id": 249,
+   "key": "MeowmereMinecart"
+  },
+  {
+   "id": 250,
+   "key": "MeowmereMinecartLegacyUnused"
+  },
+  {
+   "id": 251,
+   "key": "PartyMinecart"
+  },
+  {
+   "id": 252,
+   "key": "PartyMinecartLegacyUnused"
+  },
+  {
+   "id": 253,
+   "key": "PirateMinecart"
+  },
+  {
+   "id": 254,
+   "key": "PirateMinecartLegacyUnused"
+  },
+  {
+   "id": 255,
+   "key": "SteampunkMinecart"
+  },
+  {
+   "id": 256,
+   "key": "SteampunkMinecartLegacyUnused"
+  },
+  {
+   "id": 257,
+   "key": "Lucky"
+  },
+  {
+   "id": 258,
+   "key": "LilHarpy"
+  },
+  {
+   "id": 259,
+   "key": "FennecFox"
+  },
+  {
+   "id": 260,
+   "key": "GlitteryButterfly"
+  },
+  {
+   "id": 261,
+   "key": "BabyImp"
+  },
+  {
+   "id": 262,
+   "key": "BabyRedPanda"
+  },
+  {
+   "id": 263,
+   "key": "StormTiger"
+  },
+  {
+   "id": 264,
+   "key": "Plantero"
+  },
+  {
+   "id": 265,
+   "key": "Flamingo"
+  },
+  {
+   "id": 266,
+   "key": "DynamiteKitten"
+  },
+  {
+   "id": 267,
+   "key": "BabyWerewolf"
+  },
+  {
+   "id": 268,
+   "key": "ShadowMimic"
+  },
+  {
+   "id": 269,
+   "key": "CoffinMinecart"
+  },
+  {
+   "id": 270,
+   "key": "CoffinMinecartLegacyUnused"
+  },
+  {
+   "id": 271,
+   "key": "Smolstar"
+  },
+  {
+   "id": 272,
+   "key": "DiggingMoleMinecart"
+  },
+  {
+   "id": 273,
+   "key": "DiggingMoleMinecartLegacyUnused"
+  },
+  {
+   "id": 274,
+   "key": "VoltBunny"
+  },
+  {
+   "id": 275,
+   "key": "PaintedHorseMount"
+  },
+  {
+   "id": 276,
+   "key": "MajesticHorseMount"
+  },
+  {
+   "id": 277,
+   "key": "DarkHorseMount"
+  },
+  {
+   "id": 278,
+   "key": "PogoStickMount"
+  },
+  {
+   "id": 279,
+   "key": "PirateShipMount"
+  },
+  {
+   "id": 280,
+   "key": "SpookyWoodMount"
+  },
+  {
+   "id": 281,
+   "key": "SantankMount"
+  },
+  {
+   "id": 282,
+   "key": "WallOfFleshGoatMount"
+  },
+  {
+   "id": 283,
+   "key": "DarkMageBookMount"
+  },
+  {
+   "id": 284,
+   "key": "KingSlimePet"
+  },
+  {
+   "id": 285,
+   "key": "EyeOfCthulhuPet"
+  },
+  {
+   "id": 286,
+   "key": "EaterOfWorldsPet"
+  },
+  {
+   "id": 287,
+   "key": "BrainOfCthulhuPet"
+  },
+  {
+   "id": 288,
+   "key": "SkeletronPet"
+  },
+  {
+   "id": 289,
+   "key": "QueenBeePet"
+  },
+  {
+   "id": 290,
+   "key": "DestroyerPet"
+  },
+  {
+   "id": 291,
+   "key": "TwinsPet"
+  },
+  {
+   "id": 292,
+   "key": "SkeletronPrimePet"
+  },
+  {
+   "id": 293,
+   "key": "PlanteraPet"
+  },
+  {
+   "id": 294,
+   "key": "GolemPet"
+  },
+  {
+   "id": 295,
+   "key": "DukeFishronPet"
+  },
+  {
+   "id": 296,
+   "key": "LunaticCultistPet"
+  },
+  {
+   "id": 297,
+   "key": "MoonLordPet"
+  },
+  {
+   "id": 298,
+   "key": "FairyQueenPet"
+  },
+  {
+   "id": 299,
+   "key": "PumpkingPet"
+  },
+  {
+   "id": 300,
+   "key": "EverscreamPet"
+  },
+  {
+   "id": 301,
+   "key": "IceQueenPet"
+  },
+  {
+   "id": 302,
+   "key": "MartianPet"
+  },
+  {
+   "id": 303,
+   "key": "DD2OgrePet"
+  },
+  {
+   "id": 304,
+   "key": "DD2BetsyPet"
+  },
+  {
+   "id": 305,
+   "key": "LavaSharkMount"
+  },
+  {
+   "id": 306,
+   "key": "TitaniumStorm"
+  },
+  {
+   "id": 307,
+   "key": "BlandWhipEnemyDebuff"
+  },
+  {
+   "id": 308,
+   "key": "SwordWhipPlayerBuff"
+  },
+  {
+   "id": 309,
+   "key": "SwordWhipNPCDebuff"
+  },
+  {
+   "id": 310,
+   "key": "ScytheWhipEnemyDebuff"
+  },
+  {
+   "id": 311,
+   "key": "ScytheWhipPlayerBuff"
+  },
+  {
+   "id": 312,
+   "key": "CoolWhipPlayerBuff"
+  },
+  {
+   "id": 313,
+   "key": "FlameWhipEnemyDebuff"
+  },
+  {
+   "id": 314,
+   "key": "ThornWhipPlayerBuff"
+  },
+  {
+   "id": 315,
+   "key": "ThornWhipNPCDebuff"
+  },
+  {
+   "id": 316,
+   "key": "RainbowWhipNPCDebuff"
+  },
+  {
+   "id": 317,
+   "key": "QueenSlimePet"
+  },
+  {
+   "id": 318,
+   "key": "QueenSlimeMount"
+  },
+  {
+   "id": 319,
+   "key": "MaceWhipNPCDebuff"
+  },
+  {
+   "id": 320,
+   "key": "GelBalloonBuff"
+  },
+  {
+   "id": 321,
+   "key": "BrainOfConfusionBuff"
+  },
+  {
+   "id": 322,
+   "key": "EmpressBlade"
+  },
+  {
+   "id": 323,
+   "key": "OnFire3"
+  },
+  {
+   "id": 324,
+   "key": "Frostburn2"
+  },
+  {
+   "id": 325,
+   "key": "FlinxMinion"
+  },
+  {
+   "id": 326,
+   "key": "BoneWhipNPCDebuff"
+  },
+  {
+   "id": 327,
+   "key": "BerniePet"
+  },
+  {
+   "id": 328,
+   "key": "GlommerPet"
+  },
+  {
+   "id": 329,
+   "key": "DeerclopsPet"
+  },
+  {
+   "id": 330,
+   "key": "PigPet"
+  },
+  {
+   "id": 331,
+   "key": "ChesterPet"
+  },
+  {
+   "id": 332,
+   "key": "NeutralHunger"
+  },
+  {
+   "id": 333,
+   "key": "Hunger"
+  },
+  {
+   "id": 334,
+   "key": "Starving"
+  },
+  {
+   "id": 335,
+   "key": "AbigailMinion"
+  },
+  {
+   "id": 336,
+   "key": "HeartyMeal"
+  },
+  {
+   "id": 337,
+   "key": "TentacleSpike"
+  },
+  {
+   "id": 338,
+   "key": "FartMinecart"
+  },
+  {
+   "id": 339,
+   "key": "FartMinecartLegacyUnused"
+  },
+  {
+   "id": 340,
+   "key": "CoolWhipNPCDebuff"
+  },
+  {
+   "id": 341,
+   "key": "DualSlimePet"
+  },
+  {
+   "id": 342,
+   "key": "WolfMount"
+  },
+  {
+   "id": 343,
+   "key": "BiomeSight"
+  },
+  {
+   "id": 344,
+   "key": "BloodButcherer"
+  },
+  {
+   "id": 345,
+   "key": "JunimoPet"
+  },
+  {
+   "id": 346,
+   "key": "TerraFartMinecart"
+  },
+  {
+   "id": 347,
+   "key": "TerraFartMinecartLegacyUnused"
+  },
+  {
+   "id": 348,
+   "key": "WarTable"
+  },
+  {
+   "id": 349,
+   "key": "BlueChickenPet"
+  },
+  {
+   "id": 350,
+   "key": "ShadowCandle"
+  },
+  {
+   "id": 351,
+   "key": "Spiffo"
+  },
+  {
+   "id": 352,
+   "key": "CavelingGardener"
+  },
+  {
+   "id": 353,
+   "key": "Shimmer"
+  },
+  {
+   "id": 354,
+   "key": "DirtiestBlock"
+  },
+  {
+   "id": 355,
+   "key": "DeadCellsMushroomBoiMinion"
+  },
+  {
+   "id": 356,
+   "key": "DeadCellsSwarmBiter"
+  },
+  {
+   "id": 357,
+   "key": "CobWhipNPCDebuff"
+  },
+  {
+   "id": 358,
+   "key": "CorruptWhipNPCDebuff"
+  },
+  {
+   "id": 359,
+   "key": "CrimsonWhipNPCDebuff"
+  },
+  {
+   "id": 360,
+   "key": "MeteorWhipNPCDebuff"
+  },
+  {
+   "id": 361,
+   "key": "FlowerWhipNPCDebuff"
+  },
+  {
+   "id": 362,
+   "key": "EelWhipNPCDebuff"
+  },
+  {
+   "id": 363,
+   "key": "ConstellationWhipNPCDebuff"
+  },
+  {
+   "id": 364,
+   "key": "MoonLordWhipNPCDebuff"
+  },
+  {
+   "id": 365,
+   "key": "CobWhipPlayerBuff"
+  },
+  {
+   "id": 366,
+   "key": "DeadCellsPotionStation"
+  },
+  {
+   "id": 367,
+   "key": "FlowerWhipNPCDebuffProc"
+  },
+  {
+   "id": 368,
+   "key": "MoonLordWhipNPCDebuffProc"
+  },
+  {
+   "id": 369,
+   "key": "MeteorWhipNPCDebuffProc"
+  },
+  {
+   "id": 370,
+   "key": "VelociraptorMount"
+  },
+  {
+   "id": 371,
+   "key": "Pufferfish"
+  },
+  {
+   "id": 372,
+   "key": "AxeFairyPet"
+  },
+  {
+   "id": 373,
+   "key": "BoulderPet"
+  },
+  {
+   "id": 374,
+   "key": "RatMount"
+  },
+  {
+   "id": 375,
+   "key": "Hemorrhage"
+  },
+  {
+   "id": 376,
+   "key": "TorchGodPotion"
+  },
+  {
+   "id": 377,
+   "key": "BatMount"
+  },
+  {
+   "id": 378,
+   "key": "RollerSkatesMount"
+  },
+  {
+   "id": 379,
+   "key": "RollerSkatesGreenMount"
+  },
+  {
+   "id": 380,
+   "key": "RollerSkatesWhiteMount"
+  },
+  {
+   "id": 381,
+   "key": "RollerSkatesPinkMount"
+  },
+  {
+   "id": 382,
+   "key": "RainbowBoulderPet"
+  },
+  {
+   "id": 383,
+   "key": "Kite"
+  },
+  {
+   "id": 384,
+   "key": "PixieMount"
+  },
+  {
+   "id": 385,
+   "key": "PalworldMinionCattiva"
+  },
+  {
+   "id": 386,
+   "key": "PalworldMinionFoxsparks"
+  },
+  {
+   "id": 387,
+   "key": "PalworldPetChillet"
+  },
+  {
+   "id": 388,
+   "key": "PalworldPetChilletIgnis"
+  },
+  {
+   "id": 389,
+   "key": "PalworldMinionTrustyCattiva"
+  },
+  {
+   "id": 390,
+   "key": "PalworldMinionTrustyFoxsparks"
+  },
+  {
+   "id": 391,
+   "key": "PalworldMountTrustyChillet"
+  },
+  {
+   "id": 392,
+   "key": "PalworldMountTrustyChilletIgnis"
+  },
+  {
+   "id": 393,
+   "key": "ClayPotMinion"
+  },
+  {
+   "id": 394,
+   "key": "ForbiddenMinion"
+  },
+  {
+   "id": 395,
+   "key": "PotentAcid"
+  },
+  {
+   "id": 396,
+   "key": "ManaHeat"
+  },
+  {
+   "id": 397,
+   "key": "ChlorophyteSpore"
+  },
+  {
+   "id": 398,
+   "key": "AcceleratePoisons"
+  },
+  {
+   "id": 399,
+   "key": "BlueLightning"
+  },
+  {
+   "id": 400,
+   "key": "RedLightning"
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>GameDump</AssemblyName>
+  </PropertyGroup>
+  <!-- TShock 6.2.1 -> TSAPI -> OTAPI.Upcoming，提供 Terraria.* (OTAPI.dll)。
+       不写死本机路径，任何机器 restore 即可构建。 -->
+  <ItemGroup>
+    <PackageReference Include="TShock" Version="6.2.1" />
+  </ItemGroup>
+</Project>

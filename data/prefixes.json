@@ -1,0 +1,396 @@
+{
+ "meta": {
+  "gameVersion": "1.4.5.8",
+  "count": 97
+ },
+ "prefixes": [
+  {
+   "id": 1,
+   "key": "Large"
+  },
+  {
+   "id": 2,
+   "key": "Massive"
+  },
+  {
+   "id": 3,
+   "key": "Dangerous"
+  },
+  {
+   "id": 4,
+   "key": "Savage"
+  },
+  {
+   "id": 5,
+   "key": "Sharp"
+  },
+  {
+   "id": 6,
+   "key": "Pointy"
+  },
+  {
+   "id": 7,
+   "key": "Tiny"
+  },
+  {
+   "id": 8,
+   "key": "Terrible"
+  },
+  {
+   "id": 9,
+   "key": "Small"
+  },
+  {
+   "id": 10,
+   "key": "Dull"
+  },
+  {
+   "id": 11,
+   "key": "Unhappy"
+  },
+  {
+   "id": 12,
+   "key": "Bulky"
+  },
+  {
+   "id": 13,
+   "key": "Shameful"
+  },
+  {
+   "id": 14,
+   "key": "Heavy"
+  },
+  {
+   "id": 15,
+   "key": "Light"
+  },
+  {
+   "id": 16,
+   "key": "Sighted"
+  },
+  {
+   "id": 17,
+   "key": "Rapid"
+  },
+  {
+   "id": 18,
+   "key": "Hasty"
+  },
+  {
+   "id": 19,
+   "key": "Intimidating"
+  },
+  {
+   "id": 20,
+   "key": "Deadly"
+  },
+  {
+   "id": 21,
+   "key": "Staunch"
+  },
+  {
+   "id": 22,
+   "key": "Awful"
+  },
+  {
+   "id": 23,
+   "key": "Lethargic"
+  },
+  {
+   "id": 24,
+   "key": "Awkward"
+  },
+  {
+   "id": 25,
+   "key": "Powerful"
+  },
+  {
+   "id": 26,
+   "key": "Mystic"
+  },
+  {
+   "id": 27,
+   "key": "Adept"
+  },
+  {
+   "id": 28,
+   "key": "Masterful"
+  },
+  {
+   "id": 29,
+   "key": "Inept"
+  },
+  {
+   "id": 30,
+   "key": "Ignorant"
+  },
+  {
+   "id": 31,
+   "key": "Deranged"
+  },
+  {
+   "id": 32,
+   "key": "Intense"
+  },
+  {
+   "id": 33,
+   "key": "Taboo"
+  },
+  {
+   "id": 34,
+   "key": "Celestial"
+  },
+  {
+   "id": 35,
+   "key": "Furious"
+  },
+  {
+   "id": 36,
+   "key": "Keen"
+  },
+  {
+   "id": 37,
+   "key": "Superior"
+  },
+  {
+   "id": 38,
+   "key": "Forceful"
+  },
+  {
+   "id": 39,
+   "key": "Broken"
+  },
+  {
+   "id": 40,
+   "key": "Damaged"
+  },
+  {
+   "id": 41,
+   "key": "Shoddy"
+  },
+  {
+   "id": 42,
+   "key": "Quick"
+  },
+  {
+   "id": 43,
+   "key": "Deadly2"
+  },
+  {
+   "id": 44,
+   "key": "Agile"
+  },
+  {
+   "id": 45,
+   "key": "Nimble"
+  },
+  {
+   "id": 46,
+   "key": "Murderous"
+  },
+  {
+   "id": 47,
+   "key": "Slow"
+  },
+  {
+   "id": 48,
+   "key": "Sluggish"
+  },
+  {
+   "id": 49,
+   "key": "Lazy"
+  },
+  {
+   "id": 50,
+   "key": "Annoying"
+  },
+  {
+   "id": 51,
+   "key": "Nasty"
+  },
+  {
+   "id": 52,
+   "key": "Manic"
+  },
+  {
+   "id": 53,
+   "key": "Hurtful"
+  },
+  {
+   "id": 54,
+   "key": "Strong"
+  },
+  {
+   "id": 55,
+   "key": "Unpleasant"
+  },
+  {
+   "id": 56,
+   "key": "Weak"
+  },
+  {
+   "id": 57,
+   "key": "Ruthless"
+  },
+  {
+   "id": 58,
+   "key": "Frenzying"
+  },
+  {
+   "id": 59,
+   "key": "Godly"
+  },
+  {
+   "id": 60,
+   "key": "Demonic"
+  },
+  {
+   "id": 61,
+   "key": "Zealous"
+  },
+  {
+   "id": 62,
+   "key": "Hard"
+  },
+  {
+   "id": 63,
+   "key": "Guarding"
+  },
+  {
+   "id": 64,
+   "key": "Armored"
+  },
+  {
+   "id": 65,
+   "key": "Warding"
+  },
+  {
+   "id": 66,
+   "key": "Arcane"
+  },
+  {
+   "id": 67,
+   "key": "Precise"
+  },
+  {
+   "id": 68,
+   "key": "Lucky"
+  },
+  {
+   "id": 69,
+   "key": "Jagged"
+  },
+  {
+   "id": 70,
+   "key": "Spiked"
+  },
+  {
+   "id": 71,
+   "key": "Angry"
+  },
+  {
+   "id": 72,
+   "key": "Menacing"
+  },
+  {
+   "id": 73,
+   "key": "Brisk"
+  },
+  {
+   "id": 74,
+   "key": "Fleeting"
+  },
+  {
+   "id": 75,
+   "key": "Hasty2"
+  },
+  {
+   "id": 76,
+   "key": "Quick2"
+  },
+  {
+   "id": 77,
+   "key": "Wild"
+  },
+  {
+   "id": 78,
+   "key": "Rash"
+  },
+  {
+   "id": 79,
+   "key": "Intrepid"
+  },
+  {
+   "id": 80,
+   "key": "Violent"
+  },
+  {
+   "id": 81,
+   "key": "Legendary"
+  },
+  {
+   "id": 82,
+   "key": "Unreal"
+  },
+  {
+   "id": 83,
+   "key": "Mythical"
+  },
+  {
+   "id": 84,
+   "key": "Legendary2"
+  },
+  {
+   "id": 85,
+   "key": "Fabled"
+  },
+  {
+   "id": 86,
+   "key": "Loyal"
+  },
+  {
+   "id": 87,
+   "key": "Worthy"
+  },
+  {
+   "id": 88,
+   "key": "Focused"
+  },
+  {
+   "id": 89,
+   "key": "Patient"
+  },
+  {
+   "id": 90,
+   "key": "Rabid"
+  },
+  {
+   "id": 91,
+   "key": "IllTempered"
+  },
+  {
+   "id": 92,
+   "key": "Petty"
+  },
+  {
+   "id": 93,
+   "key": "Feeble"
+  },
+  {
+   "id": 94,
+   "key": "Skittish"
+  },
+  {
+   "id": 95,
+   "key": "Eager"
+  },
+  {
+   "id": 96,
+   "key": "Ballistic"
+  },
+  {
+   "id": 97,
+   "key": "Scraggling"
+  }
+ ]
+}
