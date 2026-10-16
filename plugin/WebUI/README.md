@@ -2,7 +2,7 @@
 
 TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达给在线玩家与服务器，再把游戏内的真实结果带回网页。
 
-> 版本 **1.0.0**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
+> 版本 **0.1.0**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
 > 配置 `<TShock SavePath>/WebUI/config.json`。
 
 核心能力：
@@ -49,7 +49,7 @@ scripts/build-plugin.sh      # 打印 DLL 路径
 3. 启动日志应出现：
    ```
    [WebUI] REST 端点已注册：/webui/auth/*、/webui/batch、/webui/{commands,me,data,serverinfo,events}
-   [Server API] Info Plugin WebUI v1.0.0.0 (by TShockWebUI) initiated.
+   [Server API] Info Plugin WebUI v0.1.0.0 (by TShockWebUI) initiated.
    ```
 
 ### 本机测试容器（一键）

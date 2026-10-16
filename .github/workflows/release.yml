@@ -1,0 +1,233 @@
+name: Release
+
+# 只在推 tag（v*）或手动触发时发版；普通分支 push 不会发 release（只跑 ci.yml 的测试）。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（手动触发必填，如 0.1.0 或 0.1.0-rc.1）'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  # 解析版本与 tag；带 `-` 的版本（如 0.1.0-rc.1）视为预发布。
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            V="$INPUT_VERSION"
+            [ -n "$V" ] || { echo "workflow_dispatch 需要填写 version"; exit 1; }
+            TAG="v$V"
+          else
+            TAG="$REF_NAME"
+            V="${TAG#v}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          case "$V" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "版本 $V / tag $TAG"
+
+  verify:
+    name: Go tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  web:
+    name: Web tests + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:run
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist/
+          retention-days: 1
+
+  binary:
+    name: Binary ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: [prepare, verify, web]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64, ext: "" }
+          - { goos: linux,   goarch: arm64, ext: "" }
+          - { goos: windows, goarch: amd64, ext: ".exe" }
+          - { goos: darwin,  goarch: amd64, ext: "" }
+          - { goos: darwin,  goarch: arm64, ext: "" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+      - name: Build single binary
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          NAME="tswui-${VERSION}-${GOOS}-${GOARCH}${{ matrix.ext }}"
+          SKIP_WEB=1 OUT="dist/$NAME" scripts/build-binary.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          retention-days: 1
+
+  plugin:
+    name: Plugin DLL
+    needs: [prepare, verify]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Build
+        working-directory: plugin/WebUI
+        run: dotnet build -c Release
+      - name: Stage asset
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p release-assets
+          cp plugin/WebUI/bin/Release/net9.0/WebUI.dll "release-assets/WebUI-${VERSION}.dll"
+          ls -la release-assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-dll
+          path: release-assets/*.dll
+          retention-days: 1
+
+  release:
+    name: GitHub Release
+    needs: [prepare, binary, plugin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bin-*
+          merge-multiple: true
+          path: release-assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: plugin-dll
+          path: release-assets
+      - name: Create / update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          echo "assets:"; ls -la release-assets
+          ARGS=(--title "$TAG" --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then ARGS+=(--prerelease); fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/* --clobber
+          else
+            gh release create "$TAG" "${ARGS[@]}" release-assets/*
+          fi
+
+  docker:
+    name: Docker (GHCR + Docker Hub)
+    needs: [prepare, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+      - name: Compute tags
+        id: tags
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          repo_lc=$(echo "$REPO" | tr '[:upper:]' '[:lower:]')
+          ghcr="ghcr.io/$repo_lc"
+          tags="$ghcr:$VERSION"
+          if [ "$VERSION" = "${VERSION#*-}" ]; then tags="$tags"$'\n'"$ghcr:latest"; fi
+          if [ -n "$DOCKERHUB_USERNAME" ]; then
+            dh="$DOCKERHUB_USERNAME/$(basename "$repo_lc")"
+            tags="$tags"$'\n'"$dh:$VERSION"
+            if [ "$VERSION" = "${VERSION#*-}" ]; then tags="$tags"$'\n'"$dh:latest"; fi
+          fi
+          printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
+          echo "--- tags ---"; echo "$tags"
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+          tags: ${{ steps.tags.outputs.tags }}
