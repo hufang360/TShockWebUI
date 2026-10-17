@@ -181,14 +181,14 @@ it('退出需二次确认，取消后仍保持登录', async () => {
 
 it('侧栏页头有主题 / 语言快捷按钮，可切换', async () => {
   mockFetch()
-  const { container } = render(<App transport={new MockTransport()} />)
+  render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
 
-  // 默认深色。
-  expect(container.querySelector('.dark')).toBeTruthy()
+  // 默认深色（深色类挂在 <html>，portal 弹框才能继承）。
+  expect(document.documentElement.classList.contains('dark')).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: /主题：深色/ }))
   // 下一个状态是「自动」；jsdom 无系统深色 → 变浅色。
-  await waitFor(() => expect(container.querySelector('.dark')).toBeNull())
+  await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(false))
   expect(screen.getByRole('button', { name: /主题：自动/ })).toBeTruthy()
 
   const langBtn = screen.getByRole('button', { name: /语言：中文/ })

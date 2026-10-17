@@ -451,13 +451,9 @@ export function SettingsPage({
             </NativeSelect>
           </SettingRow>
           <Separator />
-          <SettingRow label={t('settings.eventsInterval')}>
-            <div className="flex items-center gap-2">
-              {!canFastEvents && (
-                <span className="text-[10px] text-muted-foreground">
-                  {t('settings.eventsIntervalFastHint')}
-                </span>
-              )}
+          <div className="flex flex-col gap-1 py-2">
+            <Field orientation="horizontal" className="flex-nowrap justify-between gap-3">
+              <FieldTitle>{t('settings.eventsInterval')}</FieldTitle>
               <NativeSelect
                 size="sm"
                 value={settings.eventsRefreshInterval}
@@ -477,8 +473,13 @@ export function SettingsPage({
                   {t('settings.refreshIntervalMinutes', { n: 15 })}
                 </NativeSelectOption>
               </NativeSelect>
-            </div>
-          </SettingRow>
+            </Field>
+            {!canFastEvents && (
+              <p className="text-[10px] leading-4 text-muted-foreground">
+                {t('settings.eventsIntervalFastHint')}
+              </p>
+            )}
+          </div>
           <Separator />
           <SettingRow label={t('settings.refreshInterval')}>
             <NativeSelect

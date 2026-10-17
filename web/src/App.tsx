@@ -67,7 +67,6 @@ import { ItemsPage } from '@/pages/ItemsPage'
 import { PlayerManagerPage } from '@/pages/PlayerManagerPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { CommandModulePage } from '@/pages/CommandModulePage'
-import { cn } from '@/lib/cn'
 import type { Dataset, Me, Settings, TabId, UiState } from '@/types'
 
 const DEFAULT_SETTINGS: Settings = {
@@ -166,6 +165,18 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   }, [])
   // theme='auto' 跟随系统；强制 light/dark 时忽略系统。
   const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && systemDark)
+
+  // 深色类挂到 <html>：Radix 的 portal（Dialog / Sheet / Select / DropdownMenu / Popover / Tooltip）
+  // 渲染到 document.body，只有在 <html> 上才能继承 `.dark`；否则弹框在暗色下会是白底。
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.toggle('dark', isDark)
+    root.style.colorScheme = isDark ? 'dark' : 'light'
+    return () => {
+      root.classList.remove('dark')
+      root.style.colorScheme = ''
+    }
+  }, [isDark])
 
   const [ui, setUi] = useLocalState(StorageKeys.ui, DEFAULT_UI)
   // 「指令 → 物品」里点「前往物品图鉴」时带上要展示的物品 id；物品图鉴消费后清空。
@@ -566,7 +577,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       <DatasetProvider value={view}>
         <ExecutionQueueProvider interval={settings.commandInterval}>
         <CommandResultsProvider>
-        <div className={cn('h-full', isDark && 'dark')} style={{ colorScheme: isDark ? 'dark' : 'light' }}>
+        <div className="h-full">
         <AppShell
           activeTab={activeTab}
           onTabChange={(activeTab) => setUi({ ...ui, activeTab })}
