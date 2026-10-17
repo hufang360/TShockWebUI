@@ -38,6 +38,7 @@ interface ModuleCardsPanelProps {
   cards: PanelCard[]
   /** 允许「管理卡片」时提供。 */
   onAddCard?: (name: string, command: string) => void
+  onUpdateCard?: (id: string, patch: { name?: string; command?: string }) => void
   onRemoveCard?: (id: string) => void
 }
 
@@ -56,6 +57,7 @@ export function ModuleCardsPanel({
   title,
   cards,
   onAddCard,
+  onUpdateCard,
   onRemoveCard,
 }: ModuleCardsPanelProps) {
   const { t } = useI18n()
@@ -264,6 +266,7 @@ export function ModuleCardsPanel({
           isManual={cardManual}
           onToggleManual={toggleManual}
           onAdd={onAddCard}
+          onUpdate={onUpdateCard ?? (() => {})}
           onRemove={onRemoveCard ?? (() => {})}
         />
       )}

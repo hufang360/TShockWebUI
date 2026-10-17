@@ -1,12 +1,15 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Play, RefreshCw } from 'lucide-react'
+import { CollapseChevron } from '@/components/CollapseChevron'
 import { CommandOutput } from '@/components/ResultPanel'
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
-  CardTitle,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Spinner,
   Tooltip,
   TooltipContent,
@@ -64,73 +67,110 @@ export function CommandCard({
   className,
 }: CommandCardProps) {
   const { t } = useI18n()
+  const [open, setOpen] = useState(true)
   const lastRun = result?.ts ? new Date(result.ts) : null
   return (
-    <Card className={cn('flex flex-col', className)}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {icon}
-          {title}
-        </CardTitle>
-        {onRefresh && (
-          <TooltipProvider delayDuration={150}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
-                  disabled={unavailable || loading}
-                  onClick={onRefresh}
-                >
-                  {loading ? (
-                    <Spinner aria-hidden data-icon="inline-start" />
-                  ) : action === 'run' ? (
-                    <Play data-icon="inline-start" />
-                  ) : (
-                    <RefreshCw data-icon="inline-start" />
+    <Card className={cn('flex flex-col overflow-hidden', className)}>
+      <Collapsible
+        open={open}
+        onOpenChange={setOpen}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <CardHeader className="group/header shrink-0">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="group/title flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            >
+              {icon}
+              <span className="truncate text-sm font-semibold tracking-wide text-foreground">
+                {title}
+              </span>
+            </button>
+          </CollapsibleTrigger>
+          {/* 操作按钮：默认隐藏，hover 表头才显示；折叠时不显示。 */}
+          <div
+            className={cn(
+              'flex shrink-0 items-center gap-1',
+              open ? 'opacity-0 transition-opacity group-hover/header:opacity-100' : 'hidden',
+            )}
+          >
+            {onRefresh && (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
+                      disabled={unavailable || loading}
+                      onClick={onRefresh}
+                    >
+                      {loading ? (
+                        <Spinner aria-hidden data-icon="inline-start" />
+                      ) : action === 'run' ? (
+                        <Play data-icon="inline-start" />
+                      ) : (
+                        <RefreshCw data-icon="inline-start" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {lastRun
+                      ? t('home.lastRun', { time: lastRun.toLocaleTimeString() })
+                      : t('home.neverRun')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="shrink-0 cursor-pointer"
+              aria-label={open ? t('result.collapse') : t('result.expand')}
+            >
+              <CollapseChevron open={open} reveal="group-hover/header:opacity-100" />
+            </button>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
+          <CardBody className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {unavailable ? (
+                <p className="text-xs text-muted-foreground">
+                  {unavailableText ?? t('home.needLogin')}
+                </p>
+              ) : result ? (
+                <div className="flex flex-col gap-1.5">
+                  {/* 无权限：卡片保留，给出本地化提示（TShock 的原文可能不是当前语言）。 */}
+                  {result.status === 'no_permission' && (
+                    <p className="text-xs text-warning">{t('home.permissionDenied')}</p>
                   )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {lastRun
-                  ? t('home.lastRun', { time: lastRun.toLocaleTimeString() })
-                  : t('home.neverRun')}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </CardHeader>
-      <CardBody className="flex flex-1 flex-col gap-2">
-        <div className="flex-1">
-          {unavailable ? (
-            <p className="text-xs text-muted-foreground">{unavailableText ?? t('home.needLogin')}</p>
-          ) : result ? (
-            <div className="flex flex-col gap-1.5">
-              {/* 无权限：卡片保留，给出本地化提示（TShock 的原文可能不是当前语言）。 */}
-              {result.status === 'no_permission' && (
-                <p className="text-xs text-warning">{t('home.permissionDenied')}</p>
+                  <CommandOutput
+                    result={
+                      result.status === 'no_permission'
+                        ? { ...result, message: undefined }
+                        : result
+                    }
+                    itemsById={itemsById}
+                    prefixesById={prefixesById}
+                    atlas={atlas}
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {loading ? t('home.refreshing') : (emptyText ?? t('home.empty'))}
+                </p>
               )}
-              <CommandOutput
-                result={
-                  result.status === 'no_permission' ? { ...result, message: undefined } : result
-                }
-                itemsById={itemsById}
-                prefixesById={prefixesById}
-                atlas={atlas}
-              />
             </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {loading ? t('home.refreshing') : (emptyText ?? t('home.empty'))}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-          <code className="font-pixel text-[10px] text-muted-foreground">{command ?? '—'}</code>
-          {footerNote}
-        </div>
-      </CardBody>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+              <code className="font-pixel text-[10px] text-muted-foreground">{command ?? '—'}</code>
+              {footerNote}
+            </div>
+          </CardBody>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   )
 }

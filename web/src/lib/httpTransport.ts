@@ -82,7 +82,7 @@ async function readError(res: Response): Promise<{ code?: string; message?: stri
   }
 }
 
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
+async function request(path: string, init: RequestInit = {}, targetOverride?: string): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase()
   const headers = new Headers(init.headers)
   if (method !== 'GET' && method !== 'HEAD') {
@@ -93,7 +93,8 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
     }
   }
   // 多服务器切换：非内置默认时携带所选 TShock 上游（后端校验 http/https + host:port）。
-  const target = activeTargetHeader()
+  // targetOverride 为空串时强制「内置默认」（不带头），用于按行探测连通性。
+  const target = targetOverride !== undefined ? targetOverride : activeTargetHeader()
   if (target) headers.set('X-TSWUI-Target', target)
 
   let res: Response
@@ -204,9 +205,9 @@ export class HttpTransport implements BackendTransport {
     await request('/logout', { method: 'POST' })
   }
 
-  async serverStatus(): Promise<ServerStatus> {
+  async serverStatus(target?: string): Promise<ServerStatus> {
     try {
-      const res = await request('/status')
+      const res = await request('/status', {}, target)
       return (await res.json()) as ServerStatus
     } catch {
       // 契约要求：探测失败返回 200 + reachable:false，不抛错。

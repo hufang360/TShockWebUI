@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Fish, Globe2, House, Plug, Terminal, Users } from 'lucide-react'
+import { BookOpen, Fish, Globe2, House, Plug, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { AppShell, type NavItem } from '@/components/AppShell'
 import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
 import { LoginDialog } from '@/components/LoginDialog'
-import { SettingsMenu } from '@/components/SettingsMenu'
+import { QuickPreferences } from '@/components/QuickPreferences'
 import { SidebarAccountMenu } from '@/components/SidebarAccountMenu'
 import {
   Alert,
@@ -17,7 +17,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  Separator,
   Spinner,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
@@ -42,11 +41,13 @@ import {
   BUILTIN_ID,
   addServerTarget,
   loadServers as loadServerTargets,
+  hostPortLabel,
   maskHost,
   maskedTargetLabel,
   readActiveTargetId,
   resolveTarget,
   saveServers,
+  updateServerTarget,
   writeActiveTargetId,
   type ServerTarget,
 } from '@/lib/servers'
@@ -116,7 +117,9 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const [rawSettings, setSettings] = useLocalState(StorageKeys.settings, DEFAULT_SETTINGS)
   const settings = useMemo(() => {
     const merged: Settings = { ...DEFAULT_SETTINGS, ...rawSettings }
-    if (merged.theme !== 'light' && merged.theme !== 'dark') merged.theme = 'dark'
+    if (merged.theme !== 'light' && merged.theme !== 'dark' && merged.theme !== 'auto') {
+      merged.theme = 'dark'
+    }
     if (merged.language !== 'zh' && merged.language !== 'en') merged.language = 'zh'
     if (typeof merged.compact !== 'boolean') merged.compact = true
     if (
@@ -147,6 +150,22 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       translate(settings.language, key, vars),
     [settings.language],
   )
+
+  // 系统深色偏好（theme='auto' 时用）；jsdom 可能没有 matchMedia，降级为 false。
+  const [systemDark, setSystemDark] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false,
+  )
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mql = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
+  // theme='auto' 跟随系统；强制 light/dark 时忽略系统。
+  const isDark = settings.theme === 'dark' || (settings.theme === 'auto' && systemDark)
 
   const [ui, setUi] = useLocalState(StorageKeys.ui, DEFAULT_UI)
   // 「指令 → 物品」里点「前往物品图鉴」时带上要展示的物品 id；物品图鉴消费后清空。
@@ -188,6 +207,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         icon: Plug,
       })
     }
+    // 「设置」始终排在最后：新增模块（内置 / 自定义）都插在它前面。
+    items.push({ id: 'settings', label: t('settings.title'), icon: SettingsIcon })
     return items
   }, [modules, activeServerId, t, customModules])
 
@@ -415,16 +436,26 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     [activeServerId, transport, clearLocalUser, settings.language],
   )
 
-  const addServer = useCallback(
-    (target: ServerTarget) => {
+  // 新增上游只写入列表，**不自动切换**（由玩家在列表里点选）。
+  const addServer = useCallback((target: ServerTarget) => {
+    setServers((prev) => {
+      const next = addServerTarget(prev, target)
+      saveServers(next)
+      return next
+    })
+  }, [])
+
+  // 修改已保存的上游：替换列表项；改的是当前上游时，地址已变、旧 token 失效，走一次切换（要求重新登录）。
+  const updateServer = useCallback(
+    (oldId: string, target: ServerTarget) => {
       setServers((prev) => {
-        const next = addServerTarget(prev, target)
+        const next = updateServerTarget(prev, oldId, target)
         saveServers(next)
         return next
       })
-      void selectServer(target.id)
+      if (activeServerId === oldId) void selectServer(target.id)
     },
-    [selectServer],
+    [activeServerId, selectServer],
   )
 
   const removeServer = useCallback(
@@ -526,7 +557,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const accountServerLabel =
     activeServerId === BUILTIN_ID
       ? serverInfo.default
-        ? `${maskHost(serverInfo.default.host)}:${serverInfo.default.port}`
+        ? hostPortLabel(maskHost(serverInfo.default.host), serverInfo.default.port)
         : (status?.name ?? '—')
       : maskedTargetLabel(resolveTarget(servers, activeServerId))
 
@@ -535,11 +566,19 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       <DatasetProvider value={view}>
         <ExecutionQueueProvider interval={settings.commandInterval}>
         <CommandResultsProvider>
-        <div className={cn('h-full', settings.theme === 'dark' && 'dark')}>
+        <div className={cn('h-full', isDark && 'dark')} style={{ colorScheme: isDark ? 'dark' : 'light' }}>
         <AppShell
           activeTab={activeTab}
           onTabChange={(activeTab) => setUi({ ...ui, activeTab })}
           nav={nav}
+          headerExtra={
+            <QuickPreferences
+              theme={settings.theme}
+              language={settings.language}
+              onThemeChange={(theme) => setSettings({ ...settings, theme })}
+              onLanguageChange={(language) => setSettings({ ...settings, language })}
+            />
+          }
           sidebarCollapsed={ui.sidebarCollapsed}
           onToggleSidebar={() => setUi({ ...ui, sidebarCollapsed: !ui.sidebarCollapsed })}
           compact={settings.compact}
@@ -547,8 +586,6 @@ export default function App({ transport: transportProp }: AppProps = {}) {
           sidebarExtra={<ExecutionQueuePanel />}
           headerRight={
             <>
-              <SettingsMenu onOpen={() => setUi({ ...ui, activeTab: 'settings' })} active={activeTab === 'settings'} />
-              <Separator />
               <SidebarAccountMenu
                 serverId={activeServerId}
                 serverLabel={accountServerLabel}
@@ -558,8 +595,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
                 servers={servers}
                 activeId={activeServerId}
                 info={serverInfo}
+                transport={transport}
                 onSelectServer={(id) => void selectServer(id)}
                 onAddServer={addServer}
+                onEditServer={updateServer}
                 onRemoveServer={removeServer}
                 onLogin={() => {
                   setLoginReason(null)
@@ -577,9 +616,14 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               authenticated={session.authenticated}
               username={username}
               serverId={activeServerId}
+              modules={modules}
               refreshInterval={settings.refreshInterval}
               eventsRefreshInterval={settings.eventsRefreshInterval}
               onTokenInvalid={handleTokenInvalid}
+              onLogin={() => {
+                setLoginReason(null)
+                setLoginOpen(true)
+              }}
               onNavigate={(activeTab) => setUi({ ...ui, activeTab })}
             />
           )}
@@ -594,6 +638,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               ingameAllowed={ingameAllowed}
               runtimeValues={runtimeParams}
               onTokenInvalid={handleTokenInvalid}
+              onLogin={() => {
+                setLoginReason(null)
+                setLoginOpen(true)
+              }}
               onOpenInDex={(itemId) => {
                 setDexFocus(itemId)
                 setUi({ ...ui, activeTab: 'items' })
@@ -643,6 +691,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               serverId={activeServerId}
               refreshInterval={settings.refreshInterval}
               onTokenInvalid={handleTokenInvalid}
+              onLogin={() => {
+                setLoginReason(null)
+                setLoginOpen(true)
+              }}
               moduleId="world"
               keyPrefix="world:"
               title={t('nav.world')}
@@ -661,6 +713,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
                 serverId={activeServerId}
                 refreshInterval={settings.refreshInterval}
                 onTokenInvalid={handleTokenInvalid}
+                onLogin={() => {
+                  setLoginReason(null)
+                  setLoginOpen(true)
+                }}
                 moduleId={mod.id}
                 keyPrefix={`${mod.id}:`}
                 title={mod.name || t('modules.custom.untitled')}
@@ -714,6 +770,14 @@ export default function App({ transport: transportProp }: AppProps = {}) {
           open={loginOpen}
           reason={loginReason ? t(loginReason) : undefined}
           serverId={activeServerId}
+          serverLabel={accountServerLabel}
+          serverOnline={status?.reachable === true}
+          servers={servers}
+          info={serverInfo}
+          onSelectServer={(id) => void selectServer(id)}
+          onAddServer={addServer}
+          onEditServer={updateServer}
+          onRemoveServer={removeServer}
           onClose={() => {
             setLoginOpen(false)
             setLoginReason(null)

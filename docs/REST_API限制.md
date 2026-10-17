@@ -68,7 +68,7 @@
   - 出处：`SecureRest.cs:204-220`。
 - **静态令牌 `ApplicationRestTokens`**：配置里预置 `{token: {Username, UserGroupName}}`，永不失效、**不受建令牌限流**，是服务端对接的推荐方式。
   - 出处：`TShockConfig.cs:658`、`SecureRest.cs:60-70`。
-- **403 语义不区分**：密码错 / 组缺 `useapi` / 被限流，返回**同一句** 403 文案 → 调用方无法区分（本项目据此把三种可能都提示给玩家）。
+- **403 语义不区分**：密码错 / 组缺 `useapi` / 被限流，返回**同一句** 403 文案 → 调用方无法区分。本项目据此把三种可能拆成**逐条清单**提示玩家（`docs/UI组件.md` 登录框章节；英文界面走前端 i18n，不透出后端中文 message）。
   - 出处：`SecureRest.cs:126-176`。
 
 ## 3. 权限模型
@@ -92,6 +92,7 @@
 - 定时器每 `RESTRequestBucketDecreaseIntervalMinutes`（**最小 1 分钟**）把所有 IP 计数 −1。
 - 默认 `RESTMaximumRequestsPerInterval = 5` → 约 5 次成功或 3 次失败即被挡，之后每分钟恢复 1 次。
 - 出处：`Rest.cs:237-241,320-334`、`SecureRest.cs:117-125`、`TShockConfig.cs:650,654`。
+- **装了 WebUI 信使插件后可精确/可放宽**：插件暴露只读端点 `/webui/restlimit`（返回 `limit` 与**调用者自己 IP** 的 `bucket`，源码读 public 的 `Rest.tokenBucket`），后端在密码登录前调用 → 桶满直接判 `rate_limited`；服务端还可用 `/weblimit <值>|unlimited|default` 修改并保存 `RESTMaximumRequestsPerInterval`（高级指令，需 `tshock.rest.cfg`）。见 `docs/插件-信使.md`。
 
 ## 5. 端点清单（核心，v6.2.1）
 
@@ -215,7 +216,7 @@
 - **`POST /v2/token/create` 只能用 query**：表单体会 500（实测），故本项目登录走 query。
 - **建令牌限流是全局的**：反代后所有玩家共用一个来源 IP，`RESTMaximumRequestsPerInterval` 成为**全站**限额；本机已调到 `1000` 便于测试。
 - **rawcmd 无速率限制**：首页多卡片连续执行不会被 REST 限流挡（之前排查的「空响应」是网络路径/代理问题，不是限流）。
-- **403 不可区分**：密码错/缺权限/限流同文案，前端只能一并提示。
+- **403 不可区分**：密码错/缺权限/限流同文案；装了 WebUI 插件时后端先用 `/webui/restlimit` 排除限流（清单少一项），未装时前端把三种原因一并（逐条）提示。
 - **`AllowServer=false` 仍要前端先拦**：否则会发出站请求；本项目 Tier A 已前置拒绝。
 - **出站方法默认 POST**：TShock 不校验方法，而部分机房只劫持明文 GET（见 §1、§8.1）；
   `TSHOCK_METHOD=GET` 可切回旧行为（等价，但域名被栏时不可用）。

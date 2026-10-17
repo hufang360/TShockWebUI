@@ -313,12 +313,13 @@ describe('FishShopPage', () => {
     )
   })
 
-  it('点击弹框外区域不关闭', async () => {
+  it('点击抽屉外区域关闭抽屉', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
-    const dialog = await screen.findByRole('dialog')
+    await screen.findByRole('dialog')
     fireEvent.pointerDown(document.body)
-    expect(within(dialog).getByText('商品详情')).toBeTruthy()
+    fireEvent.click(document.body)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })
 

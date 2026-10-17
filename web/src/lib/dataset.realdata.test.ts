@@ -22,6 +22,17 @@ const locEn = readJson<LocalizationBundle>('loc.en-US.json')
 const stats = readJson<{ items: Record<string, { stats?: unknown }> }>('item-stats.json')
 const tipsZh = readJson<{ items: Record<string, string[]> }>('item-tips.zh-Hans.json')
 const tipsEn = readJson<{ items: Record<string, string[]> }>('item-tips.en-US.json')
+const itemGroups = readJson<{
+  meta: { tabCount: number }
+  tabs: Array<{ id: string; label: string }>
+  items: Record<string, { g: string; gv: number; o: number; t: number[] }>
+}>('item-groups.json')
+const shimmer = readJson<{ meta: { count: number }; items: Record<string, number> }>('shimmer.json')
+const prefixSets = readJson<{
+  meta: { setCount: number }
+  sets: number[][]
+  items: Record<string, number>
+}>('prefix-sets.json')
 
 describe('真实数据：语言拆分契约', () => {
   it('items.json / prefixes.json 不含任何语言字段', () => {
@@ -109,6 +120,8 @@ describe('loadDataset 按语言加载（真实数据）', () => {
     expect(ds.prefixesById.get(1)?.name).toBe('大')
     expect(locText(ds.loc, ds.recipes.groups.Wood.key)).toBe('木材')
     expect(locText(ds.loc, ds.recipes.groups.Turtles.key)).toBe('龟')
+    expect(ds.itemGroups.tabs.length).toBe(11)
+    expect(ds.itemGroups.items['4956'].g).toBe('MeleeWeapon')
   })
 
   it('英文：名称 / 提示行 / 词缀均取 en-US', async () => {
@@ -118,6 +131,116 @@ describe('loadDataset 按语言加载（真实数据）', () => {
     expect(ds.itemStats.items['4956']?.tip?.[0]).toContain('damage')
     expect(ds.prefixesById.get(1)?.name).toBe('Large')
     expect(locText(ds.loc, ds.recipes.groups.Wood.key)).toBe('Wood')
+  })
+})
+
+describe('真实数据：创意菜单物品分组（item-groups.json）', () => {
+  it('页签 = 游戏创意菜单的 11 个 ItemFilters，顺序固定', () => {
+    expect(itemGroups.meta.tabCount).toBe(11)
+    expect(itemGroups.tabs.map((t) => t.id)).toEqual([
+      'weapons',
+      'armor',
+      'vanity',
+      'blocks',
+      'furniture',
+      'accessories',
+      'accessoriesMisc',
+      'consumables',
+      'tools',
+      'materials',
+      'misc',
+    ])
+    // 页签 key 保留游戏本地化出处
+    for (const t of itemGroups.tabs) expect(t.label).toMatch(/^CreativePowers\.Tab/)
+  })
+
+  it('每件物品都有 ItemGroup / 组内顺序 / 页签下标，且下标合法', () => {
+    const entries = Object.entries(itemGroups.items)
+    expect(entries.length).toBeGreaterThan(6000)
+    for (const [, v] of entries) {
+      expect(typeof v.g).toBe('string')
+      expect(typeof v.gv).toBe('number')
+      expect(typeof v.o).toBe('number')
+      expect(Array.isArray(v.t)).toBe(true)
+      for (const i of v.t) {
+        expect(i).toBeGreaterThanOrEqual(0)
+        expect(i).toBeLessThan(11)
+      }
+    }
+  })
+
+  it('样例：天顶剑属于武器页签，生命水晶同时属于消耗品与材料', () => {
+    expect(itemGroups.items['4956'].g).toBe('MeleeWeapon')
+    expect(itemGroups.items['4956'].t).toContain(0)
+    expect(itemGroups.items['29'].t).toEqual(expect.arrayContaining([7, 9]))
+  })
+})
+
+describe('真实数据：可滚词缀（prefix-sets.json）', () => {
+  const mockFetch = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const rel = String(input).replace(/^.*\/data\//, '')
+        try {
+          return new Response(readFileSync(resolve(dataDir, rel)), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        } catch {
+          return new Response('not found', { status: 404 })
+        }
+      }),
+    )
+
+  it('武器有可滚词缀，材料 / 盔甲没有', () => {
+    expect(prefixSets.meta.setCount).toBeGreaterThan(0)
+    // 天顶剑（4956，剑）有；铁锭（22，材料）没有
+    expect(prefixSets.items['4956']).toBeGreaterThanOrEqual(0)
+    expect(prefixSets.items['22']).toBeUndefined()
+  })
+
+  it('loadDataset 建立 rollablePrefixesById', async () => {
+    mockFetch()
+    const ds = await loadDataset('zh')
+    expect(ds.rollablePrefixesById.get(4956)?.length).toBeGreaterThan(0)
+    expect(ds.rollablePrefixesById.has(22)).toBe(false)
+  })
+})
+
+describe('真实数据：微光转换（shimmer.json）', () => {
+  const mockFetch = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const rel = String(input).replace(/^.*\/data\//, '')
+        try {
+          return new Response(readFileSync(resolve(dataDir, rel)), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        } catch {
+          return new Response('not found', { status: 404 })
+        }
+      }),
+    )
+
+  it('包含数百条映射，且都是有效物品 id', () => {
+    expect(shimmer.meta.count).toBeGreaterThan(200)
+    for (const [from, to] of Object.entries(shimmer.items)) {
+      expect(Number(from)).toBeGreaterThan(0)
+      expect(to).toBeGreaterThan(0)
+      expect(to).not.toBe(Number(from))
+    }
+  })
+
+  it('loadDataset 会建立正向 / 反向索引', async () => {
+    mockFetch()
+    const ds = await loadDataset('zh')
+    const first = Number(Object.keys(shimmer.items)[0])
+    const to = shimmer.items[String(first)]
+    expect(ds.shimmerToById.get(first)).toBe(to)
+    expect(ds.shimmerFromById.get(to)).toContain(first)
   })
 })
 

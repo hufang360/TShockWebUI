@@ -2,13 +2,18 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { clearSelfAvatar, setSelfAvatar } from '@/lib/selfAvatar'
-import { emptyPlayerLook } from '@/lib/tshock'
+import { emptyPlayerLook, type BackendTransport } from '@/lib/tshock'
 import { SidebarAccountMenu } from './SidebarAccountMenu'
+
+const transport = {
+  serverStatus: async () => ({ reachable: true }),
+} as unknown as BackendTransport
 
 function renderMenu(overrides: Partial<Parameters<typeof SidebarAccountMenu>[0]> = {}) {
   const handlers = {
     onSelectServer: vi.fn(),
     onAddServer: vi.fn(),
+    onEditServer: vi.fn(),
     onRemoveServer: vi.fn(),
     onLogin: vi.fn(),
     onLogout: vi.fn(),
@@ -24,6 +29,7 @@ function renderMenu(overrides: Partial<Parameters<typeof SidebarAccountMenu>[0]>
         servers={[]}
         activeId="default"
         info={{ allowCustom: true, default: { scheme: 'http', host: '127.0.0.1', port: 7878 } }}
+        transport={transport}
         {...handlers}
         {...overrides}
       />
@@ -65,6 +71,21 @@ describe('SidebarAccountMenu', () => {
     expect(onLogin).toHaveBeenCalledTimes(1)
   })
 
+  it('未登录时账号卡片上方有登录按钮，点击直接打开登录', () => {
+    const { onLogin } = renderMenu({ username: null })
+    const button = screen.getByRole('button', { name: '登录' })
+    const trigger = screen.getByRole('button', { name: '账号与服务器' })
+    // 登录按钮在账号卡片之前（上方）。
+    expect(button.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(button)
+    expect(onLogin).toHaveBeenCalledTimes(1)
+  })
+
+  it('已登录时没有单独的登录按钮', () => {
+    renderMenu()
+    expect(screen.queryByRole('button', { name: '登录' })).toBeNull()
+  })
+
   it('有「自己」的外观时用全身图作头像', () => {
     setSelfAvatar('default', emptyPlayerLook('Alice'))
     renderMenu()
@@ -76,6 +97,9 @@ describe('SidebarAccountMenu', () => {
     openMenu()
     fireEvent.click(await screen.findByRole('menuitem', { name: '切换服务器' }))
     expect(await screen.findByRole('dialog')).toBeTruthy()
+    // 表单默认收起，点「添加服务器」才出现 IP 输入框。
+    expect(screen.queryByLabelText('IP / 域名')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /添加服务器/ }))
     expect(screen.getByLabelText('IP / 域名')).toBeTruthy()
   })
 })

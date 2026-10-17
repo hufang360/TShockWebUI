@@ -6,7 +6,7 @@
 node tools/gen-data.mjs          # 1) 物品/词缀/指令 + loc.<culture>.json（官方本地化）
 python3 tools/gen-atlas.py       # 2) 图标图集（需 Pillow）
 python3 tools/gen-player-atlas.py # 3) 玩家角色图集（需 Pillow）
-bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<culture>.json（需 dotnet 9）
+bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<culture>.json + item-groups.json + shimmer.json（需 dotnet 9）
 ```
 
 数据对应 **Terraria 1.4.5.8**。版本不匹配时必须重新生成，否则物品 ID / 名称 / 图标可能错位。
@@ -42,6 +42,10 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 | `commands.json` | TShock 核心指令（源码 best-effort 解析，含参数表 `paramSets`） | 95（70 条带参数表） |
 | `recipes.json` | 合成表：配方、配方组（**只有本地化 `key`**）、产出/材料倒排索引 | 3603 |
 | `item-stats.json` | 物品属性 `stats`（语言无关） | 6195 |
+| `item-groups.json` | 创意菜单物品分组（页签 + 每件物品的 ItemGroup / 组内顺序，语言无关） | 6195 |
+| `shimmer.json` | 微光转换：源物品 id → 目标物品 id（语言无关） | 316 |
+| `prefix-mods.json` | 词缀数值修正（乘/加；来自 `Item.cs`，与物品无关） | 78 |
+| `prefix-sets.json` | 每件物品**可滚词缀**（`Item.GetRollablePrefixes()`；盔甲/材料不收录） | 886 |
 | `item-tips.zh-Hans.json` | 物品提示行（中文） | 6049 |
 | `item-tips.en-US.json` | 物品提示行（英文） | 6049 |
 | `loc.zh-Hans.json` | 官方本地化：`ItemName` / `Prefix` / `Misc` / `LegacyMisc` / `NPCName` / `BuffName` | — |
@@ -134,6 +138,72 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 - `tip` 行顺序与文案复刻游戏 `Main.MouseText_DrawItemTooltip_GetLinesInfo()`；
   伤害/暴击为**物品基础值**（暴击已按无装备玩家 +4% 基础值处理），不含前缀与玩家/世界状态相关行。
 - `stats` 只保留非默认字段，供详情面板/筛选使用。
+
+### item-groups.json 结构（创意菜单分组）
+
+来自游戏运行时（GameDump 通过反射先执行 `Main.Initialize_TileAndNPCData1/2`，再调
+`ContentSamples.CreativeHelper.GetItemGroup` / `ItemCreativeSortingId` 与
+`Terraria.GameContent.Creative.ItemFilters`）：
+
+```jsonc
+{
+  "meta": { "gameVersion": "1.4.5.8", "itemCount": 6195, "tabCount": 11, ... },
+  // 页签 = 创意菜单 UICreativeInfiniteItemsDisplay 使用的过滤器列表（顺序固定）
+  "tabs": [{ "id": "weapons", "label": "CreativePowers.TabWeapons" }, ...],
+  "items": {
+    // g/gv = ItemGroup 枚举名/值；o = 组内顺序（ByCreativeSortingId 用）；
+    // t = 所属页签下标（一个物品可属于多个页签，与游戏 EntryFilterer 一致）
+    "4956": { "g": "MeleeWeapon", "gv": 530, "o": -190, "t": [0] }
+  }
+}
+```
+
+- 页签有 11 个：武器 / 盔甲 / 时装 / 物块 / 家具 / 配饰 / 装备 / 消耗品 / 工具 / 材料 / 其他。
+- 前端页签文案取自 `web/src/lib/i18n.tsx` 的 `dex.tab.<id>`（与游戏 `CreativePowers.Tab*` 官方文案一致）。
+- 由 `tools/gen-item-groups.mjs` 整理（页签 key → i18n id 的映射也在其中）。
+
+### shimmer.json 结构（微光转换）
+
+来源：`ItemID.Sets.ShimmerTransformToItem`（源物品 → 目标物品；-1 = 无转换）。
+
+```jsonc
+{
+  "meta": { "gameVersion": "1.4.5.8", "count": 316, "source": "ItemID.Sets.ShimmerTransformToItem @ OTAPI 1.4.5.8", ... },
+  "items": { "3": 2, "8": 5353, "9": 2 }
+}
+```
+
+- 由 `tools/gen-shimmer.mjs` 整理（只收录有效且非自身的映射）。
+- 前端 `dataset.ts` 同时建正向 `shimmerToById` 与反向 `shimmerFromById`，供详情「微光转换」区展示。
+
+### prefix-mods.json 结构（词缀数值修正）
+
+来源：`TR_SRC/Terraria/Item.cs` 的 `TryGetPrefixStatMultipliersForItem()` switch（与物品无关）。
+
+```jsonc
+{
+  "meta": { "count": 78, "source": "Terraria/Item.cs TryGetPrefixStatMultipliersForItem() @ 1.4.5.8", ... },
+  "mods": { "81": { "kb": 1.15, "dmg": 1.15, "crt": 5, "spd": 0.9, "size": 1.1 } }
+}
+```
+
+- 由 `tools/gen-prefix-mods.mjs` 解析（只保留非默认字段）。
+- 前端详情「词缀」下拉用它预览词缀加成（伤害/暴击/速度/击退）。
+
+### prefix-sets.json 结构（可滚词缀）
+
+来源：游戏运行时 `Item.GetRollablePrefixes()`（武器/饰品各不相同，盔甲/材料返回 null）。
+
+```jsonc
+{
+  "meta": { "setCount": 7, "itemCount": 886, ... },
+  "sets": [[1, 2, 3, ...], [16, 17, ...]],
+  "items": { "4956": 0, "12": 4 }
+}
+```
+
+- 由 `tools/gamedump` 导出 + `tools/gen-prefix-sets.mjs` 整理；`items` 只收录有词缀的物品。
+- 前端详情「词缀」下拉**只列该物品可滚的词缀**（盔甲等不显示下拉）。
 
 ## items.json 单条结构
 

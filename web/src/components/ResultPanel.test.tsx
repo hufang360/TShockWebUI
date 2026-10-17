@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
 import { ResultPanel, type ResultEntry } from './ResultPanel'
@@ -39,6 +39,24 @@ describe('ResultPanel', () => {
     )
     expect(screen.queryByRole('img')).toBeNull()
     expect(screen.getByText(/\[i:29\]/)).toBeTruthy()
+  })
+
+  it('富文本区域提供复制按钮，点击复制原始文本', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[entry('/time', { status: 'ok', output: ['第一行', '第二行'] })]}
+          running={false}
+        />
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '复制' }))
+    expect(writeText).toHaveBeenCalledWith('第一行\n第二行')
   })
 
   it('把输出里的 [c/RRGGBB:..] 颜色标签渲染成彩色文本', () => {
@@ -100,7 +118,7 @@ describe('ResultPanel', () => {
     expect(screen.getByText('5')).toBeTruthy()
   })
 
-  it('悬停物品图标显示图标 / 词缀 / 名称 / 数量提示', () => {
+  it('悬停物品图标显示图标 / 词缀 / 名称 / 数量提示', async () => {
     const dataset = makeDataset()
     render(
       <I18nProvider lang="zh">
@@ -119,7 +137,8 @@ describe('ResultPanel', () => {
       </I18nProvider>,
     )
     fireEvent.mouseOver(screen.getByRole('img', { name: '生命水晶' }))
-    const tip = screen.getByRole('tooltip')
+    // 提示有弹出延迟（避免太容易触发），等待其出现。
+    const tip = await screen.findByRole('tooltip')
     expect(within(tip).getByText('传奇')).toBeTruthy()
     expect(within(tip).getByText('生命水晶')).toBeTruthy()
     expect(within(tip).getByText('x5')).toBeTruthy()

@@ -22,9 +22,19 @@ export function builtinTarget(): ServerTarget {
   return { id: BUILTIN_ID, scheme: 'http', host: '', port: DEFAULT_TSHOCK_PORT }
 }
 
+/**
+ * host:port 展示串；IPv6 加方括号，避免 `2001:db8::1:7878` 这类冒号歧义。
+ * 空 host（内置默认）不特殊处理，由调用方决定文案。
+ */
+export function hostPortLabel(host: string, port: number): string {
+  const h = host.trim()
+  const wrapped = h.includes(':') && !h.startsWith('[') ? `[${h}]` : h
+  return `${wrapped}:${port}`
+}
+
 /** 界面展示用：默认项返回空串，由调用方给出「服务器默认」文案。 */
 export function targetLabel(target: ServerTarget): string {
-  return target.id === BUILTIN_ID ? '' : `${target.host}:${target.port}`
+  return target.id === BUILTIN_ID ? '' : hostPortLabel(target.host, target.port)
 }
 
 /**
@@ -56,7 +66,7 @@ export function maskHost(host: string): string {
 
 /** 界面展示用（隐私遮挡版）：默认项返回空串。 */
 export function maskedTargetLabel(target: ServerTarget): string {
-  return target.id === BUILTIN_ID ? '' : `${maskHost(target.host)}:${target.port}`
+  return target.id === BUILTIN_ID ? '' : hostPortLabel(maskHost(target.host), target.port)
 }
 
 /** 请求头值；内置默认返回 undefined（不携带该头）。 */
@@ -109,8 +119,39 @@ export function saveServers(list: ServerTarget[]): void {
   writeJson(StorageKeys.servers, list)
 }
 
+/** 列表/编辑展示用完整 URL：`scheme://host:port`（IPv6 加方括号）。 */
+export function formatTargetUrl(scheme: string, host: string, port: number): string {
+  return `${scheme}://${hostPortLabel(host, port)}`
+}
+
+/** 列表/编辑展示用完整 URL（自定义项）。 */
+export function targetUrl(target: ServerTarget): string {
+  return formatTargetUrl(target.scheme, target.host, target.port)
+}
+
 export function addServerTarget(list: ServerTarget[], target: ServerTarget): ServerTarget[] {
   return [target, ...list.filter((s) => s.id !== target.id)].slice(0, SERVER_LIMIT)
+}
+
+/**
+ * 修改一条已保存的上游：`oldId` 是要改的项，`next` 是新值（id 可能因 host/port/scheme 变化而变）。
+ * 保持原有顺序；若 `oldId` 不在列表里则插到最前。
+ */
+export function updateServerTarget(
+  list: ServerTarget[],
+  oldId: string,
+  next: ServerTarget,
+): ServerTarget[] {
+  const out: ServerTarget[] = []
+  const seen = new Set<string>()
+  for (const s of list) {
+    const item = s.id === oldId ? next : s
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    out.push(item)
+  }
+  if (!list.some((s) => s.id === oldId)) out.unshift(next)
+  return out.slice(0, SERVER_LIMIT)
 }
 
 export function readActiveTargetId(): string {

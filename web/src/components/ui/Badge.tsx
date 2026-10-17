@@ -14,6 +14,7 @@ const badgeVariants = cva(
         success: 'bg-success/15 text-success',
         warn: 'bg-warning/15 text-warning',
         mock: 'bg-info/15 text-info',
+        purple: 'bg-purple/15 text-purple',
       },
     },
     defaultVariants: { tone: 'neutral' },

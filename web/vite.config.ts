@@ -1,4 +1,4 @@
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
@@ -9,6 +9,9 @@ import type { Plugin } from 'vite'
 const webDir = fileURLToPath(new URL('.', import.meta.url))
 // 仓库根 data/（生成数据）。不再用 web/public/data 符号链接，避免 Windows / CI 失效。
 const dataDir = join(webDir, '..', 'data')
+
+/** 前端版本号：取自 web/package.json，构建时注入 `__APP_VERSION__`。 */
+const pkg = JSON.parse(readFileSync(join(webDir, 'package.json'), 'utf8')) as { version: string }
 
 /**
  * 把仓库根 `data/` 挂到 `/data/*`：
@@ -50,6 +53,7 @@ function dataDirPlugin(): Plugin {
 // 静态资源与 `/api/*` 同源；子路径部署不在本版范围。
 export default defineConfig({
   base: '/',
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [react(), tailwindcss(), dataDirPlugin()],
   resolve: {
     alias: {

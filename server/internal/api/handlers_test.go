@@ -218,6 +218,53 @@ func TestLoginRateLimited(t *testing.T) {
 	}
 }
 
+// 装了 WebUI 插件且 TShock 建令牌桶已满时：后端直接判 rate_limited，且不再打 token/create。
+// 依据：SecureRest.cs:117-125 —— 限流返回的 403 与「密码错」同文案，只能靠插件读桶区分。
+func TestLoginTShockRateLimitDetectedViaPlugin(t *testing.T) {
+	f := newFake(map[string]http.HandlerFunc{
+		"/webui/restlimit": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, 200, map[string]any{"code": "ok", "limit": 5, "bucket": 5, "intervalMinutes": 1})
+		},
+		"/v2/token/create": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, 403, map[string]any{"error": "Username or password may be incorrect or this account may not have sufficient privileges."})
+		},
+	})
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+
+	rec := do(srv.Handler(), http.MethodPost, "/api/login", map[string]string{"username": "alice", "password": "pw"}, nil, true)
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), "rate_limited") {
+		t.Fatalf("HTTP %d body=%s，期望 429 rate_limited", rec.Code, rec.Body.String())
+	}
+	if f.count("/v2/token/create") != 0 {
+		t.Fatal("桶已满时不应再调 /v2/token/create")
+	}
+}
+
+// 插件报告桶未满时：按原逻辑调 token/create（证明预检不误伤正常登录）。
+func TestLoginPluginBucketUnderLimitProceeds(t *testing.T) {
+	f := newFake(map[string]http.HandlerFunc{
+		"/webui/restlimit": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, 200, map[string]any{"code": "ok", "limit": 5, "bucket": 1, "intervalMinutes": 1})
+		},
+		"/v2/token/create": func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, 403, map[string]any{"error": "Username or password may be incorrect or this account may not have sufficient privileges."})
+		},
+	})
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+
+	rec := do(srv.Handler(), http.MethodPost, "/api/login", map[string]string{"username": "alice", "password": "pw"}, nil, true)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("HTTP %d body=%s，期望 401（桶未满，继续走 token/create 失败）", rec.Code, rec.Body.String())
+	}
+	if f.count("/v2/token/create") != 1 {
+		t.Fatalf("token/create 调用 %d 次，期望 1 次", f.count("/v2/token/create"))
+	}
+}
+
 func TestLoginWithTokenSuccess(t *testing.T) {
 	f := newFake(map[string]http.HandlerFunc{
 		"/tokentest": func(w http.ResponseWriter, _ *http.Request) {
@@ -919,8 +966,8 @@ func TestPlayerLookPluginMissing(t *testing.T) {
 	cookie := loginCookie(t, h, "alice", "pw")
 
 	rec := do(h, http.MethodGet, "/api/player/look?name=hf", nil, cookie, false)
-	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
-		t.Fatalf("HTTP %d body=%s，期望 404 plugin_not_installed", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
+		t.Fatalf("HTTP %d body=%s，期望 501 plugin_not_installed", rec.Code, rec.Body.String())
 	}
 }
 
@@ -1005,8 +1052,8 @@ func TestPlayerExportPluginMissing(t *testing.T) {
 	cookie := loginCookie(t, h, "alice", "pw")
 
 	rec := do(h, http.MethodGet, "/api/player/export?name=hf", nil, cookie, false)
-	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
-		t.Fatalf("HTTP %d body=%s，期望 404 plugin_not_installed", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
+		t.Fatalf("HTTP %d body=%s，期望 501 plugin_not_installed", rec.Code, rec.Body.String())
 	}
 }
 
@@ -1241,8 +1288,8 @@ func TestLoginOnlinePluginMissing(t *testing.T) {
 	srv, _ := newServer(t, ts.URL, nil)
 
 	rec := do(srv.Handler(), http.MethodPost, "/api/login/online", map[string]string{"username": "Alice"}, nil, true)
-	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
-		t.Fatalf("HTTP %d body=%s，期望 404 plugin_not_installed", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
+		t.Fatalf("HTTP %d body=%s，期望 501 plugin_not_installed", rec.Code, rec.Body.String())
 	}
 }
 
@@ -1374,7 +1421,7 @@ func TestBatchPluginMissing(t *testing.T) {
 	cookie := loginCookie(t, h, "alice", "pw")
 
 	rec := do(h, http.MethodPost, "/api/batch", map[string]any{"cmds": []string{"/who"}}, cookie, true)
-	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
+	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
 		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
 	}
 }

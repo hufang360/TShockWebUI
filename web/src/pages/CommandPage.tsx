@@ -1,10 +1,16 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Activity, BookOpen, History, Package, Star, X } from 'lucide-react'
+import { Activity, BookOpen, History, Package, ShoppingBasket, Star } from 'lucide-react'
+import { BatchDeleteControls } from '@/components/BatchDeleteControls'
+import { CollapseChevron } from '@/components/CollapseChevron'
 import { CommandEditor } from '@/components/CommandEditor'
 import { CommandPickerPanel } from '@/components/CommandPickerPanel'
+import { ConfirmButton } from '@/components/ConfirmButton'
 import { ItemSearchPanel } from '@/components/ItemSearchPanel'
+import { LoginGate } from '@/components/LoginGate'
 import { ResultPanel, STATUS_TONE, type ResultEntry } from '@/components/ResultPanel'
+import { SelectIndicator } from '@/components/SelectIndicator'
 import { ServerFeedTab } from '@/components/ServerFeed'
+import { SearchInput } from '@/components/SearchInput'
 import { TagAssist } from '@/components/TagAssist'
 import {
   Badge,
@@ -12,22 +18,34 @@ import {
   Card,
   CardBody,
   CardHeader,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  Separator,
   Tabs,
   TabsList,
   TabsTrigger,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { useBatchSelect } from '@/hooks/useBatchSelect'
 import { useLocalState } from '@/hooks/useLocalState'
 import { inspectCommand, type CommandCheck } from '@/lib/commands'
 import { computeCompletions, paramHintFor } from '@/lib/completion'
 import type { CompletionItem } from '@/lib/completion'
 import { addFavorite, isFavorited, removeFavorite as removeFavoriteEntry, sanitizeFavorites } from '@/lib/favorites'
-import { removeItemFavorite, sanitizeItemFavorites } from '@/lib/itemFavorites'
+import { HISTORY_LIMIT, sanitizeHistory } from '@/lib/history'
+import { addItemFavorite, isItemFavorited, removeItemFavorite, sanitizeItemFavorites } from '@/lib/itemFavorites'
+import { ItemFavoritesProvider, type ItemFavoritesApi } from '@/lib/itemFavoritesContext'
 import { useI18n } from '@/lib/i18n'
 import { StorageKeys } from '@/lib/storage'
 import { resultFromError, type BackendTransport } from '@/lib/tshock'
 import type {
   CommandResult,
+  CommandStatus,
   Dataset,
   FavoriteEntry,
   HistoryEntry,
@@ -35,9 +53,39 @@ import type {
   Settings,
 } from '@/types'
 
-const HISTORY_LIMIT = 100
 /** 结果卡片保留最近 N 条（更早的自动丢弃）。 */
 const RESULT_LIMIT = 20
+
+/** 从本机恢复结果卡片：丢弃非法项，只保留合法的 output / status。 */
+function sanitizeResults(value: unknown): ResultEntry[] {
+  if (!Array.isArray(value)) return []
+  const out: ResultEntry[] = []
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue
+    const seq = (raw as { seq?: unknown }).seq
+    const command = (raw as { command?: unknown }).command
+    const result = (raw as { result?: unknown }).result
+    if (typeof seq !== 'number' || typeof command !== 'string') continue
+    if (!result || typeof result !== 'object') continue
+    const r = result as Record<string, unknown>
+    if (typeof r.status !== 'string') continue
+    const output = Array.isArray(r.output)
+      ? r.output.filter((line): line is string => typeof line === 'string')
+      : []
+    const ts = (raw as { ts?: unknown }).ts
+    out.push({
+      seq,
+      ts: typeof ts === 'number' && Number.isFinite(ts) ? ts : Date.now(),
+      command,
+      result: {
+        status: r.status as CommandStatus,
+        output,
+        message: typeof r.message === 'string' ? r.message : undefined,
+      },
+    })
+  }
+  return out.slice(-RESULT_LIMIT)
+}
 
 interface CommandPageProps {
   dataset: Dataset
@@ -53,6 +101,8 @@ interface CommandPageProps {
   runtimeValues?: { regions?: string[]; warps?: string[] }
   /** token 失效时被调用；返回 Promise，登录成功 resolve(true)，取消 resolve(false)。 */
   onTokenInvalid: () => Promise<boolean>
+  /** 未登录时点「登录」打开登录框。 */
+  onLogin: () => void
   /** 前往物品图鉴并显示该物品。 */
   onOpenInDex?: (itemId: number) => void
 }
@@ -79,15 +129,26 @@ export function CommandPage({
   ingameAllowed,
   runtimeValues,
   onTokenInvalid,
+  onLogin,
   onOpenInDex,
 }: CommandPageProps) {
   const { t } = useI18n()
   const [text, setText] = useLocalState(StorageKeys.draft, '')
-  const [history, setHistory] = useLocalState<HistoryEntry[]>(StorageKeys.history, [])
-  const [results, setResults] = useState<ResultEntry[]>([])
+  const [rawHistory, setRawHistory] = useLocalState<HistoryEntry[]>(StorageKeys.history, [])
+  const history = useMemo(() => sanitizeHistory(rawHistory), [rawHistory])
+  // 最近几条结果卡片（含输出内容）存本机，刷新后仍在。
+  const [rawResults, setRawResults] = useLocalState<ResultEntry[]>(
+    StorageKeys.commandResults,
+    [],
+  )
+  const results = useMemo(() => sanitizeResults(rawResults), [rawResults])
   const [running, setRunning] = useState(false)
-  const [tab, setTab] = useState<SidebarTab>('items')
-  const resultSeq = useRef(0)
+  // 记忆右侧当前 tab（刷新 / 切页后保持）。
+  const [tab, setTab] = useLocalState<SidebarTab>(StorageKeys.commandTab, 'items')
+  // 右栏整列可折叠。
+  const [panelOpen, setPanelOpen] = useState(true)
+  // 序号接着已恢复的结果，避免 key / seq 冲突。
+  const resultSeq = useRef(Math.max(0, ...results.map((r) => r.seq)))
   const [insertRequest, setInsertRequest] = useState<{ token: number; text: string } | null>(null)
   const insertSeq = useRef(0)
   // 递增令牌：让指令输入框重新聚焦并把光标移到末尾（载入指令 / 历史时）。
@@ -95,10 +156,10 @@ export function CommandPage({
   const focusEnd = useCallback(() => setFocusSeq((n) => n + 1), [])
   // 左列至少铺满 main 的可见高度：输入框是 sticky bottom-0，只有容器真正到屏幕底部，
   // 它才会贴在底部，而不是停在结果卡片下方的屏幕中间（图鉴页同款量法）。
-  const leftColRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const [fillHeight, setFillHeight] = useState<number | undefined>(undefined)
   useLayoutEffect(() => {
-    const el = leftColRef.current
+    const el = rootRef.current
     const scroller = el?.closest('main')
     if (!el || !(scroller instanceof HTMLElement)) return
     const measure = () => {
@@ -118,22 +179,14 @@ export function CommandPage({
       ro?.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [])
+    // 依赖 authenticated：未登录时先渲染 LoginGate，rootRef 尚未挂载；登录后需重新量高。
+  }, [authenticated])
 
   const check = useMemo(() => inspectCommand(text, dataset), [text, dataset])
 
-  // 收藏指令（tswui:favorites）：星标按钮反映当前输入文本是否已收藏。
+  // 收藏指令（tswui:favorites）：收藏 tab 展示、结果卡片星标增删。
   const [rawFavorites, setRawFavorites] = useLocalState<FavoriteEntry[]>(StorageKeys.favorites, [])
   const favorites = useMemo(() => sanitizeFavorites(rawFavorites), [rawFavorites])
-  const favoriteKey = check.parsed ? check.normalized : ''
-  const favorited = isFavorited(favorites, favoriteKey)
-  const toggleFavorite = useCallback(() => {
-    if (!favoriteKey) return
-    setRawFavorites((prev) => {
-      const clean = sanitizeFavorites(prev)
-      return favorited ? removeFavoriteEntry(clean, favoriteKey) : addFavorite(clean, favoriteKey)
-    })
-  }, [favoriteKey, favorited, setRawFavorites])
 
   const removeFavorite = useCallback(
     (cmd: string) => {
@@ -166,6 +219,26 @@ export function CommandPage({
     },
     [setRawItemFavs],
   )
+  const toggleItemFav = useCallback(
+    (id: number) => {
+      setRawItemFavs((prev) => {
+        const clean = sanitizeItemFavorites(prev)
+        return isItemFavorited(clean, id) ? removeItemFavorite(clean, id) : addItemFavorite(clean, id)
+      })
+    },
+    [setRawItemFavs],
+  )
+  const clearFavorites = useCallback(() => {
+    setRawFavorites([])
+    setRawItemFavs([])
+  }, [setRawFavorites, setRawItemFavs])
+  const favoritesApi = useMemo<ItemFavoritesApi>(
+    () => ({
+      isFavorited: (id) => isItemFavorited(itemFavorites, id),
+      toggle: toggleItemFav,
+    }),
+    [itemFavorites, toggleItemFav],
+  )
 
   const getCompletions = useCallback(
     (value: string, caret: number): CompletionItem[] =>
@@ -181,21 +254,21 @@ export function CommandPage({
 
   const pushHistory = useCallback(
     (entry: HistoryEntry) => {
-      setHistory((prev) => [entry, ...prev].slice(0, HISTORY_LIMIT))
+      setRawHistory((prev) => [entry, ...sanitizeHistory(prev)].slice(0, HISTORY_LIMIT))
     },
-    [setHistory],
+    [setRawHistory],
   )
 
   /** 追加一条执行结果（不覆盖上次），最多保留 RESULT_LIMIT 条。 */
   const appendResult = useCallback((command: string, result: CommandResult) => {
     resultSeq.current += 1
     const entry: ResultEntry = { seq: resultSeq.current, ts: Date.now(), command, result }
-    setResults((prev) => [...prev, entry].slice(-RESULT_LIMIT))
-  }, [])
+    setRawResults((prev) => [...sanitizeResults(prev), entry].slice(-RESULT_LIMIT))
+  }, [setRawResults])
 
   const removeResult = useCallback((seq: number) => {
-    setResults((prev) => prev.filter((e) => e.seq !== seq))
-  }, [])
+    setRawResults((prev) => sanitizeResults(prev).filter((e) => e.seq !== seq))
+  }, [setRawResults])
 
   /** 执行任意指令文本（收藏 / 首页等入口复用），追加结果卡片与历史。 */
   const runCommandText = useCallback(
@@ -269,43 +342,76 @@ export function CommandPage({
 
   const removeHistory = useCallback(
     (entry: HistoryEntry) => {
-      setHistory((prev) => prev.filter((h) => !(h.ts === entry.ts && h.cmd === entry.cmd)))
+      setRawHistory((prev) =>
+        sanitizeHistory(prev).filter((h) => !(h.ts === entry.ts && h.cmd === entry.cmd)),
+      )
     },
-    [setHistory],
+    [setRawHistory],
   )
+
+  /** 历史去重：同一指令只保留最新一条（history 为最新在前）。 */
+  const dedupeHistory = useCallback(() => {
+    setRawHistory((prev) => {
+      const seen = new Set<string>()
+      return sanitizeHistory(prev).filter((h) => {
+        if (seen.has(h.cmd)) return false
+        seen.add(h.cmd)
+        return true
+      })
+    })
+  }, [setRawHistory])
 
   const insertText = useCallback((snippet: string) => {
     insertSeq.current += 1
     setInsertRequest({ token: insertSeq.current, text: snippet })
   }, [])
 
+  /** 把物品 ID 追加到指令末尾（收藏 tab 点击物品条目用），并把焦点移回输入框。 */
+  const appendItemId = useCallback(
+    (id: number) => {
+      setText((prev) => {
+        const base = prev.replace(/\s+$/, '')
+        return base ? `${base} ${id} ` : `${id} `
+      })
+      focusEnd()
+    },
+    [setText, focusEnd],
+  )
+
+  // 未登录：隐藏编辑器 / 结果 / 侧栏，只留标题 + 登录提示（执行与数据拉取都要 token）。
+  if (!authenticated) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold text-foreground">{t('editor.title')}</h2>
+        <LoginGate onLogin={onLogin} />
+      </div>
+    )
+  }
+
   return (
+    <ItemFavoritesProvider api={favoritesApi}>
     <div
-      className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]"
-      // 右栏高度用实测可用高度（而不是 100vh），避免页面多出一点滚动、底部被裁剪。
+      ref={rootRef}
+      // 两列锁到实测可用高度：左卡片内结果区滚动、输入框贴卡片底部（图鉴/鱼店同款量法）。
+      className="grid gap-4 xl:h-[var(--cmd-fill)] xl:grid-cols-[minmax(0,1fr)_360px]"
       style={fillHeight ? ({ '--cmd-fill': `${fillHeight}px` } as CSSProperties) : undefined}
     >
-      {/* 主列：结果卡片 + 底部吸附输入框 */}
-      <div
-        ref={leftColRef}
-        style={fillHeight ? { minHeight: fillHeight } : undefined}
-        className="flex min-w-0 flex-col gap-4"
-      >
-        <div className="min-h-[40vh] flex-1">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold text-foreground">{t('editor.title')}</h2>
-            <div className="flex items-center gap-2">
-              {transport.mock && <Badge tone="mock">{t('editor.mockOutput')}</Badge>}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setResults([])}
-                disabled={results.length === 0}
-              >
-                {t('result.clear')}
-              </Button>
-            </div>
+      {/* 主列：单卡片 = 头部 + 可滚动结果区 + 底部输入框（透明底、无投影） */}
+      <Card className="flex min-w-0 flex-col bg-transparent shadow-none xl:min-h-0">
+        <CardHeader className="shrink-0">
+          <h2 className="text-lg font-semibold text-foreground">{t('editor.title')}</h2>
+          <div className="flex items-center gap-2">
+            {transport.mock && <Badge tone="mock">{t('editor.mockOutput')}</Badge>}
+            <ConfirmButton
+              onConfirm={() => setRawResults([])}
+              disabled={results.length === 0}
+              confirmLabel={t('action.clearConfirm')}
+            >
+              {t('result.clear')}
+            </ConfirmButton>
           </div>
+        </CardHeader>
+        <CardBody className="flex min-h-0 flex-1 flex-col pt-0">
           <ResultPanel
             entries={results}
             running={running}
@@ -316,34 +422,52 @@ export function CommandPage({
             isFavorite={isFavorite}
             onToggleFavorite={toggleFavoriteCommand}
           />
+        </CardBody>
+        <Separator />
+        {/* 输入框贴在卡片底部（固定高度时不动，只滚动上方结果区）。 */}
+        <div className="shrink-0 px-4 py-3">
+          <CommandEditor
+            value={text}
+            onChange={setText}
+            computeCompletions={getCompletions}
+            getParamHint={getParamHint}
+            onExecute={execute}
+            busy={running}
+            atlas={dataset.atlas}
+            fontSize={settings.fontSize}
+            invalid={check.executability === 'in_game_only' && !ingameAllowed}
+            insertRequest={insertRequest}
+            onInsertHandled={() => setInsertRequest(null)}
+            focusRequest={focusSeq}
+          />
+          <TagAssist dataset={dataset} text={text} />
         </div>
+      </Card>
 
-        {/* 输入框吸附到底部：滚动正文时始终可见。 */}
-        <div className="sticky bottom-0 z-10 -mx-1 bg-background/95 px-1 pt-2 pb-2 backdrop-blur">
-          <div className="rounded-xl border border-border bg-card p-3 shadow-lg">
-            <CommandEditor
-              value={text}
-              onChange={setText}
-              computeCompletions={getCompletions}
-              getParamHint={getParamHint}
-              onExecute={execute}
-              busy={running}
-              atlas={dataset.atlas}
-              fontSize={settings.fontSize}
-              invalid={check.executability === 'in_game_only' && !ingameAllowed}
-              insertRequest={insertRequest}
-              onInsertHandled={() => setInsertRequest(null)}
-              focusRequest={focusSeq}
-            />
-            <TagAssist dataset={dataset} text={text} />
-          </div>
-        </div>
-      </div>
-
-      {/* 右侧栏：物品 / 指令 / 历史记录 */}
-      <div className="min-w-0 xl:sticky xl:top-4 xl:h-[var(--cmd-fill)]">
-        <Card className="flex h-full min-h-0 flex-col">
-          <CardHeader>
+      {/* 右侧栏：物品 / 指令 / 收藏 / 历史 / 动态；整列可折叠 */}
+      <div className={cn('min-w-0', panelOpen && 'xl:min-h-0')}>
+        <Card className={cn('flex min-h-0 flex-col', panelOpen && 'h-full')}>
+          <Collapsible
+            open={panelOpen}
+            onOpenChange={setPanelOpen}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+          <CardHeader className="shrink-0">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="group/title flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+              >
+                <ShoppingBasket className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm font-semibold tracking-wide text-foreground">
+                  {t('editor.panel')}
+                </span>
+                <CollapseChevron open={panelOpen} className="ml-auto" />
+              </button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
+          <CardHeader className="shrink-0 border-t border-border/60">
             <Tabs value={tab} onValueChange={(v) => setTab(v as SidebarTab)} className="w-full">
               <TabsList className="w-full">
                 <TabsTrigger value="items">
@@ -382,39 +506,28 @@ export function CommandPage({
               />
             )}
             {tab === 'items' && (
-              <ItemSearchPanel dataset={dataset} onInsert={insertText} onOpenInDex={onOpenInDex} />
+              <ItemSearchPanel
+                dataset={dataset}
+                onInsert={insertText}
+                onOpenInDex={onOpenInDex}
+                favorites={itemFavorites}
+                onInsertFavorite={(id) => {
+                  appendItemId(id)
+                  removeItemFav(id)
+                }}
+              />
             )}
             {tab === 'commands' && (
-              <CommandPickerPanel
-                view="commands"
-                dataset={dataset}
-                favorites={favorites}
-                currentKey={favoriteKey}
-                favoritedCurrent={favorited}
-                onToggleCurrent={toggleFavorite}
-                onRemoveFavorite={removeFavorite}
-                onLoad={loadText}
-                onRun={(cmd) => void runCommandText(cmd)}
-                authenticated={authenticated}
-                running={running}
-              />
+              <CommandPickerPanel view="commands" dataset={dataset} onLoad={loadText} />
             )}
             {tab === 'favorites' && (
               <CommandPickerPanel
                 view="favorites"
                 dataset={dataset}
                 favorites={favorites}
-                itemFavorites={itemFavorites}
-                currentKey={favoriteKey}
-                favoritedCurrent={favorited}
-                onToggleCurrent={toggleFavorite}
                 onRemoveFavorite={removeFavorite}
-                onRemoveItemFavorite={removeItemFav}
-                onInsertItemId={(id) => insertText(` ${id} `)}
+                onClearFavorites={clearFavorites}
                 onLoad={loadText}
-                onRun={(cmd) => void runCommandText(cmd)}
-                authenticated={authenticated}
-                running={running}
               />
             )}
             {tab === 'history' && (
@@ -422,13 +535,17 @@ export function CommandPage({
                 history={history}
                 onLoad={loadText}
                 onRemove={removeHistory}
-                onClear={() => setHistory([])}
+                onDedupe={dedupeHistory}
+                onClear={() => setRawHistory([])}
               />
             )}
           </CardBody>
+          </CollapsibleContent>
+          </Collapsible>
         </Card>
       </div>
     </div>
+    </ItemFavoritesProvider>
   )
 }
 
@@ -436,57 +553,129 @@ function HistoryPanel({
   history,
   onLoad,
   onRemove,
+  onDedupe,
   onClear,
 }: {
   history: HistoryEntry[]
   onLoad: (cmd: string) => void
   onRemove: (entry: HistoryEntry) => void
+  onDedupe: () => void
   onClear: () => void
 }) {
   const { t } = useI18n()
-  if (history.length === 0) {
-    return <p className="text-xs text-muted-foreground">{t('editor.historyEmpty')}</p>
+  const [query, setQuery] = useState('')
+  const batch = useBatchSelect()
+  const keyword = query.trim().toLowerCase()
+  const filtered = useMemo(
+    () => (keyword ? history.filter((h) => h.cmd.toLowerCase().includes(keyword)) : history),
+    [history, keyword],
+  )
+
+  const handleBatchDelete = () => {
+    for (const key of batch.selected) {
+      const sep = key.indexOf('|')
+      const ts = Number(key.slice(0, sep))
+      const cmd = key.slice(sep + 1)
+      const entry = history.find((h) => h.ts === ts && h.cmd === cmd)
+      if (entry) onRemove(entry)
+    }
+    batch.cancel()
   }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-muted-foreground">{t('editor.historyNote', { n: HISTORY_LIMIT })}</span>
-        <Button size="sm" variant="ghost" onClick={onClear}>
-          {t('editor.historyClear')}
-        </Button>
-      </div>
-      <ul className="min-h-0 flex-1 flex flex-col gap-1 overflow-y-auto pr-1">
-        {history.map((h) => (
-          <li key={`${h.ts}-${h.cmd}`} className="flex items-center gap-2 rounded-lg bg-accent/30 px-1.5 py-1">
-            {/* 指令在最左；点击替换输入框并把光标移到末尾。异常标红。 */}
-            <Button
-              variant="ghost"
-              onClick={() => onLoad(h.cmd)}
-              className="h-auto min-w-0 flex-1 cursor-pointer justify-start px-1 py-0.5 font-pixel text-[11px] font-normal hover:bg-transparent hover:text-primary"
-              title={h.cmd}
-            >
-              <span className={cn('min-w-0 truncate', h.ok ? 'text-foreground' : 'text-destructive')}>
-                {h.cmd}
-              </span>
-            </Button>
-            {/* 异常状态 tag 在时间左边 */}
-            {!h.ok && <Badge tone={STATUS_TONE[h.status]}>{t(`status.${h.status}`)}</Badge>}
-            <span className="shrink-0 text-[10px] text-muted-foreground">
-              {new Date(h.ts).toLocaleTimeString()}
+      <SearchInput
+        value={query}
+        onValueChange={setQuery}
+        placeholder={t('editor.historySearch')}
+        aria-label={t('editor.historySearch')}
+      />
+
+      {history.length === 0 ? (
+        <Empty className="py-6">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <History />
+            </EmptyMedia>
+            <EmptyTitle>{t('editor.historyEmpty')}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+              {batch.active ? t('batch.hint') : t('editor.historyNote', { n: HISTORY_LIMIT })}
             </span>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="shrink-0"
-              aria-label={t('result.remove')}
-              title={t('result.remove')}
-              onClick={() => onRemove(h)}
-            >
-              <X data-icon="inline-start" />
-            </Button>
-          </li>
-        ))}
-      </ul>
+            <div className="flex shrink-0 items-center gap-1">
+              {!batch.active && (
+                <ConfirmButton onConfirm={onDedupe} confirmLabel={t('action.dedupeConfirm')}>
+                  {t('editor.historyDedupe')}
+                </ConfirmButton>
+              )}
+              <BatchDeleteControls
+                active={batch.active}
+                count={batch.count}
+                disabled={history.length === 0}
+                onEnter={batch.enter}
+                onCancel={batch.cancel}
+                onConfirm={handleBatchDelete}
+              />
+              {!batch.active && (
+                <ConfirmButton onConfirm={onClear} confirmLabel={t('action.clearConfirm')}>
+                  {t('editor.historyClear')}
+                </ConfirmButton>
+              )}
+            </div>
+          </div>
+          <ul className="min-h-0 flex-1 flex flex-col gap-1 overflow-y-auto pr-1">
+            {filtered.map((h) => {
+              // 旧数据可能缺 status：按 ok 兜底，避免渲染出 `status.undefined`。
+              const status = h.status ?? (h.ok ? 'ok' : 'command_error')
+              const key = `${h.ts}|${h.cmd}`
+              const checked = batch.has(key)
+              return (
+                <li key={key}>
+                  <Button
+                    variant="ghost"
+                    aria-pressed={batch.active ? checked : undefined}
+                    title={batch.active ? undefined : t('favorites.load')}
+                    onClick={() => {
+                      if (batch.active) {
+                        batch.toggle(key)
+                        return
+                      }
+                      onLoad(h.cmd)
+                    }}
+                    className={cn(
+                      'h-auto w-full cursor-pointer justify-start gap-2 rounded-lg bg-accent/40 px-1.5 py-1 font-pixel text-[11px] font-normal hover:bg-accent',
+                      checked && 'bg-accent',
+                    )}
+                  >
+                    {batch.active && <SelectIndicator checked={checked} />}
+                    <span
+                      className={cn(
+                        'min-w-0 flex-1 truncate text-left',
+                        h.ok ? 'text-foreground' : 'text-destructive',
+                      )}
+                    >
+                      {h.cmd}
+                    </span>
+                    {!h.ok && <Badge tone={STATUS_TONE[status]}>{t(`status.${status}`)}</Badge>}
+                    <span className="shrink-0 font-sans text-[10px] text-muted-foreground">
+                      {new Date(h.ts).toLocaleTimeString()}
+                    </span>
+                  </Button>
+                </li>
+              )
+            })}
+            {filtered.length === 0 && (
+              <li className="px-2 py-2 text-[11px] text-muted-foreground">
+                {t('editor.historyNoMatch')}
+              </li>
+            )}
+          </ul>
+        </>
+      )}
     </div>
   )
 }

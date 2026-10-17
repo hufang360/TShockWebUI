@@ -192,7 +192,7 @@ export class MockTransport implements BackendTransport {
     this.#session = { authenticated: false, username: null }
   }
 
-  async serverStatus(): Promise<ServerStatus> {
+  async serverStatus(_target?: string): Promise<ServerStatus> {
     await delay(160)
     return {
       reachable: true,

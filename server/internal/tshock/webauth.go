@@ -20,12 +20,15 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const (
 	webAuthRequestPath = "/webui/auth/request"
 	webAuthPollPath    = "/webui/auth/poll"
 	webAuthCancelPath  = "/webui/auth/cancel"
+	// webAuthRestLimitPath 是插件暴露的 TShock 建令牌限流快照（只读、调用者自己 IP）。
+	webAuthRestLimitPath = "/webui/restlimit"
 )
 
 // 插件业务错误码（WebAuthEnvelope.Code）。
@@ -82,9 +85,15 @@ type webAuthEnvelope struct {
 }
 
 // WebAuthRequest 发起一次在线授权请求。
-func (c *Client) WebAuthRequest(ctx context.Context, name, secret string) (*WebAuthRequestResult, error) {
+//
+// ip 是网页访客的来源 IP（可为空）：插件用它做「同一来源 IP 每分钟请求数」限流，
+// 防止有人从单一来源反复骚扰在线玩家。
+func (c *Client) WebAuthRequest(ctx context.Context, name, secret, ip string) (*WebAuthRequestResult, error) {
 	q := url.Values{}
 	q.Set("name", name)
+	if ip = strings.TrimSpace(ip); ip != "" {
+		q.Set("ip", ip)
+	}
 	setSecret(q, secret)
 
 	env, err := c.webAuthCall(ctx, webAuthRequestPath, q)
@@ -135,6 +144,55 @@ func (c *Client) WebAuthCancel(ctx context.Context, ticket, secret string) {
 	_, _ = c.webAuthCall(ctx, webAuthCancelPath, q)
 }
 
+// RestLimitSnapshot 是插件返回的 TShock 建令牌限流快照（调用者自己 IP）。
+//
+// 背景：TShock 的 /v2/token/create 对来源 IP 计数，达到 RESTMaximumRequestsPerInterval
+// 后返回 403，且与「密码错误 / 缺 useapi」同文案（SecureRest.cs:117-125）。
+// 本端点让后端能精确判断「是否被限流」，而不是把三种原因都推给玩家。
+type RestLimitSnapshot struct {
+	// Limit 是 TShock 配置的上限（RESTMaximumRequestsPerInterval）。
+	Limit int
+	// Bucket 是后端 IP 当前的计数；Bucket >= Limit 表示下一次建令牌会被挡。
+	Bucket int
+	// IntervalMinutes 是桶每分钟恢复的步长（RESTRequestBucketDecreaseIntervalMinutes）。
+	IntervalMinutes int
+}
+
+// RestLimit 查询 TShock 建令牌限流状态（需已安装 WebUI 插件）。
+//
+// 端点不存在（未装插件 / 旧版插件）→ KindNotFound，调用方应静默忽略、按原逻辑继续。
+// 该端点只读，不消耗限流桶。
+func (c *Client) RestLimit(ctx context.Context, secret string) (*RestLimitSnapshot, error) {
+	q := url.Values{}
+	setSecret(q, secret)
+
+	status, body, err := c.do(ctx, webAuthRestLimitPath, q)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case status == http.StatusNotFound:
+		return nil, &APIError{Kind: KindNotFound, Status: status, Message: messageFromBody(body)}
+	case status == http.StatusForbidden:
+		return nil, &APIError{Kind: KindPluginForbidden, Status: status, Message: messageFromBody(body)}
+	case status >= 500:
+		return nil, &APIError{Kind: KindUnavailable, Status: status, Message: messageFromBody(body)}
+	case status >= 400:
+		return nil, &APIError{Kind: KindBadResponse, Status: status, Message: messageFromBody(body)}
+	}
+
+	var env struct {
+		Code            string `json:"code"`
+		Limit           int    `json:"limit"`
+		Bucket          int    `json:"bucket"`
+		IntervalMinutes int    `json:"intervalMinutes"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, &APIError{Kind: KindBadResponse, Status: status, Message: "REST 限流端点返回非法 JSON"}
+	}
+	return &RestLimitSnapshot{Limit: env.Limit, Bucket: env.Bucket, IntervalMinutes: env.IntervalMinutes}, nil
+}
+
 // WebAuthProbe 探测插件是否安装：用空 name 调一次 request。
 //
 //   - KindNotFound → 未安装
@@ -142,7 +200,7 @@ func (c *Client) WebAuthCancel(ctx context.Context, ticket, secret string) {
 //   - KindPluginForbidden → 已安装但密钥不匹配
 //   - nil → 已安装
 func (c *Client) WebAuthProbe(ctx context.Context, secret string) error {
-	_, err := c.WebAuthRequest(ctx, "", secret)
+	_, err := c.WebAuthRequest(ctx, "", secret, "")
 	return err
 }
 

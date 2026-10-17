@@ -36,6 +36,9 @@ namespace WebUI
         private readonly Dictionary<string, AuthTicket> _tickets = new Dictionary<string, AuthTicket>();
         private readonly Dictionary<string, string> _pendingByPlayer = new Dictionary<string, string>();
         private readonly Dictionary<string, List<DateTime>> _requestTimes = new Dictionary<string, List<DateTime>>();
+        private readonly Dictionary<string, DateTime> _cooldownUntil = new Dictionary<string, DateTime>();
+        private readonly List<DateTime> _globalTimes = new List<DateTime>();
+        private readonly Dictionary<string, List<DateTime>> _ipTimes = new Dictionary<string, List<DateTime>>();
         private readonly RandomNumberGenerator _rng = RandomNumberGenerator.Create();
         private readonly WebAuthConfig _cfg;
 
@@ -68,21 +71,26 @@ namespace WebUI
                 return Business("no_api_permission", "该账号所属用户组缺少 tshock.rest.useapi 权限，请联系管理员");
 
             var key = account.Name.ToLowerInvariant();
-            if (!AllowRequest(key))
-                return Business("rate_limited", "请求过于频繁，请稍后再试");
 
             string code;
+            bool created;
             lock (_lock)
             {
-                // 同一玩家已有未过期请求：复用，避免重复刷屏。
+                // 同一玩家已有未过期请求：复用，且**不再重复发游戏内消息**（避免刷屏）。
                 if (_pendingByPlayer.TryGetValue(key, out var existing) &&
                     _tickets.TryGetValue(existing, out var ticket) &&
                     ticket.State == StatePending && ticket.ExpiresAtUtc > UtcNow)
                 {
                     code = existing;
+                    created = false;
                 }
                 else
                 {
+                    if (!AllowRequestLocked(key, clientIp))
+                        return Business("rate_limited", "请求过于频繁，请稍后再试");
+                    if (_cfg.MaxPendingTickets > 0 && CountPendingLocked() >= _cfg.MaxPendingTickets)
+                        return Business("rate_limited", "待处理请求过多，请稍后再试");
+
                     code = NewCodeLocked();
                     var t = new AuthTicket
                     {
@@ -95,16 +103,20 @@ namespace WebUI
                     };
                     _tickets[code] = t;
                     _pendingByPlayer[key] = code;
+                    // 新建票据才发消息：冷却期内不允许再次新建，防止反复刷屏。
+                    SetCooldownLocked(key, _cfg.PlayerCooldownSeconds);
+                    created = true;
                 }
             }
 
             var expires = _cfg.TimeoutSeconds;
-            var source = string.IsNullOrWhiteSpace(clientIp) ? "" : $"（来源：{clientIp.Trim()}）";
-            Plugin.NotifyPlayer(player.Name,
-                $"[网页登录] 有人请求以 {account.Name} 的身份登录网页端{source}。\n" +
-                $"同意请发送：/web auth {code}（或直接回复 y）\n" +
-                $"拒绝请发送：/web deny {code}（或直接回复 n）\n" +
-                $"（{expires} 秒内有效）");
+            if (created)
+            {
+                var source = string.IsNullOrWhiteSpace(clientIp) ? "" : $"（来源：{clientIp.Trim()}）";
+                Plugin.NotifyPlayer(player.Name,
+                    $"[网页登录] 有人请求以 {account.Name} 登录网页端{source}。\n" +
+                    $"同意：/web auth {code}　拒绝：/web deny {code}（{expires} 秒内，亦可回复 y/n）");
+            }
 
             return new RestObject("200")
             {
@@ -147,7 +159,10 @@ namespace WebUI
                     return new RestObject("200") { { "code", "invalid_ticket" }, { "state", StateExpired } };
 
                 if (t.State == StatePending && t.ExpiresAtUtc <= UtcNow)
+                {
                     t.State = StateExpired;
+                    SetCooldownLocked(t.AccountName.ToLowerInvariant(), _cfg.DeniedCooldownSeconds);
+                }
 
                 switch (t.State)
                 {
@@ -230,6 +245,7 @@ namespace WebUI
                 if (t.State == StatePending && t.ExpiresAtUtc <= UtcNow)
                 {
                     t.State = StateExpired;
+                    SetCooldownLocked(t.AccountName.ToLowerInvariant(), _cfg.DeniedCooldownSeconds);
                     RemoveLocked(t);
                     return "验证码已过期，请让网页端重新发起。";
                 }
@@ -241,6 +257,7 @@ namespace WebUI
                 if (deny)
                 {
                     t.State = StateDenied;
+                    SetCooldownLocked(t.AccountName.ToLowerInvariant(), _cfg.DeniedCooldownSeconds);
                     Plugin.NotifyPlayer(t.PlayerName, "[网页登录] 已拒绝本次登录请求。");
                     return "已拒绝本次网页登录请求。";
                 }
@@ -263,7 +280,11 @@ namespace WebUI
                 var stale = _tickets.Values.Where(t => t.ExpiresAtUtc <= UtcNow).ToList();
                 foreach (var t in stale)
                 {
-                    if (t.State == StatePending) t.State = StateExpired;
+                    if (t.State == StatePending)
+                    {
+                        t.State = StateExpired;
+                        SetCooldownLocked(t.AccountName.ToLowerInvariant(), _cfg.DeniedCooldownSeconds);
+                    }
                     // 只有被 API 取走过 token 的票据才会带 token；此时若仍未交付则回收。
                     if (!string.IsNullOrEmpty(t.Token))
                         Plugin.DestroyToken(t.Token);
@@ -277,6 +298,14 @@ namespace WebUI
                     _requestTimes[k].RemoveAll(ts => ts < cutoff);
                     if (_requestTimes[k].Count == 0) _requestTimes.Remove(k);
                 }
+                _globalTimes.RemoveAll(ts => ts < cutoff);
+                foreach (var k in _ipTimes.Keys.ToList())
+                {
+                    _ipTimes[k].RemoveAll(ts => ts < cutoff);
+                    if (_ipTimes[k].Count == 0) _ipTimes.Remove(k);
+                }
+                foreach (var k in _cooldownUntil.Keys.ToList())
+                    if (_cooldownUntil[k] <= UtcNow) _cooldownUntil.Remove(k);
             }
         }
 
@@ -289,21 +318,62 @@ namespace WebUI
                 if (kv.Value == t.Code) _pendingByPlayer.Remove(kv.Key);
         }
 
-        private bool AllowRequest(string accountKey)
+        /// <summary>限流检查（调用方必须已持有 <see cref="_lock"/>）。命中后消费一个配额。</summary>
+        private bool AllowRequestLocked(string accountKey, string clientIp)
         {
-            lock (_lock)
+            var now = UtcNow;
+            var since = now.AddMinutes(-1);
+
+            // 同一玩家冷却（上次新建 / 拒绝 / 过期后）。
+            if (_cooldownUntil.TryGetValue(accountKey, out var until) && until > now) return false;
+
+            // 全局窗口：防止有人逐个玩家骚扰。
+            _globalTimes.RemoveAll(ts => ts < since);
+            if (_cfg.MaxRequestsPerMinuteGlobal > 0 && _globalTimes.Count >= _cfg.MaxRequestsPerMinuteGlobal)
+                return false;
+
+            // 同一来源 IP 窗口。
+            var ip = (clientIp ?? "").Trim();
+            if (_cfg.MaxRequestsPerMinutePerIp > 0 && ip.Length > 0)
             {
-                if (!_requestTimes.TryGetValue(accountKey, out var list))
+                if (!_ipTimes.TryGetValue(ip, out var ipList))
                 {
-                    list = new List<DateTime>();
-                    _requestTimes[accountKey] = list;
+                    ipList = new List<DateTime>();
+                    _ipTimes[ip] = ipList;
                 }
-                var since = UtcNow.AddMinutes(-1);
-                list.RemoveAll(ts => ts < since);
-                if (list.Count >= _cfg.MaxRequestsPerMinute) return false;
-                list.Add(UtcNow);
-                return true;
+                ipList.RemoveAll(ts => ts < since);
+                if (ipList.Count >= _cfg.MaxRequestsPerMinutePerIp) return false;
+                ipList.Add(now);
             }
+
+            // 同一账号窗口。
+            if (!_requestTimes.TryGetValue(accountKey, out var list))
+            {
+                list = new List<DateTime>();
+                _requestTimes[accountKey] = list;
+            }
+            list.RemoveAll(ts => ts < since);
+            if (list.Count >= _cfg.MaxRequestsPerMinute) return false;
+            list.Add(now);
+
+            _globalTimes.Add(now);
+            return true;
+        }
+
+        private int CountPendingLocked()
+        {
+            var n = 0;
+            foreach (var t in _tickets.Values)
+                if (t.State == StatePending && t.ExpiresAtUtc > UtcNow) n++;
+            return n;
+        }
+
+        private void SetCooldownLocked(string accountKey, int seconds)
+        {
+            if (string.IsNullOrEmpty(accountKey) || seconds <= 0) return;
+            var until = UtcNow.AddSeconds(seconds);
+            if (!_cooldownUntil.TryGetValue(accountKey, out var cur) || until > cur)
+                _cooldownUntil[accountKey] = until;
         }
 
         private string NewCodeLocked()

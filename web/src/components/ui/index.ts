@@ -36,6 +36,15 @@ export { Slider } from './Slider'
 export { ToggleGroup, ToggleGroupItem } from './ToggleGroup'
 export type { ToggleGroupProps, ToggleGroupItemProps } from './ToggleGroup'
 export { NativeSelect, NativeSelectOption, NativeSelectOptGroup } from './NativeSelect'
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+} from './Select'
 export { Separator } from './Separator'
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from './Collapsible'
 export {
@@ -67,6 +76,7 @@ export {
   useSidebar,
 } from './Sidebar'
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './Tooltip'
+export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent } from './Popover'
 export {
   Pagination,
   PaginationContent,

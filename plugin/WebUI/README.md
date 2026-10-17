@@ -73,6 +73,11 @@ docker restart tshock
   "Secret": "",
   "TimeoutSeconds": 60,
   "MaxRequestsPerMinute": 5,
+  "PlayerCooldownSeconds": 60,
+  "DeniedCooldownSeconds": 300,
+  "MaxRequestsPerMinuteGlobal": 10,
+  "MaxRequestsPerMinutePerIp": 3,
+  "MaxPendingTickets": 64,
   "TokenTTLMinutes": 0,
   "AllowInGameOnlyCommands": false,
   "AllowChatConfirm": true,
@@ -85,6 +90,11 @@ docker restart tshock
 | `Secret` | 与后端 `TSWUI_AUTH_SECRET` 共享的密钥。非空时所有 `/webui/auth/*` 都要求 `secret` 匹配。 |
 | `TimeoutSeconds` | 一次授权请求的有效期（10–600 秒）。 |
 | `MaxRequestsPerMinute` | 每个账号每分钟最多发起的请求数（防游戏内刷屏）。 |
+| `PlayerCooldownSeconds` | 每次「新建票据」后的冷却（秒）：冷却期内重复请求只复用已有票据，**不再重复发游戏内消息**。 |
+| `DeniedCooldownSeconds` | 玩家拒绝 / 票据过期后的额外冷却（秒）。 |
+| `MaxRequestsPerMinuteGlobal` | 全服每分钟请求上限（防有人逐个骚扰在线玩家）；0 = 不限。 |
+| `MaxRequestsPerMinutePerIp` | 同一来源 IP 每分钟请求上限（后端会传 `ip`）；0 = 不限。 |
+| `MaxPendingTickets` | 同时存在的未完成票据上限（防内存增长）；0 = 不限。 |
 | `TokenTTLMinutes` | 本插件铸造的 web token 有效期（分钟）。0 = 不过期（跟随后端会话/手动退出）。 |
 | `AllowInGameOnlyCommands` | Tier B：是否允许以**真实在线玩家**身份执行 `AllowServer=false` 的指令（默认关；权限不多一分）。 |
 | `AllowChatConfirm` | 是否允许玩家直接回复 `y`/`n` 确认（无需输入 `/web auth` 验证码）。 |
@@ -111,8 +121,9 @@ docker restart tshock
 | `/webui/auth/request` | `name`、`secret` | `{code:"ok", ticket, expires, player, username}`；玩家不在线 → `{code:"offline"}` |
 | `/webui/auth/poll` | `ticket`、`secret` | `{code:"ok", state:"pending"/"approved"/"denied"/"expired"}`；批准时附 `username` + `token`（仅返回一次） |
 | `/webui/auth/cancel` | `ticket`、`secret` | `{code:"ok"}`（后端放弃等待时回收票据） |
+| `/webui/restlimit` | `secret` | `{code:"ok", limit, bucket, intervalMinutes}`：TShock 建令牌限流只读快照，`bucket` 是调用者自己 IP 的计数（后端用它精确判限流） |
 | `/webui/batch` | `cmds`（JSON 数组）、`token`、可选 `mode=server\|player` | `{status:"200", results:[{cmd, output:[...]}]}`（需 token + `tshock.rest.command`） |
-| `/webui/commands` | `token` | `{commands:[{name,aliases,permissions,allowServer,help,doLog}]}`（TShock 运行时全部指令，含插件指令） |
+| `/webui/commands` | `token` | `{commands:[{name,aliases,permissions,allowServer,help,doLog}]}`（TShock 运行时指令，含插件指令；**按调用者用户组过滤**，带权限的不下发） |
 | `/webui/me` | `token` | `{username,group,permissions,canUseApi,canRunCommands}` |
 | `/webui/data` | `type=regions\|warps\|npcs\|buffs`、`token` | `{regions/warps:[...]}` 或 `{npcs/buffs:[{id,name}]}` |
 | `/webui/serverinfo` | `token` | 世界事件 / Boss 进度等 |
@@ -133,13 +144,28 @@ docker restart tshock
 
 ## 游戏内指令
 
+**普通玩家**（无权限要求、仅限游戏内）：
+
 ```
 /web auth <验证码>          # 同意
 /web deny <验证码>          # 拒绝
 ```
 
 主命令是 `/webui`，简写 `/web`；帮助会在不带参数时显示。
-只有发起请求时匹配到的那名玩家能审批自己的验证码。`/web` 对所有玩家开放（无需权限）。
+只有发起请求时匹配到的那名玩家能审批自己的验证码，`auth`/`deny` 必须在游戏内由本人执行。
+
+**高级指令**（单独注册、挂 `tshock.rest.cfg`，普通玩家看不到也跑不了）：
+
+```
+/weblimit                   # 查看 TShock 建令牌限流
+/weblimit <上限>            # 设为 N（≥1）；unlimited=1000000；default=5
+```
+
+命令名 `webadmin` / `weblimit`，`AllowServer=true`（控制台也可执行）；
+会修改并保存 TShock 的 `config.json` 中的 `RESTMaximumRequestsPerInterval`——
+这是服务端配置变更，属于用户明确要求的例外。
+`/webui/commands` 指令目录按调用者用户组过滤（与 TShock `/help` 的可见性一致），
+带权限的指令不会下发给普通玩家。
 
 ## 手动验收
 

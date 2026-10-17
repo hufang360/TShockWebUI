@@ -33,9 +33,11 @@ interface AppShellProps {
   onTabChange: (tab: TabId) => void
   /** 侧边栏导航项（由 App 按已激活模块动态生成）。 */
   nav: NavItem[]
+  /** 侧栏页头（收起按钮旁）的额外控件，如语言 / 主题快捷切换。 */
+  headerExtra?: ReactNode
   /** 侧栏底部的玩家状态 / 设置等 */
   headerRight: ReactNode
-  /** 侧栏中部的额外区域（如执行队列） */
+  /** 侧栏底部额外区域（账号卡片上方，如执行队列） */
   sidebarExtra?: ReactNode
   banner?: ReactNode
   children: ReactNode
@@ -80,6 +82,7 @@ export function AppShell({
   activeTab,
   onTabChange,
   nav,
+  headerExtra,
   headerRight,
   sidebarExtra,
   banner,
@@ -108,16 +111,19 @@ export function AppShell({
               <h1 className="min-w-0 truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
                 {t('app.title')}
               </h1>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="max-md:hidden"
-                onClick={onToggleSidebar}
-                aria-label={t('nav.hideSidebar')}
-                title={t('nav.hideSidebar')}
-              >
-                <PanelLeftClose data-icon="inline-start" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {headerExtra}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="max-md:hidden"
+                  onClick={onToggleSidebar}
+                  aria-label={t('nav.hideSidebar')}
+                  title={t('nav.hideSidebar')}
+                >
+                  <PanelLeftClose data-icon="inline-start" />
+                </Button>
+              </div>
             </div>
           </SidebarHeader>
 
@@ -127,10 +133,12 @@ export function AppShell({
                 <SidebarNav nav={nav} activeTab={activeTab} onTabChange={onTabChange} />
               </SidebarGroupContent>
             </SidebarGroup>
-            {sidebarExtra}
           </SidebarContent>
 
-          <SidebarFooter>{headerRight}</SidebarFooter>
+          <SidebarFooter>
+            {sidebarExtra}
+            {headerRight}
+          </SidebarFooter>
           <SidebarRail />
         </Sidebar>
 

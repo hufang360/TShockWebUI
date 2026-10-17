@@ -7,7 +7,7 @@
     <RootNamespace>WebUI</RootNamespace>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Version>0.1.0</Version>
+    <Version>0.1.0-rc.2</Version>
     <AssemblyTitle>WebUI</AssemblyTitle>
     <Product>WebUI</Product>
     <Description>TShockWebUI 的「在线授权」信使插件：把网页端登录请求转达给在线玩家，由玩家在游戏内同意/拒绝。</Description>

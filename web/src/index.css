@@ -37,6 +37,8 @@
   --warning-foreground: oklch(0.984 0.003 247.858);
   --info: oklch(0.546 0.245 262.881);
   --info-foreground: oklch(0.984 0.003 247.858);
+  /* 紫色（配方标记：无微光分解等） */
+  --purple: oklch(0.55 0.22 300);
   --sidebar: oklch(0.985 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.208 0.042 265.755);
@@ -78,6 +80,7 @@
   --warning-foreground: oklch(0.129 0.042 264.695);
   --info: oklch(0.707 0.165 254.624);
   --info-foreground: oklch(0.129 0.042 264.695);
+  --purple: oklch(0.72 0.2 300);
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -119,6 +122,7 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-purple: var(--purple);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -201,4 +205,17 @@ textarea.editor {
 }
 .tswui-flash {
   animation: tswui-flash 0.7s ease-in-out 4;
+}
+
+/* 物品集合下拉的「点我」提示：选中集合分组后，第二级下拉出现时脉冲一圈主色阴影。 */
+@keyframes tswui-attention {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+.tswui-attention {
+  animation: tswui-attention 0.9s ease-out 2;
 }

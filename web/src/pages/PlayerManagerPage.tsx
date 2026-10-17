@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { AlertTriangle, ChevronRight, Download, RefreshCw, Search, ShieldAlert, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Download, RefreshCw, Search, ShieldAlert, Trash2, Upload } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
+import { CollapseChevron } from '@/components/CollapseChevron'
+import { LoginGate } from '@/components/LoginGate'
 import { PlayerAvatar } from '@/components/PlayerAvatar'
 import { SlotTooltip } from '@/components/SlotTooltip'
 import {
@@ -20,6 +22,10 @@ import {
   Separator,
   Spinner,
   Switch,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { cn } from '@/lib/cn'
@@ -344,14 +350,7 @@ export function PlayerManagerPage({
     return (
       <div className="flex flex-col gap-4">
         {heading}
-        <Card>
-          <CardBody className="flex flex-wrap items-center justify-between gap-3 pt-4">
-            <p className="text-sm text-foreground/80">{t('players.notLoggedIn')}</p>
-            <Button variant="primary" onClick={onLogin}>
-              {t('action.login')}
-            </Button>
-          </CardBody>
-        </Card>
+        <LoginGate onLogin={onLogin} />
       </div>
     )
   }
@@ -391,83 +390,123 @@ export function PlayerManagerPage({
         <Card>
           {/* 顶部多留一点边距：用户名（输入框）上方不贴卡边 */}
           <CardBody className="flex flex-col gap-3 pt-6">
-            {/* 查询行：输入 + 图标按钮（下载 / 刷新 / 查看）+ 分隔线 + 导入 .plr */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                className="max-w-xs"
-                list="players-page-names"
-                value={name}
-                placeholder={t('players.namePlaceholder')}
-                onChange={(e) => {
-                  setName(e.target.value)
-                  // 输入时清掉上一次的错误，避免边打字边被「无法解析」打扰。
-                  setError(null)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void runLook()
-                }}
-              />
-              <datalist id="players-page-names">
-                {players.map((p) => (
-                  <option key={p} value={p} />
-                ))}
-              </datalist>
-              <Button
-                size="icon"
-                variant="secondary"
-                disabled={busy != null || imported}
-                aria-label={t('players.export')}
-                title={t('players.export')}
-                onClick={() => void runExport()}
-              >
-                {busy === 'export' ? <Spinner aria-hidden /> : <Download aria-hidden />}
-              </Button>
-              <Button
-                size="icon"
-                variant="secondary"
-                disabled={busy != null || imported}
-                aria-label={t('players.refresh')}
-                title={t('players.refresh')}
-                onClick={() => void runLook(look?.name || name)}
-              >
-                {busy === 'look' ? <Spinner aria-hidden /> : <RefreshCw aria-hidden />}
-              </Button>
-              <Button
-                size="icon"
-                variant="primary"
-                disabled={busy != null}
-                aria-label={t('players.look')}
-                title={t('players.look')}
-                onClick={() => void runLook()}
-              >
-                {busy === 'look' ? <Spinner aria-hidden /> : <Search aria-hidden />}
-              </Button>
-              <Separator orientation="vertical" className="mx-1 h-6" />
-              <Button
-                size="icon"
-                variant="secondary"
-                disabled={busy != null}
-                aria-label={t('players.import')}
-                title={t('players.importHint')}
-                onClick={() => importRef.current?.click()}
-              >
-                {busy === 'import' ? <Spinner aria-hidden /> : <Upload aria-hidden />}
-              </Button>
-              <input
-                ref={importRef}
-                type="file"
-                accept=".plr,application/octet-stream"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  e.target.value = '' // 允许再次选择同一个文件
-                  if (file) void runImport(file)
-                }}
-              />
-            </div>
+            {/* 查询行：输入 + 带文字按钮（下载 / 刷新 / 查看）+ 分隔线 + 导入 .plr */}
+            <TooltipProvider delayDuration={150}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  className="max-w-xs"
+                  list="players-page-names"
+                  value={name}
+                  placeholder={t('players.namePlaceholder')}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    // 输入时清掉上一次的错误，避免边打字边被「无法解析」打扰。
+                    setError(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void runLook()
+                  }}
+                />
+                <datalist id="players-page-names">
+                  {players.map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy != null || imported}
+                      onClick={() => void runExport()}
+                    >
+                      {busy === 'export' ? (
+                        <Spinner aria-hidden data-icon="inline-start" />
+                      ) : (
+                        <Download data-icon="inline-start" />
+                      )}
+                      {t('players.export')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('players.export')}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy != null || imported}
+                      onClick={() => void runLook(look?.name || name)}
+                    >
+                      {busy === 'look' ? (
+                        <Spinner aria-hidden data-icon="inline-start" />
+                      ) : (
+                        <RefreshCw data-icon="inline-start" />
+                      )}
+                      {t('players.refresh')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('players.refresh')}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="sm" variant="primary" disabled={busy != null} onClick={() => void runLook()}>
+                      {busy === 'look' ? (
+                        <Spinner aria-hidden data-icon="inline-start" />
+                      ) : (
+                        <Search data-icon="inline-start" />
+                      )}
+                      {t('players.look')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('players.look')}</TooltipContent>
+                </Tooltip>
+                <Separator orientation="vertical" className="mx-1 h-6" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy != null}
+                      onClick={() => importRef.current?.click()}
+                    >
+                      {busy === 'import' ? (
+                        <Spinner aria-hidden data-icon="inline-start" />
+                      ) : (
+                        <Upload data-icon="inline-start" />
+                      )}
+                      {t('players.import')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('players.importHint')}</TooltipContent>
+                </Tooltip>
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept=".plr,application/octet-stream"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = '' // 允许再次选择同一个文件
+                    if (file) void runImport(file)
+                  }}
+                />
+              </div>
+            </TooltipProvider>
 
-            {/* 最近查询结果 + 简约视图 */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* 简约视图（最左） + 最近查询结果 */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Field orientation="horizontal" className="w-auto flex-nowrap gap-1.5">
+                <Switch
+                  id="players-compact"
+                  checked={compact}
+                  onCheckedChange={setCompact}
+                  aria-label={t('players.compactView')}
+                />
+                <FieldLabel htmlFor="players-compact" className="font-normal text-muted-foreground">
+                  {t('players.compactView')}
+                </FieldLabel>
+              </Field>
               <div className="flex flex-wrap items-center gap-1.5">
                 {recentChips.map((n) => (
                   <Button
@@ -484,17 +523,6 @@ export function PlayerManagerPage({
                   </Button>
                 ))}
               </div>
-              <Field orientation="horizontal" className="w-auto flex-nowrap gap-1.5">
-                <Switch
-                  id="players-compact"
-                  checked={compact}
-                  onCheckedChange={setCompact}
-                  aria-label={t('players.compactView')}
-                />
-                <FieldLabel htmlFor="players-compact" className="font-normal text-muted-foreground">
-                  {t('players.compactView')}
-                </FieldLabel>
-              </Field>
             </div>
 
             {error && (
@@ -511,7 +539,7 @@ export function PlayerManagerPage({
             {/* 角色全身图：只画皮肤 / 衣服 / 头发（不含盔甲饰品）。 */}
             <PlayerAvatar look={look} />
             {/* 属性区：左边留出间隔，名字加大、与属性行拉开，整体高度与人物接近。 */}
-            <div className="flex min-w-0 flex-1 flex-col gap-3 pl-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-3 pt-2 pl-2">
               <div className="flex items-center gap-2 text-lg font-semibold">
                 {look.name}
                 {imported ? (
@@ -580,6 +608,9 @@ export function PlayerManagerPage({
 function sliceGroup(look: PlayerLook, group: { start: number; count: number }): PlayerItem[] {
   return look.items.slice(group.start, group.start + group.count)
 }
+
+/** 分组里非空格子的数量（id <= 0 视为空）。 */
+const countItems = (items: PlayerItem[]) => items.filter((it) => it && it.id > 0).length
 
 type LabelKind = 'number' | 'none' | 'trash' | 'armor' | 'vanity' | 'dye' | 'miscEquip'
 
@@ -654,12 +685,8 @@ function CollapsibleTitle({
     <CollapsibleTrigger asChild>
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+        className="group/title flex w-full cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
       >
-        <ChevronRight
-          aria-hidden
-          className={cn('size-3.5 shrink-0 transition-transform', open && 'rotate-90')}
-        />
         {titleIconId != null && (
           <ItemIcon
             item={dataset?.itemsById.get(titleIconId)}
@@ -668,7 +695,8 @@ function CollapsibleTitle({
             tooltip={false}
           />
         )}
-        {label}
+        <span className="truncate">{label}</span>
+        <CollapseChevron open={open} />
       </button>
     </CollapsibleTrigger>
   )
@@ -691,9 +719,14 @@ function Group({
   const { t } = useI18n()
   if (items.length === 0) return null
   const kind = labelKindOf(group.key)
+  const n = countItems(items)
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="flex flex-col gap-1.5">
-      <CollapsibleTitle label={t(group.key)} titleIconId={titleIconId} open={open} />
+      <CollapsibleTitle
+        label={n > 0 ? `${t(group.key)}（${n}）` : t(group.key)}
+        titleIconId={titleIconId}
+        open={open}
+      />
       <CollapsibleContent>
         <div
           className="grid gap-1"
@@ -716,20 +749,25 @@ function ArrowColumn({
   groupKey,
   items,
   dimLast,
+  hideLabel,
 }: {
   groupKey: string
   items: PlayerItem[]
   /** 恶魔之心未吃时，最后一格（额外配饰槽）半透明。 */
   dimLast?: boolean
+  /** 不显示列顶标签（配装块用：直接用「配装 N」作标题）。 */
+  hideLabel?: boolean
 }) {
   const { t } = useI18n()
   if (items.length === 0) return null
   const kind = labelKindOf(groupKey)
   return (
     <section className="flex flex-col gap-1.5">
-      <h3 className="text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
-        {t(groupKey)}
-      </h3>
+      {!hideLabel && (
+        <h3 className="text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
+          {t(groupKey)}
+        </h3>
+      )}
       <div className="mx-auto grid gap-1" style={{ gridTemplateColumns: 'minmax(0, 1fr)', maxWidth: 40 }}>
         {items.map((it, i) => (
           <Slot
@@ -757,8 +795,8 @@ function BackpackCluster({ look }: { look: PlayerLook }) {
   if (main.length === 0) return null
 
   return (
-    // `pt-5.5` = 一行标题的高度：让背包的格子与右侧配装块的格子对齐（用间距类，不写任意值）。
-    <div className="flex flex-wrap items-start gap-x-2 gap-y-3 pt-5.5">
+    // 与右侧配装块顶部对齐；不额外留空行。
+    <div className="flex flex-wrap items-start gap-x-2 gap-y-3">
       <section className="flex flex-col gap-1.5">
         <h3 className="text-xs font-medium text-muted-foreground">
           {t('players.group.inventory')}
@@ -802,8 +840,7 @@ function accessoryLocked(look: PlayerLook, key: string): boolean {
  */
 function EquipCluster({ look }: { look: PlayerLook }) {
   return (
-    // `pt-5.5` = 一行标题的高度：让装备列的格子与配装块的格子对齐。
-    <div className="flex flex-wrap items-start gap-x-2 gap-y-3 pt-5.5">
+    <div className="flex flex-wrap items-start gap-x-2 gap-y-3">
       <div className="flex items-start gap-x-1">
         {EQUIP_GROUP_B.map((key) => (
           <ArrowColumn key={key} groupKey={key} items={sliceGroup(look, findGroup(key))} />
@@ -839,9 +876,13 @@ function LoadoutBlock({
   const cols = loadoutColumns(findGroup(groupKey).start)
   const hasAny = cols.some((c) => sliceGroup(look, c).length > 0)
   if (!hasAny) return null
+  const total = cols.reduce((n, c) => n + countItems(sliceGroup(look, c)), 0)
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="flex flex-col gap-1.5">
-      <CollapsibleTitle label={t(groupKey)} open={open} />
+      <CollapsibleTitle
+        label={total > 0 ? `${t(groupKey)}（${total}）` : t(groupKey)}
+        open={open}
+      />
       <CollapsibleContent>
         <div className="flex items-start gap-x-1.5">
           {cols.map((c) => (
@@ -850,6 +891,7 @@ function LoadoutBlock({
               groupKey={c.key}
               items={sliceGroup(look, c)}
               dimLast={accessoryLocked(look, c.key)}
+              hideLabel
             />
           ))}
         </div>
@@ -901,7 +943,7 @@ function PlayerInfoPanel({ look }: { look: PlayerLook }) {
   )
   return (
     <div className="flex flex-col gap-2 text-sm text-foreground">
-      <dl className="grid w-fit max-w-full grid-cols-[auto_auto] items-baseline gap-x-3 gap-y-1">
+      <dl className="mt-1 grid w-fit max-w-full grid-cols-[auto_auto] items-baseline gap-x-3 gap-y-1">
         {attr(
           t('players.hp'),
           <>

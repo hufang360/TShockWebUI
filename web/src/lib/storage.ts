@@ -16,8 +16,18 @@ export const StorageKeys = {
   draft: 'draft',
   history: 'history',
   favorites: 'favorites',
+  /** 指令页最近几条结果卡片（含输出内容）。 */
+  commandResults: 'commandResults',
+  /** 指令页右侧当前选中的 tab。 */
+  commandTab: 'commandTab',
   /** 物品图鉴里收藏的物品 id（在「指令」模块的收藏 tab 展示）。 */
   itemFavorites: 'itemFavorites',
+  /** 物品图鉴每页数量（跨刷新记忆；见 lib/dexState.ts）。 */
+  dexPageSize: 'dex:pageSize',
+  /** 物品图鉴合成表「仅图标」开关（跨刷新记忆）。 */
+  dexRecipeIconOnly: 'dex:recipeIconOnly',
+  /** 物品图鉴合成表复制文本是否含 [i:..] 标签。 */
+  dexRecipeCopyTag: 'dex:recipeCopyTag',
   itemsRecent: 'items:recent',
   settings: 'settings',
   ui: 'ui',

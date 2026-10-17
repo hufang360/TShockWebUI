@@ -37,7 +37,7 @@
 | `bad_credentials` | 401 | 账号或密码错误 | 提示「账号或密码错误」 |
 | `no_api_permission` | 403 | 账号所属组缺 `tshock.rest.useapi` | 提示联系管理员赋权 |
 | `no_permission` | 403 | 已有 token 但缺所需权限（如 `tshock.rest.command`、`playermanager`） | 提示权限不足 |
-| `plugin_not_installed` | 404 | 服务器未安装对应第三方 TShock 插件（PlayerManager / FishShop） | 提示「未安装插件」，隐藏模块 |
+| `plugin_not_installed` | 501 | 服务器未安装对应第三方 TShock 插件（PlayerManager / FishShop） | 提示「未安装插件」，隐藏模块 |
 | `player_offline` | 404 | 在线授权：目标玩家不在线 | 提示「该玩家不在线」 |
 | `online_auth_denied` | 403 | 在线授权：玩家在游戏内拒绝 | 提示「玩家已拒绝授权」 |
 | `online_auth_timeout` | 504 | 在线授权：等待确认超时 | 提示重新发起 |
@@ -93,10 +93,13 @@
 > 前端在登录失败时会展示该命令并提供复制。
 
 后端行为：
+0. （可选）装了 WebUI 信使插件时，先调 `GET {TSHOCK_URL}/webui/restlimit` 看建令牌桶：
+   `bucket >= limit` → 直接 `429 rate_limited`（精确，不再受同文案 403 误导）；未装 / 旧版插件（404）→ 跳过。
 1. `POST {TSHOCK_URL}/v2/token/create?username=<urlenc>&password=<urlenc>`
 2. `200` 且 body 含 `token` → 建会话、写 Cookie。
-3. `403` → `no_api_permission`（TShock 对「密码错」与「无权限」都返回 403，需结合 body 文案；
-   无法区分时统一返回 `bad_credentials`，**不泄露账号是否存在**）。
+3. `403` → 统一 `bad_credentials`（TShock 对「密码错 / 无权限 / 限流」返回同一句 403；
+   未装插件时无法区分，**不泄露账号是否存在**；装了插件时步骤 0 已排除限流）。
+   前端把剩余可能原因渲染成逐条清单。
 4. 不把 token 返回给浏览器。
 
 ---
@@ -128,7 +131,7 @@
 | 组缺 `tshock.rest.useapi` | 403 | `no_api_permission` | 联系管理员赋权 |
 | 玩家拒绝 | 403 | `online_auth_denied` | 玩家已拒绝授权 |
 | 超时未操作 | 504 | `online_auth_timeout` | 等待授权超时，请重新发起 |
-| 未安装信使插件 | 404 | `plugin_not_installed` | 服务器未安装 WebUI 信使插件 |
+| 未安装信使插件 | 501 | `plugin_not_installed` | 服务器未安装 WebUI 信使插件 |
 | 插件密钥不匹配 | 502 | `online_auth_error` | 检查 `TSWUI_AUTH_SECRET` 与插件 `Secret` |
 | 限流 | 429 | `rate_limited` | 稍后重试 |
 
@@ -144,7 +147,7 @@ The token 仍只在后端内存；插件铸造的 token 与 `/v2/token/create` �
 { "plugin": true }
 ```
 - 后端用**空 `name`** 调一次插件 `/webui/auth/request`：404 = 未安装，其它 = 已安装。
-- 前端据此决定「在线授权」标签页是否可用（未安装时禁用并提示）。
+- 前端据此决定「在线授权」入口是否可用（未安装时禁用并提示）。
 
 ---
 
@@ -278,7 +281,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
   `spawnX`/`spawnY`、`currentLoadoutIndex`。
 - 上游在线分支这些标记是 `0`/`1`、离线分支是 `true`/`false`，后端用 `flexBool` 统一为 `bool`。
 - 缺少/非法 `name` → `400 bad_request`。
-- 未安装插件 → `404 plugin_not_installed`；无权限 → `403 no_permission`。
+- 未安装插件 → `501 plugin_not_installed`；无权限 → `403 no_permission`。
 - 限流：与 `/api/command` 共用按会话的限流器（`COMMAND_MAX_PER_MIN`），超出 `429 rate_limited`。
 
 ---
@@ -353,7 +356,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 - `buyMax` 单次最多可购买件数（1 = 不显示数量调节框）。
 - `needArgs` = 指令类商品含 `{args}`/`{0}` 占位符，购买时需填参数（此时不再调数量）。
 - `comment`（备注）也可能含 `[i:..]` 物品标签，前端同样渲染成图标。
-- 未安装插件 → `404 plugin_not_installed`；无权限 → `403 no_permission`。
+- 未安装插件 → `501 plugin_not_installed`；无权限 → `403 no_permission`。
 - 业务失败（如「商店打烊」）→ `400 fishshop_error`，`message` 为上游原文。
 
 ---
@@ -457,7 +460,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 - 逐条权限仍由 TShock 按当前 token 用户组判定（与 rawcmd 一致，**不提权、不绕过 `AllowServer`**）。
 
 失败（请求级，统一错误信封）：
-- 未安装信使插件 → `404 plugin_not_installed`
+- 未安装信使插件 → `501 plugin_not_installed`
 - 缺 `tshock.rest.command` → `403 no_permission`
 - `token_invalid` → `401 token_invalid`（后端清会话）
 - 超时 / 不可达 → `504 tshock_timeout` / `502 tshock_unavailable`
@@ -480,7 +483,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 
 ## 6.3 信使插件只读信息 / 会话管理（需登录）
 
-以下端点都需会话；插件未安装时返回 `404 plugin_not_installed`。权限仍由插件判定，后端不提权。
+以下端点都需会话；插件未安装时返回 `501 plugin_not_installed`。权限仍由插件判定，后端不提权。
 
 ### `GET /api/commands`
 TShock **运行时**指令目录（含 `/fish`、`/pm`、本插件的 `/web` 等插件指令）：
@@ -589,7 +592,7 @@ export interface BackendTransport {
 - [ ] 登录按 IP 限流；`429` 时不泄露账号信息。
 - [ ] 不提供通用 URL 转发 / 代理端点。
 - [ ] 玩家管理（`/api/player/*`）复用**当前会话的 token**，不引入任何管理员身份；
-      权限完全由上游 TShock / PlayerManager 判定，后端区分 `plugin_not_installed`(404) 与 `no_permission`(403)。
+      权限完全由上游 TShock / PlayerManager 判定，后端区分 `plugin_not_installed`(501) 与 `no_permission`(403)。
 - [ ] 会话 TTL 与上限生效；`token_invalid` 立即清会话。
 - [ ] 启动日志脱敏。
 

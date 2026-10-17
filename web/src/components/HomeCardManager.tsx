@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { GripVertical, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { ConfirmButton } from '@/components/ConfirmButton'
 import {
   Badge,
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  Field,
-  FieldLabel,
+  Checkbox,
   Input,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
   Switch,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
@@ -25,7 +25,6 @@ import {
   isCustomCardId,
   moveCard,
   normalizeCustomCommand,
-  shiftCard,
   type CustomHomeCard,
   type HomeCardsPrefs,
 } from '@/lib/homeCards'
@@ -62,7 +61,6 @@ export function HomeCardManager({
   const [overId, setOverId] = useState<string | null>(null)
   // 仅当从拖拽手柄按下时才允许整行拖动，避免在输入框里选词时误拖。
   const [handleArmed, setHandleArmed] = useState<string | null>(null)
-  const [confirmReset, setConfirmReset] = useState(false)
   // 刚添加的自定义卡片：让名称输入框自动聚焦。
   const [justAddedId, setJustAddedId] = useState<string | null>(null)
 
@@ -85,10 +83,6 @@ export function HomeCardManager({
 
   const move = (fromId: string, toId: string) => {
     onChange({ ...prefs, order: moveCard(prefs.order, fromId, toId) })
-  }
-
-  const shift = (id: string, delta: number) => {
-    onChange({ ...prefs, order: shiftCard(prefs.order, id, delta) })
   }
 
   const addCard = () => {
@@ -120,15 +114,18 @@ export function HomeCardManager({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t('home.manageTitle')}</DialogTitle>
-          <DialogDescription>{t('home.manageDesc')}</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+      >
+        <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
+          <SheetTitle>{t('home.manageTitle')}</SheetTitle>
+          <SheetDescription>{t('home.manageDesc')}</SheetDescription>
+        </SheetHeader>
 
-        <ul className="max-h-[58vh] flex flex-col gap-2 overflow-y-auto pr-1">
-          {prefs.order.map((id, index) => {
+        <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-4">
+          {prefs.order.map((id) => {
             const builtin = isBuiltinCardId(id)
             const meta = builtin ? BUILTIN_CARD_META[id] : null
             const custom = !builtin && isCustomCardId(id) ? customById.get(id) : undefined
@@ -190,27 +187,31 @@ export function HomeCardManager({
 
                 <div className="min-w-0 flex-1 flex flex-col gap-1.5">
                   {meta ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-foreground">{label}</span>
-                      <Badge>{t('home.manageBuiltin')}</Badge>
-                      {missing && <Badge tone="warn">{t('home.managePluginMissing')}</Badge>}
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-foreground">{label}</span>
+                        <Badge>{t('home.manageBuiltin')}</Badge>
+                        {missing && <Badge tone="warn">{t('home.managePluginMissing')}</Badge>}
+                      </div>
                       {command ? (
-                        <code className="font-pixel text-[10px] text-muted-foreground">{command}</code>
+                        <code className="font-pixel text-[10px] text-muted-foreground">
+                          {command}
+                        </code>
                       ) : (
                         <span className="text-[10px] text-muted-foreground">
                           {t('home.manageNoCommand')}
                         </span>
                       )}
-                    </div>
+                    </>
                   ) : (
-                    <div className="flex flex-col gap-1.5 sm:flex-row">
+                    <div className="flex flex-col gap-1.5">
                       <Input
                         autoFocus={justAddedId === id}
                         value={custom?.name ?? ''}
                         onChange={(e) => updateCard(id, { name: e.target.value })}
                         placeholder={t('home.manageNamePlaceholder')}
                         aria-label={t('home.manageNamePlaceholder')}
-                        className="h-8 text-xs sm:w-36"
+                        className="h-8 text-xs"
                       />
                       <Input
                         list={`fav-${id}`}
@@ -221,7 +222,7 @@ export function HomeCardManager({
                         }
                         placeholder={t('home.manageCommandPlaceholder')}
                         aria-label={t('home.manageCommandPlaceholder')}
-                        className="h-8 flex-1 font-pixel text-xs"
+                        className="h-8 font-pixel text-xs"
                       />
                       <datalist id={`fav-${id}`}>
                         {favoriteCommands.map((cmd) => (
@@ -231,49 +232,25 @@ export function HomeCardManager({
                     </div>
                   )}
                   {command && onToggleManual && (
-                    <Field orientation="horizontal" className="w-auto flex-nowrap gap-1.5">
-                      <Switch
+                    <label className="flex w-fit cursor-pointer items-center gap-1.5">
+                      <Checkbox
                         checked={!(isManual?.(id) ?? false)}
-                        onCheckedChange={(v) => onToggleManual(id, !v)}
+                        onCheckedChange={(v) => onToggleManual(id, v !== true)}
                         aria-label={`${label} ${t('home.autoExec')}`}
                       />
-                      <FieldLabel className="text-[10px] font-normal text-muted-foreground">
+                      <span className="text-[10px] font-normal text-muted-foreground">
                         {t('home.autoExec')}
-                      </FieldLabel>
-                    </Field>
+                      </span>
+                    </label>
                   )}
                 </div>
 
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t('home.manageMoveUp')}
-                    title={t('home.manageMoveUp')}
-                    disabled={index === 0}
-                    onClick={() => shift(id, -1)}
-                  >
-                    <ChevronUp data-icon="inline-start" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t('home.manageMoveDown')}
-                    title={t('home.manageMoveDown')}
-                    disabled={index === prefs.order.length - 1}
-                    onClick={() => shift(id, 1)}
-                  >
-                    <ChevronDown data-icon="inline-start" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
+                <div className="flex shrink-0 flex-col items-center gap-1.5">
+                  <Switch
+                    checked={!hidden}
+                    onCheckedChange={() => toggleHidden(id)}
                     aria-label={hidden ? t('home.manageShow') : t('home.manageHide')}
-                    title={hidden ? t('home.manageShow') : t('home.manageHide')}
-                    onClick={() => toggleHidden(id)}
-                  >
-                    {hidden ? <EyeOff data-icon="inline-start" /> : <Eye data-icon="inline-start" />}
-                  </Button>
+                  />
                   {custom && (
                     <Button
                       size="icon-sm"
@@ -291,47 +268,36 @@ export function HomeCardManager({
           })}
         </ul>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary" onClick={addCard}>
               <Plus data-icon="inline-start" />
               {t('home.manageAdd')}
             </Button>
-            {confirmReset ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => {
-                    onChange({
-                      order: [...DEFAULT_HOME_CARDS.order],
-                      hidden: {},
-                      custom: [],
-                      layoutVersion: DEFAULT_HOME_CARDS.layoutVersion,
-                    })
-                    setConfirmReset(false)
-                  }}
-                >
-                  {t('home.manageResetConfirm')}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>
-                  {t('action.cancel')}
-                </Button>
-              </>
-            ) : (
-              <Button size="sm" variant="ghost" onClick={() => setConfirmReset(true)}>
-                <RotateCcw data-icon="inline-start" />
-                {t('home.manageReset')}
-              </Button>
-            )}
+            <ConfirmButton
+              icon={<RotateCcw data-icon="inline-start" />}
+              confirmLabel={t('home.manageResetConfirm')}
+              onConfirm={() =>
+                onChange({
+                  order: [...DEFAULT_HOME_CARDS.order],
+                  hidden: {},
+                  custom: [],
+                  layoutVersion: DEFAULT_HOME_CARDS.layoutVersion,
+                })
+              }
+            >
+              {t('home.manageReset')}
+            </ConfirmButton>
           </div>
           <Button size="sm" variant="primary" onClick={() => onOpenChange(false)}>
             {t('home.manageDone')}
           </Button>
         </div>
 
-        <p className="text-[10px] text-muted-foreground">{t('home.manageNote')}</p>
-      </DialogContent>
-    </Dialog>
+        <p className="shrink-0 px-5 pb-4 text-[10px] text-muted-foreground">
+          {t('home.manageNote')}
+        </p>
+      </SheetContent>
+    </Sheet>
   )
 }

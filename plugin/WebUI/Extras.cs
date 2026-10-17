@@ -23,11 +23,27 @@ namespace WebUI
     {
         // ---------- /webui/commands ----------
 
-        public static object CommandsCatalog()
+        /// <summary>
+        /// 运行时指令目录（供网页端补全）。**按调用者用户组过滤**：
+        /// 带权限的指令（如高级指令 <c>/weblimit</c>）只有用户组真能跑才下发，
+        /// 普通玩家拿不到（与 TShock <c>/help</c> 的可见性一致，对应 Command.CanRun）。
+        /// </summary>
+        public static object CommandsCatalog(SecureRest.TokenData token)
         {
+            var group = string.IsNullOrEmpty(token.UserGroupName) ? null : TShock.Groups.GetGroupByName(token.UserGroupName);
+            bool CanRun(Command cmd)
+            {
+                if (cmd.Permissions == null || cmd.Permissions.Count < 1) return true;
+                if (group == null) return false;
+                foreach (var permission in cmd.Permissions)
+                    if (group.HasPermission(permission)) return true;
+                return false;
+            }
+
             var list = new List<Dictionary<string, object>>();
             foreach (var cmd in Commands.ChatCommands)
             {
+                if (!CanRun(cmd)) continue;
                 var item = new Dictionary<string, object>
                 {
                     { "name", cmd.Name },

@@ -31,7 +31,11 @@ function seedHomeCards(value: unknown) {
   localStorage.setItem('tswui:homeCards', JSON.stringify(value))
 }
 
-function renderPage(transport: BackendTransport, authenticated = true) {
+function renderPage(
+  transport: BackendTransport,
+  authenticated = true,
+  onLogin: () => void = vi.fn(),
+) {
   return render(
     <I18nProvider lang="zh">
       <ExecutionQueueProvider interval={0}>
@@ -45,6 +49,7 @@ function renderPage(transport: BackendTransport, authenticated = true) {
             refreshInterval={120000}
             eventsRefreshInterval={180000}
             onTokenInvalid={vi.fn().mockResolvedValue(true)}
+            onLogin={onLogin}
             onNavigate={vi.fn()}
           />
         </CommandResultsProvider>
@@ -61,6 +66,20 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.clear()
   vi.restoreAllMocks()
+})
+
+describe('HomePage 未登录', () => {
+  it('隐藏卡片内容，显示登录提示与登录按钮', () => {
+    const onLogin = vi.fn()
+    renderPage(fakeTransport(vi.fn()), false, onLogin)
+
+    expect(screen.getByText('请先登录！')).toBeTruthy()
+    expect(screen.queryByText('服务器状态')).toBeNull()
+    expect(screen.queryByRole('button', { name: '管理卡片' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+    expect(onLogin).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('HomePage 卡片管理', () => {
@@ -88,7 +107,7 @@ describe('HomePage 卡片管理', () => {
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
-    fireEvent.click(within(timeRow).getByRole('button', { name: '隐藏' }))
+    fireEvent.click(within(timeRow).getByRole('switch', { name: '隐藏' }))
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
 
     await waitFor(() => expect(screen.queryByText('游戏时间')).toBeNull())
@@ -225,6 +244,7 @@ describe('HomePage 卡片管理', () => {
                   refreshInterval={120000}
                   eventsRefreshInterval={180000}
                   onTokenInvalid={vi.fn().mockResolvedValue(true)}
+                  onLogin={vi.fn()}
                   onNavigate={vi.fn()}
                 />
               ) : (

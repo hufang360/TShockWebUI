@@ -42,6 +42,34 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+describe('SettingsPage 未登录', () => {
+  it('隐藏设置内容，显示登录提示与登录按钮', () => {
+    const onLogin = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={fakeTransport()}
+          authenticated={false}
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          customModules={[]}
+          onCustomModulesChange={vi.fn()}
+          onTokenInvalid={vi.fn()}
+          onLogin={onLogin}
+        />
+      </I18nProvider>,
+    )
+
+    expect(screen.getByText('请先登录！')).toBeTruthy()
+    expect(screen.queryByText('统一执行')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+    expect(onLogin).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('SettingsPage 统一执行（批量执行开关）', () => {
   const renderSettings = (transport: BackendTransport) =>
     render(
@@ -75,6 +103,33 @@ describe('SettingsPage 统一执行（批量执行开关）', () => {
     const sw = await screen.findByRole('switch', { name: '统一执行' })
     await waitFor(() => expect(sw.hasAttribute('disabled')).toBe(true))
     expect(screen.getByText('需服务器安装信使插件后可用')).toBeTruthy()
+  })
+
+  it('统一执行位于「数据刷新」卡片内（不在界面偏好）', async () => {
+    renderSettings(fakeTransport({ batchCapabilities: async () => ({ plugin: true }) }))
+    const sw = await screen.findByRole('switch', { name: '统一执行' })
+    const card = sw.closest('[data-slot="card"]')
+    expect(card?.textContent).toContain('数据刷新')
+    expect(card?.textContent).not.toContain('界面偏好')
+  })
+
+  it('两栏结构：激活模块在左列，界面偏好 / 数据刷新 / 账户在右列', async () => {
+    renderSettings(fakeTransport({ batchCapabilities: async () => ({ plugin: true }) }))
+    const accountCard = (await screen.findByText('在线授权 / 账户')).closest('[data-slot="card"]')
+    const prefCard = screen.getByText('界面偏好').closest('[data-slot="card"]')
+    const refreshCard = screen.getByText('数据刷新').closest('[data-slot="card"]')
+    const activateCard = screen.getByText('激活模块').closest('[data-slot="card"]')
+
+    const rightCol = accountCard?.parentElement
+    const leftCol = activateCard?.parentElement
+    const grid = rightCol?.parentElement
+
+    expect(grid?.className).toContain('xl:grid-cols-[minmax(0,1fr)_360px]')
+    // 左列只放激活模块；右列含界面偏好 / 数据刷新 / 账户，且为 grid 的最后一列。
+    expect(leftCol).not.toBe(rightCol)
+    expect(prefCard?.parentElement).toBe(rightCol)
+    expect(refreshCard?.parentElement).toBe(rightCol)
+    expect(grid?.lastElementChild).toBe(rightCol)
   })
 })
 
@@ -253,7 +308,6 @@ describe('SettingsPage 激活模块', () => {
       </I18nProvider>,
     )
 
-    fireEvent.mouseDown(screen.getByRole('tab', { name: '自定义' }))
     fireEvent.change(screen.getByLabelText('模块名称'), { target: { value: '我的模块' } })
     fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'time' } })
     fireEvent.click(screen.getByRole('button', { name: /创建模块/ }))
@@ -290,9 +344,29 @@ describe('SettingsPage 激活模块', () => {
       </I18nProvider>,
     )
 
-    fireEvent.mouseDown(screen.getByRole('tab', { name: '自定义' }))
     const input = screen.getByDisplayValue('旧名')
     fireEvent.change(input, { target: { value: '新名' } })
     expect(onCustomModulesChange).toHaveBeenCalledWith([{ id: 'm:1', name: '新名' }])
+  })
+
+  it('页面底部显示版本号', () => {
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={fakeTransport({})}
+          authenticated
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          customModules={[]}
+          onCustomModulesChange={vi.fn()}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText(/TShockWebUI 0\.1\.0-rc\.2/)).toBeTruthy()
   })
 })

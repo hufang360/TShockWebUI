@@ -240,6 +240,87 @@ export interface PlayerAtlas {
   regions: AtlasRegions
 }
 
+/** 创意菜单页签（游戏 `Terraria.GameContent.Creative.ItemFilters` 的过滤器列表）。 */
+export interface ItemGroupTab {
+  /** 前端 i18n 键后缀：`dex.tab.<id>` */
+  id: string
+  /** 游戏本地化 key（如 `CreativePowers.TabWeapons`），保留出处 */
+  label: string
+}
+
+/** 单个物品的分组信息（游戏 `GetItemGroup` / `ItemCreativeSortingId`）。 */
+export interface ItemGroupEntry {
+  /** `ItemGroup` 枚举名（语言无关，如 `MeleeWeapon`） */
+  g: string
+  /** `ItemGroup` 枚举值（用于按游戏自身顺序排序） */
+  gv: number
+  /** 组内顺序（`OrderInGroup`，`ByCreativeSortingId` 排序用） */
+  o: number
+  /** 所属页签下标（对应 `tabs` 的索引；一个物品可属于多个页签） */
+  t: number[]
+}
+
+/** `data/item-groups.json`：游戏创意菜单的页签与每件物品的分组。 */
+export interface ItemGroupsData {
+  meta: {
+    gameVersion: string
+    itemCount: number
+    tabCount: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  tabs: ItemGroupTab[]
+  /** itemId -> 分组信息 */
+  items: Record<string, ItemGroupEntry>
+}
+
+/** 词缀数值修正（`Item.cs TryGetPrefixStatMultipliersForItem`，与物品无关）。 */
+export interface PrefixMods {
+  dmg?: number
+  kb?: number
+  spd?: number
+  size?: number
+  shtspd?: number
+  mcst?: number
+  crt?: number
+  tagdmg?: number
+  arpen?: number
+}
+
+/** `data/prefix-sets.json`：每件物品可滚词缀（来自 `Item.GetRollablePrefixes()`）。 */
+export interface PrefixSetsData {
+  meta: {
+    gameVersion: string
+    setCount: number
+    itemCount: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  sets: number[][]
+  items: Record<string, number>
+}
+
+/** `data/prefix-mods.json`。 */
+export interface PrefixModsData {
+  meta: { count: number; source: string; generatedBy: string; note: string }
+  mods: Record<string, PrefixMods>
+}
+
+/** `data/shimmer.json`：微光转换（源物品 id → 目标物品 id）。 */
+export interface ShimmerData {
+  meta: {
+    gameVersion: string
+    itemCount: number
+    count: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  items: Record<string, number>
+}
+
 export interface Dataset {
   meta: DatasetMeta
   items: Item[]
@@ -250,6 +331,22 @@ export interface Dataset {
   atlas: Atlas
   recipes: RecipesData
   itemStats: ItemStatsData
+  /** 游戏创意菜单的物品分组（页签 + 每件物品的 ItemGroup） */
+  itemGroups: ItemGroupsData
+  /** 微光转换（源 → 目标） */
+  shimmer: ShimmerData
+  /** 词缀数值修正 */
+  prefixMods: PrefixModsData
+  /** prefixId -> 修正 */
+  prefixModsById: Map<number, PrefixMods>
+  /** 每件物品可滚词缀 */
+  prefixSets: PrefixSetsData
+  /** itemId -> 可滚词缀 id 列表（没有则不收录，如盔甲） */
+  rollablePrefixesById: Map<number, number[]>
+  /** itemId -> 微光转换目标 */
+  shimmerToById: Map<number, number>
+  /** itemId -> 可微光转换为此物品的源物品列表 */
+  shimmerFromById: Map<number, number[]>
   /** 当前语言的官方本地化（用于解析配方组名等）。 */
   loc: LocalizationBundle
   /** items.id -> item */
@@ -330,7 +427,8 @@ export interface ParsedItemTag {
   prefixId?: number
 }
 
-export type ThemeName = 'light' | 'dark'
+/** 主题：`auto` 跟随系统（`prefers-color-scheme`），`light` / `dark` 强制。 */
+export type ThemeName = 'light' | 'dark' | 'auto'
 
 /** 界面语言。 */
 export type Lang = 'zh' | 'en'

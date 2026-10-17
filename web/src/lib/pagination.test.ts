@@ -34,13 +34,13 @@ describe('shuffleWithSeed', () => {
 })
 
 describe('totalPages / clampPage / paginate', () => {
-  it('总页数按每页 50 计算，且至少 1 页', () => {
-    expect(PAGE_SIZE).toBe(50)
+  it('总页数按每页 100 计算，且至少 1 页', () => {
+    expect(PAGE_SIZE).toBe(100)
     expect(totalPages(0)).toBe(1)
     expect(totalPages(1)).toBe(1)
-    expect(totalPages(50)).toBe(1)
-    expect(totalPages(101)).toBe(3)
-    expect(totalPages(6195)).toBe(124)
+    expect(totalPages(100)).toBe(1)
+    expect(totalPages(101)).toBe(2)
+    expect(totalPages(6195)).toBe(62)
   })
 
   it('页码被夹在有效范围内', () => {
@@ -52,10 +52,10 @@ describe('totalPages / clampPage / paginate', () => {
 
   it('paginate 返回对应切片', () => {
     const items = Array.from({ length: 250 }, (_, i) => i)
-    expect(paginate(items, 1)).toEqual(items.slice(0, 50))
-    expect(paginate(items, 2)).toEqual(items.slice(50, 100))
-    expect(paginate(items, 3)).toEqual(items.slice(100, 150))
-    expect(paginate(items, 4)).toEqual(items.slice(150, 200))
+    expect(paginate(items, 1)).toEqual(items.slice(0, 100))
+    expect(paginate(items, 2)).toEqual(items.slice(100, 200))
+    expect(paginate(items, 3)).toEqual(items.slice(200, 250))
+    expect(paginate(items, 4)).toEqual([])
     expect(paginate(items, 6)).toEqual([])
   })
 })

@@ -110,6 +110,35 @@ export const testCommands: CommandDef[] = [
   },
 ]
 
+export const testItemGroups: Dataset['itemGroups'] = {
+  meta: {
+    gameVersion: '1.4.5.8',
+    itemCount: testItems.length,
+    tabCount: 11,
+    source: 'test',
+    generatedBy: 'test',
+    note: '',
+  },
+  tabs: [
+    { id: 'weapons', label: 'CreativePowers.TabWeapons' },
+    { id: 'armor', label: 'CreativePowers.TabArmor' },
+    { id: 'vanity', label: 'CreativePowers.TabVanity' },
+    { id: 'blocks', label: 'CreativePowers.TabBlocks' },
+    { id: 'furniture', label: 'CreativePowers.TabFurniture' },
+    { id: 'accessories', label: 'CreativePowers.TabAccessories' },
+    { id: 'accessoriesMisc', label: 'CreativePowers.TabAccessoriesMisc' },
+    { id: 'consumables', label: 'CreativePowers.TabConsumables' },
+    { id: 'tools', label: 'CreativePowers.TabTools' },
+    { id: 'materials', label: 'CreativePowers.TabMaterials' },
+    { id: 'misc', label: 'CreativePowers.TabMisc' },
+  ],
+  items: {
+    '29': { g: 'ConsumableThatDoesNotDamage', gv: 94, o: 0, t: [7, 9] },
+    '75': { g: 'Material', gv: 10000, o: 0, t: [9] },
+    '4956': { g: 'MeleeWeapon', gv: 530, o: 0, t: [0] },
+  },
+}
+
 export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
   const items = overrides.items ?? testItems
   const commands = overrides.commands ?? testCommands
@@ -190,6 +219,38 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
       },
       items: {},
     },
+    itemGroups: overrides.itemGroups ?? testItemGroups,
+    shimmer: overrides.shimmer ?? {
+      meta: {
+        gameVersion: '1.4.5.8',
+        itemCount: items.length,
+        count: 0,
+        source: 'test',
+        generatedBy: 'test',
+        note: '',
+      },
+      items: {},
+    },
+    shimmerToById: overrides.shimmerToById ?? new Map(),
+    shimmerFromById: overrides.shimmerFromById ?? new Map(),
+    prefixMods: overrides.prefixMods ?? {
+      meta: { count: 0, source: 'test', generatedBy: 'test', note: '' },
+      mods: {},
+    },
+    prefixModsById: overrides.prefixModsById ?? new Map(),
+    prefixSets: overrides.prefixSets ?? {
+      meta: {
+        gameVersion: '1.4.5.8',
+        setCount: 0,
+        itemCount: 0,
+        source: 'test',
+        generatedBy: 'test',
+        note: '',
+      },
+      sets: [],
+      items: {},
+    },
+    rollablePrefixesById: overrides.rollablePrefixesById ?? new Map(),
     commandsByToken,
     ...overrides,
   }

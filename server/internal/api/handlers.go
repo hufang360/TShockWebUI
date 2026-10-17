@@ -37,7 +37,7 @@ const (
 	codeNotFound         = "not_found"
 	codeMethodNotAllowed = "method_not_allowed"
 	codeServerError      = "server_error"
-	// codePluginMissing：TShock 返回 404，说明服务器未安装对应插件
+	// codePluginMissing：上游插件未安装（TShock 对未知端点返回 404）；对前端返回 501 未实现。
 	// （目前只有 PlayerManager 的 /pm/*）。
 	codePluginMissing = "plugin_not_installed"
 	// codeFishError：FishShop 的业务失败（缺参数 / 商品不存在 / 钱不够 /
@@ -203,6 +203,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			username = "token-user"
 		}
 	} else {
+		// 装了 WebUI 插件时：先问一下 TShock 的建令牌桶是否已满。
+		// 桶满就直接判「限流」，不再打 token/create —— 那里返回的 403 与「密码错 / 缺 useapi」
+		// 同文案（SecureRest.cs:117-125），后端无法区分，是「错误提示不精确」的根因。
+		// 插件不存在 / 旧版插件（无该端点）或调用失败时静默跳过，按原逻辑继续。
+		if snap, lerr := client.RestLimit(ctx, s.cfg.WebAuthSecret); lerr == nil && snap != nil &&
+			snap.Limit > 0 && snap.Bucket >= snap.Limit {
+			writeError(w, http.StatusTooManyRequests, codeRateLimited,
+				fmt.Sprintf("已触发 TShock 建令牌限流（上限 %d，每 %d 分钟恢复 1 个）。请稍后重试；服主可用 /weblimit 放宽上限。",
+					snap.Limit, max(1, snap.IntervalMinutes)))
+			return
+		}
 		tok, err := client.CreateToken(ctx, req.Username, req.Password)
 		if err != nil {
 			status, code, msg := mapLoginError(err)
@@ -265,7 +276,7 @@ func (s *Server) handleLoginOnline(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.WebAuthTimeout)
 	defer cancel()
 
-	ticket, err := client.WebAuthRequest(ctx, req.Username, s.cfg.WebAuthSecret)
+	ticket, err := client.WebAuthRequest(ctx, req.Username, s.cfg.WebAuthSecret, s.clientIP(r))
 	if err != nil {
 		s.writeWebAuthError(w, err)
 		return
@@ -362,7 +373,7 @@ func (s *Server) writeWebAuthError(w http.ResponseWriter, err error) {
 	}
 	switch e.Kind {
 	case tshock.KindNotFound:
-		writeError(w, http.StatusNotFound, codePluginMissing, "服务器未安装 WebUI 信使插件，无法使用在线授权")
+		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 WebUI 信使插件，无法使用在线授权")
 	case tshock.KindPluginForbidden:
 		writeError(w, http.StatusBadGateway, codeOnlineAuthError, "在线授权插件拒绝了请求（密钥不匹配），请检查后端 TSWUI_AUTH_SECRET 与插件 Secret 是否一致")
 	case tshock.KindPluginBusiness:
@@ -870,7 +881,7 @@ func (s *Server) writeBatchError(w http.ResponseWriter, err error) {
 	case tshock.KindNoPermission, tshock.KindNoAPIPermission:
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")
 	case tshock.KindNotFound:
-		writeError(w, http.StatusNotFound, codePluginMissing, "服务器未安装 WebUI 信使插件，无法批量执行")
+		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 WebUI 信使插件，无法批量执行")
 	case tshock.KindTimeout:
 		writeError(w, http.StatusGatewayTimeout, codeTShockTimeout, "TShock 响应超时，请重试")
 	case tshock.KindUnavailable:
@@ -1005,7 +1016,7 @@ func (s *Server) writeTShockError(w http.ResponseWriter, sess *session.Session, 
 	case tshock.KindNoPermission, tshock.KindNoAPIPermission:
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")
 	case tshock.KindNotFound:
-		writeError(w, http.StatusNotFound, codePluginMissing, "服务器未安装 PlayerManager 插件")
+		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 PlayerManager 插件")
 	case tshock.KindTimeout:
 		writeError(w, http.StatusGatewayTimeout, codeTShockTimeout, "TShock 响应超时，请重试")
 	case tshock.KindUnavailable:
@@ -1345,7 +1356,7 @@ func (s *Server) writeFishError(w http.ResponseWriter, sess *session.Session, er
 	case tshock.KindNoPermission, tshock.KindNoAPIPermission:
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")
 	case tshock.KindNotFound:
-		writeError(w, http.StatusNotFound, codePluginMissing, "服务器未安装 FishShop 插件")
+		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 FishShop 插件")
 	case tshock.KindTimeout:
 		writeError(w, http.StatusGatewayTimeout, codeTShockTimeout, "TShock 响应超时，请重试")
 	case tshock.KindUnavailable:

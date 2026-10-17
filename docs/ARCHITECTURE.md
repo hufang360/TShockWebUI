@@ -60,7 +60,7 @@ Go 后端（单进程，标准库）
   ├─ 会话层：map[sessionID]{username, tshockToken, exp}  +  随机 Cookie
   ├─ TShock 客户端：/v2/token/create, /token/destroy, /tokentest,
   │                 /v2/server/status, /v2/players/list, /v3/server/rawcmd,
-  │                 /webui/auth/*, /webui/batch
+  │                 /webui/auth/*, /webui/restlimit, /webui/batch
   └─ Tier A 前置校验：内嵌 commands.json → 已知 allowServer=false 直接拒绝，未知指令放行
         │
         ▼  服务端发起（token 只出现在这里）
@@ -68,7 +68,9 @@ TShock REST API  (env TSHOCK_URL，默认 http://127.0.0.1:7878)
   └─ WebUI 信使插件（可选）：
        ├─ /webui/auth/{request,poll,cancel} → 玩家在游戏内 /web auth <code> 同意 → 插件铸造 REST token
        ├─ /webui/batch → 按 token 用户组逐条执行指令（与 rawcmd 同权限；`mode=player` 可跑 AllowServer=false，需显式开启）
+       ├─ /webui/restlimit → TShock 建令牌限流只读快照（调用者自己 IP）；后端据此精确判 `rate_limited`
        └─ /webui/{commands,me,data,serverinfo,events} → 只读信息；/webui/auth/{sessions,revoke} → 会话自助管理
+       └─ 高级指令 `/weblimit [值|unlimited|default]` → 查看/放宽 RESTMaximumRequestsPerInterval（挂 tshock.rest.cfg，普通玩家不可见）
 ```
 
 关键点：**TShock token 只存在于后端内存**，只出现在 Go → TShock 的出站请求里；浏览器、Cookie、URL、日志里都没有它。
@@ -108,7 +110,7 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 
 ### 4.1 静态资源
 - `//go:embed all:webdist` 内嵌 `web/dist` 全部内容（构建期由 Dockerfile 或脚本拷入 `server/internal/webdist/`）。
-- 路由：`/`、`/assets/*`、`/data/*`、`/favicon.svg`。
+- 路由：`/`、`/assets/*`、`/data/*`、`/favicon.png`（猛爪手套物品图标，`tools/gen-brand-assets.py` 生成）。
 - 未命中的非 `/api` 路径回退到 `index.html`（SPA 兜底）。
 - 缓存头：`/assets/*`（带哈希）`Cache-Control: public, max-age=31536000, immutable`；`/data/items-atlas.png` `max-age=604800`；JSON `max-age=3600`。
 - 对文本类型（`text/html`、`text/css`、`application/javascript`、`application/json`、`image/svg+xml`）启用 gzip（自定义中间件，`gzip.Writer`，`Content-Encoding` 协商）。
@@ -280,6 +282,7 @@ cd web && npm run dev
    默认 `guest`/`default` 组都没有，需管理员赋权。
 3. **调大 `RESTMaximumRequestsPerInterval`**（建议 `60`）：经反代后 TShock 只看到网关 IP，
    所有玩家共用一个限流桶（实测 `<gateway-ip>`），默认 5/分钟会互相影响。
+   装了 WebUI 插件后也可在游戏内 / 控制台执行 `/weblimit 60`（或 `unlimited`）自动改并保存（需 `tshock.rest.cfg`）。
 4. 可选：`EnableTokenEndpointAuthentication = false` 让 `/v2/server/status` 公开（否则登录前拿不到版本）。
    后端已兼容两种情况（401 也视为「可达」）。
 5. `7878` 尽量只对本容器网络开放，不要暴露到公网。

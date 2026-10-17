@@ -1,23 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, ExternalLink, Search, Shuffle, Star } from 'lucide-react'
+import { Search, Star } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { ItemTooltipContent } from '@/components/ItemTooltipContent'
 import { useItemTooltip } from '@/components/ItemTooltip'
 import { RecipePanel } from '@/components/RecipePanel'
+import { SearchInput } from '@/components/SearchInput'
 import {
   Button,
   Card,
   CardBody,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
+  Checkbox,
   Empty,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
   FieldLabel,
-  Input,
   NativeSelect,
   NativeSelectOption,
   Pagination,
@@ -27,6 +24,22 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Separator,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useLocalState } from '@/hooks/useLocalState'
@@ -44,22 +57,19 @@ import {
   removeItemFavorite,
   sanitizeItemFavorites,
 } from '@/lib/itemFavorites'
-import { readDexState, rememberDexState, type CopyKind, type DexState } from '@/lib/dexState'
+import { readDexState, rememberDexState, rememberDexPageSize, DEFAULT_GAME_TAB, type CopyKind, type DexMode, type DexState } from '@/lib/dexState'
+import { ItemFavoritesProvider, type ItemFavoritesApi } from '@/lib/itemFavoritesContext'
 import { formatItemTag, searchItems, wikiUrl } from '@/lib/items'
 import {
   PAGE_SIZES,
   clampPage,
   paginate,
   paginationRange,
-  shuffleWithSeed,
   totalPages,
 } from '@/lib/pagination'
 import { StorageKeys } from '@/lib/storage'
 import { computeVirtualGrid } from '@/lib/virtualGrid'
 import type { Dataset, Item, ItemFavorite } from '@/types'
-
-/** 随机种子。用位运算生成 32 位非负整数，供 shuffleWithSeed 使用。 */
-const randomSeed = () => (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0
 
 /** 图标框统一 **64×64**（= 游戏 `sizeLimit` 32 的 2 倍）→ `mode='game'` 下是整数 2× 最近邻放大，不糊。 */
 const ICON_SIZE = 64
@@ -123,7 +133,7 @@ function DexCell({
 }
 
 /**
- * 物品图鉴：集合/搜索 + 分页（默认每页 50，可切换）+ 选中后详情弹框。
+ * 物品图鉴：集合/搜索 + 分页（默认每页 100，可切换）+ 选中后详情弹框。
  *
  * 页面填满可用高度、自身不滚动（顶部工具条与底部翻页器固定）：只有网格区与详情内部滚动。
  */
@@ -162,6 +172,16 @@ export function ItemsPage({
     [],
   )
   const itemFavs = useMemo(() => sanitizeItemFavorites(rawItemFavs), [rawItemFavs])
+  // 合成表「仅图标」开关（减少视觉信息，跨刷新记忆）。
+  const [recipeIconOnly, setRecipeIconOnly] = useLocalState<boolean>(
+    StorageKeys.dexRecipeIconOnly,
+    false,
+  )
+  // 合成表「复制含标签」开关（复制的合成文本是否带 [i:..] 标签）。
+  const [recipeCopyTag, setRecipeCopyTag] = useLocalState<boolean>(
+    StorageKeys.dexRecipeCopyTag,
+    true,
+  )
   const toggleItemFavorite = useCallback(
     (id: number) => {
       setRawItemFavs((prev) => {
@@ -184,7 +204,7 @@ export function ItemsPage({
   // 「前往物品图鉴」：选中指定物品并弹出详情（清空筛选，保证它出现在结果里）。
   useEffect(() => {
     if (focusItemId == null) return
-    patch({ selectedId: focusItemId, query: '', collectionId: '', page: 1, scrollTop: 0 })
+    patch({ selectedId: focusItemId, query: '', mode: 'all', favoritesOnly: false, collectionId: '', groupTab: '', prefixId: 0, page: 1, scrollTop: 0 })
     if (scrollRef.current) scrollRef.current.scrollTop = 0
     onFocusConsumed?.()
   }, [focusItemId, patch, onFocusConsumed])
@@ -198,34 +218,161 @@ export function ItemsPage({
   // 卸载时把最新状态写进模块内存：切模块回来还原，刷新则重新随机
   useEffect(() => () => rememberDexState(stateRef.current), [])
 
-  const collection = state.collectionId ? COLLECTIONS_BY_ID.get(state.collectionId) ?? null : null
   const keyword = debounced.trim()
-  /** 无搜索时一律随机排序：全部物品 / 集合条目都是「每次换一批就从池子里随机取」。 */
-  const shuffleable = !keyword
 
-  const baseItems = useMemo(
-    () => (collection ? resolveCollectionItems(collection, dataset.itemsById) : dataset.items),
-    [collection, dataset.items, dataset.itemsById],
+  // 一级模式：全部物品（all）/ 制作界面（game）/ ⭐ 收藏（favorites）/ 集合分组（二级）
+  const isCollectionGroup = state.mode !== 'all' && state.mode !== 'game'
+  /** 一级 ToggleGroup 的当前值（集合分组激活时为空，不选中任何一级模式）。 */
+  const activeTopMode = state.favoritesOnly
+    ? 'favorites'
+    : isCollectionGroup
+      ? ''
+      : state.mode
+  const collection =
+    isCollectionGroup && state.collectionId ? COLLECTIONS_BY_ID.get(state.collectionId) ?? null : null
+
+  /** ⭐ 收藏（按收藏时间倒序）解析为物品。 */
+  const favoriteItems = useMemo(
+    () => itemFavs.map((f) => dataset.itemsById.get(f.id)).filter((it): it is Item => !!it),
+    [itemFavs, dataset.itemsById],
   )
+
+  const baseItems = useMemo(() => {
+    if (state.favoritesOnly) return favoriteItems
+    if (collection) return resolveCollectionItems(collection, dataset.itemsById)
+    return dataset.items
+  }, [state.favoritesOnly, favoriteItems, collection, dataset.items, dataset.itemsById])
+
+  // 游戏自身的物品分组：创意菜单页签（ItemFilters）+ 每件物品的 ItemGroup / 组内顺序。
+  const groupTabs = dataset.itemGroups.tabs
+  const groupItems = dataset.itemGroups.items
+  const gameMode = state.mode === 'game'
+  // 游戏分组模式不再有「全部」页签：未选时落到默认页签（工具）。
+  const effectiveGroupTab = gameMode ? state.groupTab || DEFAULT_GAME_TAB : ''
+  const groupTabIndex =
+    gameMode && effectiveGroupTab ? groupTabs.findIndex((t) => t.id === effectiveGroupTab) : -1
+
+  /** 游戏分组模式下选中页签时按该页签过滤（一个物品可同时属于多个页签，与游戏一致）。 */
+  const tabItems = useMemo(() => {
+    if (groupTabIndex < 0) return baseItems
+    return baseItems.filter((it) => groupItems[String(it.id)]?.t.includes(groupTabIndex))
+  }, [baseItems, groupTabIndex, groupItems])
 
   const matched = useMemo(
-    () => (keyword ? searchItems(baseItems, keyword, baseItems.length) : baseItems),
-    [baseItems, keyword],
+    () => (keyword ? searchItems(tabItems, keyword, tabItems.length) : tabItems),
+    [tabItems, keyword],
   )
 
-  const ordered = useMemo(
-    () => (shuffleable ? shuffleWithSeed(matched, state.seed) : matched),
-    [shuffleable, matched, state.seed],
+  const ordered = useMemo(() => {
+    if (gameMode) {
+      // 游戏 ByCreativeSortingId 顺序：ItemGroup → 组内顺序（gv / o）
+      return [...matched].sort((a, b) => {
+        const ea = groupItems[String(a.id)]
+        const eb = groupItems[String(b.id)]
+        return (ea?.gv ?? 0) - (eb?.gv ?? 0) || (ea?.o ?? 0) - (eb?.o ?? 0) || a.id - b.id
+      })
+    }
+    return matched
+  }, [gameMode, matched, groupItems])
+
+  /** 切换主筛选方式：清空第二级与收藏；进「物品分组」时默认落到「工具」页签。 */
+  const selectMode = useCallback(
+    (mode: DexMode) => {
+      setState((s) => ({
+        ...s,
+        mode,
+        favoritesOnly: false,
+        collectionId: '',
+        groupTab: mode === 'game' && !s.groupTab ? DEFAULT_GAME_TAB : s.groupTab,
+        page: 1,
+        scrollTop: 0,
+      }))
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
+    },
+    [setState],
+  )
+
+  /** 一级模式切换（ToggleGroup）：收藏 → 只看收藏；其余 → 对应池子。
+   *  空值 = 取消选中：仅「收藏」允许再点一次关掉（回到全部物品），其余忽略。 */
+  const selectTopMode = useCallback(
+    (value: string) => {
+      if (!value) {
+        setState((s) =>
+          s.favoritesOnly ? { ...s, favoritesOnly: false, mode: 'all', page: 1, scrollTop: 0 } : s,
+        )
+        if (scrollRef.current) scrollRef.current.scrollTop = 0
+        return
+      }
+      if (value === 'favorites') {
+        setState((s) => ({
+          ...s,
+          favoritesOnly: true,
+          mode: 'all',
+          collectionId: '',
+          groupTab: '',
+          page: 1,
+          scrollTop: 0,
+        }))
+        if (scrollRef.current) scrollRef.current.scrollTop = 0
+        return
+      }
+      selectMode(value as DexMode)
+    },
+    [selectMode],
+  )
+
+  /** 工具提示右上角 ⭐ 用的收藏读写。 */
+  const favoritesApi = useMemo<ItemFavoritesApi>(
+    () => ({
+      isFavorited: (id) => isItemFavorited(itemFavs, id),
+      toggle: toggleItemFavorite,
+    }),
+    [itemFavs, toggleItemFavorite],
+  )
+
+  /** 切换游戏页签：同时把网格滚动复位。 */
+  const selectGroupTab = useCallback(
+    (value: string) => {
+      patch({ groupTab: value, page: 1, scrollTop: 0 })
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
+    },
+    [patch],
+  )
+
+  /** 选择物品集合：同时把网格滚动复位。 */
+  const selectCollection = useCallback(
+    (id: string) => {
+      patch({ collectionId: id, page: 1, scrollTop: 0 })
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
+    },
+    [patch],
   )
 
   const pageCount = totalPages(ordered.length, state.pageSize)
   const page = clampPage(state.page, pageCount)
   const pageItems = paginate(ordered, page, state.pageSize)
+  /** 收藏模式下但收藏夹为空：区别于「有记录但没匹配到」。 */
+  const favoritesEmpty = state.favoritesOnly && favoriteItems.length === 0
 
   const selected =
     state.selectedId != null ? dataset.itemsById.get(state.selectedId) ?? null : null
   const selectedStat = selected ? dataset.itemStats.items[String(selected.id)] : undefined
-  const itemFavorited = selected ? isItemFavorited(itemFavs, selected.id) : false
+  /** 详情里预览的词缀（0 = 无词缀）。 */
+  const selectedPrefix = state.prefixId ? dataset.prefixesById.get(state.prefixId) ?? null : null
+  const selectedPrefixMods = state.prefixId ? dataset.prefixModsById.get(state.prefixId) : undefined
+  /** 该物品**可滚的词缀**（严格按游戏规则；盔甲等没有）。 */
+  const rollablePrefixes = selected
+    ? (dataset.rollablePrefixesById.get(selected.id) ?? [])
+        .map((id) => dataset.prefixesById.get(id))
+        .filter((p): p is NonNullable<typeof p> => !!p)
+    : []
+  /** 当前物品是否有合成 / 用途 / 微光转换信息（没有则连「仅图标」开关也不显示）。 */
+  const hasRecipeInfo = selected
+    ? (dataset.recipes.byResult[String(selected.id)]?.length ?? 0) > 0 ||
+      (dataset.recipes.byIngredient[String(selected.id)]?.length ?? 0) > 0 ||
+      dataset.shimmerToById.has(selected.id) ||
+      (dataset.shimmerFromById.get(selected.id)?.length ?? 0) > 0
+    : false
 
   // 页面高度 = 容器可用高度（详见 docs/页面-物品图鉴.md：不能用「视口 − rect.top」，要减掉容器滚动偏移）
   useLayoutEffect(() => {
@@ -329,52 +476,121 @@ export function ItemsPage({
   }, [copyValue, selected])
 
   return (
-    <div
-      ref={rootRef}
-      className="flex min-h-[360px] flex-col gap-3 overflow-hidden"
-      style={{ height: pageHeight }}
-    >
+    <ItemFavoritesProvider api={favoritesApi}>
+      <div
+        ref={rootRef}
+        className="flex min-h-[360px] flex-col gap-3 overflow-hidden"
+        style={{ height: pageHeight }}
+      >
       {/* 工具条：一张卡片 */}
       <Card className="shrink-0">
         <CardBody className="flex flex-col gap-2 pt-4">
-          <Input
+          <SearchInput
             ref={searchRef}
             value={state.query}
-            onChange={(e) => patch({ query: e.target.value, page: 1 })}
+            onValueChange={(v) => patch({ query: v, page: 1 })}
             placeholder={t('dex.placeholder')}
             aria-label={t('nav.items')}
+            className="h-9"
+            inputClassName="text-sm"
           />
 
-          {/* 换一批在左；集合按分组拆成 4 个下拉：ID 范围 / 集合 / 职业 / 水友专属。 */}
+          {/* 一级模式 + 集合分组 + 上下文控件：手气不错→换一批；制作界面→页签；集合分组→集合下拉；全部/收藏→无 */}
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {shuffleable && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-muted-foreground hover:text-foreground"
-                onClick={() => patch({ seed: randomSeed(), page: 1 })}
+            {/* 一级模式（一键可达，含 ⭐ 收藏） */}
+            <ToggleGroup
+              type="single"
+              value={activeTopMode}
+              onValueChange={selectTopMode}
+              aria-label={t('dex.filter')}
+              className="flex-wrap"
+            >
+              <ToggleGroupItem value="all" data-testid="dex-mode-all">
+                {t('dex.collectionAll')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="game" data-testid="dex-mode-game">
+                {t('dex.tabs')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="favorites" data-testid="dex-favorites-toggle">
+                <Star
+                  className={cn(activeTopMode === 'favorites' && 'fill-current')}
+                  data-icon="inline-start"
+                />
+                {t('dex.favorites')}
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            {/* 分组 + 集合：合并成一个 InputGroup 样式（同一底色、共享边框） */}
+            <div className="flex items-center rounded-lg bg-accent p-0.5">
+              <Select
+                value={isCollectionGroup ? state.mode : ''}
+                onValueChange={(v) => v && selectMode(v as DexMode)}
               >
-                <Shuffle data-icon="inline-start" />
-                {t('dex.shuffle')}
-              </Button>
+                <SelectTrigger
+                  size="default"
+                  aria-label={t('dex.collectionGroup')}
+                  className="max-w-full rounded-md bg-transparent"
+                >
+                  <SelectValue placeholder={t('dex.collectionGroup')} />
+                </SelectTrigger>
+                <SelectContent className="min-h-[9rem]">
+                  <SelectGroup>
+                    {COLLECTION_GROUPS.map((group) => (
+                      <SelectItem key={group} value={group}>
+                        {t(`dex.group.${group}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {isCollectionGroup && (
+                <>
+                  <Separator orientation="vertical" className="mx-0.5 h-5" />
+                  <Select
+                    key={state.mode}
+                    value={state.collectionId}
+                    onValueChange={selectCollection}
+                  >
+                    <SelectTrigger
+                      size="default"
+                      aria-label={t('dex.collection')}
+                      className="tswui-attention max-w-full rounded-md bg-transparent"
+                    >
+                      <SelectValue placeholder={t(`dex.group.${state.mode}`)} />
+                    </SelectTrigger>
+                    <SelectContent className="min-w-[9rem]">
+                      <SelectGroup>
+                        {ITEM_COLLECTIONS.filter((c) => c.group === state.mode).map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}（{c.ids.length}）
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+            </div>
+
+            {gameMode && (
+              <Tabs
+                value={effectiveGroupTab}
+                onValueChange={selectGroupTab}
+                className="min-w-0 flex-1"
+              >
+                <TabsList
+                  aria-label={t('dex.tabs')}
+                  className="h-auto w-full flex-wrap justify-start gap-1"
+                >
+                  {groupTabs.map((tab) => (
+                    <TabsTrigger key={tab.id} value={tab.id} className="flex-none px-2.5">
+                      {t(`dex.tab.${tab.id}`)}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
             )}
-            {COLLECTION_GROUPS.map((group) => (
-              <NativeSelect
-                key={group}
-                size="sm"
-                value={collection?.group === group ? state.collectionId : ''}
-                onChange={(e) => patch({ collectionId: e.target.value, page: 1 })}
-                aria-label={t(`dex.group.${group}`)}
-                className="max-w-full"
-              >
-                <NativeSelectOption value="">{t(`dex.group.${group}`)}</NativeSelectOption>
-                {ITEM_COLLECTIONS.filter((c) => c.group === group).map((c) => (
-                  <NativeSelectOption key={c.id} value={c.id}>
-                    {c.name}（{c.ids.length}）
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            ))}
+
           </div>
         </CardBody>
       </Card>
@@ -386,13 +602,11 @@ export function ItemsPage({
         onScroll={(e) => patch({ scrollTop: e.currentTarget.scrollTop })}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
       >
-        {pageItems.length === 0 ? (
+        {favoritesEmpty || pageItems.length === 0 ? (
           <Empty className="min-h-40 border border-dashed">
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Search />
-              </EmptyMedia>
-              <EmptyTitle>{t('dex.noMatch')}</EmptyTitle>
+              <EmptyMedia variant="icon">{favoritesEmpty ? <Star /> : <Search />}</EmptyMedia>
+              <EmptyTitle>{favoritesEmpty ? t('dex.favoritesEmpty') : t('dex.noMatch')}</EmptyTitle>
             </EmptyHeader>
           </Empty>
         ) : (
@@ -413,7 +627,7 @@ export function ItemsPage({
                   selected={state.selectedId === item.id}
                   width={cell}
                   height={cellHeight}
-                  onSelect={(it) => patch({ selectedId: it.id })}
+                  onSelect={(it) => patch({ selectedId: it.id, prefixId: 0 })}
                 />
               ))}
             </div>
@@ -446,7 +660,11 @@ export function ItemsPage({
               size="sm"
               className="w-20"
               value={state.pageSize}
-              onChange={(e) => patch({ pageSize: Number(e.target.value), page: 1 })}
+              onChange={(e) => {
+                const size = Number(e.target.value)
+                patch({ pageSize: size, page: 1 })
+                rememberDexPageSize(size)
+              }}
             >
               {PAGE_SIZES.map((size) => (
                 <NativeSelectOption key={size} value={size}>
@@ -496,74 +714,118 @@ export function ItemsPage({
         </div>
       </div>
 
-      {/* 详情：弹框。高度固定（普通弹框高度），并随屏幕高度适当收缩 */}
-      <Dialog
+      {/* 详情：右侧抽屉（合成区域较长，抽屉比分栏弹框更好用） */}
+      <Sheet
         open={selected != null}
         onOpenChange={(open) => {
           if (!open) patch({ selectedId: null })
         }}
       >
-        <DialogContent
+        <SheetContent
+          side="right"
           data-testid="dex-detail"
-          // 常见弹框宽度（576px）；标题 / 底部固定，仅中间（tips + 合成表）滚动。
-          className="flex max-w-xl flex-col overflow-hidden"
-          // 点击框外 / 遮罩不关闭：仅允许右上角关闭或 Esc。
-          onInteractOutside={(event) => event.preventDefault()}
-          onPointerDownOutside={(event) => event.preventDefault()}
+          // 标题 / 底部固定，仅中间（tips + 合成表）滚动；宽度同旧弹框（576px）。
+          className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
         >
           {selected && (
             <>
-              <DialogTitle className="shrink-0">{t('dex.detail')}</DialogTitle>
+              <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
+                <SheetTitle>{t('dex.detail')}</SheetTitle>
+              </SheetHeader>
 
-              {/* 中间滚动区：游戏同款 tips + 合成表 */}
-              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
-                <div className="min-w-0">
-                  <ItemTooltipContent item={selected} atlas={dataset.atlas} stat={selectedStat} />
+              {/* 中间滚动区：左 = 游戏同款 tips，右 = 词缀下拉（group 样式）；下方合成表 */}
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <ItemTooltipContent
+                      item={selected}
+                      atlas={dataset.atlas}
+                      stat={selectedStat}
+                      prefix={selectedPrefix?.name ?? null}
+                      prefixMods={selectedPrefixMods}
+                    />
+                  </div>
+                  {/* 词缀与下拉作为一个 group，放在 tips 右侧；切换后 tips 属性值随之变化。 */}
+                  {rollablePrefixes.length > 0 && (
+                    <div className="flex w-40 shrink-0 flex-col gap-1.5 rounded-lg bg-accent/50 p-2 text-xs text-muted-foreground">
+                      <span className="shrink-0">{t('prefix.label')}</span>
+                      <Select
+                        value={String(state.prefixId)}
+                        onValueChange={(v) => patch({ prefixId: Number(v) })}
+                      >
+                        <SelectTrigger size="sm" aria-label={t('prefix.label')} className="max-w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[min(20rem,50vh)]">
+                          <SelectGroup>
+                            <SelectItem value="0">{t('prefix.none')}</SelectItem>
+                            {rollablePrefixes.map((pf) => (
+                              <SelectItem key={pf.id} value={String(pf.id)}>
+                                {pf.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      {selectedPrefix && (
+                        <code className="rounded bg-accent px-1.5 py-0.5 font-pixel text-[11px] text-foreground">
+                          {formatItemTag(selected.id, { prefixId: state.prefixId })}
+                        </code>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* 下：合成表 */}
-                <div className="min-w-0">
-                  <RecipePanel itemId={selected.id} dataset={dataset} />
+                {/* 合成表 + 下方居左的「仅显示图标 / 复制含标签」勾选项 */}
+                <div className="flex min-w-0 flex-col gap-2">
+                  <RecipePanel
+                    itemId={selected.id}
+                    dataset={dataset}
+                    iconOnly={recipeIconOnly}
+                    copyTags={recipeCopyTag}
+                  />
+                  {hasRecipeInfo && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <label className="flex cursor-pointer items-center gap-1.5">
+                        <Checkbox
+                          checked={recipeIconOnly}
+                          onCheckedChange={(v) => setRecipeIconOnly(v === true)}
+                          aria-label={t('dex.recipeIconOnly')}
+                        />
+                        <span>{t('dex.recipeIconOnly')}</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-1.5">
+                        <Checkbox
+                          checked={recipeCopyTag}
+                          onCheckedChange={(v) => setRecipeCopyTag(v === true)}
+                          aria-label={t('dex.recipeCopyTag')}
+                        />
+                        <span>{t('dex.recipeCopyTag')}</span>
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* 底部操作区（固定不滚动）：左 = 收藏 / 前往 Wiki，右 = 复制（主操作） */}
-              <DialogFooter className="shrink-0 flex-wrap sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 bg-card"
-                    aria-pressed={itemFavorited}
-                    aria-label={itemFavorited ? t('editor.unfavorite') : t('editor.favorite')}
-                    title={itemFavorited ? t('editor.unfavorite') : t('editor.favorite')}
-                    onClick={() => toggleItemFavorite(selected.id)}
+              {/* 底部操作区（固定不滚动）：左 = 前往 Wiki，右 = 复制（主操作）；收藏用提示右上角 ⭐ */}
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
+                <Button size="sm" variant="outline" className="h-8 bg-card" asChild>
+                  <a
+                    href={wikiUrl(selected.name, lang)}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    aria-label={t('dex.wiki')}
                   >
-                    <Star
-                      className={cn(itemFavorited && 'fill-current text-warning')}
-                      data-icon="inline-start"
-                    />
-                    {itemFavorited ? t('editor.unfavorite') : t('editor.favorite')}
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-8 bg-card" asChild>
-                    <a
-                      href={wikiUrl(selected.name, lang)}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      aria-label={t('dex.wiki')}
-                    >
-                      <ExternalLink data-icon="inline-start" />
-                      {t('dex.wiki')}
-                    </a>
-                  </Button>
-                </div>
+                    {t('dex.wiki')}
+                  </a>
+                </Button>
                 <div className="flex items-stretch">
                   <NativeSelect
                     size="sm"
                     value={state.copyKind}
                     onChange={(e) => patch({ copyKind: e.target.value as CopyKind })}
                     aria-label={t('dex.copyWhat')}
-                    className="[&>select]:h-8 [&>select]:rounded-r-none"
+                    className="[&>select]:h-8 [&>select]:rounded-lg [&>select]:rounded-r-none [&>select]:border [&>select]:border-border/60"
                   >
                     <NativeSelectOption value="id">{t('dex.copyId')}</NativeSelectOption>
                     <NativeSelectOption value="name">{t('dex.copyName')}</NativeSelectOption>
@@ -572,19 +834,35 @@ export function ItemsPage({
                   <Button
                     size="sm"
                     variant="primary"
-                    className="h-8 rounded-l-none"
+                    className="h-8 min-w-[5rem] rounded-l-none px-4"
                     onClick={() => void copy()}
                     aria-label={t('dex.copy')}
                   >
-                    {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
                     {copied ? t('dex.copied') : t('dex.copy')}
                   </Button>
                 </div>
-              </DialogFooter>
+              </div>
+
+              {/* 空态插画：只有 tips、没有合成信息时，右下角放一个半透明大号工匠图标 */}
+              {!hasRecipeInfo && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute right-6 bottom-16 opacity-[0.15]"
+                >
+                  <ItemIcon
+                    item={dataset.itemsById.get(36)}
+                    atlas={dataset.atlas}
+                    size={200}
+                    mode="fit"
+                    tooltip={false}
+                  />
+                </div>
+              )}
             </>
           )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        </SheetContent>
+      </Sheet>
+      </div>
+    </ItemFavoritesProvider>
   )
 }

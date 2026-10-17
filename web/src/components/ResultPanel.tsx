@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Star, Terminal, X } from 'lucide-react'
+import { Check, Copy, Star, Terminal, Trash2 } from 'lucide-react'
+import { CollapseChevron } from '@/components/CollapseChevron'
 import { RichText } from '@/components/RichText'
 import {
   Badge,
   Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -51,16 +55,42 @@ function OutputBlock({
   atlas?: Atlas
 }) {
   const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
   if (output.length === 0) {
     return <p className="text-xs text-foreground/60">{t('result.noOutput')}</p>
   }
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(output.join('\n'))
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopied(false)
+    }
+  }
   return (
-    <div className="flex flex-col gap-1 rounded-xl bg-accent/60 p-3 font-pixel text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
-      {output.map((line, index) => (
-        <p key={index} className="min-h-6">
-          {!line ? '\u00a0' : <RichText text={line} itemsById={itemsById} prefixesById={prefixesById} atlas={atlas} />}
-        </p>
-      ))}
+    <div className="group/rich relative">
+      <div className="flex flex-col gap-1 rounded-xl bg-accent/60 p-3 pr-9 font-pixel text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
+        {output.map((line, index) => (
+          <p key={index} className="min-h-6">
+            {!line ? '\u00a0' : <RichText text={line} itemsById={itemsById} prefixesById={prefixesById} atlas={atlas} />}
+          </p>
+        ))}
+      </div>
+      {/* hover 时右上角出现复制按钮：复制富文本区域的原始文本。 */}
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        className="absolute top-1.5 right-1.5 rounded-full opacity-0 transition-opacity group-hover/rich:opacity-100 focus-visible:opacity-100"
+        aria-label={t('action.copy')}
+        title={copied ? t('action.copied') : t('action.copy')}
+        onClick={(e) => {
+          e.stopPropagation()
+          void copy()
+        }}
+      >
+        {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+      </Button>
     </div>
   )
 }
@@ -114,76 +144,85 @@ function ResultItem({
   const abnormal = result.status !== 'ok'
   const favorited = isFavorite?.(command) ?? false
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* 指令在最左边；点它折叠/展开；异常时标红。 */}
-        <Button
-          variant="ghost"
-          onClick={() => setCollapsed((v) => !v)}
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? t('result.expand') : t('result.collapse')}
-          title={collapsed ? t('result.expand') : t('result.collapse')}
-          className="h-auto min-w-0 flex-1 justify-start gap-1 px-1 py-0.5 font-normal"
-        >
-          <span
-            className={cn(
-              'min-w-0 flex-1 truncate text-left font-pixel text-[11px]',
-              abnormal ? 'text-destructive' : 'text-foreground',
+    <div className="group/result rounded-xl border border-border/60 bg-card/40 p-3">
+      <Collapsible open={!collapsed} onOpenChange={(o) => setCollapsed(!o)}>
+        {/* 表头：指令 + 收藏 + 删除（垃圾桶）+ 折叠箭头（大字号指令）。 */}
+        <div className="flex items-center gap-1.5">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="group/title flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left"
+              aria-label={collapsed ? t('result.expand') : t('result.collapse')}
+            >
+              <span
+                className={cn(
+                  'min-w-0 flex-1 truncate font-pixel text-sm',
+                  abnormal ? 'text-destructive' : 'text-foreground',
+                )}
+                title={command}
+              >
+                {command}
+              </span>
+            </button>
+          </CollapsibleTrigger>
+          {/* 收藏 / 删除：hover 卡片才出现，与折叠箭头同时出现。 */}
+          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/result:opacity-100 focus-within:opacity-100">
+            {onToggleFavorite && result.status === 'ok' && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="shrink-0"
+                aria-pressed={favorited}
+                aria-label={favorited ? t('editor.unfavorite') : t('editor.favorite')}
+                title={favorited ? t('editor.unfavorite') : t('editor.favorite')}
+                onClick={() => onToggleFavorite(command)}
+              >
+                <Star className={cn(favorited && 'fill-current')} data-icon="inline-start" />
+              </Button>
             )}
-            title={command}
-          >
-            {command}
-          </span>
-          {collapsed ? (
-            <ChevronRight className="shrink-0 text-muted-foreground" data-icon="inline-end" />
-          ) : (
-            <ChevronDown className="shrink-0 text-muted-foreground" data-icon="inline-end" />
-          )}
-        </Button>
-        <span className="shrink-0 text-[10px] text-muted-foreground">
-          {new Date(entry.ts).toLocaleTimeString()}
-        </span>
-        {/* 执行成功不显示 tag；异常状态 tag 放在时间右边。 */}
-        {abnormal && <Badge tone={STATUS_TONE[result.status]}>{t(`status.${result.status}`)}</Badge>}
-        {onToggleFavorite && result.status === 'ok' && (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="shrink-0"
-            aria-pressed={favorited}
-            aria-label={favorited ? t('editor.unfavorite') : t('editor.favorite')}
-            title={favorited ? t('editor.unfavorite') : t('editor.favorite')}
-            onClick={() => onToggleFavorite(command)}
-          >
-            <Star
-              className={cn(favorited && 'fill-current text-warning')}
-              data-icon="inline-start"
-            />
-          </Button>
-        )}
-        {onRemove && (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="shrink-0"
-            aria-label={t('result.remove')}
-            title={t('result.remove')}
-            onClick={() => onRemove(entry.seq)}
-          >
-            <X data-icon="inline-start" />
-          </Button>
-        )}
-      </div>
-      {!collapsed && (
-        <div className="mt-2">
-          <CommandOutput
-            result={result}
-            itemsById={itemsById}
-            prefixesById={prefixesById}
-            atlas={atlas}
-          />
+            {onRemove && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="shrink-0"
+                aria-label={t('result.remove')}
+                title={t('result.remove')}
+                onClick={() => onRemove(entry.seq)}
+              >
+                <Trash2 data-icon="inline-start" />
+              </Button>
+            )}
+          </div>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="shrink-0 cursor-pointer"
+              aria-label={collapsed ? t('result.expand') : t('result.collapse')}
+            >
+              <CollapseChevron open={!collapsed} reveal="group-hover/result:opacity-100" />
+            </button>
+          </CollapsibleTrigger>
         </div>
-      )}
+        <CollapsibleContent>
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 执行成功不显示 tag；异常状态 tag 在最左。 */}
+              {abnormal && (
+                <Badge tone={STATUS_TONE[result.status]}>{t(`status.${result.status}`)}</Badge>
+              )}
+              <span className="text-[10px] text-muted-foreground">
+                {new Date(entry.ts).toLocaleTimeString()}
+              </span>
+            </div>
+            <CommandOutput
+              result={result}
+              itemsById={itemsById}
+              prefixesById={prefixesById}
+              atlas={atlas}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   )
 }
@@ -238,7 +277,7 @@ export function ResultPanel({
     )
   }
   return (
-    <div ref={scrollRef} className="max-h-[60vh] flex flex-col gap-3 overflow-y-auto pr-1">
+    <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
       {entries.map((entry) => (
         <ResultItem
           key={entry.seq}

@@ -196,7 +196,7 @@ func (s *Server) writePluginError(w http.ResponseWriter, sess *session.Session, 
 	case tshock.KindNoPermission, tshock.KindNoAPIPermission:
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")
 	case tshock.KindNotFound:
-		writeError(w, http.StatusNotFound, codePluginMissing, "服务器未安装 WebUI 信使插件")
+		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 WebUI 信使插件")
 	case tshock.KindTimeout:
 		writeError(w, http.StatusGatewayTimeout, codeTShockTimeout, "TShock 响应超时，请重试")
 	case tshock.KindUnavailable:

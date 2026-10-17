@@ -59,7 +59,7 @@ afterEach(() => {
 describe('PlayerManagerPage', () => {
   it('未登录时提示先登录', () => {
     renderPage(makeTransport(), false)
-    expect(screen.getByText('请先登录，再查看玩家资料。')).toBeTruthy()
+    expect(screen.getByText('请先登录！')).toBeTruthy()
   })
 
   it('服务器未安装插件时给出提醒', async () => {

@@ -4,6 +4,7 @@ import { PlayerAvatar } from '@/components/PlayerAvatar'
 import { ServerSwitcherDialog } from '@/components/ServerSwitcher'
 import {
   Badge,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -16,7 +17,7 @@ import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { useSelfAvatar } from '@/lib/selfAvatar'
 import type { ServerTarget } from '@/lib/servers'
-import type { ServerInfo } from '@/lib/tshock'
+import type { BackendTransport, ServerInfo } from '@/lib/tshock'
 
 interface SidebarAccountMenuProps {
   /** 当前上游 id（用于取「自己」的外观缓存）。 */
@@ -29,8 +30,11 @@ interface SidebarAccountMenuProps {
   servers: ServerTarget[]
   activeId: string
   info: ServerInfo
+  /** 用于「切换服务器」弹框逐行探测连通性。 */
+  transport: BackendTransport
   onSelectServer: (id: string) => void
   onAddServer: (target: ServerTarget) => void
+  onEditServer: (oldId: string, target: ServerTarget) => void
   onRemoveServer: (id: string) => void
   onLogin: () => void
   onLogout: () => void
@@ -50,8 +54,10 @@ export function SidebarAccountMenu({
   servers,
   activeId,
   info,
+  transport,
   onSelectServer,
   onAddServer,
+  onEditServer,
   onRemoveServer,
   onLogin,
   onLogout,
@@ -59,6 +65,7 @@ export function SidebarAccountMenu({
   const { t } = useI18n()
   const [serverOpen, setServerOpen] = useState(false)
   const look = useSelfAvatar(serverId)
+  const loggedIn = Boolean(username)
 
   const avatar = look ? (
     <span className="grid h-10 w-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-sidebar-accent">
@@ -72,12 +79,19 @@ export function SidebarAccountMenu({
 
   return (
     <>
+      {/* 未登录：账号卡片上方放一条登录按钮，一点即开登录框（无需再进菜单）。 */}
+      {!loggedIn && (
+        <Button variant="primary" size="sm" className="w-full" onClick={onLogin}>
+          <LogIn data-icon="inline-start" />
+          {t('action.login')}
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             aria-label={t('account.menu')}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
           >
             {avatar}
             <span className="flex min-w-0 flex-1 flex-col">
@@ -142,8 +156,10 @@ export function SidebarAccountMenu({
         servers={servers}
         activeId={activeId}
         info={info}
+        transport={transport}
         onSelect={onSelectServer}
         onAdd={onAddServer}
+        onEdit={onEditServer}
         onRemove={onRemoveServer}
       />
     </>

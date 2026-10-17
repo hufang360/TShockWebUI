@@ -214,6 +214,7 @@ TSWUI_TOKEN=... server/scripts/smoke.sh   # 对已运行后端做端到端冒烟
 ```bash
 node tools/gen-data.mjs          # 物品 / 词缀 / 指令（需 TR_SRC 指向 tr-code-1458）
 python3 tools/gen-atlas.py       # 图标图集（需 Pillow，需 SPRITE_DIR）
+python3 tools/gen-brand-assets.py # favicon + 登录框插画（猛爪手套，需 Pillow）
 bash tools/gen-game-data.sh      # 合成表 + 物品属性（需 dotnet 9，自动还原 TShock NuGet 包）
 ```
 

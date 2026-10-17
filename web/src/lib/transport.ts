@@ -300,7 +300,11 @@ export interface BackendTransport {
   runBatch(cmds: string[]): Promise<CommandResult[]>
   logout(): Promise<void>
 
-  serverStatus(): Promise<ServerStatus>
+  /**
+   * 探测上游连通情况。不传 `target` 时用当前选中的上游；
+   * `target` 形如 `scheme://host:port`，传空串表示内置默认（不带 `X-TSWUI-Target`）。
+   */
+  serverStatus(target?: string): Promise<ServerStatus>
   playersList(): Promise<string[]>
   /** 执行一条指令；ingame=true 时走插件「真实玩家」模式（可跑 allowServer=false 的指令）。 */
   runCommand(cmd: string, ingame?: boolean): Promise<CommandResult>

@@ -7,10 +7,12 @@ import {
   BookOpen,
   Clock,
   Crown,
+  Fish,
   Globe2,
   History,
   RefreshCw,
   Server,
+  Settings,
   Skull,
   SlidersHorizontal,
   Swords,
@@ -19,7 +21,9 @@ import {
 } from 'lucide-react'
 import { HomeCardManager } from '@/components/HomeCardManager'
 import { CommandCard } from '@/components/CommandCard'
+import { LoginGate } from '@/components/LoginGate'
 import { ServerFeedList } from '@/components/ServerFeed'
+import { isModuleEnabled, DEFAULT_MODULES, type ModulesPrefs } from '@/lib/modules'
 import {
   Badge,
   Button,
@@ -95,7 +99,7 @@ const RIGHT_COLUMN_IDS = new Set<string>(['server', 'events', 'quick', 'recent']
 /** 「最近执行」固定一个合适的高度，内容超出时内部滚动。 */
 const RECENT_CARD_HEIGHT = 'xl:h-56'
 
-const RECENT_LIMIT = 6
+const RECENT_LIMIT = 5
 
 interface HomePageProps {
   dataset: Dataset
@@ -105,12 +109,16 @@ interface HomePageProps {
   username: string | null
   /** 当前 TShock 上游 id；切换服务器后需重新探测信使插件。 */
   serverId: string
+  /** 模块开关（决定快捷入口是否显示鱼店 / 玩家管理）。 */
+  modules?: ModulesPrefs
   /** 页面数据自动刷新间隔（毫秒，0 = 不自动刷新）。 */
   refreshInterval: number
   /** 服务器动态刷新间隔（毫秒）。 */
   eventsRefreshInterval: number
   /** token 失效 → 弹出登录框；返回是否重登成功。 */
   onTokenInvalid: () => Promise<boolean>
+  /** 未登录时点「登录」打开登录框。 */
+  onLogin: () => void
   onNavigate: (tab: TabId) => void
 }
 
@@ -120,9 +128,11 @@ export function HomePage({
   authenticated,
   username,
   serverId,
+  modules = DEFAULT_MODULES,
   refreshInterval,
   eventsRefreshInterval,
   onTokenInvalid,
+  onLogin,
   onNavigate,
 }: HomePageProps) {
   const { t } = useI18n()
@@ -483,6 +493,7 @@ export function HomePage({
       footerNote={opts.footerNote}
       action={isManual(autoExec, `home:${opts.id}`) ? 'run' : 'refresh'}
       onRefresh={opts.onRefresh}
+      className="max-h-[48rem]"
       itemsById={dataset.itemsById}
       prefixesById={dataset.prefixesById}
       atlas={dataset.atlas}
@@ -548,17 +559,17 @@ export function HomePage({
           <Server />
           {t('home.server')}
         </CardTitle>
-        <Badge tone={reachable ? 'success' : loadingStatus && !status ? 'neutral' : 'danger'}>
-          {loadingStatus && !status
-            ? t('home.refreshing')
+        <Badge tone={status === null ? 'neutral' : reachable ? 'success' : 'danger'}>
+          {status === null
+            ? t('home.connecting')
             : reachable
               ? t('status.online')
               : t('home.offline')}
         </Badge>
       </CardHeader>
       <CardBody className="flex-1">
-        {loadingStatus && !status ? (
-          <p className="text-xs text-muted-foreground">{t('home.refreshing')}</p>
+        {status === null ? (
+          <p className="text-xs text-muted-foreground">{t('home.connecting')}</p>
         ) : !reachable ? (
           <p className="text-sm text-destructive">{t('home.offline')}</p>
         ) : (
@@ -671,15 +682,33 @@ export function HomePage({
           {t('home.quick')}
         </CardTitle>
       </CardHeader>
-      <CardBody className="flex flex-1 flex-col items-center justify-center gap-2">
-        <Button size="sm" variant="secondary" className="w-full max-w-52" onClick={() => onNavigate('editor')}>
-          <Terminal data-icon="inline-start" />
-          {t('home.goEditor')}
-        </Button>
-        <Button size="sm" variant="secondary" className="w-full max-w-52" onClick={() => onNavigate('items')}>
-          <BookOpen data-icon="inline-start" />
-          {t('home.goItems')}
-        </Button>
+      <CardBody className="flex flex-1 flex-col justify-center gap-2">
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('editor')}>
+            <Terminal data-icon="inline-start" />
+            {t('nav.editor')}
+          </Button>
+          <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('items')}>
+            <BookOpen data-icon="inline-start" />
+            {t('nav.items')}
+          </Button>
+          {isModuleEnabled(modules, serverId, 'store') && (
+            <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('store')}>
+              <Fish data-icon="inline-start" />
+              {t('nav.store')}
+            </Button>
+          )}
+          {isModuleEnabled(modules, serverId, 'players') && (
+            <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('players')}>
+              <Users data-icon="inline-start" />
+              {t('nav.players')}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('settings')}>
+            <Settings data-icon="inline-start" />
+            {t('settings.title')}
+          </Button>
+        </div>
       </CardBody>
     </Card>
   )
@@ -713,6 +742,19 @@ export function HomePage({
   // 各自保持 `prefs.order` 里的相对顺序。
   const leftCards = visibleCards.filter((id) => !RIGHT_COLUMN_IDS.has(id))
   const rightCards = visibleCards.filter((id) => RIGHT_COLUMN_IDS.has(id))
+
+  // 未登录：隐藏首页所有卡片（数据都要 token 才能拉取），只留标题 + 登录提示。
+  if (!authenticated) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground">{t('nav.home')}</h2>
+          {transport.mock && <Badge tone="mock">Mock</Badge>}
+        </div>
+        <LoginGate onLogin={onLogin} />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -751,8 +793,8 @@ export function HomePage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        {/* 左栏：指令卡片（两列铺开） */}
-        <div data-testid="home-left" className="grid content-start gap-4 sm:grid-cols-2">
+        {/* 左栏：指令卡片（单列，高度随内容并限 min/max） */}
+        <div data-testid="home-left" className="flex flex-col gap-4">
           {leftCards.map((id) => renderCard(id))}
         </div>
         {/* 右栏：概览卡片（服务器状态 / 服务器动态 / 快捷入口 / 最近执行） */}

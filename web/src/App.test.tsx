@@ -40,6 +40,18 @@ async function clickAccountItem(name: string) {
   fireEvent.click(await screen.findByRole('menuitem', { name }))
 }
 
+/** 通过账号菜单登录（MockTransport 接受任意账号密码）。 */
+async function loginAsAlice() {
+  await clickAccountItem('登录')
+  const dialog = screen.getByRole('dialog')
+  fireEvent.change(within(dialog).getByPlaceholderText('输入玩家名'), {
+    target: { value: 'Alice' },
+  })
+  fireEvent.change(within(dialog).getByPlaceholderText('密码'), { target: { value: 'pw' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: '登录' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
   localStorage.clear()
@@ -56,6 +68,43 @@ it('应用可启动并加载真实数据（Mock 传输标识存在）', async ()
   expect(screen.getByText(/未连接真实服务器/)).toBeTruthy()
 })
 
+it('未登录时首页 / 指令 / 设置只显示登录提示与登录按钮', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  // 首页：隐藏卡片，显示登录提示。
+  expect(screen.getByText('请先登录！')).toBeTruthy()
+  expect(screen.queryByText('服务器状态')).toBeNull()
+
+  // 指令页：隐藏编辑器，显示登录提示。
+  fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
+  expect(await screen.findByText('请先登录！')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '执行' })).toBeNull()
+
+  // 设置页：隐藏设置内容，同样只显示登录提示。
+  fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
+  expect(await screen.findByText('请先登录！')).toBeTruthy()
+  expect(screen.queryByRole('switch', { name: '紧凑视图' })).toBeNull()
+
+  // 提示里的登录按钮能打开登录框（侧栏还有一条登录按钮，这里限定正文）。
+  fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: '登录' }))
+  expect(await screen.findByRole('dialog')).toBeTruthy()
+  fireEvent.keyDown(document.body, { key: 'Escape' })
+})
+
+it('未登录时侧栏账号上方有一条登录按钮，点击直接打开登录框', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  // 侧栏（导航区）里的登录按钮，直接打开登录框。
+  const sidebarLogin = within(screen.getByTestId('sidebar')).getAllByRole('button', { name: '登录' })[0]
+  fireEvent.click(sidebarLogin)
+  expect(await screen.findByRole('dialog')).toBeTruthy()
+  fireEvent.keyDown(document.body, { key: 'Escape' })
+})
+
 it('登录只缓存 tswui:me，不持久化任何 token', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
@@ -63,7 +112,7 @@ it('登录只缓存 tswui:me，不持久化任何 token', async () => {
 
   await clickAccountItem('登录')
   const dialog = screen.getByRole('dialog')
-  fireEvent.change(within(dialog).getByPlaceholderText('TShock 账号'), {
+  fireEvent.change(within(dialog).getByPlaceholderText('输入玩家名'), {
     target: { value: 'Alice' },
   })
   fireEvent.change(within(dialog).getByPlaceholderText('密码'), {
@@ -87,7 +136,7 @@ it('记住密码：登录后写入 tswui:login，重新打开自动回填账号�
 
   await clickAccountItem('登录')
   let dialog = screen.getByRole('dialog')
-  fireEvent.change(within(dialog).getByPlaceholderText('TShock 账号'), { target: { value: 'Alice' } })
+  fireEvent.change(within(dialog).getByPlaceholderText('输入玩家名'), { target: { value: 'Alice' } })
   fireEvent.change(within(dialog).getByPlaceholderText('密码'), { target: { value: 'pw' } })
   // 「记住密码」默认勾选（Radix Checkbox：用 data-state 表达勾选态）
   const remember = within(dialog).getByRole('checkbox')
@@ -106,7 +155,7 @@ it('记住密码：登录后写入 tswui:login，重新打开自动回填账号�
   await waitFor(() => expect(screen.queryByText('Alice')).toBeNull())
   await clickAccountItem('登录')
   dialog = screen.getByRole('dialog')
-  expect((within(dialog).getByPlaceholderText('TShock 账号') as HTMLInputElement).value).toBe('Alice')
+  expect((within(dialog).getByPlaceholderText('输入玩家名') as HTMLInputElement).value).toBe('Alice')
 })
 
 it('退出需二次确认，取消后仍保持登录', async () => {
@@ -116,7 +165,7 @@ it('退出需二次确认，取消后仍保持登录', async () => {
 
   await clickAccountItem('登录')
   const login = screen.getByRole('dialog')
-  fireEvent.change(within(login).getByPlaceholderText('TShock 账号'), { target: { value: 'Alice' } })
+  fireEvent.change(within(login).getByPlaceholderText('输入玩家名'), { target: { value: 'Alice' } })
   fireEvent.change(within(login).getByPlaceholderText('密码'), { target: { value: 'pw' } })
   fireEvent.click(within(login).getByRole('button', { name: '登录' }))
   await waitFor(() => expect(screen.getByText('Alice')).toBeTruthy())
@@ -130,16 +179,49 @@ it('退出需二次确认，取消后仍保持登录', async () => {
   expect(screen.getByText('Alice')).toBeTruthy()
 })
 
+it('侧栏页头有主题 / 语言快捷按钮，可切换', async () => {
+  mockFetch()
+  const { container } = render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  // 默认深色。
+  expect(container.querySelector('.dark')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: /主题：深色/ }))
+  // 下一个状态是「自动」；jsdom 无系统深色 → 变浅色。
+  await waitFor(() => expect(container.querySelector('.dark')).toBeNull())
+  expect(screen.getByRole('button', { name: /主题：自动/ })).toBeTruthy()
+
+  const langBtn = screen.getByRole('button', { name: /语言：中文/ })
+  expect(langBtn.textContent).toBe('中')
+  fireEvent.click(langBtn)
+  await waitFor(() => expect(langBtn.textContent).toBe('EN'))
+  expect(langBtn.getAttribute('aria-label')).toContain('Language')
+})
+
+it('设置入口固定在侧栏导航末尾（模块在其上方）', async () => {
+  mockFetch()
+  localStorage.setItem('tswui:modules', JSON.stringify({ byServer: { default: ['world'] } }))
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  const menu = screen.getByTestId('sidebar').querySelector('[data-slot="sidebar-menu"]')
+  expect(menu).toBeTruthy()
+  const labels = Array.from(menu!.querySelectorAll('button')).map((b) => b.textContent?.trim())
+  expect(labels).toContain('世界管理')
+  expect(labels[labels.length - 1]).toBe('设置')
+})
+
 it('紧凑视图默认开启，可在设置中关闭', async () => {
   mockFetch()
   const { container } = render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
+  await loginAsAlice()
 
   // 默认紧凑
   expect(container.querySelector('[data-compact="true"]')).toBeTruthy()
 
   // 设置里关闭紧凑视图（设置现在是正文页，不是弹框）
-  fireEvent.click(screen.getByRole('button', { name: '设置' }))
+  fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
   fireEvent.click(await screen.findByRole('switch', { name: '紧凑视图' }))
   await waitFor(() => expect(container.querySelector('[data-compact="true"]')).toBeNull())
 })
@@ -168,7 +250,7 @@ it('可用访问令牌登录，且令牌不落 localStorage', async () => {
 
   await clickAccountItem('登录')
   const dialog = screen.getByRole('dialog')
-  fireEvent.mouseDown(within(dialog).getByRole('tab', { name: '访问令牌' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '令牌登录' }))
   fireEvent.change(within(dialog).getByPlaceholderText('ApplicationRestToken'), {
     target: { value: 'mock-token-xyz' },
   })
@@ -195,37 +277,42 @@ it('侧栏可隐藏并可重新显示', async () => {
   expect(sidebar().dataset.collapsed).toBe('false')
 })
 
-it('可新增并切换到自定义 TShock 上游', async () => {
+it('可新增自定义 TShock 上游（新增不自动切换）', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
 
   await clickAccountItem('切换服务器')
+  fireEvent.click(await screen.findByRole('button', { name: /添加服务器/ }))
   fireEvent.change(await screen.findByLabelText('IP / 域名'), { target: { value: '1.2.3.4' } })
   fireEvent.change(screen.getByLabelText('端口'), { target: { value: '9999' } })
-  fireEvent.click(screen.getByRole('button', { name: /添加/ }))
+  fireEvent.click(screen.getByRole('button', { name: '添加' }))
 
-  await waitFor(() => expect(localStorage.getItem('tswui:server')).toContain('1.2.3.4'))
+  await waitFor(() => expect(localStorage.getItem('tswui:servers')).toContain('1.2.3.4'))
   expect(localStorage.getItem('tswui:servers')).toContain('9999')
+  // 新增只入库、不切换：当前上游仍为内置默认。
+  expect(localStorage.getItem('tswui:server') ?? 'default').not.toContain('1.2.3.4')
 })
 
 it('收藏是独立 tab（侧栏「指令」页 → 「收藏」）', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
+  await loginAsAlice()
 
-  fireEvent.click(screen.getByRole('button', { name: '指令' }))
+  fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
   fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
-  expect(await screen.findByPlaceholderText('搜索收藏指令（指令名 / 参数）')).toBeTruthy()
+  expect(await screen.findByPlaceholderText(/搜索收藏/)).toBeTruthy()
 })
 
 it('历史并入指令编辑器（侧栏「历史」页）', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
+  await loginAsAlice()
 
   // 默认打开首页，先切到指令页
-  fireEvent.click(screen.getByRole('button', { name: '指令' }))
+  fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
   fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
   expect(await screen.findByText('暂无历史')).toBeTruthy()
 })
@@ -333,7 +420,7 @@ it('登录失败时提示服主赋权命令（addperm tshock.rest.useapi）', as
 
   await clickAccountItem('登录')
   const dialog = screen.getByRole('dialog')
-  fireEvent.change(within(dialog).getByPlaceholderText('TShock 账号'), { target: { value: 'player' } })
+  fireEvent.change(within(dialog).getByPlaceholderText('输入玩家名'), { target: { value: 'player' } })
   fireEvent.change(within(dialog).getByPlaceholderText('密码'), { target: { value: 'pw' } })
   fireEvent.click(within(dialog).getByRole('button', { name: '登录' }))
 

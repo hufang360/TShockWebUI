@@ -8,6 +8,10 @@ import type {
   ItemStatsBaseData,
   ItemStatsData,
   ItemTipsData,
+  ItemGroupsData,
+  ShimmerData,
+  PrefixModsData,
+  PrefixSetsData,
   Lang,
   LocalizationBundle,
   Npc,
@@ -53,7 +57,7 @@ function buildCommandIndex(commands: CommandDef[]): Map<string, CommandDef> {
  */
 export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
   const culture = cultureOf(lang)
-  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, loc] = await Promise.all([
+  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, loc] = await Promise.all([
     fetchJson<{ items: Omit<Item, 'name'>[] }>('items.json'),
     fetchJson<{ prefixes: Omit<Prefix, 'name'>[] }>('prefixes.json'),
     fetchJson<{ npcs: Omit<Npc, 'name'>[] }>('npcs.json'),
@@ -64,6 +68,10 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     fetchJson<RecipesData>('recipes.json'),
     fetchJson<ItemStatsBaseData>('item-stats.json'),
     fetchJson<ItemTipsData>(`item-tips.${culture}.json`),
+    fetchJson<ItemGroupsData>('item-groups.json'),
+    fetchJson<ShimmerData>('shimmer.json'),
+    fetchJson<PrefixModsData>('prefix-mods.json'),
+    fetchJson<PrefixSetsData>('prefix-sets.json'),
     fetchJson<LocalizationBundle>(`loc.${culture}.json`),
   ])
 
@@ -87,6 +95,26 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     itemStats.items[id] = { ...(itemStats.items[id] ?? {}), tip }
   }
 
+  // 微光转换：正向 + 反向索引
+  const shimmerToById = new Map<number, number>()
+  const shimmerFromById = new Map<number, number[]>()
+  for (const [id, to] of Object.entries(shimmer.items)) {
+    const from = Number(id)
+    shimmerToById.set(from, to)
+    const list = shimmerFromById.get(to)
+    if (list) list.push(from)
+    else shimmerFromById.set(to, [from])
+  }
+
+  const prefixModsById = new Map<number, (typeof prefixMods.mods)[string]>()
+  for (const [id, mod] of Object.entries(prefixMods.mods)) prefixModsById.set(Number(id), mod)
+
+  const rollablePrefixesById = new Map<number, number[]>()
+  for (const [id, idx] of Object.entries(prefixSets.items)) {
+    const set = prefixSets.sets[idx]
+    if (set) rollablePrefixesById.set(Number(id), set)
+  }
+
   return {
     meta,
     items,
@@ -97,6 +125,14 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     atlas,
     recipes,
     itemStats,
+    itemGroups: groups,
+    shimmer,
+    shimmerToById,
+    shimmerFromById,
+    prefixMods,
+    prefixModsById,
+    prefixSets,
+    rollablePrefixesById,
     loc,
     itemsById: new Map(items.map((it) => [it.id, it])),
     prefixesById: new Map(prefixes.map((p) => [p.id, p])),

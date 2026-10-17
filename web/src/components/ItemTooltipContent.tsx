@@ -1,8 +1,55 @@
 import type { CSSProperties } from 'react'
+import { useMemo } from 'react'
+import { Star } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { cn } from '@/lib/cn'
+import { useI18n, type I18n } from '@/lib/i18n'
+import { useItemFavorites } from '@/lib/itemFavoritesContext'
 import { rarityColor } from '@/lib/items'
-import type { Atlas, Item, ItemStatEntry } from '@/types'
+import type { Atlas, Item, ItemStatEntry, PrefixMods } from '@/types'
+
+const EMPTY_LINES: string[] = []
+
+/** 速度档位（`LegacyTooltip.6`–`.13`）：复刻 gen-item-stats.mjs。 */
+function speedTier(useAnimation: number): number {
+  return useAnimation <= 8 ? 0 : useAnimation <= 20 ? 1 : useAnimation <= 25 ? 2
+    : useAnimation <= 30 ? 3 : useAnimation <= 35 ? 4 : useAnimation <= 45 ? 5
+      : useAnimation <= 55 ? 6 : 7
+}
+
+/** 击退档位（`LegacyTooltip.14`–`.22`）：复刻 gen-item-stats.mjs。 */
+function kbTier(knockBack: number): number {
+  return knockBack === 0 ? 0 : knockBack <= 1.5 ? 1 : knockBack <= 3 ? 2
+    : knockBack <= 4 ? 3 : knockBack <= 6 ? 4 : knockBack <= 7 ? 5
+      : knockBack <= 9 ? 6 : knockBack <= 11 ? 7 : 8
+}
+
+/** 按词缀修正重算属性行（伤害 / 暴击 / 速度 / 击退）。 */
+function applyPrefix(
+  lines: string[],
+  stats: Record<string, number | boolean> | undefined,
+  mods: PrefixMods,
+  t: I18n['t'],
+): string[] {
+  if (lines.length === 0) return lines
+  const speedWords = new Set(Array.from({ length: 8 }, (_, i) => t(`prefix.speed.${i}`)))
+  const kbWords = new Set(Array.from({ length: 9 }, (_, i) => t(`prefix.kb.${i}`)))
+  const baseDmg = Number(/^\d+/.exec(lines[0])?.[0] ?? NaN)
+  const newDmg = Number.isFinite(baseDmg) ? Math.round(baseDmg * (mods.dmg ?? 1)) : null
+  const baseCrit = /^\d+%/.test(lines[1] ?? '') ? Number(/^\d+/.exec(lines[1])![0]) : null
+  const newCrit = baseCrit != null ? baseCrit + (mods.crt ?? 0) : null
+  const anim = typeof stats?.useAnimation === 'number' ? stats.useAnimation : 0
+  const kb = typeof stats?.knockBack === 'number' ? stats.knockBack : 0
+  const newAnim = anim > 0 ? Math.round(anim * (mods.spd ?? 1)) : anim
+  const newKb = kb * (mods.kb ?? 1)
+  return lines.map((line, idx) => {
+    if (idx === 0 && newDmg != null && newDmg !== baseDmg) return line.replace(/^\d+/, String(newDmg))
+    if (idx === 1 && newCrit != null && newCrit !== baseCrit) return line.replace(/^\d+/, String(newCrit))
+    if (speedWords.has(line)) return t(`prefix.speed.${speedTier(newAnim)}`)
+    if (kbWords.has(line)) return t(`prefix.kb.${kbTier(newKb)}`)
+    return line
+  })
+}
 
 /**
  * 游戏同款物品提示（**全项目唯一的一套样式**：图标 28px / 名称 15px semibold / 属性行 14px / 页脚 12px）。
@@ -15,6 +62,8 @@ interface ItemTooltipContentProps {
   atlas?: Atlas
   stat?: ItemStatEntry
   prefix?: string | null
+  /** 词缀数值修正（有则在提示里重算伤害/暴击/速度/击退）。 */
+  prefixMods?: PrefixMods
   stack?: number
   /** 覆盖显示名（默认 item.name）。 */
   name?: string
@@ -32,6 +81,7 @@ export function ItemTooltipContent({
   atlas,
   stat,
   prefix,
+  prefixMods,
   stack,
   name,
   variant = 'tooltip',
@@ -39,8 +89,16 @@ export function ItemTooltipContent({
   className,
   style,
 }: ItemTooltipContentProps) {
+  const { t } = useI18n()
+  const favorites = useItemFavorites()
+  const favorited = favorites ? favorites.isFavorited(item.id) : false
   // tip 行在载入数据集时已按当前界面语言解析好。
-  const lines = stat?.tip ?? []
+  const baseLines = stat?.tip ?? EMPTY_LINES
+  // 选了词缀就用修正重算属性行（伤害/暴击/速度/击退）。
+  const lines = useMemo(
+    () => (prefix && prefixMods ? applyPrefix(baseLines, stat?.stats, prefixMods, t) : baseLines),
+    [baseLines, stat?.stats, prefix, prefixMods, t],
+  )
   const rare = typeof stat?.stats?.rare === 'number' ? stat.stats.rare : 0
   const showStack = stack != null && stack > 1
 
@@ -69,12 +127,32 @@ export function ItemTooltipContent({
     )
   }
 
+  const favoriteButton = favorites ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        favorites.toggle(item.id)
+      }}
+      aria-label={favorited ? t('tooltip.unfavorite') : t('tooltip.favorite')}
+      aria-pressed={favorited}
+      title={favorited ? t('tooltip.unfavorite') : t('tooltip.favorite')}
+      className={cn(
+        'ml-auto grid size-6 shrink-0 cursor-pointer place-items-center rounded-md transition-colors',
+        'text-zinc-500 hover:bg-white/10 hover:text-amber-300',
+        'focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none',
+      )}
+    >
+      <Star className={cn('size-4', favorited && 'fill-current text-warning')} />
+    </button>
+  ) : null
+
   return (
     <div
       data-testid="item-tooltip"
       className={cn(
         // 半透明黑（**不加模糊**：与游戏一样是纯半透明，紧跟在物品旁边时不会把背景完全挖掉）
-        'max-w-96 rounded-md border border-white/15 bg-black/85 px-3 py-2.5 text-[15px] font-medium text-zinc-100 shadow-xl',
+        'max-w-96 rounded-md border border-white/15 bg-black/85 px-3 py-2.5 text-[15px] font-medium text-zinc-100 shadow-xl select-text',
         className,
       )}
       style={style}
@@ -87,8 +165,10 @@ export function ItemTooltipContent({
             {name ?? item.name}
           </span>
           {showStack ? <span className="font-pixel text-sm font-bold text-zinc-300">x{stack}</span> : null}
+          {favoriteButton}
         </div>
       )}
+      {hideHeader && favoriteButton && <div className="mb-1 flex items-center">{favoriteButton}</div>}
       {lines.length > 0 && (
         <div
           className={cn(

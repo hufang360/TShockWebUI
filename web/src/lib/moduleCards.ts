@@ -60,6 +60,27 @@ export function addModuleCard(
   }
 }
 
+export function updateModuleCard(
+  prefs: ModuleCardsPrefs,
+  serverId: string,
+  moduleId: string,
+  cardId: string,
+  patch: Partial<Pick<ModuleCard, 'name' | 'command'>>,
+): ModuleCardsPrefs {
+  const forServer = prefs.byServer[serverId]
+  const list = forServer?.[moduleId]
+  if (!forServer || !list) return prefs
+  return {
+    byServer: {
+      ...prefs.byServer,
+      [serverId]: {
+        ...forServer,
+        [moduleId]: list.map((c) => (c.id === cardId ? { ...c, ...patch } : c)),
+      },
+    },
+  }
+}
+
 export function removeModuleCard(
   prefs: ModuleCardsPrefs,
   serverId: string,

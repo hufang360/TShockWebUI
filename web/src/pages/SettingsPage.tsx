@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, Plug, Plus, ShieldAlert, Trash2 } from 'lucide-react'
 import {
-  Alert,
-  AlertDescription,
   Badge,
   Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Field,
   FieldLabel,
   FieldTitle,
@@ -15,15 +16,14 @@ import {
   Slider,
   Spinner,
   Switch,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
   ToggleGroup,
   ToggleGroupItem,
 } from '@/components/ui'
+import { CollapseChevron } from '@/components/CollapseChevron'
 import { CollapsibleCard } from '@/components/CollapsibleCard'
+import { LoginGate } from '@/components/LoginGate'
 import { useI18n } from '@/lib/i18n'
+import { APP_VERSION } from '@/lib/version'
 import { useLocalState } from '@/hooks/useLocalState'
 import { WebAccountSection } from '@/components/WebAccountSection'
 import { MODULE_DEFS, isModuleEnabled, setModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
@@ -93,8 +93,6 @@ export function SettingsPage({
   const [, setRawModuleCards] = useLocalState(StorageKeys.moduleCards, DEFAULT_MODULE_CARDS)
   const [newModuleName, setNewModuleName] = useState('')
   const [newModuleCommand, setNewModuleCommand] = useState('')
-  // 「激活模块」卡片的分页：已适配 / 自定义。
-  const [moduleTab, setModuleTab] = useState<'builtin' | 'custom'>('builtin')
   // 当前用户组：决定「服务器动态」能否选 1 分钟（仅 GM / superadmin / vip）。
   const [group, setGroup] = useState<string | null>(null)
   useEffect(() => {
@@ -215,6 +213,20 @@ export function SettingsPage({
     [t],
   )
 
+  // 未登录：隐藏设置内容（模块探测 / 激活 / 自定义模块都要登录），只留标题 + 登录提示。
+  if (!authenticated) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
+          <p className="text-xs text-muted-foreground">{t('settings.note')}</p>
+        </div>
+        <LoginGate onLogin={onLogin} />
+        <p className="pt-1 text-center text-[10px] text-muted-foreground">TShockWebUI {APP_VERSION}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
@@ -222,6 +234,9 @@ export function SettingsPage({
         <p className="text-xs text-muted-foreground">{t('settings.note')}</p>
       </div>
 
+      {/* 两栏：左 = 激活模块；右 = 界面偏好 / 数据刷新 / 在线授权 / 账户 */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex min-w-0 flex-col gap-4">
       <CollapsibleCard
         title={t('modules.activate')}
         icon={<Plug />}
@@ -232,28 +247,8 @@ export function SettingsPage({
           </Button>
         }
       >
-        <Tabs
-          value={moduleTab}
-          onValueChange={(v) => setModuleTab(v as 'builtin' | 'custom')}
-          className="gap-3"
-        >
-          <TabsList>
-            <TabsTrigger value="builtin">{t('modules.tab.builtin')}</TabsTrigger>
-            <TabsTrigger value="custom">{t('modules.tab.custom')}</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="builtin" className="flex flex-col gap-3">
+        <CollapsibleGroup title={t('modules.tab.builtin')}>
           <p className="text-[11px] text-muted-foreground">{t('modules.activateHint')}</p>
-          {!authenticated && (
-            <Alert variant="warning">
-              <AlertDescription className="flex flex-wrap items-center gap-2">
-                {t('modules.needLogin')}
-                <Button size="sm" variant="ghost" onClick={onLogin}>
-                  {t('action.login')}
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
           <ul className="flex flex-col gap-2">
             {MODULE_DEFS.map((def) => {
               const cap = caps[def.id]
@@ -298,9 +293,9 @@ export function SettingsPage({
             })}
           </ul>
           <p className="text-[10px] text-muted-foreground">{t('modules.note')}</p>
-          </TabsContent>
+        </CollapsibleGroup>
 
-          <TabsContent value="custom" className="flex flex-col gap-3">
+        <CollapsibleGroup title={t('modules.tab.custom')}>
             <p className="text-[11px] text-muted-foreground">{t('modules.custom.hint')}</p>
             <div className="flex flex-col gap-2">
             {customModules.length > 0 && (
@@ -377,10 +372,12 @@ export function SettingsPage({
               </Button>
             </div>
             </div>
-          </TabsContent>
-        </Tabs>
+        </CollapsibleGroup>
       </CollapsibleCard>
+        </div>
 
+        {/* 右列：界面偏好 / 数据刷新 / 在线授权 / 账户 */}
+        <div className="flex min-w-0 flex-col gap-4">
       <CollapsibleCard title={t('settings.heading')} bodyClassName="flex flex-col gap-0 pt-0">
           <SettingRow label={t('settings.fontSize')}>
             <div className="flex items-center gap-2">
@@ -426,29 +423,11 @@ export function SettingsPage({
               onValueChange={(v) => v && onChange({ theme: v as Settings['theme'] })}
               aria-label={t('settings.theme')}
             >
-              <ToggleGroupItem value="light">light</ToggleGroupItem>
-              <ToggleGroupItem value="dark">dark</ToggleGroupItem>
+              <ToggleGroupItem value="auto">{t('settings.theme.auto')}</ToggleGroupItem>
+              <ToggleGroupItem value="light">{t('settings.theme.light')}</ToggleGroupItem>
+              <ToggleGroupItem value="dark">{t('settings.theme.dark')}</ToggleGroupItem>
             </ToggleGroup>
           </SettingRow>
-          <Separator />
-          <Field orientation="horizontal" className="flex-nowrap items-center justify-between gap-3 py-2">
-            <div className="flex flex-col gap-0.5">
-              <FieldTitle>{t('home.batch')}</FieldTitle>
-              <p className="text-[10px] leading-4 text-muted-foreground">
-                {batchPlugin === true ? t('home.batchHint') : t('home.batchUnavailable')}
-              </p>
-            </div>
-            {batchPlugin === null ? (
-              <Spinner className="text-muted-foreground" />
-            ) : (
-              <Switch
-                checked={batchMode}
-                disabled={batchPlugin !== true}
-                onCheckedChange={setBatchMode}
-                aria-label={t('home.batch')}
-              />
-            )}
-          </Field>
       </CollapsibleCard>
 
       <CollapsibleCard title={t('settings.dataRefresh')} bodyClassName="flex flex-col gap-0 pt-0">
@@ -523,9 +502,33 @@ export function SettingsPage({
               </NativeSelectOption>
             </NativeSelect>
           </SettingRow>
+          <Separator />
+          <Field orientation="horizontal" className="flex-nowrap items-center justify-between gap-3 py-2">
+            <div className="flex flex-col gap-0.5">
+              <FieldTitle>{t('home.batch')}</FieldTitle>
+              <p className="text-[10px] leading-4 text-muted-foreground">
+                {batchPlugin === true ? t('home.batchHint') : t('home.batchUnavailable')}
+              </p>
+            </div>
+            {batchPlugin === null ? (
+              <Spinner className="text-muted-foreground" />
+            ) : (
+              <Switch
+                checked={batchMode}
+                disabled={batchPlugin !== true}
+                onCheckedChange={setBatchMode}
+                aria-label={t('home.batch')}
+              />
+            )}
+          </Field>
       </CollapsibleCard>
 
-      <WebAccountSection transport={transport} authenticated={authenticated} serverId={serverId} />
+          <WebAccountSection transport={transport} authenticated={authenticated} serverId={serverId} />
+        </div>
+      </div>
+
+      {/* 底部版本号 */}
+      <p className="pt-1 text-center text-[10px] text-muted-foreground">TShockWebUI {APP_VERSION}</p>
     </div>
   )
 }
@@ -542,4 +545,18 @@ function SettingRow({ label, children }: { label: string; children: React.ReactN
 function CapBadge({ status, text }: { status: CapStatus; text: string }) {
   const tone = status === 'ready' ? 'success' : status === 'missing' ? 'danger' : status === 'no-permission' ? 'warn' : 'neutral'
   return <Badge tone={tone}>{text}</Badge>
+}
+
+/** 激活模块里的可折叠分组（已适配 / 自定义），默认展开。 */
+function CollapsibleGroup({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-3">
+      <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-left">
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        <CollapseChevron open={open} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-col gap-3">{children}</CollapsibleContent>
+    </Collapsible>
+  )
 }

@@ -50,10 +50,19 @@ namespace WebUI
             Store = new AuthStore(Config);
             Sessions = new SessionRegistry();
 
+            // 普通玩家：只开放「授权登录」确认（/web auth|deny），无权限要求、仅限游戏内。
             Commands.ChatCommands.Add(new Command(WebAuthCommand, "webui", "web")
             {
                 AllowServer = false,
-                HelpText = "网页端：/web auth <验证码> 同意登录；/web deny <验证码> 拒绝",
+                HelpText = "网页端登录：/web auth <验证码> 同意；/web deny <验证码> 拒绝",
+            });
+
+            // 高级指令：改 TShock REST 建令牌限流。单独注册、挂 tshock.rest.cfg，
+            // 普通玩家既不会在 /help 看到它，也跑不了（TShock 按 Command.CanRun 校验）。
+            Commands.ChatCommands.Add(new Command(RestPermissions.restcfg, WebAdminCommand, "webadmin", "weblimit")
+            {
+                AllowServer = true,
+                HelpText = "WebUI 管理：/weblimit 查看、/weblimit <上限|unlimited|default> 放宽 REST 建令牌限流",
             });
 
             ServerApi.Hooks.GameUpdate.Register(this, OnGameUpdate);
@@ -71,6 +80,8 @@ namespace WebUI
                 TShock.RestApi.Register(new RestCommand("/webui/auth/request", WebAuthRest.Request));
                 TShock.RestApi.Register(new RestCommand("/webui/auth/poll", WebAuthRest.Poll));
                 TShock.RestApi.Register(new RestCommand("/webui/auth/cancel", WebAuthRest.Cancel));
+                // 建令牌限流快照（只读、调用者自己 IP）；后端用它精确判定是否被限流。
+                TShock.RestApi.Register(new RestCommand("/webui/restlimit", WebAuthRest.RateLimit));
                 // 批量执行需 token（用户本人），与 rawcmd 同权限；逐个指令仍走 TShock 权限检查。
                 TShock.RestApi.Register(new SecureRestCommand("/webui/batch", WebAuthRest.Batch, RestPermissions.restrawcommand));
                 // 只读信息 / 会话管理：只要有效 token（不额外要求权限）。
@@ -81,7 +92,7 @@ namespace WebUI
                 TShock.RestApi.Register(new SecureRestCommand("/webui/events", WebAuthRest.Events));
                 TShock.RestApi.Register(new SecureRestCommand("/webui/auth/sessions", WebAuthRest.Sessions));
                 TShock.RestApi.Register(new SecureRestCommand("/webui/auth/revoke", WebAuthRest.Revoke));
-                TShock.Log.ConsoleInfo("[WebUI] REST 端点已注册：/webui/auth/*、/webui/batch、/webui/{commands,me,data,serverinfo,events}");
+                TShock.Log.ConsoleInfo("[WebUI] REST 端点已注册：/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,data,serverinfo,events}");
             }
             else
             {
@@ -244,7 +255,7 @@ namespace WebUI
         {
             if (args.Parameters.Count == 0)
             {
-                args.Player.SendInfoMessage("用法：/web auth <验证码> 同意登录；/web deny <验证码> 拒绝。");
+                WebAuthHelp(args);
                 return;
             }
 
@@ -254,6 +265,7 @@ namespace WebUI
                 case "auth":
                 case "login":
                 case "同意":
+                    if (!RequireInGamePlayer(args)) return;
                     if (args.Parameters.Count < 2)
                     {
                         args.Player.SendInfoMessage("用法：/web auth <验证码>");
@@ -265,6 +277,7 @@ namespace WebUI
                 case "deny":
                 case "reject":
                 case "拒绝":
+                    if (!RequireInGamePlayer(args)) return;
                     if (args.Parameters.Count < 2)
                     {
                         args.Player.SendInfoMessage("用法：/web deny <验证码>");
@@ -274,9 +287,68 @@ namespace WebUI
                     return;
 
                 default:
-                    args.Player.SendInfoMessage("用法：/web auth <验证码> 同意登录；/web deny <验证码> 拒绝。");
+                    WebAuthHelp(args);
                     return;
             }
+        }
+
+        private static void WebAuthHelp(CommandArgs args)
+        {
+            args.Player?.SendInfoMessage("用法：/web auth <验证码> 同意登录；/web deny <验证码> 拒绝。");
+        }
+
+        /// <summary>auth / deny 必须由本人游戏内执行（控制台顶替不了玩家确认）。</summary>
+        private static bool RequireInGamePlayer(CommandArgs args)
+        {
+            if (args.Player != null && args.Player.RealPlayer) return true;
+            args.Player?.SendErrorMessage("该操作必须在游戏内由玩家本人执行。");
+            return false;
+        }
+
+        /// <summary>
+        /// /weblimit：查看或放宽 TShock 的建令牌限流（<c>RESTMaximumRequestsPerInterval</c>）。
+        /// 命令本身挂 <c>tshock.rest.cfg</c>（普通玩家不可见/不可执行）；改的是 TShock 的 config.json。
+        /// 背景：该限流会把 403 伪装成「账号或密码错误」，放宽后玩家不再莫名登录失败。
+        /// </summary>
+        private void WebAdminCommand(CommandArgs args)
+        {
+            var player = args.Player;
+            var settings = TShock.Config.Settings;
+
+            if (args.Parameters.Count == 0)
+            {
+                player.SendInfoMessage($"TShock REST 建令牌限流：上限 {settings.RESTMaximumRequestsPerInterval}，" +
+                                       $"每 {settings.RESTRequestBucketDecreaseIntervalMinutes} 分钟恢复 1 个。");
+                player.SendInfoMessage("用法：/weblimit <上限>（≥1）；/weblimit unlimited 基本不限；/weblimit default 恢复默认 5。");
+                return;
+            }
+
+            var arg = (args.Parameters[0] ?? "").Trim().ToLowerInvariant();
+            int value;
+            if (arg == "default" || arg == "重置")
+                value = RestLimit.DefaultLimit;
+            else if (arg == "unlimited" || arg == "off" || arg == "无限")
+                value = RestLimit.Unlimited;
+            else if (!int.TryParse(arg, out value) || value < 1)
+            {
+                player.SendErrorMessage("上限必须是 ≥1 的整数（或用 unlimited / default）。");
+                return;
+            }
+
+            settings.RESTMaximumRequestsPerInterval = value;
+            try
+            {
+                TShock.Config.Write(System.IO.Path.Combine(TShock.SavePath, "config.json"));
+            }
+            catch (Exception ex)
+            {
+                player.SendErrorMessage("写入 config.json 失败：" + ex.Message);
+                return;
+            }
+
+            var who = string.IsNullOrEmpty(player?.Name) ? "Console" : player.Name;
+            TShock.Log.ConsoleInfo($"[WebUI] RESTMaximumRequestsPerInterval 已由 {who} 设为 {value}。");
+            player.SendSuccessMessage($"已把 REST 建令牌上限设为 {value}（每 {settings.RESTRequestBucketDecreaseIntervalMinutes} 分钟恢复 1 个），并写入 config.json。");
         }
     }
 }

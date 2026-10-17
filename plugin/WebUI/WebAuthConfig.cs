@@ -24,6 +24,30 @@ namespace WebUI
         public int MaxRequestsPerMinute = 5;
 
         /// <summary>
+        /// 同一玩家两次「新建票据」之间的冷却（秒）：新建票据会发游戏内消息，
+        /// 冷却期内重复请求只复用已有票据 / 直接拒绝，不再刷屏。
+        /// </summary>
+        public int PlayerCooldownSeconds = 60;
+
+        /// <summary>玩家拒绝 / 票据过期后，再次发起请求的额外冷却（秒）。</summary>
+        public int DeniedCooldownSeconds = 300;
+
+        /// <summary>
+        /// 服务器整体每分钟最多发起的授权请求数（防有人逐个骚扰在线玩家）。
+        /// 0 = 不限。
+        /// </summary>
+        public int MaxRequestsPerMinuteGlobal = 10;
+
+        /// <summary>
+        /// 同一来源 IP 每分钟最多发起的授权请求数。0 = 不限。
+        /// 依赖后端传入 ip 参数；未传时此项不生效。
+        /// </summary>
+        public int MaxRequestsPerMinutePerIp = 3;
+
+        /// <summary>同时存在的未完成票据上限（防内存增长）。0 = 不限。</summary>
+        public int MaxPendingTickets = 64;
+
+        /// <summary>
         /// 本插件铸造的 web token 有效期（分钟）。0 = 不过期（跟随后端会话 / 手动退出）。
         /// 到期后自动从 TShock 的 REST token 表移除。
         /// </summary>
@@ -74,6 +98,11 @@ namespace WebUI
         {
             if (TimeoutSeconds < 10 || TimeoutSeconds > 600) TimeoutSeconds = 60;
             if (MaxRequestsPerMinute < 1) MaxRequestsPerMinute = 1;
+            if (PlayerCooldownSeconds < 0) PlayerCooldownSeconds = 0;
+            if (DeniedCooldownSeconds < 0) DeniedCooldownSeconds = 0;
+            if (MaxRequestsPerMinuteGlobal < 0) MaxRequestsPerMinuteGlobal = 0;
+            if (MaxRequestsPerMinutePerIp < 0) MaxRequestsPerMinutePerIp = 0;
+            if (MaxPendingTickets < 0) MaxPendingTickets = 0;
             if (TokenTTLMinutes < 0) TokenTTLMinutes = 0;
             if (Secret == null) Secret = "";
             return this;

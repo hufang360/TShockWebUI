@@ -3,6 +3,7 @@ import {
   BUILTIN_ID,
   activeTargetHeader,
   addServerTarget,
+  hostPortLabel,
   isValidHost,
   loadServers,
   maskHost,
@@ -13,6 +14,7 @@ import {
   sanitizeServers,
   saveServers,
   targetHeader,
+  targetLabel,
   writeActiveTargetId,
   type ServerTarget,
 } from './servers'
@@ -119,5 +121,21 @@ describe('maskHost（隐私遮挡）', () => {
     expect(
       maskedTargetLabel({ id: 'http://1.2.3.4:7878', scheme: 'http', host: '1.2.3.4', port: 7878 }),
     ).toBe('1.2.*.*:7878')
+  })
+})
+
+describe('hostPortLabel（IPv6 加方括号）', () => {
+  it('IPv4 / 域名正常拼接', () => {
+    expect(hostPortLabel('1.2.3.4', 7878)).toBe('1.2.3.4:7878')
+    expect(hostPortLabel('api.example.com', 7878)).toBe('api.example.com:7878')
+  })
+  it('IPv6 加方括号，已有方括号不重复', () => {
+    expect(hostPortLabel('2001:db8::1', 7878)).toBe('[2001:db8::1]:7878')
+    expect(hostPortLabel('[2001:db8::1]', 7878)).toBe('[2001:db8::1]:7878')
+  })
+  it('targetLabel / maskedTargetLabel 对 IPv6 同样加方括号', () => {
+    const t: ServerTarget = { id: 'http://2001:db8::1:7878', scheme: 'http', host: '2001:db8::1', port: 7878 }
+    expect(targetLabel(t)).toBe('[2001:db8::1]:7878')
+    expect(maskedTargetLabel(t)).toBe('[2001:****]:7878')
   })
 })

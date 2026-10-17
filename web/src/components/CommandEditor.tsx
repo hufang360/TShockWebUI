@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { User } from 'lucide-react'
+import { Send, User, X } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Badge, Button, Kbd, Spinner } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -162,6 +162,19 @@ export function CommandEditor({
     if (ta) setCaret(ta.selectionStart ?? 0)
   }, [])
 
+  /** 清空输入框（保留焦点，光标回到开头）。 */
+  const clear = useCallback(() => {
+    onChange('')
+    setCaret(0)
+    setOpen(false)
+    const ta = taRef.current
+    if (ta) {
+      ta.focus()
+      ta.setSelectionRange(0, 0)
+    }
+    hasFocusedRef.current = true
+  }, [onChange])
+
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     const composing = composingRef.current || e.nativeEvent.isComposing
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -196,9 +209,17 @@ export function CommandEditor({
 
   return (
     <div className="relative">
+      {paramHint && (
+        <p
+          className="mb-1.5 truncate pl-4 font-pixel text-[11px] text-muted-foreground"
+          title={`/${paramHint}`}
+        >
+          /{paramHint}
+        </p>
+      )}
       <div
         className={cn(
-          'flex items-center gap-2 rounded-xl bg-accent pr-1.5 pl-3.5',
+          'flex items-center gap-2 rounded-full bg-card pr-1.5 pl-4',
           'focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring',
           invalid && 'ring-1 ring-destructive/60',
         )}
@@ -249,14 +270,28 @@ export function CommandEditor({
             window.setTimeout(() => setOpen(false), 150)
           }}
         />
+        {value.length > 0 && (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="my-1.5 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+            aria-label={t('editor.clear')}
+            title={t('editor.clear')}
+            onClick={clear}
+          >
+            <X data-icon="inline-start" />
+          </Button>
+        )}
         <Button
+          size="icon"
           variant="primary"
-          className="my-1.5 shrink-0"
+          className="my-1.5 shrink-0 rounded-full"
           onClick={onExecute}
           disabled={busy}
+          aria-label={busy ? t('editor.running') : t('editor.execute')}
+          title={busy ? t('editor.running') : t('editor.execute')}
         >
-          {busy && <Spinner aria-hidden data-icon="inline-start" />}
-          {busy ? t('editor.running') : t('editor.execute')}
+          {busy ? <Spinner aria-hidden /> : <Send data-icon="inline-start" />}
         </Button>
       </div>
 
@@ -347,12 +382,6 @@ export function CommandEditor({
             </span>
           </li>
         </ul>
-      )}
-
-      {paramHint && (
-        <p className="mt-2 truncate font-pixel text-[11px] text-muted-foreground" title={paramHint}>
-          {paramHint}
-        </p>
       )}
     </div>
   )

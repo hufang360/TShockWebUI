@@ -42,6 +42,39 @@ namespace WebUI
             return Plugin.Store.Cancel(args.Parameters["ticket"]);
         }
 
+        /// <summary>
+        /// TShock 建令牌限流的只读快照（调用者自己 IP）。后端在密码登录前调用：
+        /// 桶满就可直接判「限流」，避免 TShock 那句与「密码错」相同的 403（见 <see cref="RestLimit"/>）。
+        /// </summary>
+        public static object RateLimit(RestRequestArgs args)
+        {
+            if (!CheckSecret(args, out var forbidden)) return forbidden;
+            return RestLimit.Snapshot(CallerIp(args));
+        }
+
+        /// <summary>
+        /// 取调用方的来源 IP（= TShock 限流桶的 key）。
+        /// 用反射读 <c>RestRequestArgs.Context.RemoteEndPoint.Address</c>：
+        /// 这两个类型来自 TShock 附带的 HttpServer.dll，插件没有引用该程序集，
+        /// 为了不与 TShock 包版本耦合，这里不在编译期引用它们。
+        /// </summary>
+        private static string CallerIp(RestRequestArgs args)
+        {
+            try
+            {
+                var ctx = args.GetType().GetProperty("Context")?.GetValue(args);
+                if (ctx == null) return "";
+                var endpoint = ctx.GetType().GetProperty("RemoteEndPoint")?.GetValue(ctx);
+                if (endpoint == null) return "";
+                var address = endpoint.GetType().GetProperty("Address")?.GetValue(endpoint);
+                return address?.ToString() ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
         /// <summary>批量执行：需要有效 token（SecureRestCommand 已校验）。</summary>
         public static object Batch(RestRequestArgs args)
         {
@@ -68,7 +101,7 @@ namespace WebUI
 
         // ---------- 只读信息 / 会话管理（SecureRestCommand，任意有效 token） ----------
 
-        public static object Commands(RestRequestArgs args) => Extras.CommandsCatalog();
+        public static object Commands(RestRequestArgs args) => Extras.CommandsCatalog(args.TokenData);
 
         public static object Me(RestRequestArgs args) => Extras.Me(args.TokenData);
 

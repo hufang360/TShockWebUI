@@ -38,18 +38,24 @@ function fakeTransport(runCommand: (cmd: string) => Promise<CommandResult>): Bac
   }
 }
 
-function renderEditor(transport: BackendTransport, onTokenInvalid: () => Promise<boolean>) {
+function renderEditor(
+  transport: BackendTransport,
+  onTokenInvalid: () => Promise<boolean>,
+  authenticated = true,
+  onLogin: () => void = vi.fn(),
+) {
   return render(
     <I18nProvider lang="zh">
       <CommandPage
         dataset={makeDataset()}
         transport={transport}
-        authenticated
+        authenticated={authenticated}
         settings={settings}
         serverId="default"
         players={[]}
         ingameAllowed={false}
         onTokenInvalid={onTokenInvalid}
+        onLogin={onLogin}
       />
     </I18nProvider>,
   )
@@ -58,6 +64,48 @@ function renderEditor(transport: BackendTransport, onTokenInvalid: () => Promise
 afterEach(() => {
   localStorage.clear()
   vi.restoreAllMocks()
+})
+
+describe('CommandPage 未登录', () => {
+  it('隐藏编辑器，显示登录提示与登录按钮', () => {
+    const onLogin = vi.fn()
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true), false, onLogin)
+
+    expect(screen.getByText('请先登录！')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '执行' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+    expect(onLogin).toHaveBeenCalledTimes(1)
+  })
+
+  it('登录后重新量高，左卡片撑满（回归：登录后高度变窄）', () => {
+    const transport = fakeTransport(vi.fn())
+    const page = (authenticated: boolean) => (
+      <I18nProvider lang="zh">
+        <main>
+          <CommandPage
+            dataset={makeDataset()}
+            transport={transport}
+            authenticated={authenticated}
+            settings={settings}
+            serverId="default"
+            players={[]}
+            ingameAllowed={false}
+            onTokenInvalid={vi.fn().mockResolvedValue(true)}
+            onLogin={vi.fn()}
+          />
+        </main>
+      </I18nProvider>
+    )
+
+    const { rerender } = render(page(false))
+    // 未登录：只有登录提示，没有量高后的 --cmd-fill。
+    expect(document.querySelector('[style*="--cmd-fill"]')).toBeNull()
+
+    rerender(page(true))
+    // 登录后 rootRef 才挂载，需重新量高把卡片撑满。
+    expect(document.querySelector('[style*="--cmd-fill"]')).not.toBeNull()
+  })
 })
 
 describe('CommandPage token 失效处理', () => {
@@ -105,23 +153,35 @@ describe('CommandPage token 失效处理', () => {
 })
 
 describe('CommandPage 收藏', () => {
-  it('可收藏当前指令，再次点击取消收藏', async () => {
+  it('「指令」tab 不再显示收藏星标（收藏独立成 tab）', async () => {
     localStorage.setItem('tswui:draft', JSON.stringify('/time 12:00'))
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    // 收藏入口在侧栏「指令」页内。
     fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
-    fireEvent.click(await screen.findByRole('button', { name: '收藏' }))
-    await waitFor(() =>
-      expect(localStorage.getItem('tswui:favorites')).toContain('/time 12:00'),
-    )
-    expect(screen.getByRole('button', { name: '取消收藏' })).toBeTruthy()
+    await screen.findByPlaceholderText('搜索指令（名称 / 别名 / 帮助）')
+    expect(screen.queryByRole('button', { name: '收藏' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '取消收藏' })).toBeNull()
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: '取消收藏' }))
-    await waitFor(() =>
-      expect(JSON.parse(localStorage.getItem('tswui:favorites') ?? '[]')).toEqual([]),
-    )
-    expect(screen.getByRole('button', { name: '收藏' })).toBeTruthy()
+  it('搜索前导 / 仍能匹配指令', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
+    fireEvent.change(await screen.findByPlaceholderText('搜索指令（名称 / 别名 / 帮助）'), {
+      target: { value: '/time' },
+    })
+    expect(screen.getByText('/time')).toBeTruthy()
+  })
+
+  it('搜索框 ↓ 进入指令列表并高亮', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
+    const input = await screen.findByPlaceholderText('搜索指令（名称 / 别名 / 帮助）')
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    const focused = document.activeElement as HTMLElement
+    expect(focused.tagName).toBe('BUTTON')
+    expect(focused.className).toContain('bg-accent')
+    expect(focused.textContent).toContain('/help')
   })
 })
 
@@ -148,6 +208,7 @@ describe('CommandPage 服务器动态', () => {
           players={[]}
           ingameAllowed={false}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
+          onLogin={vi.fn()}
         />
       </I18nProvider>,
     )
@@ -171,37 +232,257 @@ describe('CommandPage 物品面板', () => {
           players={[]}
           ingameAllowed={false}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
+          onLogin={vi.fn()}
           onOpenInDex={onOpenInDex}
         />
       </I18nProvider>,
     )
-    const input = await screen.findByPlaceholderText('ID / 名称（Enter 查找）')
+    const input = await screen.findByPlaceholderText('搜索物品（ID / 名称）')
     fireEvent.change(input, { target: { value: '生命' } })
     fireEvent.click(await screen.findByRole('button', { name: /生命水晶/ }))
     fireEvent.click(screen.getByRole('button', { name: /前往 物品图鉴/ }))
     expect(onOpenInDex).toHaveBeenCalledWith(29)
   })
+
+  it('键盘上下键移动时高亮结果行', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    const input = await screen.findByPlaceholderText('搜索物品（ID / 名称）')
+    fireEvent.change(input, { target: { value: '生命' } })
+    const row = await screen.findByRole('button', { name: /生命水晶/ })
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(row)
+    expect(row.className).toContain('bg-accent')
+  })
 })
 
 describe('CommandPage 物品收藏', () => {
-  it('图鉴收藏的物品出现在「收藏」tab', async () => {
+  it('物品 tab 默认展示收藏物品，点击追加 ID 并从收藏移除', async () => {
+    localStorage.setItem('tswui:draft', JSON.stringify('/give'))
     localStorage.setItem('tswui:itemFavorites', JSON.stringify([{ id: 29, ts: 1 }]))
-    render(
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    // 默认就是「物品」tab：搜索为空时展示收藏物品。
+    fireEvent.click(await screen.findByRole('button', { name: /生命水晶/ }))
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:draft') ?? '""')).toBe('/give 29 '),
+    )
+    expect(JSON.parse(localStorage.getItem('tswui:itemFavorites') ?? '[]')).toEqual([])
+  })
+
+  it('收藏 tab 只显示指令收藏（物品收藏已移到物品 tab）', async () => {
+    localStorage.setItem('tswui:itemFavorites', JSON.stringify([{ id: 29, ts: 1 }]))
+    localStorage.setItem('tswui:favorites', JSON.stringify([{ cmd: '/time 12:00', ts: 1 }]))
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
+    expect(await screen.findByText('/time 12:00')).toBeTruthy()
+    expect(screen.queryByText('生命水晶')).toBeNull()
+  })
+
+  it('收藏 tab 搜索过滤指令收藏', async () => {
+    localStorage.setItem(
+      'tswui:favorites',
+      JSON.stringify([{ cmd: '/time 12:00', ts: 1 }, { cmd: '/give 29 Alice', ts: 2 }]),
+    )
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
+    expect(await screen.findByText('/time 12:00')).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('搜索收藏指令（指令名 / 参数）'), {
+      target: { value: 'give' },
+    })
+    expect(screen.getByText('/give 29 Alice')).toBeTruthy()
+    expect(screen.queryByText('/time 12:00')).toBeNull()
+  })
+
+  it('清空收藏清空指令收藏', async () => {
+    localStorage.setItem('tswui:favorites', JSON.stringify([{ cmd: '/time 12:00', ts: 1 }]))
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
+    // 清空需要二次确认：先点「清空」，再点「确认清空」。
+    fireEvent.click(await screen.findByRole('button', { name: '清空' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认清空' }))
+
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:favorites') ?? '[]')).toEqual([]),
+    )
+    expect(await screen.findByText('还没有收藏任何指令')).toBeTruthy()
+  })
+
+  it('点击收藏指令替换输入框内容（不执行）', async () => {
+    localStorage.setItem('tswui:favorites', JSON.stringify([{ cmd: '/time 12:00', ts: 1 }]))
+    const runCommand = vi.fn()
+    renderEditor(fakeTransport(runCommand), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
+    fireEvent.click(await screen.findByRole('button', { name: '/time 12:00' }))
+
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:draft') ?? '""')).toBe('/time 12:00'),
+    )
+    expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it('批量删除指令收藏', async () => {
+    localStorage.setItem('tswui:favorites', JSON.stringify([{ cmd: '/time 12:00', ts: 1 }]))
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
+    fireEvent.click(screen.getByRole('button', { name: '/time 12:00' }))
+    fireEvent.click(screen.getByRole('button', { name: '删除（1）' }))
+
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:favorites') ?? '[]')).toEqual([]),
+    )
+  })
+})
+
+describe('CommandPage 历史', () => {
+  it('批量删除：进入删除状态后可多选删除', async () => {
+    localStorage.setItem(
+      'tswui:history',
+      JSON.stringify([
+        { cmd: '/time 12:00', ts: 1, ok: true, status: 'ok' },
+        { cmd: '/time 13:00', ts: 2, ok: true, status: 'ok' },
+      ]),
+    )
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
+    // 默认逐行不显示删除图标，只有一个「删除」入口。
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
+    fireEvent.click(screen.getByRole('button', { name: /\/time 12:00/ }))
+    fireEvent.click(screen.getByRole('button', { name: /\/time 13:00/ }))
+    fireEvent.click(screen.getByRole('button', { name: '删除（2）' }))
+
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:history') ?? '[]')).toEqual([]),
+    )
+    expect(await screen.findByText('暂无历史')).toBeTruthy()
+  })
+
+  it('清空历史需要二次确认', async () => {
+    localStorage.setItem(
+      'tswui:history',
+      JSON.stringify([{ cmd: '/time 12:00', ts: 1, ok: true, status: 'ok' }]),
+    )
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
+    fireEvent.click(await screen.findByRole('button', { name: '清空历史' }))
+    // 首次点击只展开确认，不直接清空。
+    expect(JSON.parse(localStorage.getItem('tswui:history') ?? '[]')).toHaveLength(1)
+
+    fireEvent.click(await screen.findByRole('button', { name: '确认清空' }))
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:history') ?? '[]')).toEqual([]),
+    )
+    expect(await screen.findByText('暂无历史')).toBeTruthy()
+  })
+
+  it('历史搜索按指令文本过滤', async () => {
+    localStorage.setItem(
+      'tswui:history',
+      JSON.stringify([
+        { cmd: '/time 12:00', ts: 1, ok: true, status: 'ok' },
+        { cmd: '/give 29 Alice', ts: 2, ok: true, status: 'ok' },
+      ]),
+    )
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
+    fireEvent.change(await screen.findByPlaceholderText('搜索历史指令'), { target: { value: 'give' } })
+    expect(screen.getByText('/give 29 Alice')).toBeTruthy()
+    expect(screen.queryByText('/time 12:00')).toBeNull()
+  })
+
+  it('去重保留最新、删除较旧的重复记录', async () => {
+    localStorage.setItem(
+      'tswui:history',
+      JSON.stringify([
+        { cmd: '/time 12:00', ts: 3, ok: true, status: 'ok' },
+        { cmd: '/give 29 Alice', ts: 2, ok: true, status: 'ok' },
+        { cmd: '/time 12:00', ts: 1, ok: true, status: 'ok' },
+      ]),
+    )
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
+    fireEvent.click(await screen.findByRole('button', { name: '去重' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认去重' }))
+
+    await waitFor(() => {
+      const after = JSON.parse(localStorage.getItem('tswui:history') ?? '[]') as Array<{
+        cmd: string
+      }>
+      expect(after).toHaveLength(2)
+      expect(after.map((h) => h.cmd)).toEqual(['/time 12:00', '/give 29 Alice'])
+    })
+  })
+})
+
+describe('CommandPage 结果持久化', () => {
+  it('执行结果存本机，重新挂载后仍在', async () => {
+    localStorage.setItem('tswui:draft', JSON.stringify('/time'))
+    const transport = fakeTransport(
+      vi.fn().mockResolvedValue({ status: 'ok', output: ['已把时间设置为 12:00'], message: '' }),
+    )
+    const page = () => (
       <I18nProvider lang="zh">
         <CommandPage
           dataset={makeDataset()}
-          transport={fakeTransport(vi.fn())}
+          transport={transport}
           authenticated
           settings={settings}
           serverId="default"
           players={[]}
           ingameAllowed={false}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
+          onLogin={vi.fn()}
         />
-      </I18nProvider>,
+      </I18nProvider>
     )
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
-    expect(await screen.findByText('物品收藏（1）')).toBeTruthy()
-    expect(screen.getByText('生命水晶')).toBeTruthy()
+
+    const first = render(page())
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    await screen.findByText('已把时间设置为 12:00')
+    expect(JSON.parse(localStorage.getItem('tswui:commandResults') ?? '[]')).toHaveLength(1)
+    first.unmount()
+
+    render(page())
+    expect(await screen.findByText('已把时间设置为 12:00')).toBeTruthy()
+  })
+})
+
+describe('CommandPage 右侧 tab 记忆', () => {
+  it('切换 tab 后写入本机，重新挂载恢复', async () => {
+    const transport = fakeTransport(vi.fn())
+    const page = () => (
+      <I18nProvider lang="zh">
+        <CommandPage
+          dataset={makeDataset()}
+          transport={transport}
+          authenticated
+          settings={settings}
+          serverId="default"
+          players={[]}
+          ingameAllowed={false}
+          onTokenInvalid={vi.fn().mockResolvedValue(true)}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>
+    )
+
+    const first = render(page())
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
+    await waitFor(() => expect(localStorage.getItem('tswui:commandTab')).toBe('"history"'))
+    first.unmount()
+
+    render(page())
+    // 默认应停在「历史」tab。
+    expect(await screen.findByPlaceholderText('搜索历史指令')).toBeTruthy()
   })
 })

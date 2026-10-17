@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, ListOrdered, X } from 'lucide-react'
+import { ConfirmButton } from '@/components/ConfirmButton'
 import {
   Badge,
   Button,
@@ -35,7 +36,7 @@ export function ExecutionQueuePanel() {
   if (total === 0) return null
 
   return (
-    <div className="shrink-0 p-2">
+    <div className="shrink-0">
       <Separator className="mb-1 bg-sidebar-border" />
       <Button
         variant="ghost"
@@ -86,9 +87,14 @@ export function ExecutionQueuePanel() {
             <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
               {t('queue.close')}
             </Button>
-            <Button size="sm" variant="danger" disabled={pending.length === 0} onClick={clear}>
+            <ConfirmButton
+              variant="danger"
+              disabled={pending.length === 0}
+              onConfirm={clear}
+              confirmLabel={t('action.clearConfirm')}
+            >
               {t('queue.clear')}
-            </Button>
+            </ConfirmButton>
           </div>
         </DialogContent>
       </Dialog>

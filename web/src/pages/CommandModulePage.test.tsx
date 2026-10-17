@@ -32,6 +32,8 @@ function renderPage(
     { nameKey: 'world.card.info', command: '/wi' },
     { nameKey: 'world.card.boss', command: '/bi' },
   ],
+  authenticated = true,
+  onLogin: () => void = vi.fn(),
 ) {
   return render(
     <I18nProvider lang="zh">
@@ -41,10 +43,11 @@ function renderPage(
             <CommandModulePage
               dataset={makeDataset()}
               transport={transport}
-              authenticated
+              authenticated={authenticated}
               serverId="default"
               refreshInterval={0}
               onTokenInvalid={vi.fn().mockResolvedValue(true)}
+              onLogin={onLogin}
               moduleId="world"
               keyPrefix="world:"
               title="世界管理"
@@ -64,6 +67,20 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear()
+})
+
+describe('CommandModulePage 未登录', () => {
+  it('隐藏卡片列表，显示登录提示与登录按钮', () => {
+    const onLogin = vi.fn()
+    const transport = fakeTransport(async () => ({ status: 'ok', output: [] }))
+    renderPage(transport, undefined, false, onLogin)
+
+    expect(screen.getByText('请先登录！')).toBeTruthy()
+    expect(screen.queryByText('指令卡片')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+    expect(onLogin).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('CommandModulePage', () => {

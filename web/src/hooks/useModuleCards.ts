@@ -7,6 +7,7 @@ import {
   moduleCardsFor,
   removeModuleCard,
   sanitizeModuleCards,
+  updateModuleCard,
   type ModuleCard,
 } from '@/lib/moduleCards'
 import { StorageKeys } from '@/lib/storage'
@@ -18,6 +19,7 @@ export function useModuleCards(
 ): {
   cards: ModuleCard[]
   add: (name: string, command: string) => void
+  update: (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command'>>) => void
   remove: (id: string) => void
 } {
   const [raw, setRaw] = useLocalState(StorageKeys.moduleCards, DEFAULT_MODULE_CARDS)
@@ -30,6 +32,12 @@ export function useModuleCards(
     },
     [setRaw, serverId, moduleId],
   )
+  const update = useCallback(
+    (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command'>>) => {
+      setRaw((prev) => updateModuleCard(sanitizeModuleCards(prev), serverId, moduleId, id, patch))
+    },
+    [setRaw, serverId, moduleId],
+  )
   const remove = useCallback(
     (id: string) => {
       setRaw((prev) => removeModuleCard(sanitizeModuleCards(prev), serverId, moduleId, id))
@@ -37,5 +45,5 @@ export function useModuleCards(
     [setRaw, serverId, moduleId],
   )
 
-  return { cards, add, remove }
+  return { cards, add, update, remove }
 }

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Fish, Package, Plus, RefreshCw, ShoppingBasket, Terminal, Trash2, Trophy } from 'lucide-react'
+import { Fish, Package, RefreshCw, Settings2, ShoppingBasket, Terminal, Trophy } from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
-import { Button, Field, FieldLabel, Input, Spinner } from '@/components/ui'
+import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
+import { Button, Spinner } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useModuleCards } from '@/hooks/useModuleCards'
+import { DEFAULT_AUTO_EXEC, isManual, sanitizeAutoExec, setManual } from '@/lib/autoExec'
 import { useCommandResults } from '@/lib/commandResults'
 import { useExecutionQueue } from '@/lib/executionQueue'
-import { normalizeCustomCommand } from '@/lib/homeCards'
 import { useI18n } from '@/lib/i18n'
 import { isRefreshDue, lastRefreshedAt, markRefreshed, refreshScope } from '@/lib/refreshGate'
 import { StorageKeys } from '@/lib/storage'
@@ -133,10 +134,20 @@ export function FishCommandCards({
   )
 
   // 用户为鱼店追加的指令卡片（存 tswui:moduleCards，模块 id = store）。
-  const { cards: customCards, add: addCard, remove: removeCard } = useModuleCards(serverId, 'store')
-  const [adding, setAdding] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newCommand, setNewCommand] = useState('')
+  const {
+    cards: customCards,
+    add: addCard,
+    update: updateCard,
+    remove: removeCard,
+  } = useModuleCards(serverId, 'store')
+  const [manageOpen, setManageOpen] = useState(false)
+  // 自动执行偏好（与首页 / 模块卡片一致）。
+  const [rawAutoExec, setAutoExec] = useLocalState(StorageKeys.autoExec, DEFAULT_AUTO_EXEC)
+  const autoExec = useMemo(() => sanitizeAutoExec(rawAutoExec), [rawAutoExec])
+  const cardManual = useCallback(
+    (card: ManageableCard) => isManual(autoExec, card.manualKey, card.defaultManual === true),
+    [autoExec],
+  )
 
   const entries = useMemo(
     () => [
@@ -164,17 +175,19 @@ export function FishCommandCards({
       const scope = refreshScope(serverId, 'fish')
       if (!force && !isRefreshDue(scope, refreshInterval)) return
       setLastRefreshAt(markRefreshed(scope))
+      // 只刷新「自动执行」的卡片（手动卡片只能点自己的按钮）。
+      const runnable = entries.filter((e) => !isManual(autoExec, `fish:${e.key}`))
       if (batchMode && batchPlugin === true) {
         enqueue({
           key: 'fish:__batch__',
           labelKey: 'home.batch',
           label: 'home.batch',
-          command: entries.map((e) => e.command).join('  '),
-          run: () => runBatchEntries(entries),
+          command: runnable.map((e) => e.command).join('  '),
+          run: () => runBatchEntries(runnable),
         })
         return
       }
-      for (const e of entries) {
+      for (const e of runnable) {
         enqueue({
           key: `fish:${e.key}`,
           label: e.label,
@@ -183,7 +196,7 @@ export function FishCommandCards({
         })
       }
     },
-    [batchMode, batchPlugin, entries, enqueue, runBatchEntries, runOne, serverId, refreshInterval],
+    [autoExec, batchMode, batchPlugin, entries, enqueue, runBatchEntries, runOne, serverId, refreshInterval],
   )
 
   // 进入鱼店页自动刷新一次（受 2 分钟闸门限制）；批量插件可用性未探测完先等一等。
@@ -195,14 +208,14 @@ export function FishCommandCards({
 
   const refreshing = busyPrefix('fish:')
 
-  const submitAdd = () => {
-    const cmd = normalizeCustomCommand(newCommand)
-    if (!cmd) return
-    addCard(newName.trim(), cmd)
-    setNewName('')
-    setNewCommand('')
-    setAdding(false)
-  }
+  const manageable: ManageableCard[] = entries.map((e) => ({
+    id: e.key,
+    name: e.label,
+    command: e.command,
+    custom: e.custom,
+    manualKey: `fish:${e.key}`,
+    defaultManual: false,
+  }))
 
   return (
     // `xl:contents`：xl 下本组件的表头与卡片列表脱离包裹层，直接成为鱼店页两列网格的
@@ -219,9 +232,9 @@ export function FishCommandCards({
               {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
             </span>
           )}
-          <Button size="sm" variant="ghost" onClick={() => setAdding((v) => !v)}>
-            <Plus data-icon="inline-start" />
-            {t('modules.cards.add')}
+          <Button size="sm" variant="ghost" onClick={() => setManageOpen(true)}>
+            <Settings2 data-icon="inline-start" />
+            {t('modules.cards.manage')}
           </Button>
           <Button
             size="sm"
@@ -239,37 +252,6 @@ export function FishCommandCards({
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1 xl:col-start-2 xl:row-start-2 xl:min-h-0">
-        {adding && (
-          <div className="flex flex-col gap-2 rounded-xl bg-accent/40 p-3 sm:flex-row sm:items-end">
-            <Field className="min-w-0 flex-1">
-              <FieldLabel htmlFor="fish-card-name">{t('modules.cards.name')}</FieldLabel>
-              <Input
-                id="fish-card-name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder={t('modules.cards.namePlaceholder')}
-                className="h-8 text-xs"
-              />
-            </Field>
-            <Field className="min-w-0 flex-1">
-              <FieldLabel htmlFor="fish-card-command">{t('modules.cards.command')}</FieldLabel>
-              <Input
-                id="fish-card-command"
-                value={newCommand}
-                onChange={(e) => setNewCommand(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitAdd()
-                }}
-                placeholder={t('modules.cards.commandPlaceholder')}
-                className="h-8 font-pixel text-xs"
-              />
-            </Field>
-            <Button size="sm" variant="primary" onClick={submitAdd}>
-              <Plus data-icon="inline-start" />
-              {t('modules.cards.create')}
-            </Button>
-          </div>
-        )}
         {entries.map((card) => (
           <div key={card.key} className="relative">
           <CommandCard
@@ -284,21 +266,22 @@ export function FishCommandCards({
             prefixesById={dataset?.prefixesById}
             atlas={dataset?.atlas}
           />
-            {card.custom && (
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className="absolute top-2 right-11"
-                aria-label={t('modules.cards.remove')}
-                title={t('modules.cards.remove')}
-                onClick={() => removeCard(card.key)}
-              >
-                <Trash2 aria-hidden />
-              </Button>
-            )}
           </div>
         ))}
       </div>
+
+      <ModuleCardManagerDialog
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        cards={manageable}
+        isManual={cardManual}
+        onToggleManual={(card, manual) =>
+          setAutoExec((prev) => setManual(sanitizeAutoExec(prev), card.manualKey, manual))
+        }
+        onAdd={(name, cmd) => addCard(name, cmd)}
+        onUpdate={(id, patch) => updateCard(id, patch)}
+        onRemove={(id) => removeCard(id)}
+      />
     </div>
   )
 }

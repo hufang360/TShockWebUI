@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { AlertTriangle, Fish, RefreshCw, ShieldAlert, ShoppingCart } from 'lucide-react'
+import { AlertTriangle, Droplets, Fish, RefreshCw, ShieldAlert, ShoppingCart } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
+import { LoginGate } from '@/components/LoginGate'
 import { CommandOutput } from '@/components/ResultPanel'
 import { FishCommandCards } from '@/components/FishCommandCards'
 import { cn } from '@/lib/cn'
@@ -12,10 +13,6 @@ import {
   Button,
   Card,
   CardBody,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -26,6 +23,10 @@ import {
   InputGroupAddon,
   InputGroupInput,
   Kbd,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
   Spinner,
   Tooltip,
   TooltipContent,
@@ -332,7 +333,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       ro?.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [])
+    // 依赖 authenticated：未登录时先渲染 LoginGate，rootRef 尚未挂载；登录后需重新量高。
+  }, [authenticated])
 
   const heading = (
     <div className="flex flex-col gap-1">
@@ -345,20 +347,23 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     return (
       <div className="flex flex-col gap-4">
         {heading}
-        <Card>
-          <CardBody className="flex flex-wrap items-center justify-between gap-3 pt-4">
-            <p className="text-sm text-foreground/80">{t('fish.notLoggedIn')}</p>
-            <Button variant="primary" onClick={onLogin}>
-              {t('action.login')}
-            </Button>
-          </CardBody>
-        </Card>
+        <LoginGate onLogin={onLogin} />
       </div>
     )
   }
 
   return (
     <>
+      <div className="relative">
+      {/* 背景点缀：水波光晕 + 几条淡鱼（商店氛围） */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-16 -right-16 size-64 rounded-full bg-info/10 blur-3xl" />
+        <div className="absolute -bottom-20 -left-16 size-72 rounded-full bg-primary/10 blur-3xl" />
+        <Fish className="absolute top-4 left-1/3 size-24 -rotate-12 text-info/10" />
+        <Fish className="absolute right-1/4 bottom-8 size-16 rotate-12 text-primary/10" />
+        <Droplets className="absolute top-1/2 left-4 size-14 text-info/10" />
+        <Droplets className="absolute top-8 right-10 size-10 text-info/10" />
+      </div>
       <div
         ref={rootRef}
         // 两列共享行：row1 = 左页头 / 右表头，row2 = 左内容 / 右卡片列表。
@@ -490,13 +495,12 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           onTokenInvalid={onTokenInvalid}
         />
       </div>
+      </div>
 
-      <Dialog open={selected !== null} onOpenChange={(o) => !o && closeDetail()}>
-        <DialogContent
-          className="max-w-xl"
-          // 点击框外 / 遮罩不关闭：仅允许右上角关闭或 Esc。
-          onInteractOutside={(event) => event.preventDefault()}
-          onPointerDownOutside={(event) => event.preventDefault()}
+      <Sheet open={selected !== null} onOpenChange={(o) => !o && closeDetail()}>
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
           onOpenAutoFocus={(event) => {
             // 默认焦点：需填参数 → 参数输入框；否则 → 购买按钮。
             event.preventDefault()
@@ -506,35 +510,32 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
         >
           {selected && (
             <>
-              <DialogTitle>{t('fish.detail')}</DialogTitle>
-
-              <div className="max-h-[70vh] flex flex-col gap-4 overflow-y-auto pr-1">
-                {/* 图标单独一行 */}
-                <div className="flex justify-center">
+              <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
+                <SheetTitle>{t('fish.detail')}</SheetTitle>
+                <div className="mt-2 flex flex-col items-center gap-1.5">
                   <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} />
-                </div>
-
-                {/* 序号 + 名称（词缀名放在商品名前，颜色同物品 tips 的琥珀色） */}
-                <div className="text-center">
-                  <p className="text-base font-semibold text-foreground">
+                  <p className="text-center text-base font-semibold text-foreground">
                     #{selected.serial}{' '}
                     {goodPrefixName(selected, dataset) ? (
                       <span className="text-warning">{goodPrefixName(selected, dataset)} </span>
                     ) : null}
                     {selected.name}
                   </p>
-                  {selected.refund && (
-                    <div className="mt-1 flex justify-center">
-                      <Badge tone="accent">{t('fish.refundable')}</Badge>
-                    </div>
-                  )}
+                  {selected.refund && <Badge tone="accent">{t('fish.refundable')}</Badge>}
+                </div>
+              </SheetHeader>
+
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+                {/* 价格：标签在上、内容在下 */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-muted-foreground">{t('fish.cost')}</span>
+                  <div className="min-w-0">
+                    {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
+                  </div>
                 </div>
 
-                {/* 价格 / 解锁 / 别名 / 限购 / 备注：固定标签列，视觉对齐 */}
+                {/* 解锁 / 别名 / 限购 / 备注：固定标签列，视觉对齐 */}
                 <dl className="flex flex-col gap-2">
-                  <Field label={t('fish.cost')}>
-                    {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
-                  </Field>
                   {selected.unlock.trim() && (
                     <Field label={t('fish.unlock')}>{renderRich(selected.unlock)}</Field>
                   )}
@@ -623,8 +624,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 )}
               </div>
 
-              {/* 底部操作区（底色比卡片深） */}
-              <DialogFooter>
+              {/* 底部操作区 */}
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t px-5 py-3">
                 {confirming ? (
                   <>
                     <Button
@@ -663,11 +664,25 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                     </Button>
                   </>
                 )}
-              </DialogFooter>
+              </div>
+
+              {/* 空态 / 装饰：右下角半透明渔夫指南图标（鱼店氛围） */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute right-6 bottom-16 opacity-[0.15]"
+              >
+                <ItemIcon
+                  item={dataset?.itemsById.get(3120)}
+                  atlas={dataset?.atlas}
+                  size={170}
+                  mode="fit"
+                  tooltip={false}
+                />
+              </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

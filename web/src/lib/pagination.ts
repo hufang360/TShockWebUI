@@ -1,14 +1,14 @@
 /**
  * 物品图鉴的列表分页与随机洗牌（纯函数，便于单测）。
  *
- * 图鉴约定：**每页默认 50 个**（翻页控件可改：50 / 100 / 200 / 500）；
+ * 图鉴约定：**每页默认 100 个**（翻页控件可改：50 / 100 / 200 / 500）；
  * 无搜索时按随机顺序分页，刷新页面即重新随机。详见 docs/页面-物品图鉴.md。
  */
 
 /** 每页物品数默认值。 */
-export const PAGE_SIZE = 50
+export const PAGE_SIZE = 100
 /** 翻页控件可选的每页数量。 */
-export const PAGE_SIZES = [50, 100, 200, 500] as const
+export const PAGE_SIZES = [50, 100, 200, 360, 500] as const
 
 /** mulberry32：确定性 PRNG。同 seed 同顺序，避免 StrictMode 双调用导致抖动。 */
 function mulberry32(seed: number): () => number {

@@ -17,6 +17,9 @@ func TestWebAuthRequestSendsSecretAndParses(t *testing.T) {
 		if q.Get("name") != "Alice" || q.Get("secret") != "s3cret" {
 			t.Errorf("q = %v", q)
 		}
+		if q.Get("ip") != "1.2.3.4" {
+			t.Errorf("ip = %q（应透传来源 IP 供插件限流）", q.Get("ip"))
+		}
 		writeJSON(w, 200, map[string]any{
 			"status":   "200",
 			"code":     "ok",
@@ -27,7 +30,7 @@ func TestWebAuthRequestSendsSecretAndParses(t *testing.T) {
 		})
 	}), time.Second)
 
-	res, err := c.WebAuthRequest(context.Background(), "Alice", "s3cret")
+	res, err := c.WebAuthRequest(context.Background(), "Alice", "s3cret", "1.2.3.4")
 	if err != nil {
 		t.Fatalf("WebAuthRequest: %v", err)
 	}
@@ -41,7 +44,7 @@ func TestWebAuthRequestOfflineIsBusinessError(t *testing.T) {
 		writeJSON(w, 200, map[string]any{"status": "200", "code": "offline", "message": "该玩家不在线"})
 	}), time.Second)
 
-	_, err := c.WebAuthRequest(context.Background(), "Ghost", "")
+	_, err := c.WebAuthRequest(context.Background(), "Ghost", "", "")
 	var e *APIError
 	if !errors.As(err, &e) {
 		t.Fatalf("err = %v", err)
@@ -59,7 +62,7 @@ func TestWebAuthRequestPluginMissing(t *testing.T) {
 		writeJSON(w, 404, map[string]any{"error": "Specified API endpoint doesn't exist."})
 	}), time.Second)
 
-	_, err := c.WebAuthRequest(context.Background(), "Alice", "")
+	_, err := c.WebAuthRequest(context.Background(), "Alice", "", "")
 	var e *APIError
 	if !errors.As(err, &e) || e.Kind != KindNotFound {
 		t.Fatalf("err = %v", err)
@@ -71,7 +74,7 @@ func TestWebAuthRequestSecretMismatch(t *testing.T) {
 		writeJSON(w, 403, map[string]any{"status": "403", "code": "forbidden", "error": "secret 不匹配"})
 	}), time.Second)
 
-	_, err := c.WebAuthRequest(context.Background(), "Alice", "wrong")
+	_, err := c.WebAuthRequest(context.Background(), "Alice", "wrong", "")
 	var e *APIError
 	if !errors.As(err, &e) || e.Kind != KindPluginForbidden {
 		t.Fatalf("err = %v", err)
@@ -133,7 +136,7 @@ func TestSetSecretOmitsEmpty(t *testing.T) {
 		writeJSON(w, 200, map[string]any{"status": "200", "code": "ok", "ticket": "1"})
 	}), time.Second)
 
-	if _, err := c.WebAuthRequest(context.Background(), "Alice", ""); err != nil {
+	if _, err := c.WebAuthRequest(context.Background(), "Alice", "", ""); err != nil {
 		t.Fatalf("WebAuthRequest: %v", err)
 	}
 }
