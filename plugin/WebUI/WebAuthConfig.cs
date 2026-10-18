@@ -68,6 +68,39 @@ namespace WebUI
         /// </summary>
         public bool RecordChat = true;
 
+        /// <summary>
+        /// 是否允许网页端（/webui/chat）把文本发到游戏内聊天。
+        /// 消息会带 <c>[WebUI]</c> 前缀、与「真实在线玩家」明确区分，默认开。
+        /// </summary>
+        public bool AllowWebChat = true;
+
+        /// <summary>同一账号每分钟最多经网页发送的聊天条数（防刷屏）。0 = 不限。</summary>
+        public int MaxWebChatPerMinute = 20;
+
+        /// <summary>
+        /// 网页发言在游戏内/事件流里的前缀（默认 <c>[WebUI]</c>）。
+        /// 用于把「网页发言」与真实在线玩家聊天明确区分；可改成自己服里更醒目的标记。
+        /// </summary>
+        public string ChatPrefix = "[WebUI]";
+
+        /// <summary>
+        /// 是否把「服务器动态」事件写入磁盘（<c>tshock/WebUI/events/</c>）。
+        /// 默认开：重启 TShock 后历史仍在；关掉则只保留内存（重启即清空）。
+        /// </summary>
+        public bool PersistEvents = true;
+
+        /// <summary>
+        /// 是否把玩家聊天也写入事件历史文件。默认**关**（保护隐私）：
+        /// 关掉时 join/leave/boss 照常落盘，聊天只在内存里（<see cref="RecordChat"/> 为总开关）。
+        /// </summary>
+        public bool PersistChat = false;
+
+        /// <summary>事件历史保留天数（默认 7；&lt;=0 表示不按天清理）。</summary>
+        public int HistoryDays = 7;
+
+        /// <summary>事件历史目录总大小上限 MB（默认 50；&lt;=0 表示不按大小清理）。</summary>
+        public int HistoryMaxMB = 50;
+
         /// <summary>配置文件路径（便于日志提示）。</summary>
         [JsonIgnore]
         public string Path;
@@ -104,6 +137,10 @@ namespace WebUI
             if (MaxRequestsPerMinutePerIp < 0) MaxRequestsPerMinutePerIp = 0;
             if (MaxPendingTickets < 0) MaxPendingTickets = 0;
             if (TokenTTLMinutes < 0) TokenTTLMinutes = 0;
+            if (MaxWebChatPerMinute < 0) MaxWebChatPerMinute = 0;
+            if (HistoryDays < 0) HistoryDays = 0;
+            if (HistoryMaxMB < 0) HistoryMaxMB = 0;
+            if (string.IsNullOrWhiteSpace(ChatPrefix)) ChatPrefix = "[WebUI]";
             if (Secret == null) Secret = "";
             return this;
         }

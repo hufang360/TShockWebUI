@@ -20,12 +20,16 @@ RECIPES_RAW="$(mktemp -t recipes-raw.XXXXXX.json)"
 ITEMS_RAW="$(mktemp -t items-raw.XXXXXX.json)"
 GROUPS_RAW="$(mktemp -t item-groups-raw.XXXXXX.json)"
 PREFIX_SETS_RAW="$(mktemp -t prefix-sets-raw.XXXXXX.json)"
-trap 'rm -f "$RECIPES_RAW" "$ITEMS_RAW" "$GROUPS_RAW" "$PREFIX_SETS_RAW"' EXIT
+ITEM_DROPS_RAW="$(mktemp -t item-drops-raw.XXXXXX.json)"
+trap 'rm -f "$RECIPES_RAW" "$ITEMS_RAW" "$GROUPS_RAW" "$PREFIX_SETS_RAW" "$ITEM_DROPS_RAW"' EXIT
 
 echo "== GameDump (dotnet) =="
 echo "   TR_SRC=$TR_SRC"
 dotnet build "$HERE/gamedump" -c Release -v q
-dotnet "$HERE/gamedump/bin/Release/net9.0/GameDump.dll" "$TR_SRC" "$RECIPES_RAW" "$ITEMS_RAW" "$GROUPS_RAW" "$PREFIX_SETS_RAW"
+dotnet "$HERE/gamedump/bin/Release/net9.0/GameDump.dll" "$TR_SRC" "$RECIPES_RAW" "$ITEMS_RAW" "$GROUPS_RAW" "$PREFIX_SETS_RAW" "$ITEM_DROPS_RAW"
+
+# 木匣掉落是运行时模拟（1e6 次/个），直接写成品供前端读；其余 raw 再经 Node 整理。
+cp -f "$ITEM_DROPS_RAW" "$REPO/data/item-drops.json"
 
 echo "== gen-recipes =="
 TR_SRC="$TR_SRC" RAW="$RECIPES_RAW" OUT="$REPO/data/recipes.json" node "$HERE/gen-recipes.mjs"
@@ -44,5 +48,9 @@ TR_SRC="$TR_SRC" OUT="$REPO/data/prefix-mods.json" node "$HERE/gen-prefix-mods.m
 
 echo "== gen-prefix-sets =="
 RAW="$PREFIX_SETS_RAW" OUT="$REPO/data/prefix-sets.json" node "$HERE/gen-prefix-sets.mjs"
+
+echo "== gen-tile-wall =="
+TR_SRC="$TR_SRC" RAW="$RECIPES_RAW" \
+  OUT="$REPO/data/tiles.json" OUT_WALL="$REPO/data/walls.json" node "$HERE/gen-tile-wall.mjs"
 
 echo "完成。"

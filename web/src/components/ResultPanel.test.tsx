@@ -84,6 +84,22 @@ describe('ResultPanel', () => {
     expect(screen.getByText('hf')).toBeTruthy()
   })
 
+  it('默认只渲染最近 5 条，点「加载更早」展开旧结果', () => {
+    const entries = Array.from({ length: 6 }, (_, i) =>
+      entry(`/cmd ${i + 1}`, { status: 'ok', output: [`输出${i + 1}`] }, i + 1),
+    )
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel entries={entries} running={false} />
+      </I18nProvider>,
+    )
+    // 最旧的第 1 条默认在窗口外，最新一条可见。
+    expect(screen.queryByText('/cmd 1')).toBeNull()
+    expect(screen.getByText('/cmd 6')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '加载更早的 1 条' }))
+    expect(screen.getByText('/cmd 1')).toBeTruthy()
+  })
+
   it('多次执行追加展示，不覆盖上一次结果', () => {
     render(
       <I18nProvider lang="zh">
@@ -100,6 +116,70 @@ describe('ResultPanel', () => {
     expect(screen.getByText('/who')).toBeTruthy()
     expect(screen.getByText('上午 8:30')).toBeTruthy()
     expect(screen.getByText('在线玩家 (1): hf')).toBeTruthy()
+  })
+
+  it('点击整个表头折叠 / 展开结果卡片', () => {
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[entry('/time', { status: 'ok', output: ['上午 8:30'] })]}
+          running={false}
+        />
+      </I18nProvider>,
+    )
+    // 默认展开，输出可见；点表头的指令文本即折叠。
+    expect(screen.getByText('上午 8:30')).toBeTruthy()
+    fireEvent.click(screen.getByText('/time'))
+    expect(screen.queryByText('上午 8:30')).toBeNull()
+    fireEvent.click(screen.getByText('/time'))
+    expect(screen.getByText('上午 8:30')).toBeTruthy()
+  })
+
+  it('按 entry.collapsed 初始渲染为折叠状态', () => {
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[{ ...entry('/time', { status: 'ok', output: ['上午 8:30'] }), collapsed: true }]}
+          running={false}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('/time')).toBeTruthy()
+    expect(screen.queryByText('上午 8:30')).toBeNull()
+  })
+
+  it('折叠状态变化时回调（供本机记忆）', () => {
+    const onToggleCollapse = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[entry('/time', { status: 'ok', output: ['上午 8:30'] }, 7)]}
+          running={false}
+          onToggleCollapse={onToggleCollapse}
+        />
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByText('/time'))
+    expect(onToggleCollapse).toHaveBeenCalledWith(7, true)
+  })
+
+  it('鼠标选中指令文本时点击不折叠（方便复制）', () => {
+    const onToggleCollapse = vi.fn()
+    const getSelection = vi
+      .spyOn(window, 'getSelection')
+      .mockReturnValue({ toString: () => '/time' } as unknown as Selection)
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[entry('/time', { status: 'ok', output: ['上午 8:30'] })]}
+          running={false}
+          onToggleCollapse={onToggleCollapse}
+        />
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByText('/time'))
+    expect(onToggleCollapse).not.toHaveBeenCalled()
+    getSelection.mockRestore()
   })
 
   it('物品标签 stack>1 时在图标右下角显示数量', () => {

@@ -14,6 +14,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"tshockwebui/server/internal/config"
@@ -40,6 +41,10 @@ const (
 	// codePluginMissing：上游插件未安装（TShock 对未知端点返回 404）；对前端返回 501 未实现。
 	// （目前只有 PlayerManager 的 /pm/*）。
 	codePluginMissing = "plugin_not_installed"
+	// codePluginOutdated：信使插件在装，但缺少该端点 / 能力（版本过旧）；需升级插件。
+	codePluginOutdated = "plugin_outdated"
+	// codePluginProtocol：信使插件与后端协议不兼容；需升级插件或后端。
+	codePluginProtocol = "plugin_protocol_mismatch"
 	// codeFishError：FishShop 的业务失败（缺参数 / 商品不存在 / 钱不够 /
 	// 商店打烊），文案来自上游，直接展示给玩家。
 	codeFishError = "fishshop_error"
@@ -74,6 +79,19 @@ type Server struct {
 	log            *slog.Logger
 	loginLimiter   *rateLimiter
 	commandLimiter *rateLimiter
+
+	// 服务器动态：每个上游一个共享轮询 hub（见 feedhub.go）。
+	hubMu sync.Mutex
+	hubs  map[string]*eventHub
+
+	// 插件 meta 短缓存：避免每次 tail / 状态探测都打插件。
+	metaMu    sync.Mutex
+	metaCache map[string]metaCacheEntry
+}
+
+type metaCacheEntry struct {
+	meta *tshock.PluginMeta
+	at   time.Time
 }
 
 // New 构造 Server。
@@ -96,6 +114,8 @@ func New(d Deps) *Server {
 		log:            log,
 		loginLimiter:   newRateLimiter(d.Config.LoginMaxPerMin),
 		commandLimiter: newRateLimiter(d.Config.CommandMaxPerMin),
+		hubs:           map[string]*eventHub{},
+		metaCache:      map[string]metaCacheEntry{},
 	}
 }
 
@@ -107,6 +127,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/logout", s.handleLogout)
 	mux.HandleFunc("GET /api/session", s.handleSession)
 	mux.HandleFunc("GET /api/webauth/capabilities", s.handleWebAuthCapabilities)
+	mux.HandleFunc("GET /api/plugin/status", s.handlePluginStatus)
 	mux.HandleFunc("GET /api/servers", s.handleServers)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
 	mux.HandleFunc("GET /api/players", s.handlePlayers)
@@ -127,6 +148,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/data", s.handleData)
 	mux.HandleFunc("GET /api/serverinfo", s.handleServerInfo)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
+	mux.HandleFunc("GET /api/events/stream", s.handleEventsStream)
+	mux.HandleFunc("POST /api/chat", s.handleChat)
 	mux.HandleFunc("GET /api/sessions", s.handleSessions)
 	mux.HandleFunc("POST /api/sessions/revoke", s.handleRevokeSessions)
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
@@ -733,7 +756,7 @@ func (s *Server) runIngameCommand(w http.ResponseWriter, r *http.Request, sess *
 				return
 			}
 		}
-		s.writeBatchError(w, err)
+		s.writeBatchError(w, s.refinePluginError(ctx, client, tshock.CapBatch, err))
 		return
 	}
 
@@ -818,7 +841,7 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 				s.sessions.Delete(sess.ID)
 				s.clearSessionCookie(w)
 			}
-			s.writeBatchError(w, err)
+			s.writeBatchError(w, s.refinePluginError(ctx, client, tshock.CapBatch, err))
 			return
 		}
 		for j, res := range out {
@@ -882,6 +905,10 @@ func (s *Server) writeBatchError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")
 	case tshock.KindNotFound:
 		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 WebUI 信使插件，无法批量执行")
+	case tshock.KindPluginOutdated:
+		writeError(w, http.StatusNotImplemented, codePluginOutdated, e.Message)
+	case tshock.KindPluginProtocolError:
+		writeError(w, http.StatusNotImplemented, codePluginProtocol, e.Message)
 	case tshock.KindTimeout:
 		writeError(w, http.StatusGatewayTimeout, codeTShockTimeout, "TShock 响应超时，请重试")
 	case tshock.KindUnavailable:
@@ -957,8 +984,13 @@ func setCacheHeaders(w http.ResponseWriter, name string) {
 	switch {
 	case strings.HasPrefix(name, "assets/"):
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	case name == "data/items-atlas.png", name == "data/player-atlas.png":
+	case name == "data/items-atlas.png", name == "data/player-atlas.png", name == "data/npc-atlas.png":
+		// 图集 PNG 长缓存；前端用「内容哈希 ?v=...」做缓存失效（见 web/src/lib/atlas.ts），
+		// 图集一变哈希就变，不会出现「新 regions + 旧 PNG」的图标错位。
 		w.Header().Set("Cache-Control", "public, max-age=604800")
+	case strings.HasPrefix(name, "data/") && strings.HasSuffix(name, "-atlas.json"):
+		// 图集裁切信息很小，且带着 PNG 的内容哈希：每次校验，保证哈希及时更新。
+		w.Header().Set("Cache-Control", "no-cache")
 	case strings.HasPrefix(name, "data/") && strings.HasSuffix(name, ".json"):
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 	case name == "index.html":

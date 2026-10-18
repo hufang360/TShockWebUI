@@ -25,6 +25,7 @@ import { LoginGate } from '@/components/LoginGate'
 import { useI18n } from '@/lib/i18n'
 import { APP_VERSION } from '@/lib/version'
 import { useLocalState } from '@/hooks/useLocalState'
+import { PluginDiagnosticsCard } from '@/components/PluginDiagnosticsCard'
 import { WebAccountSection } from '@/components/WebAccountSection'
 import { MODULE_DEFS, isModuleEnabled, setModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
 import { createCustomModule, type CustomModule } from '@/lib/customModules'
@@ -33,7 +34,9 @@ import {
   DEFAULT_MODULE_CARDS,
   addModuleCard,
   createModuleCard,
+  moduleCardsFor,
   sanitizeModuleCards,
+  updateModuleCard,
 } from '@/lib/moduleCards'
 import { StorageKeys } from '@/lib/storage'
 import { TshockRequestError, type BackendTransport } from '@/lib/tshock'
@@ -48,6 +51,8 @@ interface SettingsPageProps {
   authenticated: boolean
   modules: ModulesPrefs
   onModulesChange: (next: ModulesPrefs) => void
+  /** 用户手动拨动模块开关时回调：App 据此记录「用户选择过」，之后不再被自动激活覆盖。 */
+  onModuleUserSet?: (id: ModuleId) => void
   /** 用户自定义模块（名称 + 指令）。 */
   customModules: CustomModule[]
   onCustomModulesChange: (next: CustomModule[]) => void
@@ -75,6 +80,7 @@ export function SettingsPage({
   authenticated,
   modules,
   onModulesChange,
+  onModuleUserSet,
   customModules,
   onCustomModulesChange,
   onTokenInvalid,
@@ -89,6 +95,8 @@ export function SettingsPage({
   })
   // 「统一执行」（批量执行）开关：全局偏好，首页与鱼店右侧卡片共用。
   const [batchMode, setBatchMode] = useLocalState(StorageKeys.homeBatch, false)
+  // 用户是否手动改过：改过后不再被「检测到插件自动开启」覆盖。
+  const [, setBatchModeSet] = useLocalState(StorageKeys.homeBatchSet, false)
   const [batchPlugin, setBatchPlugin] = useState<boolean | null>(null)
   const [, setRawModuleCards] = useLocalState(StorageKeys.moduleCards, DEFAULT_MODULE_CARDS)
   const [newModuleName, setNewModuleName] = useState('')
@@ -172,16 +180,18 @@ export function SettingsPage({
   const toggle = useCallback(
     (id: ModuleId, on: boolean) => {
       onModulesChange(setModuleEnabled(modules, serverId, id, on))
+      // 记录用户手动改过：登录后的「检测到插件自动激活」不再覆盖这个开关。
+      onModuleUserSet?.(id)
     },
-    [modules, serverId, onModulesChange],
+    [modules, serverId, onModulesChange, onModuleUserSet],
   )
 
-  /** 创建自定义模块：名称 + 指令前缀；自动创建一张「帮助」卡片 `/xx help`，并自动激活。 */
+  // 创建一个自定义模块：名称 + 主指令，自动建一张「帮助」卡片 `/xx help` 并激活。
   const createModule = useCallback(() => {
     const name = newModuleName.trim()
     const cmd = normalizeCustomCommand(newModuleCommand)
     if (!name || !cmd) return
-    const mod = createCustomModule(name)
+    const mod = createCustomModule(name, cmd)
     onCustomModulesChange([...customModules, mod])
     // 去掉可能已带上的 help，统一拼成「<cmd> help」。
     const base = cmd.replace(/\s+help$/i, '')
@@ -207,6 +217,27 @@ export function SettingsPage({
     modules,
     t,
   ])
+
+  // 修改已添加的自定义模块：名称直接改；主指令改时同步把「帮助」卡片改成 `<新主指令> help`。
+  const updateCustomModule = useCallback(
+    (id: string, patch: { name?: string; command?: string; desc?: string }) => {
+      const before = customModules.find((m) => m.id === id)
+      onCustomModulesChange(customModules.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+      if (patch.command === undefined || !before) return
+      const newBase = normalizeCustomCommand(patch.command)
+      const oldBase = normalizeCustomCommand(before.command)
+      if (!newBase || newBase === oldBase) return
+      setRawModuleCards((prev) => {
+        const prefs = sanitizeModuleCards(prev)
+        const cards = moduleCardsFor(prefs, serverId, id)
+        // 自动生成的「帮助」卡片：指令以 ` help` 结尾（不依赖语言，故不按名字匹配）。
+        const help = cards.find((c) => / help$/i.test(normalizeCustomCommand(c.command)))
+        if (!help) return prev
+        return updateModuleCard(prefs, serverId, id, help.id, { command: `${newBase} help` })
+      })
+    },
+    [customModules, onCustomModulesChange, setRawModuleCards, serverId],
+  )
 
   const statusText = useMemo(
     () => (s: CapStatus): string => t(`modules.status.${s}`),
@@ -303,39 +334,51 @@ export function SettingsPage({
                 {customModules.map((mod) => (
                   <li
                     key={mod.id}
-                    className="flex flex-wrap items-center gap-3 rounded-xl bg-accent/40 p-3"
+                    className="flex flex-col gap-2 rounded-xl bg-accent/40 p-3"
                   >
-                    {/* 名称可直接改：创建后仍能重命名。 */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* 名称可直接改：创建后仍能重命名。 */}
+                      <Input
+                        value={mod.name}
+                        onChange={(e) => updateCustomModule(mod.id, { name: e.target.value })}
+                        placeholder={t('modules.custom.namePlaceholder')}
+                        aria-label={t('modules.custom.name')}
+                        className="h-8 min-w-0 flex-1 text-xs"
+                      />
+                      <Switch
+                        checked={isModuleEnabled(modules, serverId, mod.id)}
+                        disabled={!authenticated}
+                        onCheckedChange={(v) => toggle(mod.id, v)}
+                        aria-label={mod.name || t('modules.custom.untitled')}
+                      />
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={t('modules.custom.remove')}
+                        title={t('modules.custom.remove')}
+                        onClick={() =>
+                          onCustomModulesChange(customModules.filter((x) => x.id !== mod.id))
+                        }
+                      >
+                        <Trash2 aria-hidden />
+                      </Button>
+                    </div>
+                    {/* 主指令可直接改：改时会同步更新自动生成的「帮助」卡片。 */}
                     <Input
-                      value={mod.name}
-                      onChange={(e) =>
-                        onCustomModulesChange(
-                          customModules.map((x) =>
-                            x.id === mod.id ? { ...x, name: e.target.value } : x,
-                          ),
-                        )
-                      }
-                      placeholder={t('modules.custom.namePlaceholder')}
-                      aria-label={t('modules.custom.name')}
-                      className="h-8 min-w-0 flex-1 text-xs"
+                      value={mod.command}
+                      onChange={(e) => updateCustomModule(mod.id, { command: e.target.value })}
+                      placeholder={t('modules.custom.commandPlaceholder')}
+                      aria-label={t('modules.custom.command')}
+                      className="h-8 font-pixel text-xs"
                     />
-                    <Switch
-                      checked={isModuleEnabled(modules, serverId, mod.id)}
-                      disabled={!authenticated}
-                      onCheckedChange={(v) => toggle(mod.id, v)}
-                      aria-label={mod.name || t('modules.custom.untitled')}
+                    {/* 模块页顶部说明：可留空（留空时回退为默认提示）。 */}
+                    <Input
+                      value={mod.desc}
+                      onChange={(e) => updateCustomModule(mod.id, { desc: e.target.value })}
+                      placeholder={t('modules.custom.descPlaceholder')}
+                      aria-label={t('modules.custom.desc')}
+                      className="h-8 text-xs"
                     />
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={t('modules.custom.remove')}
-                      title={t('modules.custom.remove')}
-                      onClick={() =>
-                        onCustomModulesChange(customModules.filter((x) => x.id !== mod.id))
-                      }
-                    >
-                      <Trash2 aria-hidden />
-                    </Button>
                   </li>
                 ))}
               </ul>
@@ -515,15 +558,19 @@ export function SettingsPage({
               <Spinner className="text-muted-foreground" />
             ) : (
               <Switch
-                checked={batchMode}
+                checked={batchPlugin === true && batchMode}
                 disabled={batchPlugin !== true}
-                onCheckedChange={setBatchMode}
+                onCheckedChange={(v) => {
+                  setBatchMode(v)
+                  setBatchModeSet(true)
+                }}
                 aria-label={t('home.batch')}
               />
             )}
           </Field>
       </CollapsibleCard>
 
+          <PluginDiagnosticsCard transport={transport} serverId={serverId} />
           <WebAccountSection transport={transport} authenticated={authenticated} serverId={serverId} />
         </div>
       </div>

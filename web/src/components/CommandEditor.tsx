@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Send, User, X } from 'lucide-react'
+import { Send, User } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Badge, Button, Kbd, Spinner } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -24,6 +24,8 @@ export interface CommandEditorProps {
   onInsertHandled?: () => void
   /** 递增令牌：变化时聚焦输入框并把光标移到末尾（载入指令/历史时用）。 */
   focusRequest?: number
+  /** 指令历史（最新在前）；下拉框关闭时用 ↑/↓ 回翻。 */
+  history?: string[]
   /** 只能在游戏内执行（allowServer=false）：输入文本标红提示。 */
   invalid?: boolean
 }
@@ -40,6 +42,7 @@ export function CommandEditor({
   insertRequest,
   onInsertHandled,
   focusRequest,
+  history,
   invalid = false,
 }: CommandEditorProps) {
   const { t } = useI18n()
@@ -48,6 +51,8 @@ export function CommandEditor({
   const [caret, setCaret] = useState(0)
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
+  // 历史回翻位置（-1 = 未在回翻）。
+  const [historyIdx, setHistoryIdx] = useState(-1)
   const composingRef = useRef(false)
   const hasFocusedRef = useRef(false)
   const lastFocusRef = useRef(focusRequest)
@@ -134,8 +139,9 @@ export function CommandEditor({
     (item: CompletionItem) => {
       const applied = applyCompletion(value, caret, item)
       replaceRangeNative(applied.start, applied.end, applied.snippet, applied.text, applied.caret)
-      if (item.kind !== 'command') setOpen(false)
-      else setCaret(applied.caret)
+      // 保持打开：接受后 value / caret 变化会自动算出下一级候选（没有候选时下拉框会自动隐藏）。
+      // 不再「接受参数就关闭」，否则接完 /fish jar 还得再敲一下空格才出 in/out/help，很不对齐终端体验。
+      setOpen(true)
     },
     [value, caret, replaceRangeNative],
   )
@@ -162,18 +168,20 @@ export function CommandEditor({
     if (ta) setCaret(ta.selectionStart ?? 0)
   }, [])
 
-  /** 清空输入框（保留焦点，光标回到开头）。 */
-  const clear = useCallback(() => {
-    onChange('')
-    setCaret(0)
-    setOpen(false)
-    const ta = taRef.current
-    if (ta) {
-      ta.focus()
-      ta.setSelectionRange(0, 0)
-    }
-    hasFocusedRef.current = true
-  }, [onChange])
+  /** 把整段文本换掉并把光标放到末尾（历史回翻用）。 */
+  const setValueAtEnd = useCallback(
+    (v: string) => {
+      onChange(v)
+      requestAnimationFrame(() => {
+        const ta = taRef.current
+        if (!ta) return
+        ta.focus()
+        ta.setSelectionRange(v.length, v.length)
+        setCaret(v.length)
+      })
+    },
+    [onChange],
+  )
 
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     const composing = composingRef.current || e.nativeEvent.isComposing
@@ -197,6 +205,20 @@ export function CommandEditor({
       } else if (e.key === 'Escape') {
         e.preventDefault()
         setOpen(false)
+      }
+      return
+    }
+    // 下拉框关闭时：↑/↓ 回翻指令历史（终端手感）。
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && history && history.length > 0) {
+      e.preventDefault()
+      if (e.key === 'ArrowUp') {
+        const next = Math.min(historyIdx + 1, history.length - 1)
+        setHistoryIdx(next)
+        setValueAtEnd(history[next])
+      } else {
+        const next = historyIdx - 1
+        setHistoryIdx(next)
+        setValueAtEnd(next >= 0 ? history[next] : '')
       }
       return
     }
@@ -245,12 +267,15 @@ export function CommandEditor({
             onChange(next)
             setCaret(e.target.selectionStart ?? 0)
             setOpen(true)
+            setHistoryIdx(-1)
           }}
           onKeyDown={handleKeyDown}
           onKeyUp={syncCaret}
           onClick={() => {
             hasFocusedRef.current = true
             syncCaret()
+            // 点回输入框时重新弹出候选（终端里回车后再敲也会有）。
+            setOpen(true)
           }}
           onFocus={() => {
             hasFocusedRef.current = true
@@ -270,18 +295,6 @@ export function CommandEditor({
             window.setTimeout(() => setOpen(false), 150)
           }}
         />
-        {value.length > 0 && (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="my-1.5 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-            aria-label={t('editor.clear')}
-            title={t('editor.clear')}
-            onClick={clear}
-          >
-            <X data-icon="inline-start" />
-          </Button>
-        )}
         <Button
           size="icon"
           variant="primary"
@@ -296,79 +309,76 @@ export function CommandEditor({
       </div>
 
       {open && items.length > 0 && (
-        <ul
-          className={cn(
-            'absolute bottom-full left-0 z-30 mb-1 max-h-72 w-full overflow-y-auto',
-            'rounded-xl bg-popover shadow-xl',
-          )}
-          role="listbox"
-        >
-          {items.map((item, idx) => (
-            <li key={item.id}>
-              <button
-                ref={(el) => {
-                  optionRefs.current[idx] = el
-                }}
-                type="button"
-                role="option"
-                aria-selected={idx === highlight}
-                onMouseDown={(e) => e.preventDefault()}
-                onMouseEnter={() => setHighlight(idx)}
-                onClick={() => accept(item)}
-                className={cn(
-                  'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
-                  idx === highlight ? 'bg-accent' : 'hover:bg-accent',
-                )}
-              >
-                {item.kind === 'item' && item.item ? (
-                  <ItemIcon item={item.item} atlas={atlas} size={26} />
-                ) : (
-                  <span
-                    className={cn(
-                      'grid size-[26px] shrink-0 place-items-center rounded-md font-pixel text-[11px]',
-                      item.kind === 'command' ? 'bg-accent text-foreground' : 'bg-warning/25 text-foreground',
-                    )}
-                  >
-                    {item.kind === 'command' ? '/' : item.kind === 'player' ? (
-                      <User className="size-3.5" />
-                    ) : item.kind === 'prefix' ? (
-                      '#'
-                    ) : item.kind === 'enum' ? (
-                      '='
-                    ) : (
-                      '/'
-                    )}
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-foreground">{item.label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{item.detail}</span>
-                  {item.kind === 'command' && (
+        <div className="absolute bottom-full left-0 z-30 mb-1 flex max-h-72 w-full flex-col overflow-hidden rounded-xl bg-popover shadow-xl">
+          <ul className="min-h-0 flex-1 overflow-y-auto" role="listbox">
+            {items.map((item, idx) => (
+              <li key={item.id}>
+                <button
+                  ref={(el) => {
+                    optionRefs.current[idx] = el
+                  }}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === highlight}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setHighlight(idx)}
+                  onClick={() => accept(item)}
+                  className={cn(
+                    'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
+                    idx === highlight ? 'bg-accent' : 'hover:bg-accent',
+                  )}
+                >
+                  {item.kind === 'item' && item.item ? (
+                    <ItemIcon item={item.item} atlas={atlas} size={26} />
+                  ) : (
                     <span
                       className={cn(
-                        'mt-0.5 block truncate font-pixel text-[10px]',
-                        item.command?.permission ? 'text-warning' : 'text-muted-foreground',
+                        'grid size-[26px] shrink-0 place-items-center rounded-md font-pixel text-[11px]',
+                        item.kind === 'command' ? 'bg-accent text-foreground' : 'bg-warning/25 text-foreground',
                       )}
                     >
-                      {item.command?.permission
-                        ? t('editor.permission', { perm: item.command.permission })
-                        : t('editor.permissionNone')}
+                      {item.kind === 'command' ? '/' : item.kind === 'player' ? (
+                        <User className="size-3.5" />
+                      ) : item.kind === 'prefix' ? (
+                        '#'
+                      ) : item.kind === 'enum' ? (
+                        '='
+                      ) : (
+                        '/'
+                      )}
                     </span>
                   )}
-                </span>
-                {item.inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
-                {item.kind === 'item' && (
-                  <span className="font-pixel text-[10px] text-muted-foreground">
-                    ID {(item.item?.id ?? 0)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-foreground">{item.label}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{item.detail}</span>
+                    {item.kind === 'command' && (
+                      <span
+                        className={cn(
+                          'mt-0.5 block truncate font-pixel text-[10px]',
+                          item.command?.permission ? 'text-warning' : 'text-muted-foreground',
+                        )}
+                      >
+                        {item.command?.permission
+                          ? t('editor.permission', { perm: item.command.permission })
+                          : t('editor.permissionNone')}
+                      </span>
+                    )}
                   </span>
-                )}
-              </button>
-            </li>
-          ))}
-          {/* 键盘提示：放在下拉框内（输入框在底部，下拉向上展开） */}
-          <li
+                  {item.inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
+                  {item.kind === 'item' && (
+                    <span className="font-pixel text-[10px] text-muted-foreground">
+                      ID {(item.item?.id ?? 0)}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {/* 键盘提示：放在下拉框内、**滚动区之外**（输入框在底部，下拉向上展开）；
+              不放进滚动列表，避免选中最底部时被提示条遮住一半。 */}
+          <div
             role="presentation"
-            className="sticky bottom-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 bg-popover px-3 py-1.5 text-[11px] text-muted-foreground"
+            className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground"
           >
             <span className="flex items-center gap-1">
               <Kbd>↑</Kbd>
@@ -380,8 +390,8 @@ export function CommandEditor({
             <span className="flex items-center gap-1">
               <Kbd>Esc</Kbd> {t('editor.hint.close')}
             </span>
-          </li>
-        </ul>
+          </div>
+        </div>
       )}
     </div>
   )

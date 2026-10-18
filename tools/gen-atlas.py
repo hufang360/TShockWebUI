@@ -26,6 +26,7 @@ gen-atlas.py — 把所有物品图标（含动画取第一帧）拼成一张 sp
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -111,6 +112,7 @@ def main():
 
     os.makedirs(os.path.dirname(args.out_png), exist_ok=True)
     atlas.save(args.out_png, optimize=True)
+    png_hash = hashlib.md5(open(args.out_png, "rb").read()).hexdigest()[:12]
     size_mb = os.path.getsize(args.out_png) / 1e6
     print(f"写出 {args.out_png}（{size_mb:.2f} MB）")
 
@@ -125,6 +127,7 @@ def main():
             "textures": len(textures),
             "items": len(items),
             "sheet": os.path.basename(args.out_png),
+            "hash": png_hash,
             "generatedBy": "tools/gen-atlas.py",
             "note": "regions 以「贴图 id」为键；前端用 item.icon 取值后再裁剪第一帧",
         },

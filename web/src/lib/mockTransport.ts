@@ -4,6 +4,7 @@ import {
   TshockRequestError,
   type BackendTransport,
   type BatchCapabilities,
+  type ChatSendResult,
   type EventsPage,
   type FishBuyResult,
   type FishCapabilities,
@@ -15,6 +16,7 @@ import {
   type PlayerItem,
   type PlayerLook,
   type PluginDataType,
+  type PluginStatus,
   type RuntimeCommand,
   type ServerInfo,
   type ServerInfoExtra,
@@ -39,6 +41,18 @@ export class MockTransport implements BackendTransport {
   readonly label = 'Mock（演示，未连接真实服务器）'
 
   #session: Session = { authenticated: false, username: null }
+  #mockSeq = 6
+  #mockEvents: EventsPage['events'] = [
+    { seq: 1, type: 'join', text: '[Mock] Alice 加入了服务器', time: new Date().toISOString() },
+    { seq: 2, type: 'boss', text: '[Mock] Boss「史莱姆王」被击败', time: new Date().toISOString() },
+    { seq: 3, type: 'leave', text: '[Mock] Bob 离开了服务器', time: new Date().toISOString() },
+    // 聊天可带物品标签：这里演示 `[i:..]` 渲染为图标（与结果面板同款富文本）。
+    { seq: 4, type: 'chat', text: '[Mock] Carol: 出售 [i:29] 和 [i/s5:75]', time: new Date().toISOString() },
+    // 世界公告（Boss 苏醒 / 事件开始 / 入侵）。
+    { seq: 5, type: 'announce', text: '[Mock] 光之女皇已苏醒！', time: new Date().toISOString() },
+    // NPC 到达 / 离开（旅商等）。
+    { seq: 6, type: 'npc', text: '[Mock] 旅商已到达！', time: new Date().toISOString() },
+  ]
 
   async session(): Promise<Session> {
     await delay(60)
@@ -167,19 +181,50 @@ export class MockTransport implements BackendTransport {
 
   async events(since = 0): Promise<EventsPage> {
     await delay(90)
-    const all = [
-      { seq: 1, type: 'join', text: '[Mock] Alice 加入了服务器', time: new Date().toISOString() },
-      { seq: 2, type: 'boss', text: '[Mock] Boss「史莱姆王」被击败', time: new Date().toISOString() },
-      { seq: 3, type: 'leave', text: '[Mock] Bob 离开了服务器', time: new Date().toISOString() },
-      // 聊天可带物品标签：这里演示 `[i:..]` 渲染为图标（与结果面板同款富文本）。
-      { seq: 4, type: 'chat', text: '[Mock] Carol: 出售 [i:29] 和 [i/s5:75]', time: new Date().toISOString() },
-    ]
-    return { events: all.filter((e) => e.seq > since), lastSeq: 4 }
+    return { events: this.#mockEvents.filter((e) => e.seq > since), lastSeq: this.#mockSeq }
+  }
+
+  async eventsTail(limit = 100): Promise<EventsPage> {
+    await delay(80)
+    const events = this.#mockEvents.slice(-limit)
+    return { events, firstSeq: events[0]?.seq ?? 0, lastSeq: this.#mockSeq }
+  }
+
+  async sendChat(text: string): Promise<ChatSendResult> {
+    await delay(120)
+    const trimmed = text.trim()
+    if (!trimmed) throw new TshockRequestError('validation', '发言内容不能为空')
+    const name = this.#session.username ?? 'MockUser'
+    const line = `[WebUI] ${name}: ${trimmed}`
+    this.#mockSeq += 1
+    const id = `m${this.#mockSeq}`
+    const time = new Date().toISOString()
+    this.#mockEvents = [
+      ...this.#mockEvents,
+      // 与插件一致：统一为 type=chat + source=webui。
+      { seq: this.#mockSeq, type: 'chat', source: 'webui', text: line, time },
+    ].slice(-20)
+    return { name, text: trimmed, line, id, time, source: 'webui' }
   }
 
   async sessions(): Promise<SessionInfo[]> {
     await delay(50)
     return []
+  }
+
+  async pluginStatus(): Promise<PluginStatus> {
+    await delay(40)
+    return {
+      installed: true,
+      legacy: false,
+      version: '0.1.0-mock',
+      protocol: 1,
+      minProtocol: 1,
+      capabilities: ['auth', 'batch', 'chat', 'commands', 'data', 'events', 'me', 'serverinfo', 'sessions'],
+      backendProtocol: 1,
+      compatible: true,
+      reason: 'ok',
+    }
   }
 
   async revokeSessions(_id?: string, _all = false): Promise<number> {

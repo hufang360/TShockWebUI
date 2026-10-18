@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_MODULES,
+  autoActivateModules,
   isModuleEnabled,
   sanitizeModules,
   setModuleEnabled,
@@ -48,5 +49,47 @@ describe('modules（按服务器分开记忆）', () => {
     expect(sanitizeModules('nope').byServer).toEqual({})
     // 旧结构 { enabled: {...} } 不再使用 → 视为空
     expect(sanitizeModules({ enabled: { players: true } }).byServer).toEqual({})
+  })
+})
+
+describe('autoActivateModules（探测到插件自动激活）', () => {
+  const detected = { players: true, store: true }
+
+  it('探测到插件的模块自动开启', () => {
+    const next = autoActivateModules(DEFAULT_MODULES, DEFAULT_MODULES, 'default', detected)
+    expect(isModuleEnabled(next, 'default', 'players')).toBe(true)
+    expect(isModuleEnabled(next, 'default', 'store')).toBe(true)
+  })
+
+  it('未探测到插件的模块不激活', () => {
+    const next = autoActivateModules(DEFAULT_MODULES, DEFAULT_MODULES, 'default', {
+      players: false,
+      store: true,
+    })
+    expect(isModuleEnabled(next, 'default', 'players')).toBe(false)
+    expect(isModuleEnabled(next, 'default', 'store')).toBe(true)
+  })
+
+  it('用户手动关过的模块不再被自动激活', () => {
+    const userSet = setModuleEnabled(DEFAULT_MODULES, 'default', 'store', true)
+    const next = autoActivateModules(DEFAULT_MODULES, userSet, 'default', detected)
+    expect(isModuleEnabled(next, 'default', 'store')).toBe(false)
+    expect(isModuleEnabled(next, 'default', 'players')).toBe(true)
+  })
+
+  it('已激活的模块保持原样，且按服务器区分', () => {
+    const prefs = setModuleEnabled(DEFAULT_MODULES, 'default', 'players', true)
+    const next = autoActivateModules(prefs, DEFAULT_MODULES, 'default', detected)
+    expect(isModuleEnabled(next, 'default', 'players')).toBe(true)
+    // 另一个服务器不应被激活
+    expect(isModuleEnabled(next, 'other', 'players')).toBe(false)
+  })
+
+  it('无变化时返回原对象（调用方据此跳过无意义写入）', () => {
+    const next = autoActivateModules(DEFAULT_MODULES, DEFAULT_MODULES, 'default', {
+      players: false,
+      store: false,
+    })
+    expect(next).toBe(DEFAULT_MODULES)
   })
 })

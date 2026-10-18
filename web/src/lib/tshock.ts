@@ -13,7 +13,9 @@ import type { BackendTransport } from './transport'
 export type {
   BackendTransport,
   BatchCapabilities,
+  ChatSendResult,
   EventsPage,
+  EventsStreamHandlers,
   FishBuyResult,
   FishCapabilities,
   FishGood,
@@ -24,6 +26,7 @@ export type {
   PlayerItem,
   PlayerLook,
   PluginDataType,
+  PluginStatus,
   RuntimeCommand,
   ServerEvent,
   ServerInfo,

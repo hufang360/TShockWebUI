@@ -333,6 +333,11 @@ export const ITEM_COLLECTIONS: ItemCollection[] = [
 /** id -> 集合，供页面按 id 快速取值。 */
 export const COLLECTIONS_BY_ID = new Map(ITEM_COLLECTIONS.map((c) => [c.id, c]))
 
+/** ID 区间名 `ID 1-1000` → 展示文字 `1~1000`（下拉里比 `ID 1-1000` 短些）。 */
+export function rangeTabLabel(collection: ItemCollection): string {
+  return collection.name.replace(/^ID\s*/, '').replace('-', '~')
+}
+
 /** 把集合内的 ID 解析为物品，忽略数据集中不存在的 ID。 */
 export function resolveCollectionItems(
   collection: ItemCollection,

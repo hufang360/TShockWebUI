@@ -31,6 +31,7 @@ gen-player-atlas.py — 把「玩家全身图」需要的角色部件 / 发型�
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -208,6 +209,7 @@ def main():
 
     os.makedirs(os.path.dirname(args.out_png), exist_ok=True)
     atlas.save(args.out_png, optimize=True)
+    png_hash = hashlib.md5(open(args.out_png, "rb").read()).hexdigest()[:12]
     print(f"写出 {args.out_png}（{os.path.getsize(args.out_png) / 1e6:.2f} MB）")
 
     regions = {}
@@ -228,6 +230,7 @@ def main():
             "hairs": HAIR_COUNT,
             "regions": len(regions),
             "sheet": os.path.basename(args.out_png),
+            "hash": png_hash,
             "generatedBy": "tools/gen-player-atlas.py",
             "note": "键 b:<variant>:<part>:<role> 为角色部件，h:<hair> 为发型；值 [x,y,40,56]。"
                     "都是灰度遮罩，绘制时用玩家颜色相乘着色；不含盔甲 / 饰品。",

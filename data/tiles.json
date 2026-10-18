@@ -1,0 +1,5362 @@
+{
+ "meta": {
+  "gameVersion": "1.4.5.8",
+  "count": 754,
+  "withItem": 647,
+  "withSize": 389,
+  "source": "Terraria.ID/TileID.cs + GameDump itemTile + TileObjectData",
+  "generatedBy": "tools/gen-tile-wall.mjs",
+  "note": "item = 放置该图格/墙的代表物品 id（运行期用它解析本地化名）；null = 无对应物品，显示 key。size = 图格摆放尺寸 [宽, 高]（游戏 TileObjectData；简单方块 1×1 省略）；frameImportant = 多格/动态但无固定尺寸（如树、陷阱）。"
+ },
+ "entries": [
+  {
+   "id": 0,
+   "key": "Dirt",
+   "item": 2
+  },
+  {
+   "id": 1,
+   "key": "Stone",
+   "item": 3
+  },
+  {
+   "id": 2,
+   "key": "Grass",
+   "item": 62
+  },
+  {
+   "id": 3,
+   "key": "Plants",
+   "item": 4041,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 4,
+   "key": "Torches",
+   "item": 8,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 5,
+   "key": "Trees",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 6,
+   "key": "Iron",
+   "item": 11
+  },
+  {
+   "id": 7,
+   "key": "Copper",
+   "item": 12
+  },
+  {
+   "id": 8,
+   "key": "Gold",
+   "item": 13
+  },
+  {
+   "id": 9,
+   "key": "Silver",
+   "item": 14
+  },
+  {
+   "id": 10,
+   "key": "ClosedDoor",
+   "item": 25,
+   "size": [
+    1,
+    3
+   ]
+  },
+  {
+   "id": 11,
+   "key": "OpenDoor",
+   "item": null,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 12,
+   "key": "Heart",
+   "item": 5286,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 13,
+   "key": "Bottles",
+   "item": 31,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 14,
+   "key": "Tables",
+   "item": 32,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 15,
+   "key": "Chairs",
+   "item": 34,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 16,
+   "key": "Anvils",
+   "item": 35,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 17,
+   "key": "Furnaces",
+   "item": 33,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 18,
+   "key": "WorkBenches",
+   "item": 36,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 19,
+   "key": "Platforms",
+   "item": 94,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 20,
+   "key": "Saplings",
+   "item": 27,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 21,
+   "key": "Containers",
+   "item": 48,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 22,
+   "key": "Demonite",
+   "item": 56
+  },
+  {
+   "id": 23,
+   "key": "CorruptGrass",
+   "item": 59
+  },
+  {
+   "id": 24,
+   "key": "CorruptPlants",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 25,
+   "key": "Ebonstone",
+   "item": 61
+  },
+  {
+   "id": 26,
+   "key": "DemonAltar",
+   "item": 5532,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 27,
+   "key": "Sunflower",
+   "item": 63,
+   "size": [
+    2,
+    4
+   ]
+  },
+  {
+   "id": 28,
+   "key": "Pots",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 29,
+   "key": "PiggyBank",
+   "item": 87,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 30,
+   "key": "WoodBlock",
+   "item": 9
+  },
+  {
+   "id": 31,
+   "key": "ShadowOrbs",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 32,
+   "key": "CorruptThorns",
+   "item": null
+  },
+  {
+   "id": 33,
+   "key": "Candles",
+   "item": 105,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 34,
+   "key": "Chandeliers",
+   "item": 106,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 35,
+   "key": "Jackolanterns",
+   "item": 1813,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 36,
+   "key": "Presents",
+   "item": 1869,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 37,
+   "key": "Meteorite",
+   "item": 116
+  },
+  {
+   "id": 38,
+   "key": "GrayBrick",
+   "item": 129
+  },
+  {
+   "id": 39,
+   "key": "RedBrick",
+   "item": 131
+  },
+  {
+   "id": 40,
+   "key": "ClayBlock",
+   "item": 133
+  },
+  {
+   "id": 41,
+   "key": "BlueDungeonBrick",
+   "item": 134
+  },
+  {
+   "id": 42,
+   "key": "HangingLanterns",
+   "item": 136,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 43,
+   "key": "GreenDungeonBrick",
+   "item": 137
+  },
+  {
+   "id": 44,
+   "key": "PinkDungeonBrick",
+   "item": 139
+  },
+  {
+   "id": 45,
+   "key": "GoldBrick",
+   "item": 141
+  },
+  {
+   "id": 46,
+   "key": "SilverBrick",
+   "item": 143
+  },
+  {
+   "id": 47,
+   "key": "CopperBrick",
+   "item": 145
+  },
+  {
+   "id": 48,
+   "key": "Spikes",
+   "item": 147
+  },
+  {
+   "id": 49,
+   "key": "WaterCandle",
+   "item": 148,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 50,
+   "key": "Books",
+   "item": 149,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 51,
+   "key": "Cobweb",
+   "item": 150
+  },
+  {
+   "id": 52,
+   "key": "Vines",
+   "item": null
+  },
+  {
+   "id": 53,
+   "key": "Sand",
+   "item": 169
+  },
+  {
+   "id": 54,
+   "key": "Glass",
+   "item": 170
+  },
+  {
+   "id": 55,
+   "key": "Signs",
+   "item": 171,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 56,
+   "key": "Obsidian",
+   "item": 173
+  },
+  {
+   "id": 57,
+   "key": "Ash",
+   "item": 172
+  },
+  {
+   "id": 58,
+   "key": "Hellstone",
+   "item": 174
+  },
+  {
+   "id": 59,
+   "key": "Mud",
+   "item": 176
+  },
+  {
+   "id": 60,
+   "key": "JungleGrass",
+   "item": 195
+  },
+  {
+   "id": 61,
+   "key": "JunglePlants",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 62,
+   "key": "JungleVines",
+   "item": null
+  },
+  {
+   "id": 63,
+   "key": "Sapphire",
+   "item": 4642
+  },
+  {
+   "id": 64,
+   "key": "Ruby",
+   "item": 4644
+  },
+  {
+   "id": 65,
+   "key": "Emerald",
+   "item": 4643
+  },
+  {
+   "id": 66,
+   "key": "Topaz",
+   "item": 4641
+  },
+  {
+   "id": 67,
+   "key": "Amethyst",
+   "item": 4640
+  },
+  {
+   "id": 68,
+   "key": "Diamond",
+   "item": 4645
+  },
+  {
+   "id": 69,
+   "key": "JungleThorns",
+   "item": null
+  },
+  {
+   "id": 70,
+   "key": "MushroomGrass",
+   "item": 194
+  },
+  {
+   "id": 71,
+   "key": "MushroomPlants",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 72,
+   "key": "MushroomTrees",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 73,
+   "key": "Plants2",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 74,
+   "key": "JunglePlants2",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 75,
+   "key": "ObsidianBrick",
+   "item": 192
+  },
+  {
+   "id": 76,
+   "key": "HellstoneBrick",
+   "item": 214
+  },
+  {
+   "id": 77,
+   "key": "Hellforge",
+   "item": 221,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 78,
+   "key": "ClayPot",
+   "item": 222,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 79,
+   "key": "Beds",
+   "item": 224,
+   "size": [
+    4,
+    2
+   ]
+  },
+  {
+   "id": 80,
+   "key": "Cactus",
+   "item": null
+  },
+  {
+   "id": 81,
+   "key": "Coral",
+   "item": 275,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 82,
+   "key": "ImmatureHerbs",
+   "item": 307,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 83,
+   "key": "MatureHerbs",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 84,
+   "key": "BloomingHerbs",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 85,
+   "key": "Tombstones",
+   "item": 321,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 86,
+   "key": "Loom",
+   "item": 332,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 87,
+   "key": "Pianos",
+   "item": 333,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 88,
+   "key": "Dressers",
+   "item": 334,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 89,
+   "key": "Benches",
+   "item": 335,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 90,
+   "key": "Bathtubs",
+   "item": 336,
+   "size": [
+    4,
+    2
+   ]
+  },
+  {
+   "id": 91,
+   "key": "Banners",
+   "item": 337,
+   "size": [
+    1,
+    3
+   ]
+  },
+  {
+   "id": 92,
+   "key": "Lampposts",
+   "item": 341,
+   "size": [
+    1,
+    6
+   ]
+  },
+  {
+   "id": 93,
+   "key": "Lamps",
+   "item": 342,
+   "size": [
+    1,
+    3
+   ]
+  },
+  {
+   "id": 94,
+   "key": "Kegs",
+   "item": 352,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 95,
+   "key": "ChineseLanterns",
+   "item": 344,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 96,
+   "key": "CookingPots",
+   "item": 345,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 97,
+   "key": "Safes",
+   "item": 346,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 98,
+   "key": "SkullLanterns",
+   "item": 347,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 99,
+   "key": "TrashCan",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 100,
+   "key": "Candelabras",
+   "item": 349,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 101,
+   "key": "Bookcases",
+   "item": 354,
+   "size": [
+    3,
+    4
+   ]
+  },
+  {
+   "id": 102,
+   "key": "Thrones",
+   "item": 355,
+   "size": [
+    3,
+    4
+   ]
+  },
+  {
+   "id": 103,
+   "key": "Bowls",
+   "item": 356,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 104,
+   "key": "GrandfatherClocks",
+   "item": 359,
+   "size": [
+    2,
+    5
+   ]
+  },
+  {
+   "id": 105,
+   "key": "Statues",
+   "item": 52,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 106,
+   "key": "Sawmill",
+   "item": 363,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 107,
+   "key": "Cobalt",
+   "item": 364
+  },
+  {
+   "id": 108,
+   "key": "Mythril",
+   "item": 365
+  },
+  {
+   "id": 109,
+   "key": "HallowedGrass",
+   "item": 369
+  },
+  {
+   "id": 110,
+   "key": "HallowedPlants",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 111,
+   "key": "Adamantite",
+   "item": 366
+  },
+  {
+   "id": 112,
+   "key": "Ebonsand",
+   "item": 370
+  },
+  {
+   "id": 113,
+   "key": "HallowedPlants2",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 114,
+   "key": "TinkerersWorkbench",
+   "item": 398,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 115,
+   "key": "HallowedVines",
+   "item": null
+  },
+  {
+   "id": 116,
+   "key": "Pearlsand",
+   "item": 408
+  },
+  {
+   "id": 117,
+   "key": "Pearlstone",
+   "item": 409
+  },
+  {
+   "id": 118,
+   "key": "PearlstoneBrick",
+   "item": 412
+  },
+  {
+   "id": 119,
+   "key": "IridescentBrick",
+   "item": 413
+  },
+  {
+   "id": 120,
+   "key": "Mudstone",
+   "item": 414
+  },
+  {
+   "id": 121,
+   "key": "CobaltBrick",
+   "item": 415
+  },
+  {
+   "id": 122,
+   "key": "MythrilBrick",
+   "item": 416
+  },
+  {
+   "id": 123,
+   "key": "Silt",
+   "item": 424
+  },
+  {
+   "id": 124,
+   "key": "WoodenBeam",
+   "item": 480
+  },
+  {
+   "id": 125,
+   "key": "CrystalBall",
+   "item": 487,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 126,
+   "key": "DiscoBall",
+   "item": 488,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 127,
+   "key": "MagicalIceBlock",
+   "item": null
+  },
+  {
+   "id": 128,
+   "key": "Mannequin",
+   "item": null,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 129,
+   "key": "Crystals",
+   "item": 502,
+   "frameImportant": true
+  },
+  {
+   "id": 130,
+   "key": "ActiveStoneBlock",
+   "item": 511
+  },
+  {
+   "id": 131,
+   "key": "InactiveStoneBlock",
+   "item": 512
+  },
+  {
+   "id": 132,
+   "key": "Lever",
+   "item": 513,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 133,
+   "key": "AdamantiteForge",
+   "item": 524,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 134,
+   "key": "MythrilAnvil",
+   "item": 525,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 135,
+   "key": "PressurePlates",
+   "item": 529,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 136,
+   "key": "Switches",
+   "item": 538,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 137,
+   "key": "Traps",
+   "item": 539,
+   "frameImportant": true
+  },
+  {
+   "id": 138,
+   "key": "Boulder",
+   "item": 540,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 139,
+   "key": "MusicBoxes",
+   "item": 562,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 140,
+   "key": "DemoniteBrick",
+   "item": 577
+  },
+  {
+   "id": 141,
+   "key": "Explosives",
+   "item": 580,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 142,
+   "key": "InletPump",
+   "item": 581,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 143,
+   "key": "OutletPump",
+   "item": 582,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 144,
+   "key": "Timers",
+   "item": 583,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 145,
+   "key": "CandyCaneBlock",
+   "item": 586
+  },
+  {
+   "id": 146,
+   "key": "GreenCandyCaneBlock",
+   "item": 591
+  },
+  {
+   "id": 147,
+   "key": "SnowBlock",
+   "item": 593
+  },
+  {
+   "id": 148,
+   "key": "SnowBrick",
+   "item": 594
+  },
+  {
+   "id": 149,
+   "key": "HolidayLights",
+   "item": 596,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 150,
+   "key": "AdamantiteBeam",
+   "item": 604
+  },
+  {
+   "id": 151,
+   "key": "SandstoneBrick",
+   "item": 607
+  },
+  {
+   "id": 152,
+   "key": "EbonstoneBrick",
+   "item": 609
+  },
+  {
+   "id": 153,
+   "key": "RedStucco",
+   "item": 611
+  },
+  {
+   "id": 154,
+   "key": "YellowStucco",
+   "item": 612
+  },
+  {
+   "id": 155,
+   "key": "GreenStucco",
+   "item": 613
+  },
+  {
+   "id": 156,
+   "key": "GrayStucco",
+   "item": 614
+  },
+  {
+   "id": 157,
+   "key": "Ebonwood",
+   "item": 619
+  },
+  {
+   "id": 158,
+   "key": "RichMahogany",
+   "item": 620
+  },
+  {
+   "id": 159,
+   "key": "Pearlwood",
+   "item": 621
+  },
+  {
+   "id": 160,
+   "key": "RainbowBrick",
+   "item": 662
+  },
+  {
+   "id": 161,
+   "key": "IceBlock",
+   "item": 664
+  },
+  {
+   "id": 162,
+   "key": "BreakableIce",
+   "item": 4391
+  },
+  {
+   "id": 163,
+   "key": "CorruptIce",
+   "item": 833
+  },
+  {
+   "id": 164,
+   "key": "HallowedIce",
+   "item": 834
+  },
+  {
+   "id": 165,
+   "key": "Stalactite",
+   "item": null,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 166,
+   "key": "Tin",
+   "item": 699
+  },
+  {
+   "id": 167,
+   "key": "Lead",
+   "item": 700
+  },
+  {
+   "id": 168,
+   "key": "Tungsten",
+   "item": 701
+  },
+  {
+   "id": 169,
+   "key": "Platinum",
+   "item": 702
+  },
+  {
+   "id": 170,
+   "key": "PineTree",
+   "item": 1872
+  },
+  {
+   "id": 171,
+   "key": "ChristmasTree",
+   "item": 1873,
+   "size": [
+    4,
+    8
+   ]
+  },
+  {
+   "id": 172,
+   "key": "Sinks",
+   "item": 2827,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 173,
+   "key": "PlatinumCandelabra",
+   "item": 714,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 174,
+   "key": "PlatinumCandle",
+   "item": 713,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 175,
+   "key": "TinBrick",
+   "item": 717
+  },
+  {
+   "id": 176,
+   "key": "TungstenBrick",
+   "item": 718
+  },
+  {
+   "id": 177,
+   "key": "PlatinumBrick",
+   "item": 719
+  },
+  {
+   "id": 178,
+   "key": "ExposedGems",
+   "item": 177,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 179,
+   "key": "GreenMoss",
+   "item": 4349
+  },
+  {
+   "id": 180,
+   "key": "BrownMoss",
+   "item": 4350
+  },
+  {
+   "id": 181,
+   "key": "RedMoss",
+   "item": 4351
+  },
+  {
+   "id": 182,
+   "key": "BlueMoss",
+   "item": 4352
+  },
+  {
+   "id": 183,
+   "key": "PurpleMoss",
+   "item": 4353
+  },
+  {
+   "id": 184,
+   "key": "LongMoss",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 185,
+   "key": "SmallPiles",
+   "item": null,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 186,
+   "key": "LargePiles",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 187,
+   "key": "LargePiles2",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 188,
+   "key": "CactusBlock",
+   "item": 276
+  },
+  {
+   "id": 189,
+   "key": "Cloud",
+   "item": 751
+  },
+  {
+   "id": 190,
+   "key": "MushroomBlock",
+   "item": 183
+  },
+  {
+   "id": 191,
+   "key": "LivingWood",
+   "item": 832
+  },
+  {
+   "id": 192,
+   "key": "LeafBlock",
+   "item": 933
+  },
+  {
+   "id": 193,
+   "key": "SlimeBlock",
+   "item": 762
+  },
+  {
+   "id": 194,
+   "key": "BoneBlock",
+   "item": 766
+  },
+  {
+   "id": 195,
+   "key": "FleshBlock",
+   "item": 763
+  },
+  {
+   "id": 196,
+   "key": "RainCloud",
+   "item": 765
+  },
+  {
+   "id": 197,
+   "key": "FrozenSlimeBlock",
+   "item": 767
+  },
+  {
+   "id": 198,
+   "key": "Asphalt",
+   "item": 775
+  },
+  {
+   "id": 199,
+   "key": "CrimsonGrass",
+   "item": 2171
+  },
+  {
+   "id": 200,
+   "key": "FleshIce",
+   "item": 835
+  },
+  {
+   "id": 201,
+   "key": "CrimsonPlants",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 202,
+   "key": "Sunplate",
+   "item": 824
+  },
+  {
+   "id": 203,
+   "key": "Crimstone",
+   "item": 836
+  },
+  {
+   "id": 204,
+   "key": "Crimtane",
+   "item": 880
+  },
+  {
+   "id": 205,
+   "key": "CrimsonVines",
+   "item": null
+  },
+  {
+   "id": 206,
+   "key": "IceBrick",
+   "item": 883
+  },
+  {
+   "id": 207,
+   "key": "WaterFountain",
+   "item": 909,
+   "size": [
+    2,
+    4
+   ]
+  },
+  {
+   "id": 208,
+   "key": "Shadewood",
+   "item": 911
+  },
+  {
+   "id": 209,
+   "key": "Cannon",
+   "item": 928,
+   "size": [
+    4,
+    3
+   ]
+  },
+  {
+   "id": 210,
+   "key": "LandMine",
+   "item": 937,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 211,
+   "key": "Chlorophyte",
+   "item": 947
+  },
+  {
+   "id": 212,
+   "key": "SnowballLauncher",
+   "item": 951,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 213,
+   "key": "Rope",
+   "item": 965
+  },
+  {
+   "id": 214,
+   "key": "Chain",
+   "item": 85
+  },
+  {
+   "id": 215,
+   "key": "Campfire",
+   "item": 966,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 216,
+   "key": "Firework",
+   "item": 970,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 217,
+   "key": "Blendomatic",
+   "item": 995,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 218,
+   "key": "MeatGrinder",
+   "item": 996,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 219,
+   "key": "Extractinator",
+   "item": 997,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 220,
+   "key": "Solidifier",
+   "item": 998,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 221,
+   "key": "Palladium",
+   "item": 1104
+  },
+  {
+   "id": 222,
+   "key": "Orichalcum",
+   "item": 1105
+  },
+  {
+   "id": 223,
+   "key": "Titanium",
+   "item": 1106
+  },
+  {
+   "id": 224,
+   "key": "Slush",
+   "item": 1103
+  },
+  {
+   "id": 225,
+   "key": "Hive",
+   "item": 1129
+  },
+  {
+   "id": 226,
+   "key": "LihzahrdBrick",
+   "item": 1101
+  },
+  {
+   "id": 227,
+   "key": "DyePlants",
+   "item": 1107,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 228,
+   "key": "DyeVat",
+   "item": 1120,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 229,
+   "key": "HoneyBlock",
+   "item": 1125
+  },
+  {
+   "id": 230,
+   "key": "CrispyHoneyBlock",
+   "item": 1127
+  },
+  {
+   "id": 231,
+   "key": "Larva",
+   "item": null,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 232,
+   "key": "WoodenSpikes",
+   "item": 1150
+  },
+  {
+   "id": 233,
+   "key": "PlantDetritus",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 234,
+   "key": "Crimsand",
+   "item": 1246
+  },
+  {
+   "id": 235,
+   "key": "Teleporter",
+   "item": 1263,
+   "size": [
+    3,
+    1
+   ]
+  },
+  {
+   "id": 236,
+   "key": "LifeFruit",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 237,
+   "key": "LihzahrdAltar",
+   "item": 1292,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 238,
+   "key": "PlanteraBulb",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 239,
+   "key": "MetalBars",
+   "item": 19,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 240,
+   "key": "Painting3X3",
+   "item": 1360,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 241,
+   "key": "Painting4X3",
+   "item": 1417,
+   "size": [
+    4,
+    3
+   ]
+  },
+  {
+   "id": 242,
+   "key": "Painting6X4",
+   "item": 1421,
+   "size": [
+    6,
+    4
+   ]
+  },
+  {
+   "id": 243,
+   "key": "ImbuingStation",
+   "item": 1430,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 244,
+   "key": "BubbleMachine",
+   "item": 1449,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 245,
+   "key": "Painting2X3",
+   "item": 1474,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 246,
+   "key": "Painting3X2",
+   "item": 1479,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 247,
+   "key": "Autohammer",
+   "item": 1551,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 248,
+   "key": "PalladiumColumn",
+   "item": 1589
+  },
+  {
+   "id": 249,
+   "key": "BubblegumBlock",
+   "item": 1591
+  },
+  {
+   "id": 250,
+   "key": "Titanstone",
+   "item": 1593
+  },
+  {
+   "id": 251,
+   "key": "PumpkinBlock",
+   "item": 1725
+  },
+  {
+   "id": 252,
+   "key": "HayBlock",
+   "item": 1727
+  },
+  {
+   "id": 253,
+   "key": "SpookyWood",
+   "item": 1729
+  },
+  {
+   "id": 254,
+   "key": "Pumpkins",
+   "item": 1828,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 255,
+   "key": "AmethystGemsparkOff",
+   "item": null
+  },
+  {
+   "id": 256,
+   "key": "TopazGemsparkOff",
+   "item": null
+  },
+  {
+   "id": 257,
+   "key": "SapphireGemsparkOff",
+   "item": null
+  },
+  {
+   "id": 258,
+   "key": "EmeraldGemsparkOff",
+   "item": null
+  },
+  {
+   "id": 259,
+   "key": "RubyGemsparkOff",
+   "item": null
+  },
+  {
+   "id": 260,
+   "key": "DiamondGemsparkOff",
+   "item": null
+  },
+  {
+   "id": 261,
+   "key": "AmberGemsparkOff",
+   "item": null
+  },
+  {
+   "id": 262,
+   "key": "AmethystGemspark",
+   "item": 1970
+  },
+  {
+   "id": 263,
+   "key": "TopazGemspark",
+   "item": 1971
+  },
+  {
+   "id": 264,
+   "key": "SapphireGemspark",
+   "item": 1972
+  },
+  {
+   "id": 265,
+   "key": "EmeraldGemspark",
+   "item": 1973
+  },
+  {
+   "id": 266,
+   "key": "RubyGemspark",
+   "item": 1974
+  },
+  {
+   "id": 267,
+   "key": "DiamondGemspark",
+   "item": 1975
+  },
+  {
+   "id": 268,
+   "key": "AmberGemspark",
+   "item": 1976
+  },
+  {
+   "id": 269,
+   "key": "Womannequin",
+   "item": null,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 270,
+   "key": "FireflyinaBottle",
+   "item": 1993,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 271,
+   "key": "LightningBuginaBottle",
+   "item": 2005,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 272,
+   "key": "Cog",
+   "item": 1344
+  },
+  {
+   "id": 273,
+   "key": "StoneSlab",
+   "item": 2119
+  },
+  {
+   "id": 274,
+   "key": "SandStoneSlab",
+   "item": 2120
+  },
+  {
+   "id": 275,
+   "key": "BunnyCage",
+   "item": 2162,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 276,
+   "key": "SquirrelCage",
+   "item": 2163,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 277,
+   "key": "MallardDuckCage",
+   "item": 2164,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 278,
+   "key": "DuckCage",
+   "item": 2165,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 279,
+   "key": "BirdCage",
+   "item": 2166,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 280,
+   "key": "BlueJay",
+   "item": 2167,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 281,
+   "key": "CardinalCage",
+   "item": 2168,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 282,
+   "key": "FishBowl",
+   "item": 250,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 283,
+   "key": "HeavyWorkBench",
+   "item": 2172,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 284,
+   "key": "CopperPlating",
+   "item": 2173
+  },
+  {
+   "id": 285,
+   "key": "SnailCage",
+   "item": 2174,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 286,
+   "key": "GlowingSnailCage",
+   "item": 2175,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 287,
+   "key": "AmmoBox",
+   "item": 2177,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 288,
+   "key": "MonarchButterflyJar",
+   "item": 2178,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 289,
+   "key": "PurpleEmperorButterflyJar",
+   "item": 2179,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 290,
+   "key": "RedAdmiralButterflyJar",
+   "item": 2180,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 291,
+   "key": "UlyssesButterflyJar",
+   "item": 2181,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 292,
+   "key": "SulphurButterflyJar",
+   "item": 2182,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 293,
+   "key": "TreeNymphButterflyJar",
+   "item": 2183,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 294,
+   "key": "ZebraSwallowtailButterflyJar",
+   "item": 2184,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 295,
+   "key": "JuliaButterflyJar",
+   "item": 2185,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 296,
+   "key": "ScorpionCage",
+   "item": 2186,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 297,
+   "key": "BlackScorpionCage",
+   "item": 2187,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 298,
+   "key": "FrogCage",
+   "item": 2190,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 299,
+   "key": "MouseCage",
+   "item": 2191,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 300,
+   "key": "BoneWelder",
+   "item": 2192,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 301,
+   "key": "FleshCloningVat",
+   "item": 2193,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 302,
+   "key": "GlassKiln",
+   "item": 2194,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 303,
+   "key": "LihzahrdFurnace",
+   "item": 2195,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 304,
+   "key": "LivingLoom",
+   "item": 2196,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 305,
+   "key": "SkyMill",
+   "item": 2197,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 306,
+   "key": "IceMachine",
+   "item": 2198,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 307,
+   "key": "SteampunkBoiler",
+   "item": 2203,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 308,
+   "key": "HoneyDispenser",
+   "item": 2204,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 309,
+   "key": "PenguinCage",
+   "item": 2206,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 310,
+   "key": "WormCage",
+   "item": 2207,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 311,
+   "key": "DynastyWood",
+   "item": 2260
+  },
+  {
+   "id": 312,
+   "key": "RedDynastyShingles",
+   "item": 2261
+  },
+  {
+   "id": 313,
+   "key": "BlueDynastyShingles",
+   "item": 2262
+  },
+  {
+   "id": 314,
+   "key": "MinecartTrack",
+   "item": 2340,
+   "frameImportant": true
+  },
+  {
+   "id": 315,
+   "key": "Coralstone",
+   "item": 2435
+  },
+  {
+   "id": 316,
+   "key": "BlueJellyfishBowl",
+   "item": 2439,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 317,
+   "key": "GreenJellyfishBowl",
+   "item": 2440,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 318,
+   "key": "PinkJellyfishBowl",
+   "item": 2441,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 319,
+   "key": "ShipInABottle",
+   "item": 2490,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 320,
+   "key": "SeaweedPlanter",
+   "item": 2496,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 321,
+   "key": "BorealWood",
+   "item": 2503
+  },
+  {
+   "id": 322,
+   "key": "PalmWood",
+   "item": 2504
+  },
+  {
+   "id": 323,
+   "key": "PalmTree",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 324,
+   "key": "BeachPiles",
+   "item": 2625,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 325,
+   "key": "TinPlating",
+   "item": 2692
+  },
+  {
+   "id": 326,
+   "key": "Waterfall",
+   "item": 2693
+  },
+  {
+   "id": 327,
+   "key": "Lavafall",
+   "item": 2694
+  },
+  {
+   "id": 328,
+   "key": "Confetti",
+   "item": 2695
+  },
+  {
+   "id": 329,
+   "key": "ConfettiBlack",
+   "item": 2697
+  },
+  {
+   "id": 330,
+   "key": "CopperCoinPile",
+   "item": 71
+  },
+  {
+   "id": 331,
+   "key": "SilverCoinPile",
+   "item": 72
+  },
+  {
+   "id": 332,
+   "key": "GoldCoinPile",
+   "item": 73
+  },
+  {
+   "id": 333,
+   "key": "PlatinumCoinPile",
+   "item": 74
+  },
+  {
+   "id": 334,
+   "key": "WeaponsRack",
+   "item": null,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 335,
+   "key": "FireworksBox",
+   "item": 2700,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 336,
+   "key": "LivingFire",
+   "item": 2701
+  },
+  {
+   "id": 337,
+   "key": "AlphabetStatues",
+   "item": 2702,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 338,
+   "key": "FireworkFountain",
+   "item": 2738,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 339,
+   "key": "GrasshopperCage",
+   "item": 2741,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 340,
+   "key": "LivingCursedFire",
+   "item": 2751
+  },
+  {
+   "id": 341,
+   "key": "LivingDemonFire",
+   "item": 2752
+  },
+  {
+   "id": 342,
+   "key": "LivingFrostFire",
+   "item": 2753
+  },
+  {
+   "id": 343,
+   "key": "LivingIchor",
+   "item": 2754
+  },
+  {
+   "id": 344,
+   "key": "LivingUltrabrightFire",
+   "item": 2755
+  },
+  {
+   "id": 345,
+   "key": "Honeyfall",
+   "item": 2787
+  },
+  {
+   "id": 346,
+   "key": "ChlorophyteBrick",
+   "item": 2792
+  },
+  {
+   "id": 347,
+   "key": "CrimtaneBrick",
+   "item": 2793
+  },
+  {
+   "id": 348,
+   "key": "ShroomitePlating",
+   "item": 2794
+  },
+  {
+   "id": 349,
+   "key": "MushroomStatue",
+   "item": 470,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 350,
+   "key": "MartianConduitPlating",
+   "item": 2860
+  },
+  {
+   "id": 351,
+   "key": "ChimneySmoke",
+   "item": 2868
+  },
+  {
+   "id": 352,
+   "key": "CrimsonThorns",
+   "item": null
+  },
+  {
+   "id": 353,
+   "key": "VineRope",
+   "item": 2996
+  },
+  {
+   "id": 354,
+   "key": "BewitchingTable",
+   "item": 2999,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 355,
+   "key": "AlchemyTable",
+   "item": 3000,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 356,
+   "key": "Sundial",
+   "item": 3064,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 357,
+   "key": "MarbleBlock",
+   "item": 3066
+  },
+  {
+   "id": 358,
+   "key": "GoldBirdCage",
+   "item": 3070,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 359,
+   "key": "GoldBunnyCage",
+   "item": 3071,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 360,
+   "key": "GoldButterflyCage",
+   "item": 3072,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 361,
+   "key": "GoldFrogCage",
+   "item": 3073,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 362,
+   "key": "GoldGrasshopperCage",
+   "item": 3074,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 363,
+   "key": "GoldMouseCage",
+   "item": 3075,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 364,
+   "key": "GoldWormCage",
+   "item": 3076,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 365,
+   "key": "SilkRope",
+   "item": 3077
+  },
+  {
+   "id": 366,
+   "key": "WebRope",
+   "item": 3078
+  },
+  {
+   "id": 367,
+   "key": "Marble",
+   "item": 3081
+  },
+  {
+   "id": 368,
+   "key": "Granite",
+   "item": 3086
+  },
+  {
+   "id": 369,
+   "key": "GraniteBlock",
+   "item": 3087
+  },
+  {
+   "id": 370,
+   "key": "MeteoriteBrick",
+   "item": 3100
+  },
+  {
+   "id": 371,
+   "key": "PinkSlimeBlock",
+   "item": 3113
+  },
+  {
+   "id": 372,
+   "key": "PeaceCandle",
+   "item": 3117,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 373,
+   "key": "WaterDrip",
+   "item": 3182,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 374,
+   "key": "LavaDrip",
+   "item": 3184,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 375,
+   "key": "HoneyDrip",
+   "item": 3185,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 376,
+   "key": "FishingCrate",
+   "item": 2334,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 377,
+   "key": "SharpeningStation",
+   "item": 3198,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 378,
+   "key": "TargetDummy",
+   "item": 3202,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 379,
+   "key": "Bubble",
+   "item": 3214
+  },
+  {
+   "id": 380,
+   "key": "PlanterBox",
+   "item": 3215,
+   "frameImportant": true
+  },
+  {
+   "id": 381,
+   "key": "LavaMoss",
+   "item": 4354
+  },
+  {
+   "id": 382,
+   "key": "VineFlowers",
+   "item": null
+  },
+  {
+   "id": 383,
+   "key": "LivingMahogany",
+   "item": 3360
+  },
+  {
+   "id": 384,
+   "key": "LivingMahoganyLeaves",
+   "item": 3361
+  },
+  {
+   "id": 385,
+   "key": "CrystalBlock",
+   "item": 3234
+  },
+  {
+   "id": 386,
+   "key": "TrapdoorOpen",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 387,
+   "key": "TrapdoorClosed",
+   "item": 3239,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 388,
+   "key": "TallGateClosed",
+   "item": 3240,
+   "size": [
+    1,
+    5
+   ]
+  },
+  {
+   "id": 389,
+   "key": "TallGateOpen",
+   "item": null,
+   "size": [
+    1,
+    5
+   ]
+  },
+  {
+   "id": 390,
+   "key": "LavaLamp",
+   "item": 3253,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 391,
+   "key": "CageEnchantedNightcrawler",
+   "item": 3254,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 392,
+   "key": "CageBuggy",
+   "item": 3255,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 393,
+   "key": "CageGrubby",
+   "item": 3256,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 394,
+   "key": "CageSluggy",
+   "item": 3257,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 395,
+   "key": "ItemFrame",
+   "item": 3270,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 396,
+   "key": "Sandstone",
+   "item": 3271
+  },
+  {
+   "id": 397,
+   "key": "HardenedSand",
+   "item": 3272
+  },
+  {
+   "id": 398,
+   "key": "CorruptHardenedSand",
+   "item": 3274
+  },
+  {
+   "id": 399,
+   "key": "CrimsonHardenedSand",
+   "item": 3275
+  },
+  {
+   "id": 400,
+   "key": "CorruptSandstone",
+   "item": 3276
+  },
+  {
+   "id": 401,
+   "key": "CrimsonSandstone",
+   "item": 3277
+  },
+  {
+   "id": 402,
+   "key": "HallowHardenedSand",
+   "item": 3338
+  },
+  {
+   "id": 403,
+   "key": "HallowSandstone",
+   "item": 3339
+  },
+  {
+   "id": 404,
+   "key": "DesertFossil",
+   "item": 3347
+  },
+  {
+   "id": 405,
+   "key": "Fireplace",
+   "item": 3364,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 406,
+   "key": "Chimney",
+   "item": 3365,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 407,
+   "key": "FossilOre",
+   "item": 3380
+  },
+  {
+   "id": 408,
+   "key": "LunarOre",
+   "item": 3460
+  },
+  {
+   "id": 409,
+   "key": "LunarBrick",
+   "item": 3461
+  },
+  {
+   "id": 410,
+   "key": "LunarMonolith",
+   "item": 3536,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 411,
+   "key": "Detonator",
+   "item": 3545,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 412,
+   "key": "LunarCraftingStation",
+   "item": 3549,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 413,
+   "key": "SquirrelOrangeCage",
+   "item": 3565,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 414,
+   "key": "SquirrelGoldCage",
+   "item": 3566,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 415,
+   "key": "LunarBlockSolar",
+   "item": 3573
+  },
+  {
+   "id": 416,
+   "key": "LunarBlockVortex",
+   "item": 3574
+  },
+  {
+   "id": 417,
+   "key": "LunarBlockNebula",
+   "item": 3575
+  },
+  {
+   "id": 418,
+   "key": "LunarBlockStardust",
+   "item": 3576
+  },
+  {
+   "id": 419,
+   "key": "LogicGateLamp",
+   "item": 3602,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 420,
+   "key": "LogicGate",
+   "item": 3603,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 421,
+   "key": "ConveyorBeltLeft",
+   "item": 3609
+  },
+  {
+   "id": 422,
+   "key": "ConveyorBeltRight",
+   "item": 3610
+  },
+  {
+   "id": 423,
+   "key": "LogicSensor",
+   "item": 3613,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 424,
+   "key": "WirePipe",
+   "item": 3616,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 425,
+   "key": "AnnouncementBox",
+   "item": 3617,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 426,
+   "key": "TeamBlockRed",
+   "item": 3621
+  },
+  {
+   "id": 427,
+   "key": "TeamBlockRedPlatform",
+   "item": 3622,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 428,
+   "key": "WeightedPressurePlate",
+   "item": 3626,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 429,
+   "key": "WireBulb",
+   "item": 3629,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 430,
+   "key": "TeamBlockGreen",
+   "item": 3633
+  },
+  {
+   "id": 431,
+   "key": "TeamBlockBlue",
+   "item": 3634
+  },
+  {
+   "id": 432,
+   "key": "TeamBlockYellow",
+   "item": 3635
+  },
+  {
+   "id": 433,
+   "key": "TeamBlockPink",
+   "item": 3636
+  },
+  {
+   "id": 434,
+   "key": "TeamBlockWhite",
+   "item": 3637
+  },
+  {
+   "id": 435,
+   "key": "TeamBlockGreenPlatform",
+   "item": 3638,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 436,
+   "key": "TeamBlockBluePlatform",
+   "item": 3639,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 437,
+   "key": "TeamBlockYellowPlatform",
+   "item": 3640,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 438,
+   "key": "TeamBlockPinkPlatform",
+   "item": 3641,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 439,
+   "key": "TeamBlockWhitePlatform",
+   "item": 3642,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 440,
+   "key": "GemLocks",
+   "item": 3644,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 441,
+   "key": "FakeContainers",
+   "item": 3665,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 442,
+   "key": "ProjectilePressurePad",
+   "item": 3707,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 443,
+   "key": "GeyserTrap",
+   "item": 3722,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 444,
+   "key": "BeeHive",
+   "item": 5066,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 445,
+   "key": "PixelBox",
+   "item": 3725,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 446,
+   "key": "SillyBalloonPink",
+   "item": 3736
+  },
+  {
+   "id": 447,
+   "key": "SillyBalloonPurple",
+   "item": 3737
+  },
+  {
+   "id": 448,
+   "key": "SillyBalloonGreen",
+   "item": 3738
+  },
+  {
+   "id": 449,
+   "key": "SillyStreamerBlue",
+   "item": 3739
+  },
+  {
+   "id": 450,
+   "key": "SillyStreamerGreen",
+   "item": 3740
+  },
+  {
+   "id": 451,
+   "key": "SillyStreamerPink",
+   "item": 3741
+  },
+  {
+   "id": 452,
+   "key": "SillyBalloonMachine",
+   "item": 3742,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 453,
+   "key": "SillyBalloonTile",
+   "item": 3743,
+   "size": [
+    1,
+    3
+   ]
+  },
+  {
+   "id": 454,
+   "key": "Pigronata",
+   "item": 3746,
+   "size": [
+    4,
+    3
+   ]
+  },
+  {
+   "id": 455,
+   "key": "PartyMonolith",
+   "item": 3747,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 456,
+   "key": "PartyBundleOfBalloonTile",
+   "item": 3748,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 457,
+   "key": "PartyPresent",
+   "item": 3749,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 458,
+   "key": "SandFallBlock",
+   "item": 3754
+  },
+  {
+   "id": 459,
+   "key": "SnowFallBlock",
+   "item": 3755
+  },
+  {
+   "id": 460,
+   "key": "SnowCloud",
+   "item": 3756
+  },
+  {
+   "id": 461,
+   "key": "SandDrip",
+   "item": 3782,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 462,
+   "key": "DjinnLamp",
+   "item": 3795,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 463,
+   "key": "DefendersForge",
+   "item": 3813,
+   "size": [
+    3,
+    4
+   ]
+  },
+  {
+   "id": 464,
+   "key": "WarTable",
+   "item": 3814,
+   "size": [
+    5,
+    4
+   ]
+  },
+  {
+   "id": 465,
+   "key": "WarTableBanner",
+   "item": 3815,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 466,
+   "key": "ElderCrystalStand",
+   "item": 3816,
+   "size": [
+    5,
+    4
+   ]
+  },
+  {
+   "id": 467,
+   "key": "Containers2",
+   "item": 3884,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 468,
+   "key": "FakeContainers2",
+   "item": 3886,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 469,
+   "key": "Tables2",
+   "item": 3920,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 470,
+   "key": "DisplayDoll",
+   "item": 498,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 471,
+   "key": "WeaponsRack2",
+   "item": 2699,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 472,
+   "key": "IronBrick",
+   "item": 3951
+  },
+  {
+   "id": 473,
+   "key": "LeadBrick",
+   "item": 3953
+  },
+  {
+   "id": 474,
+   "key": "LesionBlock",
+   "item": 3955
+  },
+  {
+   "id": 475,
+   "key": "HatRack",
+   "item": 3977,
+   "size": [
+    3,
+    4
+   ]
+  },
+  {
+   "id": 476,
+   "key": "GolfHole",
+   "item": 4040,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 477,
+   "key": "GolfGrass",
+   "item": null
+  },
+  {
+   "id": 478,
+   "key": "CrimstoneBrick",
+   "item": 4050
+  },
+  {
+   "id": 479,
+   "key": "SmoothSandstone",
+   "item": 4051
+  },
+  {
+   "id": 480,
+   "key": "BloodMoonMonolith",
+   "item": 4054,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 481,
+   "key": "CrackedBlueDungeonBrick",
+   "item": 4238
+  },
+  {
+   "id": 482,
+   "key": "CrackedGreenDungeonBrick",
+   "item": 4239
+  },
+  {
+   "id": 483,
+   "key": "CrackedPinkDungeonBrick",
+   "item": 4240
+  },
+  {
+   "id": 484,
+   "key": "RollingCactus",
+   "item": 4390,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 485,
+   "key": "AntlionLarva",
+   "item": 5067,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 486,
+   "key": "DrumSet",
+   "item": 4063,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 487,
+   "key": "PicnicTable",
+   "item": 4064,
+   "size": [
+    4,
+    2
+   ]
+  },
+  {
+   "id": 488,
+   "key": "FallenLog",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 489,
+   "key": "PinWheel",
+   "item": 4074,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 490,
+   "key": "WeatherVane",
+   "item": 4075,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 491,
+   "key": "VoidVault",
+   "item": 4076,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 492,
+   "key": "GolfGrassHallowed",
+   "item": null
+  },
+  {
+   "id": 493,
+   "key": "GolfCupFlag",
+   "item": 4083,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 494,
+   "key": "GolfTee",
+   "item": 4089,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 495,
+   "key": "ShellPile",
+   "item": 4090
+  },
+  {
+   "id": 496,
+   "key": "AntiPortalBlock",
+   "item": 4091
+  },
+  {
+   "id": 497,
+   "key": "Toilets",
+   "item": 4096,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 498,
+   "key": "Spider",
+   "item": 4139
+  },
+  {
+   "id": 499,
+   "key": "LesionStation",
+   "item": 4142,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 500,
+   "key": "SolarBrick",
+   "item": 4229
+  },
+  {
+   "id": 501,
+   "key": "VortexBrick",
+   "item": 4230
+  },
+  {
+   "id": 502,
+   "key": "NebulaBrick",
+   "item": 4231
+  },
+  {
+   "id": 503,
+   "key": "StardustBrick",
+   "item": 4232
+  },
+  {
+   "id": 504,
+   "key": "MysticSnakeRope",
+   "item": null
+  },
+  {
+   "id": 505,
+   "key": "GoldGoldfishBowl",
+   "item": 4275,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 506,
+   "key": "CatBast",
+   "item": 4276,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 507,
+   "key": "GoldStarryGlassBlock",
+   "item": 4277
+  },
+  {
+   "id": 508,
+   "key": "BlueStarryGlassBlock",
+   "item": 4278
+  },
+  {
+   "id": 509,
+   "key": "VoidMonolith",
+   "item": 4318,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 510,
+   "key": "ArrowSign",
+   "item": 4319,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 511,
+   "key": "PaintedArrowSign",
+   "item": 4320,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 512,
+   "key": "GreenMossBrick",
+   "item": null
+  },
+  {
+   "id": 513,
+   "key": "BrownMossBrick",
+   "item": null
+  },
+  {
+   "id": 514,
+   "key": "RedMossBrick",
+   "item": null
+  },
+  {
+   "id": 515,
+   "key": "BlueMossBrick",
+   "item": null
+  },
+  {
+   "id": 516,
+   "key": "PurpleMossBrick",
+   "item": null
+  },
+  {
+   "id": 517,
+   "key": "LavaMossBrick",
+   "item": null
+  },
+  {
+   "id": 518,
+   "key": "LilyPad",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 519,
+   "key": "Cattail",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 520,
+   "key": "FoodPlatter",
+   "item": 4326,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 521,
+   "key": "BlackDragonflyJar",
+   "item": 4327,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 522,
+   "key": "BlueDragonflyJar",
+   "item": 4328,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 523,
+   "key": "GreenDragonflyJar",
+   "item": 4329,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 524,
+   "key": "OrangeDragonflyJar",
+   "item": 4330,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 525,
+   "key": "RedDragonflyJar",
+   "item": 4331,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 526,
+   "key": "YellowDragonflyJar",
+   "item": 4332,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 527,
+   "key": "GoldDragonflyJar",
+   "item": 4333,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 528,
+   "key": "MushroomVines",
+   "item": null
+  },
+  {
+   "id": 529,
+   "key": "SeaOats",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 530,
+   "key": "OasisPlants",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 531,
+   "key": "BoulderStatue",
+   "item": 4355,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 532,
+   "key": "MaggotCage",
+   "item": 4364,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 533,
+   "key": "RatCage",
+   "item": 4376,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 534,
+   "key": "KryptonMoss",
+   "item": 4377
+  },
+  {
+   "id": 535,
+   "key": "KryptonMossBrick",
+   "item": null
+  },
+  {
+   "id": 536,
+   "key": "XenonMoss",
+   "item": 4378
+  },
+  {
+   "id": 537,
+   "key": "XenonMossBrick",
+   "item": null
+  },
+  {
+   "id": 538,
+   "key": "LadybugCage",
+   "item": 4380,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 539,
+   "key": "ArgonMoss",
+   "item": 4389
+  },
+  {
+   "id": 540,
+   "key": "ArgonMossBrick",
+   "item": null
+  },
+  {
+   "id": 541,
+   "key": "EchoBlock",
+   "item": 4392
+  },
+  {
+   "id": 542,
+   "key": "OwlCage",
+   "item": 4396,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 543,
+   "key": "PupfishBowl",
+   "item": 4398,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 544,
+   "key": "GoldLadybugCage",
+   "item": 4399,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 545,
+   "key": "LawnFlamingo",
+   "item": 4420,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 546,
+   "key": "Grate",
+   "item": 4422
+  },
+  {
+   "id": 547,
+   "key": "PottedPlants1",
+   "item": 4430,
+   "size": [
+    2,
+    5
+   ]
+  },
+  {
+   "id": 548,
+   "key": "PottedPlants2",
+   "item": 4435,
+   "size": [
+    3,
+    6
+   ]
+  },
+  {
+   "id": 549,
+   "key": "Seaweed",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 550,
+   "key": "TurtleCage",
+   "item": 4461,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 551,
+   "key": "TurtleJungleCage",
+   "item": 4462,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 552,
+   "key": "Sandcastles",
+   "item": 4460,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 553,
+   "key": "GrebeCage",
+   "item": 4473,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 554,
+   "key": "SeagullCage",
+   "item": 4474,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 555,
+   "key": "WaterStriderCage",
+   "item": 4475,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 556,
+   "key": "GoldWaterStriderCage",
+   "item": 4476,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 557,
+   "key": "GrateClosed",
+   "item": null
+  },
+  {
+   "id": 558,
+   "key": "SeahorseCage",
+   "item": 4481,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 559,
+   "key": "GoldSeahorseCage",
+   "item": 4483,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 560,
+   "key": "GolfTrophies",
+   "item": 4599,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 561,
+   "key": "MarbleColumn",
+   "item": 4554
+  },
+  {
+   "id": 562,
+   "key": "BambooBlock",
+   "item": 4564
+  },
+  {
+   "id": 563,
+   "key": "LargeBambooBlock",
+   "item": 4547
+  },
+  {
+   "id": 564,
+   "key": "PlasmaLamp",
+   "item": 4553,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 565,
+   "key": "FogMachine",
+   "item": 4552,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 566,
+   "key": "AmberStoneBlock",
+   "item": 4646
+  },
+  {
+   "id": 567,
+   "key": "GardenGnome",
+   "item": 4609,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 568,
+   "key": "PinkFairyJar",
+   "item": 4655,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 569,
+   "key": "GreenFairyJar",
+   "item": 4656,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 570,
+   "key": "BlueFairyJar",
+   "item": 4657,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 571,
+   "key": "Bamboo",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 572,
+   "key": "SoulBottles",
+   "item": 4695,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 573,
+   "key": "TatteredWoodSign",
+   "item": 4710,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 574,
+   "key": "BorealBeam",
+   "item": 4717
+  },
+  {
+   "id": 575,
+   "key": "RichMahoganyBeam",
+   "item": 4718
+  },
+  {
+   "id": 576,
+   "key": "GraniteColumn",
+   "item": 4719
+  },
+  {
+   "id": 577,
+   "key": "SandstoneColumn",
+   "item": 4720
+  },
+  {
+   "id": 578,
+   "key": "MushroomBeam",
+   "item": 4721
+  },
+  {
+   "id": 579,
+   "key": "RockGolemHead",
+   "item": 4761,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 580,
+   "key": "HellButterflyJar",
+   "item": 4846,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 581,
+   "key": "LavaflyinaBottle",
+   "item": 4848,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 582,
+   "key": "MagmaSnailCage",
+   "item": 4850,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 583,
+   "key": "TreeTopaz",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 584,
+   "key": "TreeAmethyst",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 585,
+   "key": "TreeSapphire",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 586,
+   "key": "TreeEmerald",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 587,
+   "key": "TreeRuby",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 588,
+   "key": "TreeDiamond",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 589,
+   "key": "TreeAmber",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 590,
+   "key": "GemSaplings",
+   "item": 4851,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 591,
+   "key": "PotsSuspended",
+   "item": 4858,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 592,
+   "key": "BrazierSuspended",
+   "item": 4867,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 593,
+   "key": "VolcanoSmall",
+   "item": 4868,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 594,
+   "key": "VolcanoLarge",
+   "item": 4869,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 595,
+   "key": "VanityTreeSakuraSaplings",
+   "item": 4871,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 596,
+   "key": "VanityTreeSakura",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 597,
+   "key": "TeleportationPylon",
+   "item": 4875,
+   "size": [
+    3,
+    4
+   ]
+  },
+  {
+   "id": 598,
+   "key": "LavafishBowl",
+   "item": 4880,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 599,
+   "key": "AmethystBunnyCage",
+   "item": 4882,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 600,
+   "key": "TopazBunnyCage",
+   "item": 4883,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 601,
+   "key": "SapphireBunnyCage",
+   "item": 4884,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 602,
+   "key": "EmeraldBunnyCage",
+   "item": 4885,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 603,
+   "key": "RubyBunnyCage",
+   "item": 4886,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 604,
+   "key": "DiamondBunnyCage",
+   "item": 4887,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 605,
+   "key": "AmberBunnyCage",
+   "item": 4888,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 606,
+   "key": "AmethystSquirrelCage",
+   "item": 4889,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 607,
+   "key": "TopazSquirrelCage",
+   "item": 4890,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 608,
+   "key": "SapphireSquirrelCage",
+   "item": 4891,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 609,
+   "key": "EmeraldSquirrelCage",
+   "item": 4892,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 610,
+   "key": "RubySquirrelCage",
+   "item": 4893,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 611,
+   "key": "DiamondSquirrelCage",
+   "item": 4894,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 612,
+   "key": "AmberSquirrelCage",
+   "item": 4895,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 613,
+   "key": "PottedLavaPlants",
+   "item": 4904,
+   "size": [
+    3,
+    5
+   ]
+  },
+  {
+   "id": 614,
+   "key": "PottedLavaPlantTendrils",
+   "item": 4906,
+   "size": [
+    3,
+    6
+   ]
+  },
+  {
+   "id": 615,
+   "key": "VanityTreeWillowSaplings",
+   "item": 4907,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 616,
+   "key": "VanityTreeYellowWillow",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 617,
+   "key": "MasterTrophyBase",
+   "item": 4924,
+   "size": [
+    3,
+    4
+   ]
+  },
+  {
+   "id": 618,
+   "key": "AccentSlab",
+   "item": 4962
+  },
+  {
+   "id": 619,
+   "key": "TruffleWormCage",
+   "item": 4963,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 620,
+   "key": "EmpressButterflyJar",
+   "item": 4964,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 621,
+   "key": "SliceOfCake",
+   "item": 3750,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 622,
+   "key": "TeaKettle",
+   "item": 5008,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 623,
+   "key": "PottedCrystalPlants",
+   "item": 5081,
+   "size": [
+    2,
+    5
+   ]
+  },
+  {
+   "id": 624,
+   "key": "AbigailsFlower",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 625,
+   "key": "VioletMoss",
+   "item": 5127
+  },
+  {
+   "id": 626,
+   "key": "VioletMossBrick",
+   "item": null
+  },
+  {
+   "id": 627,
+   "key": "RainbowMoss",
+   "item": 5128
+  },
+  {
+   "id": 628,
+   "key": "RainbowMossBrick",
+   "item": null
+  },
+  {
+   "id": 629,
+   "key": "StinkbugCage",
+   "item": 5133,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 630,
+   "key": "StinkbugHousingBlocker",
+   "item": 5137,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 631,
+   "key": "StinkbugHousingBlockerEcho",
+   "item": 5138,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 632,
+   "key": "ScarletMacawCage",
+   "item": 5213,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 633,
+   "key": "AshGrass",
+   "item": 5214
+  },
+  {
+   "id": 634,
+   "key": "TreeAsh",
+   "item": null,
+   "frameImportant": true
+  },
+  {
+   "id": 635,
+   "key": "AshWood",
+   "item": 5215
+  },
+  {
+   "id": 636,
+   "key": "CorruptVines",
+   "item": null
+  },
+  {
+   "id": 637,
+   "key": "AshPlants",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 638,
+   "key": "AshVines",
+   "item": null
+  },
+  {
+   "id": 639,
+   "key": "ManaCrystal",
+   "item": 5287,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 640,
+   "key": "BlueMacawCage",
+   "item": 5301,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 641,
+   "key": "ReefBlock",
+   "item": 5306
+  },
+  {
+   "id": 642,
+   "key": "ChlorophyteExtractinator",
+   "item": 5296,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 643,
+   "key": "ToucanCage",
+   "item": 5314,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 644,
+   "key": "YellowCockatielCage",
+   "item": 5315,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 645,
+   "key": "GrayCockatielCage",
+   "item": 5316,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 646,
+   "key": "ShadowCandle",
+   "item": 5322,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 647,
+   "key": "LargePilesEcho",
+   "item": 5324,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 648,
+   "key": "LargePiles2Echo",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 649,
+   "key": "SmallPiles2x1Echo",
+   "item": null,
+   "size": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": 650,
+   "key": "SmallPiles1x1Echo",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 651,
+   "key": "PlantDetritus3x2Echo",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 652,
+   "key": "PlantDetritus2x2Echo",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 653,
+   "key": "PotsEcho",
+   "item": 5481,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 654,
+   "key": "TNTBarrel",
+   "item": 5327,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 655,
+   "key": "PlanteraThorns",
+   "item": null
+  },
+  {
+   "id": 656,
+   "key": "GlowTulip",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 657,
+   "key": "EchoMonolith",
+   "item": 5345,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 658,
+   "key": "ShimmerMonolith",
+   "item": 5347,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 659,
+   "key": "ShimmerBlock",
+   "item": 5349
+  },
+  {
+   "id": 660,
+   "key": "ShimmerflyinaBottle",
+   "item": 5351,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 661,
+   "key": "CorruptJungleGrass",
+   "item": null
+  },
+  {
+   "id": 662,
+   "key": "CrimsonJungleGrass",
+   "item": null
+  },
+  {
+   "id": 663,
+   "key": "Moondial",
+   "item": 5381,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 664,
+   "key": "BouncyBoulder",
+   "item": 5383,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 665,
+   "key": "LifeCrystalBoulder",
+   "item": 5384,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 666,
+   "key": "PoopBlock",
+   "item": 5395
+  },
+  {
+   "id": 667,
+   "key": "ShimmerBrick",
+   "item": 5398
+  },
+  {
+   "id": 668,
+   "key": "DirtiestBlock",
+   "item": null
+  },
+  {
+   "id": 669,
+   "key": "LunarRustBrick",
+   "item": 5401
+  },
+  {
+   "id": 670,
+   "key": "DarkCelestialBrick",
+   "item": 5402
+  },
+  {
+   "id": 671,
+   "key": "AstraBrick",
+   "item": 5403
+  },
+  {
+   "id": 672,
+   "key": "CosmicEmberBrick",
+   "item": 5404
+  },
+  {
+   "id": 673,
+   "key": "CryocoreBrick",
+   "item": 5405
+  },
+  {
+   "id": 674,
+   "key": "MercuryBrick",
+   "item": 5406
+  },
+  {
+   "id": 675,
+   "key": "StarRoyaleBrick",
+   "item": 5407
+  },
+  {
+   "id": 676,
+   "key": "HeavenforgeBrick",
+   "item": 5408
+  },
+  {
+   "id": 677,
+   "key": "AncientBlueBrick",
+   "item": 5417
+  },
+  {
+   "id": 678,
+   "key": "AncientGreenBrick",
+   "item": 5419
+  },
+  {
+   "id": 679,
+   "key": "AncientPinkBrick",
+   "item": 5421
+  },
+  {
+   "id": 680,
+   "key": "AncientGoldBrick",
+   "item": 5423
+  },
+  {
+   "id": 681,
+   "key": "AncientSilverBrick",
+   "item": 5425
+  },
+  {
+   "id": 682,
+   "key": "AncientCopperBrick",
+   "item": 5427
+  },
+  {
+   "id": 683,
+   "key": "AncientObsidianBrick",
+   "item": 5433
+  },
+  {
+   "id": 684,
+   "key": "AncientHellstoneBrick",
+   "item": 5435
+  },
+  {
+   "id": 685,
+   "key": "AncientCobaltBrick",
+   "item": 5429
+  },
+  {
+   "id": 686,
+   "key": "AncientMythrilBrick",
+   "item": 5431
+  },
+  {
+   "id": 687,
+   "key": "LavaMossBlock",
+   "item": 5439
+  },
+  {
+   "id": 688,
+   "key": "ArgonMossBlock",
+   "item": 5440
+  },
+  {
+   "id": 689,
+   "key": "KryptonMossBlock",
+   "item": 5441
+  },
+  {
+   "id": 690,
+   "key": "XenonMossBlock",
+   "item": 5442
+  },
+  {
+   "id": 691,
+   "key": "VioletMossBlock",
+   "item": 5443
+  },
+  {
+   "id": 692,
+   "key": "RainbowMossBlock",
+   "item": 5444
+  },
+  {
+   "id": 693,
+   "key": "Stalactite1x1Echo",
+   "item": 5464,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 694,
+   "key": "Stalactite1x2Echo",
+   "item": null,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 695,
+   "key": "DemonAltarReplica",
+   "item": 5467,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 696,
+   "key": "ShadowOrbsReplica",
+   "item": 5469,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 697,
+   "key": "CobwebReplica",
+   "item": 5471
+  },
+  {
+   "id": 698,
+   "key": "DeadCellsDisplayJar",
+   "item": 5472,
+   "size": [
+    1,
+    2
+   ]
+  },
+  {
+   "id": 699,
+   "key": "DeadCellsPotionStation",
+   "item": 5482,
+   "size": [
+    4,
+    4
+   ]
+  },
+  {
+   "id": 700,
+   "key": "AbigailsFlowerReplica",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 701,
+   "key": "GlowTulipReplica",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 702,
+   "key": "LifeFruitReplica",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 703,
+   "key": "JunglePlantsEcho",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 704,
+   "key": "FallenLogEcho",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 705,
+   "key": "OasisPlantsEcho",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 706,
+   "key": "TerragrimShrineEcho",
+   "item": null,
+   "size": [
+    3,
+    2
+   ]
+  },
+  {
+   "id": 707,
+   "key": "BooksEcho",
+   "item": null,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 708,
+   "key": "Shimmerfall",
+   "item": 5493
+  },
+  {
+   "id": 709,
+   "key": "ShimmerDrip",
+   "item": 5492,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 710,
+   "key": "PufferfishCage",
+   "item": 5512,
+   "size": [
+    6,
+    3
+   ]
+  },
+  {
+   "id": 711,
+   "key": "RainbowBoulder",
+   "item": 5514,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 712,
+   "key": "Poulder",
+   "item": 5516,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 713,
+   "key": "LavaBoulder",
+   "item": 5520,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 714,
+   "key": "SpiderBoulder",
+   "item": 5521,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 715,
+   "key": "Ghoulder",
+   "item": 5522,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 716,
+   "key": "BoulderThatSpawnsPet",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 717,
+   "key": "LavaCloud",
+   "item": 5569
+  },
+  {
+   "id": 718,
+   "key": "StarCloud",
+   "item": 5570
+  },
+  {
+   "id": 719,
+   "key": "RainbowCloud",
+   "item": 5571
+  },
+  {
+   "id": 720,
+   "key": "CRTMonolith",
+   "item": 5598,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 721,
+   "key": "RetroMonolith",
+   "item": 5599,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 722,
+   "key": "FallenStarBlock",
+   "item": 5622
+  },
+  {
+   "id": 723,
+   "key": "KiteAnchor",
+   "item": 4367,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 724,
+   "key": "CritterAnchor",
+   "item": 261,
+   "size": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": 725,
+   "key": "NoirMonolith",
+   "item": 5655,
+   "size": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": 726,
+   "key": "CannonBall",
+   "item": 929,
+   "frameImportant": true
+  },
+  {
+   "id": 727,
+   "key": "TeamBlockRedVariant",
+   "item": 5674
+  },
+  {
+   "id": 728,
+   "key": "TeamBlockGreenVariant",
+   "item": 5675
+  },
+  {
+   "id": 729,
+   "key": "TeamBlockBlueVariant",
+   "item": 5676
+  },
+  {
+   "id": 730,
+   "key": "TeamBlockYellowVariant",
+   "item": 5677
+  },
+  {
+   "id": 731,
+   "key": "TeamBlockPinkVariant",
+   "item": 5678
+  },
+  {
+   "id": 732,
+   "key": "TeamBlockWhiteVariant",
+   "item": 5679
+  },
+  {
+   "id": 733,
+   "key": "RadioThingMonolith",
+   "item": 5113,
+   "size": [
+    3,
+    3
+   ]
+  },
+  {
+   "id": 734,
+   "key": "Feywood",
+   "item": 5710
+  },
+  {
+   "id": 735,
+   "key": "HallowedBrick",
+   "item": 5733
+  },
+  {
+   "id": 736,
+   "key": "EasterBlock",
+   "item": 5920
+  },
+  {
+   "id": 737,
+   "key": "GothicBrick",
+   "item": 5922
+  },
+  {
+   "id": 738,
+   "key": "FlinxFurBlock",
+   "item": 5924
+  },
+  {
+   "id": 739,
+   "key": "JellyfishBlock",
+   "item": 5926
+  },
+  {
+   "id": 740,
+   "key": "ToyBreakerBlock",
+   "item": 5928
+  },
+  {
+   "id": 741,
+   "key": "PineWoodBlock",
+   "item": 5930
+  },
+  {
+   "id": 742,
+   "key": "HarpyBlock",
+   "item": 5953
+  },
+  {
+   "id": 743,
+   "key": "MoonplateBlock",
+   "item": 5996
+  },
+  {
+   "id": 744,
+   "key": "LibrarianBlock",
+   "item": 6019
+  },
+  {
+   "id": 745,
+   "key": "SpikeBlock",
+   "item": 6042
+  },
+  {
+   "id": 746,
+   "key": "OfficeBlock",
+   "item": 6065
+  },
+  {
+   "id": 747,
+   "key": "ForbiddenBlock",
+   "item": 6088
+  },
+  {
+   "id": 748,
+   "key": "WaterBlock",
+   "item": 6109
+  },
+  {
+   "id": 749,
+   "key": "BoulderBlock",
+   "item": 6132
+  },
+  {
+   "id": 750,
+   "key": "DamagingSpikeBlock",
+   "item": 6134
+  },
+  {
+   "id": 751,
+   "key": "PalworldDigtoiseSleeping",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 752,
+   "key": "PalworldChilletEgg",
+   "item": null,
+   "size": [
+    2,
+    2
+   ]
+  },
+  {
+   "id": 753,
+   "key": "GiantTiki",
+   "item": 6147,
+   "size": [
+    3,
+    3
+   ]
+  }
+ ]
+}

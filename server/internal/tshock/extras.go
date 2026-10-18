@@ -59,12 +59,16 @@ type ServerEvent struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 	Time string `json:"time"`
+	// Source 是同类型事件的来源（如 type=chat 时 game | webui）；旧插件可能不返回。
+	Source string `json:"source,omitempty"`
 }
 
 // EventsPage 是 /webui/events 的结果。
+// FirstSeq 仅在新插件的 tail 模式下返回（最新一批的起始 seq）。
 type EventsPage struct {
-	Events  []ServerEvent `json:"events"`
-	LastSeq int64         `json:"lastSeq"`
+	Events   []ServerEvent `json:"events"`
+	LastSeq  int64         `json:"lastSeq"`
+	FirstSeq int64         `json:"firstSeq,omitempty"`
 }
 
 // SessionInfo 是本插件铸造的一条 web 会话（不含 token 明文）。
@@ -212,6 +216,18 @@ func (c *Client) Events(ctx context.Context, token string, since int64, limit in
 	if limit > 0 {
 		q.Set("limit", strconv.Itoa(limit))
 	}
+	return c.fetchEvents(ctx, token, q)
+}
+
+// EventsTail 调用 /webui/events?tail=N：返回**最新** N 条（升序）。
+// 仅新插件（能力 events_history）支持；旧插件会把它当 since=0，需调用方兜底。
+func (c *Client) EventsTail(ctx context.Context, token string, tail int) (*EventsPage, error) {
+	q := url.Values{}
+	q.Set("tail", strconv.Itoa(tail))
+	return c.fetchEvents(ctx, token, q)
+}
+
+func (c *Client) fetchEvents(ctx context.Context, token string, q url.Values) (*EventsPage, error) {
 	body, err := c.secureJSON(ctx, token, eventsPath, q)
 	if err != nil {
 		return nil, err

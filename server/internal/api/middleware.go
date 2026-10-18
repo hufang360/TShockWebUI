@@ -69,6 +69,12 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 	return r.ResponseWriter.Write(b)
 }
 
+// Unwrap 让 http.NewResponseController 能穿透该包装器拿到
+// 底层的 Flush / SetWriteDeadline 能力（SSE 需要）。
+func (r *statusRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
+}
+
 func (s *Server) accessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -91,6 +97,11 @@ func (s *Server) accessLog(next http.Handler) http.Handler {
 
 func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SSE 长连接绝不能 gzip 包装（会缓冲、破坏实时性）。
+		if r.URL.Path == "/api/events/stream" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !acceptsGzip(r) {
 			next.ServeHTTP(w, r)
 			return

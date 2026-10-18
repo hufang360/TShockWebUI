@@ -2,7 +2,7 @@
  "meta": {
   "gameVersion": "1.4.5.8",
   "count": 694,
-  "source": "Terraria.ID/NPCID.cs + loc.NPCName"
+  "source": "Terraria.ID/NPCID.cs + loc.NPCName + TShockAPI/Commands.cs SpawnBoss()"
  },
  "npcs": [
   {
@@ -19,7 +19,14 @@
   },
   {
    "id": 4,
-   "key": "EyeofCthulhu"
+   "key": "EyeofCthulhu",
+   "sb": "eye of cthulhu",
+   "sbAliases": [
+    "eoc",
+    "eye",
+    "eye of cthulhu"
+   ],
+   "sbAll": true
   },
   {
    "id": 5,
@@ -55,7 +62,14 @@
   },
   {
    "id": 13,
-   "key": "EaterofWorldsHead"
+   "key": "EaterofWorldsHead",
+   "sb": "eater of worlds",
+   "sbAliases": [
+    "eater",
+    "eater of worlds",
+    "eow"
+   ],
+   "sbAll": true
   },
   {
    "id": 14,
@@ -143,7 +157,9 @@
   },
   {
    "id": 35,
-   "key": "SkeletronHead"
+   "key": "SkeletronHead",
+   "sb": "skeletron",
+   "sbAll": true
   },
   {
    "id": 36,
@@ -203,7 +219,14 @@
   },
   {
    "id": 50,
-   "key": "KingSlime"
+   "key": "KingSlime",
+   "sb": "king slime",
+   "sbAliases": [
+    "king",
+    "king slime",
+    "ks"
+   ],
+   "sbAll": true
   },
   {
    "id": 51,
@@ -451,7 +474,12 @@
   },
   {
    "id": 113,
-   "key": "WallofFlesh"
+   "key": "WallofFlesh",
+   "sb": "wall of flesh",
+   "sbAliases": [
+    "wall of flesh",
+    "wof"
+   ]
   },
   {
    "id": 114,
@@ -499,15 +527,25 @@
   },
   {
    "id": 125,
-   "key": "Retinazer"
+   "key": "Retinazer",
+   "sb": "twins",
+   "sbAll": true
   },
   {
    "id": 126,
-   "key": "Spazmatism"
+   "key": "Spazmatism",
+   "sb": "twins",
+   "sbAll": true
   },
   {
    "id": 127,
-   "key": "SkeletronPrime"
+   "key": "SkeletronPrime",
+   "sb": "skeletron prime",
+   "sbAliases": [
+    "prime",
+    "skeletron prime"
+   ],
+   "sbAll": true
   },
   {
    "id": 128,
@@ -535,7 +573,9 @@
   },
   {
    "id": 134,
-   "key": "TheDestroyer"
+   "key": "TheDestroyer",
+   "sb": "destroyer",
+   "sbAll": true
   },
   {
    "id": 135,
@@ -883,7 +923,13 @@
   },
   {
    "id": 222,
-   "key": "QueenBee"
+   "key": "QueenBee",
+   "sb": "queen bee",
+   "sbAliases": [
+    "qb",
+    "queen bee"
+   ],
+   "sbAll": true
   },
   {
    "id": 223,
@@ -975,7 +1021,9 @@
   },
   {
    "id": 245,
-   "key": "Golem"
+   "key": "Golem",
+   "sb": "golem",
+   "sbAll": true
   },
   {
    "id": 246,
@@ -1043,7 +1091,9 @@
   },
   {
    "id": 262,
-   "key": "Plantera"
+   "key": "Plantera",
+   "sb": "plantera",
+   "sbAll": true
   },
   {
    "id": 263,
@@ -1059,7 +1109,14 @@
   },
   {
    "id": 266,
-   "key": "BrainofCthulhu"
+   "key": "BrainofCthulhu",
+   "sb": "brain of cthulhu",
+   "sbAliases": [
+    "boc",
+    "brain",
+    "brain of cthulhu"
+   ],
+   "sbAll": true
   },
   {
    "id": 267,
@@ -1295,7 +1352,8 @@
   },
   {
    "id": 325,
-   "key": "MourningWood"
+   "key": "MourningWood",
+   "sb": "mourning wood"
   },
   {
    "id": 326,
@@ -1303,7 +1361,8 @@
   },
   {
    "id": 327,
-   "key": "Pumpking"
+   "key": "Pumpking",
+   "sb": "pumpking"
   },
   {
    "id": 328,
@@ -1371,15 +1430,22 @@
   },
   {
    "id": 344,
-   "key": "Everscream"
+   "key": "Everscream",
+   "sb": "everscream"
   },
   {
    "id": 345,
-   "key": "IceQueen"
+   "key": "IceQueen",
+   "sb": "ice queen"
   },
   {
    "id": 346,
-   "key": "SantaNK1"
+   "key": "SantaNK1",
+   "sb": "santa-nk1",
+   "sbAliases": [
+    "santa",
+    "santa-nk1"
+   ]
   },
   {
    "id": 347,
@@ -1475,7 +1541,14 @@
   },
   {
    "id": 370,
-   "key": "DukeFishron"
+   "key": "DukeFishron",
+   "sb": "duke fishron",
+   "sbAliases": [
+    "duke",
+    "duke fishron",
+    "fishron"
+   ],
+   "sbAll": true
   },
   {
    "id": 371,
@@ -1563,7 +1636,8 @@
   },
   {
    "id": 392,
-   "key": "MartianSaucer"
+   "key": "MartianSaucer",
+   "sb": "martian saucer"
   },
   {
    "id": 393,
@@ -1587,7 +1661,14 @@
   },
   {
    "id": 398,
-   "key": "MoonLordCore"
+   "key": "MoonLordCore",
+   "sb": "moon lord",
+   "sbAliases": [
+    "ml",
+    "moon",
+    "moon lord"
+   ],
+   "sbAll": true
   },
   {
    "id": 399,
@@ -1683,7 +1764,8 @@
   },
   {
    "id": 422,
-   "key": "LunarTowerVortex"
+   "key": "LunarTowerVortex",
+   "sb": "vortex pillar"
   },
   {
    "id": 423,
@@ -1751,7 +1833,15 @@
   },
   {
    "id": 439,
-   "key": "CultistBoss"
+   "key": "CultistBoss",
+   "sb": "lunatic cultist",
+   "sbAliases": [
+    "cultist",
+    "lc",
+    "lunatic",
+    "lunatic cultist"
+   ],
+   "sbAll": true
   },
   {
    "id": 440,
@@ -1959,7 +2049,13 @@
   },
   {
    "id": 491,
-   "key": "PirateShip"
+   "key": "PirateShip",
+   "sb": "flying dutchman",
+   "sbAliases": [
+    "dutchman",
+    "flying",
+    "flying dutchman"
+   ]
   },
   {
    "id": 492,
@@ -1967,7 +2063,8 @@
   },
   {
    "id": 493,
-   "key": "LunarTowerStardust"
+   "key": "LunarTowerStardust",
+   "sb": "stardust pillar"
   },
   {
    "id": 494,
@@ -2023,7 +2120,8 @@
   },
   {
    "id": 507,
-   "key": "LunarTowerNebula"
+   "key": "LunarTowerNebula",
+   "sb": "nebula pillar"
   },
   {
    "id": 508,
@@ -2063,7 +2161,8 @@
   },
   {
    "id": 517,
-   "key": "LunarTowerSolar"
+   "key": "LunarTowerSolar",
+   "sb": "solar pillar"
   },
   {
    "id": 518,
@@ -2199,7 +2298,8 @@
   },
   {
    "id": 551,
-   "key": "DD2Betsy"
+   "key": "DD2Betsy",
+   "sb": "betsy"
   },
   {
    "id": 552,
@@ -2539,7 +2639,14 @@
   },
   {
    "id": 636,
-   "key": "HallowBoss"
+   "key": "HallowBoss",
+   "sb": "empress of light",
+   "sbAliases": [
+    "empress",
+    "empress of light",
+    "eol"
+   ],
+   "sbAll": true
   },
   {
    "id": 637,
@@ -2623,7 +2730,13 @@
   },
   {
    "id": 657,
-   "key": "QueenSlimeBoss"
+   "key": "QueenSlimeBoss",
+   "sb": "queen slime",
+   "sbAliases": [
+    "qs",
+    "queen slime"
+   ],
+   "sbAll": true
   },
   {
    "id": 658,
@@ -2667,7 +2780,8 @@
   },
   {
    "id": 668,
-   "key": "Deerclops"
+   "key": "Deerclops",
+   "sb": "deerclops"
   },
   {
    "id": 669,

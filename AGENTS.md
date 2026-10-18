@@ -77,8 +77,12 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
   2. **自研信使插件 `WebUI`**（用户明确要求，已确认）：
      - 「在线授权」登录：把网页登录请求转成在线玩家的一次游戏内确认，用玩家本人账号铸造 token；
      - 批量执行 / 只读信息（指令目录、区域、传送点、NPC/buff、世界状态、事件流）/ 会话自助管理；
+     - **网页发言**（`/webui/chat`）：把网页输入发到游戏内聊天，统一带 `[WebUI]` 前缀、**不伪造身份**，在线禁言不绕过、有每账号限流；
      - **Tier B**（`AllowInGameOnlyCommands`，默认关）：以真实在线玩家身份执行 `allowServer=false` 的指令。
      以上均**不提权**，权限就是 token 用户组；范围限 `plugin/WebUI/`。
+     插件与后端的兼容性靠 `GET /webui/meta` **协议握手**（版本 / 协议号 / 能力清单）：
+     新增端点或字段只扩充能力清单，**不改协议号**；破坏性改动才两侧 `protocol` 一起 +1。
+     端点 404 时后端要用 meta 区分 `plugin_not_installed` / `plugin_outdated` / `plugin_protocol_mismatch`。
      超出这些（如绕过 `AllowServer` 以外的越权、伪造身份）**仍需先问用户**。
 
 ## 遇到这些必须停下来问用户

@@ -4,6 +4,7 @@ import { ItemIcon } from '@/components/ItemIcon'
 import { ItemTooltipContent } from '@/components/ItemTooltipContent'
 import { useItemTooltip } from '@/components/ItemTooltip'
 import { RecipePanel } from '@/components/RecipePanel'
+import { ItemDropsPanel } from '@/components/ItemDropsPanel'
 import { SearchInput } from '@/components/SearchInput'
 import {
   Button,
@@ -43,11 +44,13 @@ import {
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useLocalState } from '@/hooks/useLocalState'
+import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
 import {
   COLLECTION_GROUPS,
   COLLECTIONS_BY_ID,
   ITEM_COLLECTIONS,
+  rangeTabLabel,
   resolveCollectionItems,
 } from '@/lib/collections'
 import { useI18n } from '@/lib/i18n'
@@ -69,6 +72,7 @@ import {
 } from '@/lib/pagination'
 import { StorageKeys } from '@/lib/storage'
 import { computeVirtualGrid } from '@/lib/virtualGrid'
+import { rankPrefixes, formatBenefit } from '@/lib/prefixes'
 import type { Dataset, Item, ItemFavorite } from '@/types'
 
 /** 图标框统一 **64×64**（= 游戏 `sizeLimit` 32 的 2 倍）→ `mode='game'` 下是整数 2× 最近邻放大，不糊。 */
@@ -172,15 +176,24 @@ export function ItemsPage({
     [],
   )
   const itemFavs = useMemo(() => sanitizeItemFavorites(rawItemFavs), [rawItemFavs])
-  // 合成表「仅图标」开关（减少视觉信息，跨刷新记忆）。
+  // 合成表「仅图标」开关（减少视觉信息，跨刷新记忆；**默认开启**）。
   const [recipeIconOnly, setRecipeIconOnly] = useLocalState<boolean>(
     StorageKeys.dexRecipeIconOnly,
-    false,
+    true,
   )
   // 合成表「复制含标签」开关（复制的合成文本是否带 [i:..] 标签）。
   const [recipeCopyTag, setRecipeCopyTag] = useLocalState<boolean>(
     StorageKeys.dexRecipeCopyTag,
     true,
+  )
+  // 合成表「单列显示」开关（默认多列自适应；勾选后每条记录占一行）。
+  const [recipeSingleColumn, setRecipeSingleColumn] = useLocalState<boolean>(
+    StorageKeys.dexRecipeSingleColumn,
+    false,
+  )
+  // 「最近搜索」（统一规则：最多 10 条、窄区域显示 5 条；见 lib/searchHistory.ts）。
+  const { history: searchHistory, remember: rememberSearch } = useSearchHistory(
+    StorageKeys.dexSearchHistory,
   )
   const toggleItemFavorite = useCallback(
     (id: number) => {
@@ -348,6 +361,28 @@ export function ItemsPage({
     [patch],
   )
 
+  /** 快捷搜索：切到「全部物品」并搜该关键词（tag / 最近搜索都走这里）。 */
+  const selectKeyword = useCallback(
+    (kw: string) => {
+      patch({
+        mode: 'all',
+        favoritesOnly: false,
+        collectionId: '',
+        groupTab: '',
+        query: kw,
+        page: 1,
+        scrollTop: 0,
+      })
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
+    },
+    [patch],
+  )
+
+  // 搜过的词进「最近搜索」（去重、最新在前；上限统一在 lib/searchHistory.ts）。
+  useEffect(() => {
+    if (keyword) rememberSearch(keyword)
+  }, [keyword, rememberSearch])
+
   const pageCount = totalPages(ordered.length, state.pageSize)
   const page = clampPage(state.page, pageCount)
   const pageItems = paginate(ordered, page, state.pageSize)
@@ -366,6 +401,36 @@ export function ItemsPage({
         .map((id) => dataset.prefixesById.get(id))
         .filter((p): p is NonNullable<typeof p> => !!p)
     : []
+  /** 可滚词缀按游戏评分（`prefix-mods.json` 的 `val`）从高到低排序（无效词缀已剔除）。 */
+  const prefixRanks = useMemo(
+    () =>
+      selected
+        ? rankPrefixes(
+            dataset.rollablePrefixesById.get(selected.id) ?? [],
+            dataset.prefixModsById,
+            selectedStat?.stats,
+          )
+        : [],
+    [selected, dataset.rollablePrefixesById, dataset.prefixModsById, selectedStat],
+  )
+  /** 评分并列最高的词缀 id（可能多个，如饰品顶级词缀）。 */
+  const bestPrefixIds = useMemo(() => {
+    const best = prefixRanks[0]?.val
+    if (best == null) return new Set<number>()
+    return new Set(prefixRanks.filter((p) => p.val === best).map((p) => p.id))
+  }, [prefixRanks])
+  /** 最佳词缀名（可能多个）——用于文案展示。 */
+  const bestPrefixNames = useMemo(
+    () =>
+      [
+        ...new Set(
+          [...bestPrefixIds]
+            .map((id) => dataset.prefixesById.get(id)?.name)
+            .filter((n): n is string => !!n),
+        ),
+      ],
+    [bestPrefixIds, dataset.prefixesById],
+  )
   /** 当前物品是否有合成 / 用途 / 微光转换信息（没有则连「仅图标」开关也不显示）。 */
   const hasRecipeInfo = selected
     ? (dataset.recipes.byResult[String(selected.id)]?.length ?? 0) > 0 ||
@@ -491,6 +556,8 @@ export function ItemsPage({
             onValueChange={(v) => patch({ query: v, page: 1 })}
             placeholder={t('dex.placeholder')}
             aria-label={t('nav.items')}
+            history={searchHistory}
+            onHistorySelect={selectKeyword}
             className="h-9"
             inputClassName="text-sm"
           />
@@ -562,7 +629,7 @@ export function ItemsPage({
                       <SelectGroup>
                         {ITEM_COLLECTIONS.filter((c) => c.group === state.mode).map((c) => (
                           <SelectItem key={c.id} value={c.id}>
-                            {c.name}（{c.ids.length}）
+                            {c.group === 'range' ? rangeTabLabel(c) : c.name}（{c.ids.length}）
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -592,6 +659,8 @@ export function ItemsPage({
             )}
 
           </div>
+
+          {/* 快捷搜索：最近搜索（统一最多 10 条 / 窄区域 5 条） */}
         </CardBody>
       </Card>
 
@@ -642,7 +711,7 @@ export function ItemsPage({
       >
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span>{t('dex.summary', { n: ordered.length })}</span>
-          {/* 与「共 N 件」同字号对齐 */}
+          <Separator orientation="vertical" className="h-3.5" />
           <span>
             {t('dex.version', {
               version: dataset.meta.gameVersion,
@@ -745,7 +814,8 @@ export function ItemsPage({
                       prefixMods={selectedPrefixMods}
                     />
                   </div>
-                  {/* 词缀与下拉作为一个 group，放在 tips 右侧；切换后 tips 属性值随之变化。 */}
+                  {/* 词缀与下拉作为一个 group，放在 tips 右侧；切换后 tips 属性值随之变化。
+                      下拉按游戏自身的词缀评分排序，评分最高的即「顶级词缀」（可能并列）。 */}
                   {rollablePrefixes.length > 0 && (
                     <div className="flex w-40 shrink-0 flex-col gap-1.5 rounded-lg bg-accent/50 p-2 text-xs text-muted-foreground">
                       <span className="shrink-0">{t('prefix.label')}</span>
@@ -759,14 +829,45 @@ export function ItemsPage({
                         <SelectContent className="max-h-[min(20rem,50vh)]">
                           <SelectGroup>
                             <SelectItem value="0">{t('prefix.none')}</SelectItem>
-                            {rollablePrefixes.map((pf) => (
-                              <SelectItem key={pf.id} value={String(pf.id)}>
-                                {pf.name}
-                              </SelectItem>
-                            ))}
+                            {prefixRanks.map(({ id, val }) => {
+                              const pf = dataset.prefixesById.get(id)
+                              if (!pf) return null
+                              const mods = dataset.prefixModsById.get(id)
+                              const isBest = bestPrefixIds.has(id)
+                              return (
+                                <SelectItem key={id} value={String(id)}>
+                                  <span className="flex items-center gap-1">
+                                    {isBest && (
+                                      <Star className="size-3 shrink-0 fill-current text-warning" />
+                                    )}
+                                    {pf.name}
+                                    {mods?.benefit ? (
+                                      <span className="text-muted-foreground/70">
+                                        {formatBenefit(mods.benefit, t)}
+                                      </span>
+                                    ) : val > 0 ? (
+                                      <span className="text-muted-foreground/70">
+                                        {val.toFixed(3)}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </SelectItem>
+                              )
+                            })}
                           </SelectGroup>
                         </SelectContent>
                       </Select>
+                      {/* 饰品不显示「最佳词缀」行：下拉里已带 ⭐ 与效果，足够明显。 */}
+                      {bestPrefixIds.size > 0 && selectedStat?.stats?.accessory !== true && (
+                        <button
+                          type="button"
+                          className="shrink-0 cursor-pointer text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
+                          title={t('prefix.bestHint')}
+                          onClick={() => patch({ prefixId: [...bestPrefixIds][0]! })}
+                        >
+                          {t('prefix.best')}：{bestPrefixNames.join(' / ')}
+                        </button>
+                      )}
                       {selectedPrefix && (
                         <code className="rounded bg-accent px-1.5 py-0.5 font-pixel text-[11px] text-foreground">
                           {formatItemTag(selected.id, { prefixId: state.prefixId })}
@@ -776,13 +877,17 @@ export function ItemsPage({
                   )}
                 </div>
 
-                {/* 合成表 + 下方居左的「仅显示图标 / 复制含标签」勾选项 */}
+                {/* 物品级标签：可丢微光分解（数据见 gamedump 的 canDecraft）
+                    已融入到「合成表」的每条记录里（见 RecipePanel），这里不再单独占一行。 */}
+
+                {/* 合成表 + 下方居左的「仅显示图标 / 单列 / 复制含标签」勾选项 */}
                 <div className="flex min-w-0 flex-col gap-2">
                   <RecipePanel
                     itemId={selected.id}
                     dataset={dataset}
                     iconOnly={recipeIconOnly}
                     copyTags={recipeCopyTag}
+                    singleColumn={recipeSingleColumn}
                   />
                   {hasRecipeInfo && (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -796,6 +901,14 @@ export function ItemsPage({
                       </label>
                       <label className="flex cursor-pointer items-center gap-1.5">
                         <Checkbox
+                          checked={recipeSingleColumn}
+                          onCheckedChange={(v) => setRecipeSingleColumn(v === true)}
+                          aria-label={t('dex.recipeSingleColumn')}
+                        />
+                        <span>{t('dex.recipeSingleColumn')}</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-1.5">
+                        <Checkbox
                           checked={recipeCopyTag}
                           onCheckedChange={(v) => setRecipeCopyTag(v === true)}
                           aria-label={t('dex.recipeCopyTag')}
@@ -805,6 +918,14 @@ export function ItemsPage({
                     </div>
                   )}
                 </div>
+
+                {/* 可开启物品（木匣等）的掉落：物品 + 数量范围 + 实测概率 */}
+                <ItemDropsPanel
+                  itemId={selected.id}
+                  dataset={dataset}
+                  iconOnly={recipeIconOnly}
+                  singleColumn={recipeSingleColumn}
+                />
               </div>
 
               {/* 底部操作区（固定不滚动）：左 = 前往 Wiki，右 = 复制（主操作）；收藏用提示右上角 ⭐ */}

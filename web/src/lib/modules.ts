@@ -80,6 +80,40 @@ export interface ModulesPrefs {
 
 export const DEFAULT_MODULES: ModulesPrefs = { byServer: {} }
 
+/** 插件探测结果：仅包含能可靠探测到插件的内置模块。 */
+export interface ModuleDetection {
+  /** PlayerManager 已安装且当前用户组有权限。 */
+  players: boolean
+  /** FishShop 已安装且当前用户组有权限。 */
+  store: boolean
+}
+
+/** 能通过插件探测确认可用、可自动激活的内置模块（世界管理无法探测，保持手动）。 */
+const AUTO_ACTIVATABLE: readonly (keyof ModuleDetection)[] = ['players', 'store']
+
+/**
+ * 自动激活：把「探测到插件且可用」的内置模块写进已激活列表（侧边栏入口随之出现）。
+ *
+ * - 只处理能探测到插件的模块（玩家管理 / 鱼店）；世界管理无法可靠探测，不自动激活。
+ * - 已经激活的、或用户**手动改过开关**（记录在 `userSet`）的模块保持原样，不覆盖用户选择。
+ * - 无变化时返回原对象（调用方据此避免无意义的写入）。
+ */
+export function autoActivateModules(
+  prefs: ModulesPrefs,
+  userSet: ModulesPrefs,
+  serverId: string,
+  detected: ModuleDetection,
+): ModulesPrefs {
+  let next = prefs
+  for (const id of AUTO_ACTIVATABLE) {
+    if (!detected[id]) continue
+    if (isModuleEnabled(next, serverId, id)) continue
+    if (isModuleEnabled(userSet, serverId, id)) continue
+    next = setModuleEnabled(next, serverId, id, true)
+  }
+  return next
+}
+
 export function isModuleEnabled(prefs: ModulesPrefs, serverId: string, id: ModuleId): boolean {
   return (prefs.byServer[serverId] ?? []).includes(id)
 }

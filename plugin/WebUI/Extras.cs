@@ -25,7 +25,7 @@ namespace WebUI
 
         /// <summary>
         /// 运行时指令目录（供网页端补全）。**按调用者用户组过滤**：
-        /// 带权限的指令（如高级指令 <c>/weblimit</c>）只有用户组真能跑才下发，
+        /// 带权限的指令（如 <c>/web limit</c>）只有用户组真能跑才下发，
         /// 普通玩家拿不到（与 TShock <c>/help</c> 的可见性一致，对应 Command.CanRun）。
         /// </summary>
         public static object CommandsCatalog(SecureRest.TokenData token)
@@ -141,6 +141,103 @@ namespace WebUI
         {
             // 缺权限：返回空列表而不是报错，前端表现为「没有候选」。
             return new RestObject("200") { { key, new List<string>() } };
+        }
+
+        // ---------- /webui/chat ----------
+
+        /// <summary>单条网页发言的最大长度（与 EventLog.MaxTextLength 一致）。</summary>
+        public const int MaxChatLength = 200;
+
+        /// <summary>网页发言的默认前缀；实际用插件配置 <c>ChatPrefix</c>（留空时回退此值）。</summary>
+        public const string DefaultChatPrefix = "[WebUI]";
+
+        private static readonly object ChatLock = new object();
+        private static readonly Dictionary<string, List<DateTime>> ChatTimes = new Dictionary<string, List<DateTime>>();
+
+        /// <summary>
+        /// 把网页端提交的文本广播到游戏内聊天。
+        ///
+        /// 不伪造身份：消息统一带 <see cref="ChatPrefix"/> 前缀，并标明「哪个账号说的」；
+        /// 广播不走 <c>PlayerHooks.PlayerChat</c>（避免被当成真实玩家聊天重复采集），
+        /// 而是手工以 <c>type=webui</c> 记入事件流，前端可与 <c>chat</c> 区分渲染。
+        /// </summary>
+        public static object SendChat(SecureRest.TokenData token, string raw)
+        {
+            if (Plugin.Config == null || !Plugin.Config.AllowWebChat)
+                return new RestObject("403") { { "error", "服务器已关闭网页发言" } };
+
+            var text = (raw ?? "").Trim();
+            if (text.Length == 0)
+                return new RestObject("400") { { "error", "发言内容不能为空" } };
+            if (text.Length > MaxChatLength)
+                return new RestObject("400") { { "error", $"单条最多 {MaxChatLength} 个字符" } };
+
+            var account = token.Username ?? "";
+            if (!AllowChatRate(account))
+                return new RestObject("429") { { "error", "发言过于频繁，请稍后再试" } };
+
+            // 不绕过 TShock 禁言：目标账号在线且处于 mute 状态时拒绝（离线无法判定，允许）。
+            var online = FindOnlinePlayer(account);
+            if (online != null && online.mute)
+                return new RestObject("403") { { "error", "你已被禁言，无法发言" } };
+
+            var name = online != null && !string.IsNullOrWhiteSpace(online.Name) ? online.Name : account;
+            if (string.IsNullOrWhiteSpace(name)) name = "WebUI";
+            var prefix = Plugin.Config?.ChatPrefix;
+            if (string.IsNullOrWhiteSpace(prefix)) prefix = DefaultChatPrefix;
+            var line = $"{prefix} {name}: {text}";
+            var id = Guid.NewGuid().ToString("N").Substring(0, 12);
+            var time = DateTime.UtcNow.ToString("o");
+
+            // 切回主线程再广播，避免从 REST 线程写网络缓冲。
+            Plugin.RunOnMainThread(() =>
+            {
+                try { TSPlayer.All.SendMessage(line, 135, 206, 250); }
+                catch (Exception ex) { TShock.Log.ConsoleError("[WebUI] 发送网页发言失败：" + ex); }
+            });
+            // 统一为 type=chat + source=webui：前端只处理一种聊天类型，按来源区分渲染。
+            EventLog.Add("chat", line, "webui");
+
+            return new RestObject("200")
+            {
+                { "name", name },
+                { "text", text },
+                { "line", line },
+                { "id", id },
+                { "time", time },
+                { "source", "webui" },
+            };
+        }
+
+        /// <summary>取账号对应的在线玩家（用游戏内角色名），离线时返回 null。</summary>
+        private static TSPlayer FindOnlinePlayer(string account)
+        {
+            if (string.IsNullOrWhiteSpace(account)) return null;
+            foreach (var p in TShock.Players)
+            {
+                if (p != null && p.Active && p.Account != null &&
+                    string.Equals(p.Account.Name, account, StringComparison.OrdinalIgnoreCase))
+                    return p;
+            }
+            return null;
+        }
+
+        /// <summary>每账号每分钟发言上限（<c>MaxWebChatPerMinute</c>，0 = 不限）。</summary>
+        private static bool AllowChatRate(string account)
+        {
+            var limit = Plugin.Config?.MaxWebChatPerMinute ?? 0;
+            if (limit <= 0) return true;
+            var key = string.IsNullOrEmpty(account) ? "?" : account;
+            var now = DateTime.UtcNow;
+            lock (ChatLock)
+            {
+                if (!ChatTimes.TryGetValue(key, out var times))
+                    ChatTimes[key] = times = new List<DateTime>();
+                times.RemoveAll(t => (now - t).TotalSeconds >= 60);
+                if (times.Count >= limit) return false;
+                times.Add(now);
+                return true;
+            }
         }
 
         // ---------- /webui/serverinfo ----------

@@ -249,6 +249,7 @@ export function ModuleCardsPanel({
               loading={busy(resultKey(card.id))}
               unavailable={!authenticated}
               action={cardManual(card) ? 'run' : 'refresh'}
+              collapseKey={resultKey(card.id)}
               onRefresh={authenticated ? () => void runOne(card) : undefined}
               itemsById={dataset?.itemsById}
               prefixesById={dataset?.prefixesById}

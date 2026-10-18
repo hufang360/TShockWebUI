@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowRight, Check, Copy, Hammer } from 'lucide-react'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { ItemIcon } from '@/components/ItemIcon'
@@ -61,14 +61,9 @@ function recipeToText(recipe: Recipe, dataset: Dataset, t: T, tags: boolean): st
         ? label(stationId)
         : t('recipe.station', { id: recipe.station })
   const conds = [...(recipe.env ?? []), ...(recipe.flags ?? [])]
+    .filter((c) => c !== 'notDecraftable')
     .map((c) =>
-      c === 'notDecraftable'
-        ? t('recipe.flag.noDecraft')
-        : ENV_LABEL[c]
-          ? t(ENV_LABEL[c])
-          : FLAG_LABEL[c]
-            ? t(FLAG_LABEL[c])
-            : c,
+      ENV_LABEL[c] ? t(ENV_LABEL[c]) : FLAG_LABEL[c] ? t(FLAG_LABEL[c]) : c,
     )
     .join(' ')
   return `${ingredients} → ${result} @ ${station}${conds ? ` (${conds})` : ''}`
@@ -155,11 +150,33 @@ function Station({
   )
 }
 
+/** 「可丢微光分解」行内标记：5362 图标（无 tips）+ 文字；多件一组时注明「每 N 个分解一次」。 */
+function DecraftTag({ dataset, stack }: { dataset: Dataset; stack: number }) {
+  const { t } = useI18n()
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <ItemIcon
+        item={dataset.itemsById.get(5362)}
+        atlas={dataset.atlas}
+        size={22}
+        tooltip={false}
+      />
+      <span className="text-xs text-muted-foreground">{t('dex.canDecraft')}</span>
+      {stack > 1 && (
+        <span className="text-xs text-muted-foreground">
+          {t('dex.canDecraftStack', { n: stack })}
+        </span>
+      )}
+    </span>
+  )
+}
+
 /** 环境 / 阵营条件：紧跟在制作站后面；能用物品图标的都用图标，其余用文字标签。 */
 function Conditions({ recipe, dataset }: { recipe: Recipe; dataset: Dataset }) {
   const { t } = useI18n()
   const env = recipe.env ?? []
-  const flags = recipe.flags ?? []
+  // `notDecraftable` 改为物品级的「可微分」徽章（见 ItemsPage 详情），不在配方行里重复。
+  const flags = (recipe.flags ?? []).filter((f) => f !== 'notDecraftable')
   if (env.length === 0 && flags.length === 0) return null
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
@@ -179,13 +196,6 @@ function Conditions({ recipe, dataset }: { recipe: Recipe; dataset: Dataset }) {
         return <Badge key={e}>{ENV_LABEL[e] ? t(ENV_LABEL[e]) : e}</Badge>
       })}
       {flags.map((f) => {
-        if (f === 'notDecraftable') {
-          return (
-            <Badge key={f} tone="purple">
-              {t('recipe.flag.noDecraft')}
-            </Badge>
-          )
-        }
         const iconId = FLAG_ICON[f]
         if (iconId != null) {
           return (
@@ -213,11 +223,14 @@ function RecipeRow({
   dataset,
   iconOnly,
   copyTags,
+  decraft,
 }: {
   recipe: Recipe
   dataset: Dataset
   iconOnly: boolean
   copyTags: boolean
+  /** 非空时在行尾追加「可丢微光分解」标记（只给「合成表」区的行）。 */
+  decraft?: { stack: number } | null
 }) {
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
@@ -251,6 +264,12 @@ function RecipeRow({
         <Hammer className="size-3.5 shrink-0 text-muted-foreground" />
         <Station recipe={recipe} dataset={dataset} iconOnly={iconOnly} />
         <Conditions recipe={recipe} dataset={dataset} />
+        {decraft && (
+          <>
+            <Separator orientation="vertical" className="h-5 shrink-0" />
+            <DecraftTag dataset={dataset} stack={decraft.stack} />
+          </>
+        )}
       </span>
       {/* hover 时右上角出现复制按钮（绝对定位、不占位，避免把内容挤到第二行）。 */}
       <Button
@@ -297,6 +316,7 @@ function RecipeSection({
   tone,
   iconId,
   dataset,
+  singleColumn,
   children,
 }: {
   title: string
@@ -304,6 +324,8 @@ function RecipeSection({
   /** 固定图标（按用户指定）；不传则标题前无图标。 */
   iconId?: number
   dataset: Dataset
+  /** 单列显示（默认多列自适应）。 */
+  singleColumn?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(true)
@@ -322,7 +344,14 @@ function RecipeSection({
         <CollapseChevron open={open} />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="grid gap-1 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">{children}</div>
+        <div
+          className={cn(
+            'grid gap-1',
+            singleColumn ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]',
+          )}
+        >
+          {children}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   )
@@ -336,19 +365,31 @@ function RecipeRows({
   dataset,
   iconOnly,
   copyTags,
+  decraft,
 }: {
   rows: Recipe[]
   dataset: Dataset
   iconOnly: boolean
   copyTags: boolean
+  decraft?: { stack: number } | null
 }) {
   const { t } = useI18n()
   const [limit, setLimit] = useState(MAX_ROWS)
+  // 切物品时重置展开量：rows 是 useMemo 出来的（只在 itemId 变化时换引用），
+  // 否则上一个物品点了几次「加载更多」会带到下一个物品。
+  useEffect(() => setLimit(MAX_ROWS), [rows])
   const hidden = rows.length - limit
   return (
     <>
       {rows.slice(0, limit).map((r, i) => (
-        <RecipeRow key={i} recipe={r} dataset={dataset} iconOnly={iconOnly} copyTags={copyTags} />
+        <RecipeRow
+          key={i}
+          recipe={r}
+          dataset={dataset}
+          iconOnly={iconOnly}
+          copyTags={copyTags}
+          decraft={decraft}
+        />
       ))}
       {hidden > 0 && (
         <Button
@@ -374,12 +415,15 @@ export function RecipePanel({
   dataset,
   iconOnly = false,
   copyTags = true,
+  singleColumn = false,
 }: {
   itemId: number
   dataset: Dataset
   iconOnly?: boolean
   /** 复制的合成文本是否含 `[i:ID]` 标签。 */
   copyTags?: boolean
+  /** 单列显示合成记录（默认多列自适应）。 */
+  singleColumn?: boolean
 }) {
   const { t } = useI18n()
   const make = useMemo(
@@ -390,6 +434,12 @@ export function RecipePanel({
     () => (dataset.recipes.byIngredient[String(itemId)] ?? []).map((i) => dataset.recipes.recipes[i]),
     [dataset.recipes, itemId],
   )
+  // 「可丢微光分解」与「合成表」的每条记录一起显示（只挂在 make 分区）。
+  const stat = dataset.itemStats.items[String(itemId)]
+  const decraft =
+    stat?.stats?.canDecraft === true
+      ? { stack: typeof stat.stats.decraftStack === 'number' ? stat.stats.decraftStack : 1 }
+      : null
   const shimmerInto = dataset.shimmerToById.get(itemId)
   const shimmerFrom = dataset.shimmerFromById.get(itemId) ?? []
   const shimmerCount = (shimmerInto != null ? 1 : 0) + shimmerFrom.length
@@ -406,8 +456,15 @@ export function RecipePanel({
           tone="text-success"
           iconId={531}
           dataset={dataset}
+          singleColumn={singleColumn}
         >
-          <RecipeRows rows={make} dataset={dataset} iconOnly={iconOnly} copyTags={copyTags} />
+          <RecipeRows
+            rows={make}
+            dataset={dataset}
+            iconOnly={iconOnly}
+            copyTags={copyTags}
+            decraft={decraft}
+          />
         </RecipeSection>
       )}
       {use.length > 0 && (
@@ -416,6 +473,7 @@ export function RecipePanel({
           tone="text-warning"
           iconId={36}
           dataset={dataset}
+          singleColumn={singleColumn}
         >
           <RecipeRows rows={use} dataset={dataset} iconOnly={iconOnly} copyTags={copyTags} />
         </RecipeSection>
@@ -426,6 +484,7 @@ export function RecipePanel({
           tone="text-info"
           iconId={5362}
           dataset={dataset}
+          singleColumn={singleColumn}
         >
           {shimmerInto != null && (
             <ShimmerRow fromId={itemId} toId={shimmerInto} dataset={dataset} iconOnly={iconOnly} />

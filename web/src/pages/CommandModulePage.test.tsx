@@ -39,7 +39,7 @@ function renderPage(
     <I18nProvider lang="zh">
       <DatasetProvider value={makeDataset()}>
         <ExecutionQueueProvider interval={0}>
-          <CommandResultsProvider>
+          <CommandResultsProvider serverId="default">
             <CommandModulePage
               dataset={makeDataset()}
               transport={transport}

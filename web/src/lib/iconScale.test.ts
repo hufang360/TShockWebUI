@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { ITEM_ICON_SIZE_LIMIT, iconContentSize, shouldSmooth } from '@/lib/iconScale'
+import {
+  ITEM_ICON_SIZE_LIMIT,
+  iconContentSize,
+  npcContentSize,
+  shouldSmooth,
+} from '@/lib/iconScale'
 
 /** 真实贴图尺寸（取自 data/items-atlas.json 的 regions）。 */
 const COPPER_COIN = [12, 12] as const // id 71
@@ -121,5 +126,38 @@ describe('shouldSmooth（采样方式）', () => {
     expect(shouldSmooth(32, big.width)).toBe(false)
     const small = iconContentSize(32, 32, 24, 'game')
     expect(shouldSmooth(32, small.width)).toBe(true)
+  })
+})
+
+describe('npcContentSize', () => {
+  // 真实 NPC 贴图尺寸（取自 data/npc-atlas.json 的 regions）。
+  const FIREFLY = [10, 16] as const // 355 萤火虫
+  const MERCHANT = [40, 56] as const // 17 商人
+  const BUNNY = [48, 40] as const // 46 兔兔
+  const EYE_OF_CTHULHU = [110, 166] as const // 4 克苏鲁之眼
+
+  it('game：只缩不放，保留 NPC 之间的原生大小差异（小动物小、城镇 NPC 中等）', () => {
+    // 64 方框里都放得下 → 1:1
+    expect(npcContentSize(...FIREFLY, 64, 'game')).toEqual({ width: 10, height: 16 })
+    expect(npcContentSize(...MERCHANT, 64, 'game')).toEqual({ width: 40, height: 56 })
+    expect(npcContentSize(...BUNNY, 64, 'game')).toEqual({ width: 48, height: 40 })
+  })
+
+  it('game：超过方框的等比压到方框内（克苏鲁之眼 110×166）', () => {
+    const { width, height } = npcContentSize(...EYE_OF_CTHULHU, 64, 'game')
+    expect(height).toBeCloseTo(64 * 0.94, 6)
+    expect(width).toBeCloseTo((110 * 64 * 0.94) / 166, 6)
+    // 长宽比不变
+    expect(width / height).toBeCloseTo(110 / 166, 6)
+  })
+
+  it('fit：一律填满方框（详情大图用，小虫也看得见）', () => {
+    const { width, height } = npcContentSize(...FIREFLY, 144, 'fit')
+    expect(width).toBeCloseTo((10 * 144 * 0.94) / 16, 6)
+    expect(height).toBeCloseTo(144 * 0.94, 6)
+  })
+
+  it('无效尺寸返回 0', () => {
+    expect(npcContentSize(0, 16, 64)).toEqual({ width: 0, height: 0 })
   })
 })

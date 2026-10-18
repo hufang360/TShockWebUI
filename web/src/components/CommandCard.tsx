@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { Play, RefreshCw } from 'lucide-react'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { CommandOutput } from '@/components/ResultPanel'
@@ -16,8 +16,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui'
+import { useCollapsed } from '@/hooks/useCollapsed'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { hasTextSelection } from '@/lib/selection'
 import type { Atlas, CommandResult, Item, Prefix } from '@/types'
 
 export interface CommandCardProps {
@@ -38,6 +40,8 @@ export interface CommandCardProps {
   /** 右上角按钮语义：`refresh`（默认）显示刷新图标；`run` 表示手动执行，显示播放图标。 */
   action?: 'refresh' | 'run'
   onRefresh?: () => void
+  /** 折叠状态记忆 key（不传则不持久化）；如 `home:status` / `world:relive` / `fish:rank`。 */
+  collapseKey?: string
   /** 结果里 [i:ID] 渲染图标所需的索引。 */
   itemsById?: Map<number, Item>
   prefixesById?: Map<number, Prefix>
@@ -61,13 +65,15 @@ export function CommandCard({
   footerNote,
   action = 'refresh',
   onRefresh,
+  collapseKey,
   itemsById,
   prefixesById,
   atlas,
   className,
 }: CommandCardProps) {
   const { t } = useI18n()
-  const [open, setOpen] = useState(true)
+  // 展开 / 折叠状态按卡片记忆（切换模块回来仍保持）。
+  const [open, setOpen] = useCollapsed(collapseKey)
   const lastRun = result?.ts ? new Date(result.ts) : null
   return (
     <Card className={cn('flex flex-col overflow-hidden', className)}>
@@ -76,64 +82,67 @@ export function CommandCard({
         onOpenChange={setOpen}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <CardHeader className="group/header shrink-0">
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="group/title flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-            >
-              {icon}
-              <span className="truncate text-sm font-semibold tracking-wide text-foreground">
-                {title}
-              </span>
-            </button>
-          </CollapsibleTrigger>
-          {/* 操作按钮：默认隐藏，hover 表头才显示；折叠时不显示。 */}
-          <div
-            className={cn(
-              'flex shrink-0 items-center gap-1',
-              open ? 'opacity-0 transition-opacity group-hover/header:opacity-100' : 'hidden',
-            )}
+        <CollapsibleTrigger asChild>
+          {/* 整个头部可点击折叠；标题可鼠标选中复制（选中时不折叠）。 */}
+          <CardHeader
+            className="group/header shrink-0 cursor-pointer select-text [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            role="button"
+            tabIndex={0}
+            aria-label={open ? t('result.collapse') : t('result.expand')}
+            onClick={(e) => {
+              if (hasTextSelection()) e.preventDefault()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setOpen(!open)
+              }
+            }}
           >
-            {onRefresh && (
-              <TooltipProvider delayDuration={150}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
-                      disabled={unavailable || loading}
-                      onClick={onRefresh}
-                    >
-                      {loading ? (
-                        <Spinner aria-hidden data-icon="inline-start" />
-                      ) : action === 'run' ? (
-                        <Play data-icon="inline-start" />
-                      ) : (
-                        <RefreshCw data-icon="inline-start" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {lastRun
-                      ? t('home.lastRun', { time: lastRun.toLocaleTimeString() })
-                      : t('home.neverRun')}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 cursor-pointer"
-              aria-label={open ? t('result.collapse') : t('result.expand')}
+            {icon}
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-wide text-foreground select-text">
+              {title}
+            </span>
+            {/* 操作按钮：默认隐藏，hover 表头才显示；折叠时不显示；点击不触发折叠。 */}
+            <div
+              className={cn(
+                'flex shrink-0 items-center gap-1',
+                open ? 'opacity-0 transition-opacity group-hover/header:opacity-100' : 'hidden',
+              )}
+              onClick={(e) => e.stopPropagation()}
             >
-              <CollapseChevron open={open} reveal="group-hover/header:opacity-100" />
-            </button>
-          </CollapsibleTrigger>
-        </CardHeader>
+              {onRefresh && (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
+                        disabled={unavailable || loading}
+                        onClick={onRefresh}
+                      >
+                        {loading ? (
+                          <Spinner aria-hidden data-icon="inline-start" />
+                        ) : action === 'run' ? (
+                          <Play data-icon="inline-start" />
+                        ) : (
+                          <RefreshCw data-icon="inline-start" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {lastRun
+                        ? t('home.lastRun', { time: lastRun.toLocaleTimeString() })
+                        : t('home.neverRun')}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            <CollapseChevron open={open} reveal="group-hover/header:opacity-100" />
+          </CardHeader>
+        </CollapsibleTrigger>
         <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
           <CardBody className="flex min-h-0 flex-1 flex-col gap-2">
             <div className="min-h-0 flex-1 overflow-y-auto">

@@ -39,7 +39,7 @@ function renderPage(
   return render(
     <I18nProvider lang="zh">
       <ExecutionQueueProvider interval={0}>
-        <CommandResultsProvider>
+        <CommandResultsProvider serverId="builtin">
           <HomePage
             dataset={makeDataset()}
             transport={transport}
@@ -233,7 +233,7 @@ describe('HomePage 卡片管理', () => {
       return (
         <I18nProvider lang="zh">
           <ExecutionQueueProvider interval={0}>
-            <CommandResultsProvider>
+            <CommandResultsProvider serverId="builtin">
               {home ? (
                 <HomePage
                   dataset={makeDataset()}

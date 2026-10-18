@@ -1,13 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useItemTooltip } from '@/components/ItemTooltip'
-import { loadAtlasImage } from '@/lib/atlas'
+import { loadVerifiedAtlasImage } from '@/lib/atlas'
 import { cn } from '@/lib/cn'
 import { useItemStat } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
 import { iconContentSize, shouldSmooth, type IconScaleMode } from '@/lib/iconScale'
 import type { Atlas, Item } from '@/types'
-
-const BASE = import.meta.env.BASE_URL
 
 interface ItemIconProps {
   item: Item | undefined
@@ -92,7 +90,7 @@ export function ItemIcon({
 
     const [x, y, w, h] = region
     let cancelled = false
-    loadAtlasImage(`${BASE}data/${atlas.meta.sheet}`)
+    loadVerifiedAtlasImage(atlas)
       .then((img) => {
         if (cancelled) return
         // 等比放入 size×size 的方框并居中；尺寸规则见 lib/iconScale.ts（game 模式与游戏一致，只缩不放）

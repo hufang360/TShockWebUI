@@ -23,6 +23,7 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [missing, setMissing] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
@@ -32,6 +33,7 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
       setMissing(false)
       return
     }
+    setChecking(true)
     try {
       const [m, s] = await Promise.all([transport.me(), transport.sessions()])
       setMe(m)
@@ -43,12 +45,30 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
         setMe(null)
         setSessions([])
       }
+    } finally {
+      setChecking(false)
     }
   }, [authenticated, transport])
 
   useEffect(() => {
     void load()
   }, [load, serverId])
+
+  // 容错：插件往往是「检测之后才装」的。重新回到该标签页时自动重试一次，
+  // 避免一直卡在「未安装」直到手动整页刷新或点「重新检测」。
+  useEffect(() => {
+    if (!authenticated) return
+    const onFocus = () => void load()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [authenticated, load])
 
   const revoke = async (id?: string, all?: boolean) => {
     setBusy(true)
@@ -68,8 +88,25 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
 
   if (missing) {
     return (
-      <CollapsibleCard title={t('account.title')} bodyClassName="pt-0">
+      <CollapsibleCard
+        title={t('account.title')}
+        bodyClassName="pt-0"
+        headerExtra={
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={t('modules.recheck')}
+            title={t('modules.recheck')}
+            onClick={() => void load()}
+            disabled={checking}
+          >
+            {checking ? <Spinner aria-hidden data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
+            {t('modules.recheck')}
+          </Button>
+        }
+      >
         <p className="text-[11px] text-muted-foreground">{t('account.unavailable')}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{t('account.unavailableHint')}</p>
       </CollapsibleCard>
     )
   }
@@ -81,8 +118,8 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
       title={t('account.title')}
       bodyClassName="flex flex-col gap-3 pt-0"
       headerExtra={
-        <Button size="sm" variant="ghost" aria-label={t('home.refresh')} onClick={() => void load()} disabled={busy}>
-          {busy ? <Spinner aria-hidden data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
+        <Button size="sm" variant="ghost" aria-label={t('home.refresh')} onClick={() => void load()} disabled={busy || checking}>
+          {busy || checking ? <Spinner aria-hidden data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
         </Button>
       }
     >

@@ -70,7 +70,7 @@ TShock REST API  (env TSHOCK_URL，默认 http://127.0.0.1:7878)
        ├─ /webui/batch → 按 token 用户组逐条执行指令（与 rawcmd 同权限；`mode=player` 可跑 AllowServer=false，需显式开启）
        ├─ /webui/restlimit → TShock 建令牌限流只读快照（调用者自己 IP）；后端据此精确判 `rate_limited`
        └─ /webui/{commands,me,data,serverinfo,events} → 只读信息；/webui/auth/{sessions,revoke} → 会话自助管理
-       └─ 高级指令 `/weblimit [值|unlimited|default]` → 查看/放宽 RESTMaximumRequestsPerInterval（挂 tshock.rest.cfg，普通玩家不可见）
+       └─ 高级指令 `/web limit [值|unlimited|default]` → 查看/放宽 RESTMaximumRequestsPerInterval（需 webui.admin + tshock.rest.cfg）
 ```
 
 关键点：**TShock token 只存在于后端内存**，只出现在 Go → TShock 的出站请求里；浏览器、Cookie、URL、日志里都没有它。
@@ -282,7 +282,7 @@ cd web && npm run dev
    默认 `guest`/`default` 组都没有，需管理员赋权。
 3. **调大 `RESTMaximumRequestsPerInterval`**（建议 `60`）：经反代后 TShock 只看到网关 IP，
    所有玩家共用一个限流桶（实测 `<gateway-ip>`），默认 5/分钟会互相影响。
-   装了 WebUI 插件后也可在游戏内 / 控制台执行 `/weblimit 60`（或 `unlimited`）自动改并保存（需 `tshock.rest.cfg`）。
+   装了 WebUI 插件后也可在游戏内 / 控制台执行 `/web limit 60`（或 `unlimited`）自动改并保存（需 `webui.admin` + `tshock.rest.cfg`）。
 4. 可选：`EnableTokenEndpointAuthentication = false` 让 `/v2/server/status` 公开（否则登录前拿不到版本）。
    后端已兼容两种情况（401 也视为「可达」）。
 5. `7878` 尽量只对本容器网络开放，不要暴露到公网。
@@ -293,5 +293,6 @@ cd web && npm run dev
 
 - 会话在内存：容器重启/多副本 → 需重登、无法水平扩展。
 - TShock 限流按网关 IP 计数：只能通过调大阈值缓解；要按真实玩家 IP 需插件读 `X-Forwarded-For`（**尚未实现**）。
-- 无数据库、无持久化：历史/收藏仍在浏览器 localStorage（`tswui:*`）。
+- 无数据库：历史/收藏在浏览器 localStorage（`tswui:*`）；服务器动态历史由**插件**按天落盘
+  （`tshock/WebUI/events/*.jsonl`，默认保留 7 天 / 50MB），Go 后端本身仍无状态、不落盘。
 - IPv6 与 `RemoteAddr` 解析、HTTPS 出站证书等需在实现时覆盖测试。

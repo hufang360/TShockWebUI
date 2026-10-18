@@ -66,6 +66,8 @@ const (
 	KindUnavailable     ErrorKind = "unavailable"
 	KindTimeout         ErrorKind = "timeout"
 	KindBadResponse     ErrorKind = "bad_response"
+	// KindRateLimited：上游以 429 返回限流（如信使插件的发言限流）。
+	KindRateLimited ErrorKind = "rate_limited"
 	// KindBadRequest：上游/插件以 4xx（非 401/403/404、非 5xx）返回业务错误，
 	// Message 为上游原文（如 PlayerManager 的「未找到玩家」），应原样透出给用户。
 	KindBadRequest ErrorKind = "bad_request"
@@ -74,6 +76,10 @@ const (
 	KindPluginBusiness ErrorKind = "plugin_business"
 	// KindPluginForbidden：插件拒绝了调用（共享密钥不匹配等）。
 	KindPluginForbidden ErrorKind = "plugin_forbidden"
+	// KindPluginOutdated：插件在装，但缺少该端点 / 能力（版本过旧）。
+	KindPluginOutdated ErrorKind = "plugin_outdated"
+	// KindPluginProtocolError：插件与后端协议不兼容。
+	KindPluginProtocolError ErrorKind = "plugin_protocol_mismatch"
 )
 
 // APIError 是带类别的 TShock 调用错误。
@@ -160,6 +166,9 @@ func (c *Client) ForBaseURL(baseURL string) *Client {
 	cp.baseURL = strings.TrimRight(baseURL, "/")
 	return &cp
 }
+
+// BaseURL 返回该客户端的 TShock 上游地址（用于按上游做缓存 / 共享轮询）。
+func (c *Client) BaseURL() string { return c.baseURL }
 
 // WithTimeout 返回共享同一 Transport 的副本，但整体超时为 d。
 // 用于需要更长整体超时的调用（如批量执行多条指令）。
@@ -404,6 +413,8 @@ func classify(status int, body []byte) *APIError {
 	case status == http.StatusNotFound:
 		// TShock 对未知端点返回 404；调用方据此判断插件/端点是否存在。
 		return &APIError{Kind: KindNotFound, Status: status, Message: msg}
+	case status == http.StatusTooManyRequests:
+		return &APIError{Kind: KindRateLimited, Status: status, Message: msg}
 	case status >= 400:
 		return &APIError{Kind: KindBadRequest, Status: status, Message: msg}
 	}

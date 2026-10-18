@@ -88,6 +88,52 @@ describe('ItemTooltipContent', () => {
     )
   })
 
+  it('含玩家加成会重算的属性行（伤害/蓝耗）时，补一句「基础值」说明', () => {
+    const { rerender } = render(
+      <I18nProvider lang="zh">
+        <ItemTooltipContent
+          item={item}
+          stat={{ tip: ['190近战伤害', '14%暴击率'], stats: { damage: 190, melee: true } }}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('基础值 · 不含角色属性加成')).toBeTruthy()
+
+    // 没有玩家加成相关的物品（如火把）不显示，避免噪音。
+    rerender(
+      <I18nProvider lang="zh">
+        <ItemTooltipContent item={item} stat={{ tip: ['可放置'], stats: { material: true } }} />
+      </I18nProvider>,
+    )
+    expect(screen.queryByText('基础值 · 不含角色属性加成')).toBeNull()
+  })
+
+  it('饰品词缀：显示精确效果行（玩家 Player.GrantPrefixBenefits）', () => {
+    const { rerender } = render(
+      <I18nProvider lang="zh">
+        <ItemTooltipContent
+          item={item}
+          prefix="险恶"
+          prefixMods={{ benefit: { key: 'damage', value: 4 } }}
+          stat={{ tip: ['可装备'], stats: { accessory: true } }}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('+4%伤害')).toBeTruthy()
+
+    rerender(
+      <I18nProvider lang="zh">
+        <ItemTooltipContent
+          item={item}
+          prefix="奥秘"
+          prefixMods={{ benefit: { key: 'mana', value: 20 } }}
+          stat={{ tip: ['可装备'], stats: { accessory: true } }}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('+20 魔力')).toBeTruthy()
+  })
+
   it('词缀修正：伤害 / 暴击 / 速度 / 击退随词缀变化', () => {
     render(
       <I18nProvider lang="zh">

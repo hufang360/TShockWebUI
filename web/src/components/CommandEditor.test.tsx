@@ -65,29 +65,6 @@ describe('CommandEditor 输入组与拦截提示', () => {
     expect(onExecute).toHaveBeenCalledTimes(1)
   })
 
-  it('有内容时显示圆形清空按钮，点击清空并保留焦点', () => {
-    const onChange = vi.fn()
-    const { container } = render(
-      <I18nProvider lang="zh">
-        <CommandEditor {...baseProps} onChange={onChange} onExecute={() => {}} />
-      </I18nProvider>,
-    )
-    const ta = container.querySelector('textarea') as HTMLTextAreaElement
-
-    fireEvent.click(screen.getByRole('button', { name: '清空' }))
-    expect(onChange).toHaveBeenCalledWith('')
-    expect(document.activeElement).toBe(ta)
-  })
-
-  it('空内容时不显示清空按钮', () => {
-    render(
-      <I18nProvider lang="zh">
-        <CommandEditor {...baseProps} value="" onExecute={() => {}} />
-      </I18nProvider>,
-    )
-    expect(screen.queryByRole('button', { name: '清空' })).toBeNull()
-  })
-
   // 参数提示（用法串原文）显示在编辑器下方。
   it('显示当前参数的用法串提示', () => {
     const { container } = render(
@@ -132,5 +109,31 @@ describe('CommandEditor 输入组与拦截提示', () => {
     ta.dispatchEvent(ev)
     expect(onExecute).toHaveBeenCalledTimes(1)
     expect(ev.defaultPrevented).toBe(true)
+  })
+})
+
+describe('CommandEditor 历史回翻', () => {
+  it('下拉关闭时 ↑ 逐条回翻历史（最新在前），再按 ↓ 往回', () => {
+    const onChange = vi.fn()
+    const { container } = render(
+      <CommandEditor
+        value=""
+        onChange={onChange}
+        computeCompletions={() => []}
+        onExecute={() => {}}
+        busy={false}
+        atlas={undefined}
+        history={['/time day', '/help']}
+      />,
+    )
+    const ta = container.querySelector('textarea') as HTMLTextAreaElement
+    fireEvent.keyDown(ta, { key: 'ArrowUp' })
+    expect(onChange).toHaveBeenLastCalledWith('/time day')
+    fireEvent.keyDown(ta, { key: 'ArrowUp' })
+    expect(onChange).toHaveBeenLastCalledWith('/help')
+    fireEvent.keyDown(ta, { key: 'ArrowDown' })
+    expect(onChange).toHaveBeenLastCalledWith('/time day')
+    fireEvent.keyDown(ta, { key: 'ArrowDown' })
+    expect(onChange).toHaveBeenLastCalledWith('')
   })
 })

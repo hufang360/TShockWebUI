@@ -92,7 +92,7 @@
 - 定时器每 `RESTRequestBucketDecreaseIntervalMinutes`（**最小 1 分钟**）把所有 IP 计数 −1。
 - 默认 `RESTMaximumRequestsPerInterval = 5` → 约 5 次成功或 3 次失败即被挡，之后每分钟恢复 1 次。
 - 出处：`Rest.cs:237-241,320-334`、`SecureRest.cs:117-125`、`TShockConfig.cs:650,654`。
-- **装了 WebUI 信使插件后可精确/可放宽**：插件暴露只读端点 `/webui/restlimit`（返回 `limit` 与**调用者自己 IP** 的 `bucket`，源码读 public 的 `Rest.tokenBucket`），后端在密码登录前调用 → 桶满直接判 `rate_limited`；服务端还可用 `/weblimit <值>|unlimited|default` 修改并保存 `RESTMaximumRequestsPerInterval`（高级指令，需 `tshock.rest.cfg`）。见 `docs/插件-信使.md`。
+- **装了 WebUI 信使插件后可精确/可放宽**：插件暴露只读端点 `/webui/restlimit`（返回 `limit` 与**调用者自己 IP** 的 `bucket`，源码读 public 的 `Rest.tokenBucket`），后端在密码登录前调用 → 桶满直接判 `rate_limited`；服务端还可用 `/web limit <值>|unlimited|default` 修改并保存 `RESTMaximumRequestsPerInterval`（需 `webui.admin` + `tshock.rest.cfg`）。见 `docs/插件-信使.md`。
 
 ## 5. 端点清单（核心，v6.2.1）
 

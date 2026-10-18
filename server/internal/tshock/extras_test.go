@@ -81,7 +81,10 @@ func TestServerInfoAndEvents(t *testing.T) {
 			}
 			writeJSON(w, 200, map[string]any{
 				"status": "200", "lastSeq": 7,
-				"events": []map[string]any{{"seq": 6, "type": "join", "text": "Alice 加入", "time": "t"}},
+				"events": []map[string]any{
+					{"seq": 6, "type": "join", "text": "Alice 加入", "time": "t"},
+					{"seq": 7, "type": "chat", "text": "[WebUI] Alice: 你好", "time": "t", "source": "webui"},
+				},
 			})
 		}
 	}), time.Second)
@@ -91,8 +94,37 @@ func TestServerInfoAndEvents(t *testing.T) {
 		t.Fatalf("info = %+v err=%v", info, err)
 	}
 	page, err := c.Events(context.Background(), "tok", 5, 10)
-	if err != nil || page.LastSeq != 7 || len(page.Events) != 1 {
+	if err != nil || page.LastSeq != 7 || len(page.Events) != 2 {
 		t.Fatalf("page = %+v err=%v", page, err)
+	}
+	if page.Events[1].Type != "chat" || page.Events[1].Source != "webui" {
+		t.Fatalf("事件来源未透传：%+v", page.Events[1])
+	}
+}
+
+func TestEventsTail(t *testing.T) {
+	c := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/webui/events" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		if r.URL.Query().Get("tail") != "100" {
+			t.Errorf("tail = %q", r.URL.Query().Get("tail"))
+		}
+		writeJSON(w, 200, map[string]any{
+			"status": "200", "lastSeq": 9, "firstSeq": 8,
+			"events": []map[string]any{
+				{"seq": 8, "type": "join", "text": "Alice 加入", "time": "t"},
+				{"seq": 9, "type": "leave", "text": "Bob 离开", "time": "t"},
+			},
+		})
+	}), time.Second)
+
+	page, err := c.EventsTail(context.Background(), "tok", 100)
+	if err != nil {
+		t.Fatalf("EventsTail: %v", err)
+	}
+	if page.FirstSeq != 8 || page.LastSeq != 9 || len(page.Events) != 2 {
+		t.Fatalf("page = %+v", page)
 	}
 }
 

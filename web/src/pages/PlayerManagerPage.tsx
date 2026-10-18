@@ -4,6 +4,7 @@ import { ItemIcon } from '@/components/ItemIcon'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { LoginGate } from '@/components/LoginGate'
 import { PlayerAvatar } from '@/components/PlayerAvatar'
+import { SearchInput } from '@/components/SearchInput'
 import { SlotTooltip } from '@/components/SlotTooltip'
 import {
   Alert,
@@ -18,7 +19,6 @@ import {
   CollapsibleTrigger,
   Field,
   FieldLabel,
-  Input,
   Separator,
   Spinner,
   Switch,
@@ -29,6 +29,7 @@ import {
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { cn } from '@/lib/cn'
+import { addSearchHistory } from '@/lib/searchHistory'
 import { StorageKeys } from '@/lib/storage'
 import {
   EQUIP_GROUP_A,
@@ -121,13 +122,13 @@ export function PlayerManagerPage({
   // `touched` 用来区分「从未填过」（默认自己）与「手动清空」（就显示空）。
   const name = uiState.name || (uiState.touched ? '' : username || '')
   const setName = useCallback((value: string) => setUiState({ name: value, touched: true }), [setUiState])
-  // 最近查询过的玩家名（去重、最新在前、最多 8 个）；按服务器记忆。
+  // 最近查询过的玩家名（统一规则：最多 10 条、窄区域显示 5 条；见 lib/searchHistory.ts）；按服务器记忆。
   const recent = useMemo(() => uiState.recent ?? [], [uiState.recent])
   const rememberName = useCallback(
     (displayName: string) => {
       const n = displayName.trim()
       if (!n) return
-      const next = [n, ...recent.filter((x) => x.toLowerCase() !== n.toLowerCase())].slice(0, 8)
+      const next = addSearchHistory(recent, n)
       setUiState({ recent: next })
     },
     [recent, setUiState],
@@ -231,6 +232,18 @@ export function PlayerManagerPage({
   const canUse = capability?.plugin === true && capability.permission === true
   // 最近查询的快捷按钮：不重复展示当前正在看的名字。
   const recentChips = recent.filter((n) => n.toLowerCase() !== (look?.name ?? '').toLowerCase())
+  // 输入框下拉候选：最近查过的名字在前，再补上在线玩家（去重）。
+  const suggestions = useMemo(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const n of [...recentChips, ...players]) {
+      const key = n.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(n)
+    }
+    return out
+  }, [recentChips, players])
 
   // 联动侧栏头像：查到的是「当前登录账号本人」时，记下外观供账号卡片画全身图。
   useEffect(() => {
@@ -393,25 +406,26 @@ export function PlayerManagerPage({
             {/* 查询行：输入 + 带文字按钮（下载 / 刷新 / 查看）+ 分隔线 + 导入 .plr */}
             <TooltipProvider delayDuration={150}>
               <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  className="max-w-xs"
-                  list="players-page-names"
+                <SearchInput
+                  className="h-9 max-w-xs"
+                  inputClassName="text-sm"
                   value={name}
                   placeholder={t('players.namePlaceholder')}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    // 输入时清掉上一次的错误，避免边打字边被「无法解析」打扰。
+                  history={suggestions}
+                  historyHeader={t('players.nameSuggest')}
+                  onValueChange={(v) => {
+                    setName(v)
+                    // 输入时清掉上一次的错误，避免边打字边被“无法解析”打扰。
                     setError(null)
+                  }}
+                  onHistorySelect={(n) => {
+                    setName(n)
+                    void runLook(n)
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void runLook()
                   }}
                 />
-                <datalist id="players-page-names">
-                  {players.map((p) => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -494,7 +508,7 @@ export function PlayerManagerPage({
               </div>
             </TooltipProvider>
 
-            {/* 简约视图（最左） + 最近查询结果 */}
+            {/* 简约视图 + 最近查询结果走输入框下拉（见上方 SearchInput） */}
             <div className="flex flex-wrap items-center gap-2">
               <Field orientation="horizontal" className="w-auto flex-nowrap gap-1.5">
                 <Switch
@@ -507,22 +521,6 @@ export function PlayerManagerPage({
                   {t('players.compactView')}
                 </FieldLabel>
               </Field>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {recentChips.map((n) => (
-                  <Button
-                    key={n}
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy != null}
-                    onClick={() => {
-                      setName(n)
-                      void runLook(n)
-                    }}
-                  >
-                    {n}
-                  </Button>
-                ))}
-              </div>
             </div>
 
             {error && (

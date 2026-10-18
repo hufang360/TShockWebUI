@@ -69,6 +69,27 @@
 
 ---
 
+## P5 · UI 一致性与体验（来自 `docs/审查-UI一致性与体验.md`）
+
+先看审查全文（含证据、降级矩阵、业务建议）：`docs/审查-UI一致性与体验.md`。
+
+| 项 | 现状 / 证据 | 方案 | 状态 |
+| --- | --- | --- | --- |
+| 抽共享 `CardManagerSheet`，彻底统一「管理卡片」 | 首页 `HomeCardManager` 与模块/鱼店 `ModuleCardManagerDialog` 两套交互（自动执行控件、添加流程、排序/可见性、底部操作区均不一致；首页 `Checkbox`→`Switch` 已先统一） | 抽一个可配置的卡片管理 Sheet（添加=底部表单、自动执行=Switch、删除、说明；排序/可见性/恢复默认作为可选能力注入），两处复用 | 待定（P1） |
+| 微型字号刻度统一 | `text-[10px]`(44) + `text-[11px]`(47) 任意值泛滥，与 12/14px 刻度脱节 | 在 `index.css` 定义 2 个微字号刻度（如 `text-2xs`）并全站替换 | 待定（P2） |
+| 空态统一 | 已有 `Empty`(33 处)，仍有裸 `<p>`（recentEmpty / eventsEmpty / cards.empty / sessionsEmpty / noMatch） | 统一 `Empty`（可加紧凑变体） | 待定（P2） |
+| 破坏性删除确认一致 | 清空类用 `ConfirmButton`；模块卡片 / 自定义模块 / 服务器是单击即删 | 不能撤销的用 `ConfirmButton`；可撤销的用「删除 + 撤销」 | 待定（P2） |
+| 手写彩色提示改 `Alert` | `PlayerManagerPage:529`、`FishShopPage:611` | 改 `Alert variant="destructive|success"` | 待定（P3） |
+| 巨型组件拆分 | `PlayerManagerPage` 1057 / `ItemsPage` 868 / `HomePage` 839 / `App` 827 行… | 按数据/视图/子面板拆分 | 待定（P2） |
+| 首页卡片拖拽无障碍 | 原生 HTML5 DnD，无键盘可达 | dnd-kit 或键盘上移/下移 | 待定（P2） |
+| 事件流 SSE 推送 + 可选持久化 + 更多事件类型 | 统一聊天模型（`type=chat` + `source=game\|webui`）已完成；现仍为轮询 | SSE 推送（REST 降级）；有上限的追加文件保存历史；更多事件类型 + 前端过滤/高亮 | 待定（研究） |
+| 网页聊天：回复/引用 + 导航可排序 + 骨架屏 | 消息模型（`id`/`time` + 失败重试）已完成 | 点消息引用、侧栏拖拽排序、大块内容骨架 | 待定（P3） |
+| 插件能力探测重复 | `batchCapabilities` 在多处各自探测 | 收敛为统一能力矩阵（可与 `/api/plugin/status` 合并） | 待定（P3） |
+
+> 本轮已做：自定义模块「名称 + 主指令 + 顶部说明」可配、首页「自动执行」控件改 `Switch`、插件卸载时「统一执行」开关显示一致、聊天统一 `type=chat`+`source`、发言 `id`/`time`+失败重试、`ChatPrefix` 可配、首页动态卡片加发言入口。
+
+---
+
 ## 相关文档
 
 - `docs/设计原则与约束.md` —— 产品原则、范围与硬约束。

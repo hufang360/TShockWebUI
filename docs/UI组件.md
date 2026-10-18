@@ -56,6 +56,10 @@
 - **弹框底部操作区用 `DialogFooter`**：底色 `bg-background` + `border-t`；用负外边距抵消 `DialogContent` 的 `p-5` 做成通栏；物品详情 / 商品详情 的操作按钮都放在这里。
   （亮色下 `--background` 已改为与卡片同为白，靠顶部 `border-t` 区分；暗色下仍比卡片深。）
 - **图标进组件用 `data-icon`**（`Button` / `TabsTrigger` / `ToggleGroupItem` / `CardTitle` 已统一兜底尺寸）。
+- **详情优先用右侧抽屉 `Sheet`**（物品详情、鱼店商品详情、数据图鉴的 NPC / 图格 / 墙详情）：标题栏固定、
+  中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框。
+- **带「最近搜索」的搜索框用 `SearchInput`**：历史下拉**默认聚焦时不弹、打字时弹**，另有输入框内的
+  历史按钮可手动展开（`historyOnFocus` / `historyToggle`，见 `docs/功能-搜索记录.md`）。
 
 ## 卡片的「主 / 次」层次
 
@@ -71,6 +75,8 @@
 
 - 每张卡片用 `components/CollapsibleCard.tsx`（Card + Collapsible）：头部标题可点击折叠，头部右侧控件（重新检测 / 刷新）不参与折叠。
 - 「激活模块」卡片内是 `Tabs`：**已适配**（玩家管理 / 鱼店 / 世界管理）/ **自定义**（自定义模块列表 + 创建）。
+  登录成功后 App 会探测插件，**已安装且有权限的玩家管理 / 鱼店会自动激活**（侧边栏入口直接出现）；
+  用户手动拨过开关的模块记入 `tswui:modulesSet`，不再被自动激活覆盖；世界管理无法可靠探测，保持手动。
 - 「界面偏好」只放字号 / 简约视图 / 语言 / 主题（自动 / 浅色 / 深色）/ 统一执行；「数据刷新」单独一张卡片：
   执行队列间隔 + 服务器动态刷新间隔 + 页面数据刷新间隔。
 
@@ -97,9 +103,10 @@
 ## 模块与指令卡片
 
 - 内置模块（`MODULE_DEFS`）：玩家管理、鱼店、世界管理；自定义模块（`lib/customModules.ts`，id `m:`）由用户
-  「填名称 + 指令前缀」创建，并自动生成一张「帮助」卡片（`/xx help`）；创建后可在列表中**直接改名**，激活后进侧边栏。
+  「填名称 + 主指令」创建，并自动生成一张「帮助」卡片（`/xx help`）；创建后可在列表中**直接改名称 / 主指令 / 顶部说明**（
+  `desc` 留空则回退默认提示），改主指令会同步「帮助」卡片；激活后进侧边栏。
 - 模块内的「用户添加的指令卡片」统一存 `tswui:moduleCards`（`lib/moduleCards.ts`，`byServer[serverId][moduleId]`）。
-- 侧边栏顺序：首页 → 指令 → 物品图鉴 → 已激活内置模块 → 自定义模块 → **设置（恒在末尾）**。
+- 侧边栏顺序：首页 → 指令 → 物品图鉴 → 数据图鉴（NPC / 图格 / 墙） → 已激活内置模块 → 自定义模块 → **设置（恒在末尾）**。
 - 通用页 `pages/CommandModulePage.tsx` + `components/ModuleCardsPanel.tsx`：世界管理与自定义模块共用，
   支持逐张刷新 / 刷新全部 / 添加删除卡片 / 批量执行。鱼店右侧卡片（`FishCommandCards`）也用同一份 `moduleCards`
   追加自定义卡片。
@@ -185,6 +192,10 @@
 - 错误 / 无权限提示仍在出错时才出现（含可复制的赋权命令）。
 
 ## 变更记录
+
+- v1.36：指令结果卡片与指令卡片（首页 / 模块 / 鱼店）：**表头整块可点击**折叠 / 展开（收藏 / 删除按钮除外），标题 / 指令文字可鼠标选中。新增 `hooks/useCollapsed.ts`（`tswui:collapsedCards`）按 key 记忆展开状态，`ResultEntry.collapsed` 随结果持久化；`useBottomList` 补 `ResizeObserver`，容器量高 / 尺寸变化后重新贴底（结果区总是停在最新一条）。新增 `lib/selection.ts` 的 `hasTextSelection()`：选中文字时不折叠。**结果按服务器分开存储**：指令页 `tswui:commandResults` 改为 `serverId -> ResultEntry[]`，内存结果 `CommandResultsProvider` 接收 `serverId` 并按服务器分桶。
+- v1.35：「NPC 图鉴」与「数据 ID」合并为**数据图鉴**（侧边栏「数据图鉴」，`CodexPage`）：同一套网格切换 NPC / 图格 / 墙，翻页器改走物品图鉴底部那套（件数 ｜ 数据版本 + 每页 + `Pagination`），NPC 与图格 / 墙的详情一律改**右侧抽屉**（`Sheet`）。`SearchInput` 的「最近搜索」改为**聚焦不弹、打字才弹**，并新增输入框内的历史按钮（`historyOnFocus` / `historyToggle`），物品图鉴同步生效。
+- v1.34：自定义模块新增「顶部说明」`desc`（设置里与名称 / 主指令一起可编，留空回退默认提示，模块页 `desc` 取它）；「自动执行」控件首页由 `Checkbox` 改为 `Switch`，与模块 / 鱼店管理卡片一致；插件缺失时设置里「统一执行」开关显示为关（保留用户偏好）。新增 `docs/审查-UI一致性与体验.md`（UI 一致性审查 + 业务建议 + 降级矩阵）。
 
 - v1.33：物品图鉴：默认「全部物品」（去掉手气不错 / 换一批）、「分组 + 集合」合并为一个 InputGroup 下拉、tips 悬停延迟 350ms；合成表分区图标固定 531/36/5362、条件图标化（猩红 5533 / 腐化 5532 / 水 206 / 蜂蜜 1128 / 岩浆 207 / 雪 593）、`notDecraftable` 紫色「不微光」标签、制作站前加分割线、条目 hover 右上角浮动复制（含 / 不含 `[i:..]` 标签，两个勾选框移到内容下方居左）。指令：执行按钮改小飞机图标、结果卡片收藏 / 删除与折叠箭头同步 hover、已收藏为实心星（不黄色）。新增 `Badge` 的 `purple` 语义色、`SearchInput` / `CollapseChevron` / `ConfirmButton` / `BatchDeleteControls` / `SelectIndicator` / `useBatchSelect` / `useRovingFocus`。
 - v1.32：卡片表头统一为 `[图标] 标题 [状态] ……………… [刷新] [∨]`：右侧操作按钮**默认隐藏、hover 表头才显、折叠时不显**；折叠箭头移到最右（展开 hover 显、折叠常显）。`CollapseChevron` 新增 `reveal` 参数。首页：最近执行限 5 条；快捷入口改 outline，文本「指令 / 物品图鉴」+ 鱼店 / 玩家管理（仅模块激活）+ 设置；管理卡片：指令换行、自动执行改 `Checkbox`、可见性改 `Switch`、去掉上下箭头。指令：左栏卡片透明无投影、输入框与执行按钮白底（outline）。自定义模块：管理卡片也改右侧 `Sheet`；页面两栏（左卡片 / 右记事本 textarea）。物品图鉴：合成表 / 用于合成 / 微光转换图标 = 531 / 36 / 5362。

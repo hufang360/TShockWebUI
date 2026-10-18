@@ -48,7 +48,7 @@ scripts/build-plugin.sh      # 打印 DLL 路径
 2. **重启 TShock**（插件不支持热重载）。
 3. 启动日志应出现：
    ```
-   [WebUI] REST 端点已注册：/webui/auth/*、/webui/batch、/webui/{commands,me,data,serverinfo,events}
+   [WebUI] REST 端点已注册：/webui/auth/*、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}
    [Server API] Info Plugin WebUI v0.1.0.0 (by TShockWebUI) initiated.
    ```
 
@@ -99,6 +99,13 @@ docker restart tshock
 | `AllowInGameOnlyCommands` | Tier B：是否允许以**真实在线玩家**身份执行 `AllowServer=false` 的指令（默认关；权限不多一分）。 |
 | `AllowChatConfirm` | 是否允许玩家直接回复 `y`/`n` 确认（无需输入 `/web auth` 验证码）。 |
 | `RecordChat` | 是否把玩家聊天记入「服务器动态」（事件流 `type=chat`，默认开）。仅普通聊天、不含指令；关掉即完全不采集聊天。 |
+| `PersistEvents` | 是否把事件按天写入 `tshock/WebUI/events/*.jsonl`（默认开，重启不清空）；关掉退回纯内存。 |
+| `PersistChat` | 是否把聊天也写入磁盘（默认**关**，保护隐私；仍会出现在内存事件流里）。 |
+| `HistoryDays` | 事件历史保留天数（默认 7；<=0 不按天清理）。 |
+| `HistoryMaxMB` | 事件历史目录大小上限 MB（默认 50；<=0 不按大小清理）。 |
+| `AllowWebChat` | 是否允许网页端（`/webui/chat`）把文本发到游戏内聊天（带 `[WebUI]` 前缀，默认开）。 |
+| `MaxWebChatPerMinute` | 同一账号每分钟最多经网页发送的聊天条数（默认 20；0 = 不限）。 |
+| `ChatPrefix` | 网页发言在游戏内/事件流里的前缀（默认 `[WebUI]`）。 |
 
 后端环境变量：
 
@@ -118,6 +125,7 @@ docker restart tshock
 
 | 端点 | 参数 | 返回 |
 | --- | --- | --- |
+| `/webui/meta` | `secret`（可选） | `{name,version,protocol,minProtocol,capabilities[]}`：协议握手。后端据此判定兼容性 / 能力；新增能力只改 `capabilities`，破坏性改动才 +1 `protocol` |
 | `/webui/auth/request` | `name`、`secret` | `{code:"ok", ticket, expires, player, username}`；玩家不在线 → `{code:"offline"}` |
 | `/webui/auth/poll` | `ticket`、`secret` | `{code:"ok", state:"pending"/"approved"/"denied"/"expired"}`；批准时附 `username` + `token`（仅返回一次） |
 | `/webui/auth/cancel` | `ticket`、`secret` | `{code:"ok"}`（后端放弃等待时回收票据） |
@@ -127,7 +135,8 @@ docker restart tshock
 | `/webui/me` | `token` | `{username,group,permissions,canUseApi,canRunCommands}` |
 | `/webui/data` | `type=regions\|warps\|npcs\|buffs`、`token` | `{regions/warps:[...]}` 或 `{npcs/buffs:[{id,name}]}` |
 | `/webui/serverinfo` | `token` | 世界事件 / Boss 进度等 |
-| `/webui/events` | `since`、`limit`、`token` | `{events:[{seq,type,text,time}],lastSeq}`；`type ∈ join\|leave\|boss\|chat` |
+| `/webui/events` | `since`、`limit`、`tail`、`token` | `{events:[{seq,type,text,time,source?}],lastSeq,firstSeq?}`；`type ∈ join\|leave\|boss\|announce\|npc\|chat`；`announce` = 世界公告（Boss 苏醒 / 事件开始 / 入侵），`npc` = 旅商到达（其它城镇 NPC 与 NPC 死亡不记）；聊天的 `source ∈ game\|webui`；`tail=N` 取最新 N 条（磁盘历史，需能力 `events_history`） |
+| `/webui/chat` | `text`、`token` | `{name,text,line,id,time,source}`：以配置前缀（默认 `[WebUI]`）广播到游戏内聊天（不伪造身份；在线禁言 → 403；超限流 → 429），并记入事件流 `type=chat, source=webui` |
 | `/webui/auth/sessions` | `token` | `{sessions:[{id,created,expires,current}]}` |
 | `/webui/auth/revoke` | `id` 或 `all=true`、`token` | `{revoked:n}` |
 
@@ -144,28 +153,22 @@ docker restart tshock
 
 ## 游戏内指令
 
-**普通玩家**（无权限要求、仅限游戏内）：
+**统一入口**：`/web`（`/webui`），功能指令均为**二级子命令**；权限节点 `webui.use` / `webui.admin`：
 
 ```
-/web auth <验证码>          # 同意
-/web deny <验证码>          # 拒绝
+/web auth <验证码>          # 同意（需 webui.use）
+/web deny <验证码>          # 拒绝（需 webui.use）
+/web limit                   # 查看 TShock 建令牌限流（需 webui.admin + tshock.rest.cfg）
+/web limit <上限>            # 设为 N（≥1）；unlimited=1000000；default=5
 ```
 
-主命令是 `/webui`，简写 `/web`；帮助会在不带参数时显示。
-只有发起请求时匹配到的那名玩家能审批自己的验证码，`auth`/`deny` 必须在游戏内由本人执行。
-
-**高级指令**（单独注册、挂 `tshock.rest.cfg`，普通玩家看不到也跑不了）：
-
-```
-/weblimit                   # 查看 TShock 建令牌限流
-/weblimit <上限>            # 设为 N（≥1）；unlimited=1000000；default=5
-```
-
-命令名 `webadmin` / `weblimit`，`AllowServer=true`（控制台也可执行）；
-会修改并保存 TShock 的 `config.json` 中的 `RESTMaximumRequestsPerInterval`——
-这是服务端配置变更，属于用户明确要求的例外。
-`/webui/commands` 指令目录按调用者用户组过滤（与 TShock `/help` 的可见性一致），
-带权限的指令不会下发给普通玩家。
+- `auth` / `deny` 必须在游戏内由本人执行（控制台顶替不了玩家确认）。
+- `limit` 会修改并保存 TShock 的 `config.json` 中的 `RESTMaximumRequestsPerInterval`——
+  属用户明确要求的例外；同时要求 `webui.admin` 与 `tshock.rest.cfg`（控制台 / superadmin 满足）。
+- 权限节点需服主授予，例如：`/group addperm default webui.use`、`/group addperm <管理组> webui.admin`。
+  插件启动时若没任何组拥有 `webui.use` 会在控制台警告。
+- `/webui/commands` 指令目录按调用者用户组过滤（与 TShock `/help` 的可见性一致），
+  带权限的指令不会下发给普通玩家。
 
 ## 手动验收
 

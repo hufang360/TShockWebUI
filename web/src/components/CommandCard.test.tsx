@@ -1,8 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import type { CommandResult } from '@/types'
 import { CommandCard } from './CommandCard'
+
+beforeEach(() => {
+  window.localStorage.clear()
+})
 
 function renderCard(result?: CommandResult, onRefresh = vi.fn()) {
   render(
@@ -29,5 +33,34 @@ describe('CommandCard 刷新按钮提示', () => {
   it('底部不再显示执行时间', () => {
     renderCard({ status: 'ok', output: ['ok'], ts: Date.now() })
     expect(screen.queryByText(/执行于/)).toBeNull()
+  })
+
+  it('点击整个表头折叠 / 展开卡片', () => {
+    renderCard({ status: 'ok', output: ['结果内容'], ts: Date.now() })
+    expect(screen.getByText('结果内容')).toBeTruthy()
+    fireEvent.click(screen.getByText('测试卡片'))
+    expect(screen.queryByText('结果内容')).toBeNull()
+    fireEvent.click(screen.getByText('测试卡片'))
+    expect(screen.getByText('结果内容')).toBeTruthy()
+  })
+
+  it('按 collapseKey 记忆折叠状态（切换模块回来仍保持）', () => {
+    const view = () => (
+      <I18nProvider lang="zh">
+        <CommandCard
+          title="测试卡片"
+          command="/time"
+          result={{ status: 'ok', output: ['结果内容'], ts: Date.now() }}
+          collapseKey="home:test"
+        />
+      </I18nProvider>
+    )
+    const first = render(view())
+    fireEvent.click(screen.getByText('测试卡片'))
+    expect(screen.queryByText('结果内容')).toBeNull()
+    // 切走（卸载）再回来（重新挂载）：仍是折叠状态。
+    first.unmount()
+    render(view())
+    expect(screen.queryByText('结果内容')).toBeNull()
   })
 })

@@ -30,6 +30,41 @@ export interface Npc {
   id: number
   key: string
   name: string
+  /** `/sb`（spawnboss）可用参数（规范写法，如 `eye of cthulhu`）；仅 TShock 支持的 Boss 有。 */
+  sb?: string
+  /** `/sb` 的其它别名（如 `eoc` / `eye`）。 */
+  sbAliases?: string[]
+  /** 是否包含在 `/sb all`（一次生成全部 Boss）里。 */
+  sbAll?: boolean
+}
+
+/** 图格 / 墙 ID 表条目（`data/tiles.json` / `data/walls.json`）。 */
+export interface TileWallEntry {
+  id: number
+  /** `TileID` / `WallID` 常量名（语言无关；没有对应物品时作为显示名回退）。 */
+  key: string
+  /** 放置该图格 / 墙的代表物品 id；`null` = 没有对应物品。 */
+  item: number | null
+  /**
+   * 摆放尺寸 `[宽, 高]`（单位：格），来自游戏 `TileObjectData`。
+   * 只有图格（`tiles.json`）有；省略 = 简单方块（1×1）。
+   */
+  size?: [number, number]
+  /** frame-important 但无固定尺寸（树 / 陷阱 / 铁轨…）：显示「无固定尺寸」而不是 1×1。 */
+  frameImportant?: true
+}
+
+export interface TileWallData {
+  meta: {
+    gameVersion: string
+    count: number
+    withItem: number
+    withSize?: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  entries: TileWallEntry[]
 }
 
 /** Buff（ID → 内部名；显示名从 loc.BuffName 解析）。 */
@@ -161,6 +196,9 @@ export interface CommandParamSet {
   args: CommandParam[]
   /** 手写条目的源码出处（如 Commands.cs:4626 Time()） */
   source?: string
+  /** 额外说明（如「不加参数 = 查看」），显示在参数提示行。 */
+  noteZh?: string
+  noteEn?: string
 }
 
 export interface CommandDef {
@@ -206,6 +244,8 @@ export interface AtlasMeta {
   textures: number
   items: number
   sheet: string
+  /** 图集 PNG 内容哈希（缓存失效用；见 `lib/atlas.ts`）。 */
+  hash?: string
   generatedBy: string
   note: string
 }
@@ -231,12 +271,34 @@ export interface PlayerAtlasMeta {
   hairs: number
   regions: number
   sheet: string
+  /** 图集 PNG 内容哈希（缓存失效用）。 */
+  hash?: string
   generatedBy: string
   note: string
 }
 
 export interface PlayerAtlas {
   meta: PlayerAtlasMeta
+  regions: AtlasRegions
+}
+
+/** NPC 图集（`data/npc-atlas.json`）：`regions[npcId] = [x, y, w, h]`。 */
+export interface NpcAtlas {
+  meta: {
+    gameVersion: string
+    width: number
+    height: number
+    limitWidth: number
+    padding: number
+    count: number
+    missing: number
+    sheet: string
+    /** 图集 PNG 内容哈希（缓存失效用）。 */
+    hash?: string
+    generatedBy: string
+    source: string
+    note: string
+  }
   regions: AtlasRegions
 }
 
@@ -286,6 +348,32 @@ export interface PrefixMods {
   crt?: number
   tagdmg?: number
   arpen?: number
+  /** 游戏自身的词缀评分（`Item.BestPrefixValue` 用它取「顶级词缀」）。 */
+  val?: number
+  /** 饰品词缀的精确效果（`Player.GrantPrefixBenefits` / `Main.cs:21405`）。 */
+  benefit?: { key: 'defense' | 'mana' | 'crit' | 'damage' | 'moveSpeed' | 'meleeSpeed'; value: number }
+}
+
+/** `data/item-drops.json`：木匣等可开启物品的一次掉落（运行时模拟，chance 为实测概率）。 */
+export interface ItemDropEntry {
+  id: number
+  /** 开出至少 1 个的概率（meta.trials 次模拟的实测值，非源码分数）。 */
+  chance: number
+  minStack: number
+  maxStack: number
+}
+
+/** `data/item-drops.json`。 */
+export interface ItemDropsData {
+  meta: {
+    gameVersion: string
+    trials: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  /** itemId -> 掉落列表 */
+  items: Record<string, ItemDropEntry[]>
 }
 
 /** `data/prefix-sets.json`：每件物品可滚词缀（来自 `Item.GetRollablePrefixes()`）。 */
@@ -326,6 +414,14 @@ export interface Dataset {
   items: Item[]
   prefixes: Prefix[]
   npcs: Npc[]
+  /** `data/tiles.json`：图格 ID 表 */
+  tiles: TileWallData
+  /** `data/walls.json`：墙 ID 表 */
+  walls: TileWallData
+  /** tiles.id -> tile */
+  tilesById: Map<number, TileWallEntry>
+  /** walls.id -> wall */
+  wallsById: Map<number, TileWallEntry>
   buffs: Buff[]
   commands: CommandDef[]
   atlas: Atlas
@@ -341,6 +437,10 @@ export interface Dataset {
   prefixModsById: Map<number, PrefixMods>
   /** 每件物品可滚词缀 */
   prefixSets: PrefixSetsData
+  /** 木匣等可开启物品的掉落（运行时模拟） */
+  itemDrops: ItemDropsData
+  /** itemId -> 掉落列表（木匣等，没有则不收录） */
+  itemDropsById: Map<number, ItemDropEntry[]>
   /** itemId -> 可滚词缀 id 列表（没有则不收录，如盔甲） */
   rollablePrefixesById: Map<number, number[]>
   /** itemId -> 微光转换目标 */
@@ -463,6 +563,7 @@ export type TabId =
   | 'home'
   | 'editor'
   | 'items'
+  | 'codex'
   | 'players'
   | 'store'
   | 'world'

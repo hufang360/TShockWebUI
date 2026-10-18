@@ -25,6 +25,7 @@ internal static class Program
         var itemsOut = args.Length > 2 ? args[2] : "/tmp/items-raw.json";
         var groupsOut = args.Length > 3 ? args[3] : "/tmp/item-groups-raw.json";
         var prefixSetsOut = args.Length > 4 ? args[4] : "/tmp/prefix-sets-raw.json";
+        var dropsOut = args.Length > 5 ? args[5] : "/tmp/item-drops-raw.json";
 
         Bootstrap();
 
@@ -49,6 +50,9 @@ internal static class Program
         // 3) 跑游戏自己的配方构建
         Recipe.SetupRecipes();
 
+        // 3.5) 图格摆放尺寸（家具 / 多格）。
+        var tileDims = DumpTileDims(out var tileFrameImportant);
+
         // 4) 物品 -> 放置物 映射
         var itemTile = new Dictionary<int, int>();
         var itemWall = new Dictionary<int, int>();
@@ -66,10 +70,77 @@ internal static class Program
             }
         }
 
-        DumpRecipes(recipesOut, groups, itemTile, itemWall, tileToItems);
+        DumpRecipes(recipesOut, groups, itemTile, itemWall, tileToItems, tileDims, tileFrameImportant);
         DumpItems(itemsOut);
         DumpItemGroups(groupsOut);
         DumpPrefixSets(prefixSetsOut);
+        DumpItemDrops(dropsOut);
+    }
+
+    // ── 可开启物品的掉落（木匣等）─────────────────────────
+    // 木匣 / 宝藏袋的掉落是 Player.OpenFishingCrate / OpenBossBag 里的**命令式 switch**，
+    // 没有数据表可读；这里用**运行时模拟**（Monte Carlo）测出「物品 / 数量范围 / 概率」。
+    // 概率是实测值（meta.trials 次），不是源码里的精确分数——UI 会标注来源。
+    private static void DumpItemDrops(string outPath)
+    {
+        const int trials = 1000000;
+        // 只做木匣（fishing crate）：掉落与专家/大师无关，只受 IsFishingCrateHardmode 影响。
+        var crates = new List<int>();
+        for (int i = 1; i < ItemID.Count; i++) if (ItemID.Sets.IsFishingCrate[i]) crates.Add(i);
+
+        var player = new Player();
+        var result = new Dictionary<int, object>();
+        foreach (int crate in crates)
+        {
+            // 固定种子：可重复生成（不同 crate 用同一序列也无所谓，互不相关）。
+            Terraria.Main.rand = new Terraria.Utilities.UnifiedRandom(19880617);
+            var hit = new Dictionary<int, int>();          // type -> 出现该物品的 trial 数（至少 1 个）
+            var minStack = new Dictionary<int, int>();
+            var maxStack = new Dictionary<int, int>();
+            for (int t = 0; t < trials; t++)
+            {
+                for (int i = 0; i < player.inventory.Length; i++) player.inventory[i] = new Item();
+                try { player.OpenFishingCrate(crate); } catch { }
+                var got = new HashSet<int>();
+                for (int i = 0; i < player.inventory.Length; i++)
+                {
+                    var it = player.inventory[i];
+                    if (it == null || it.IsAir || it.type <= 0) continue;
+                    got.Add(it.type);
+                    minStack[it.type] = Math.Min(minStack.GetValueOrDefault(it.type, int.MaxValue), it.stack);
+                    maxStack[it.type] = Math.Max(maxStack.GetValueOrDefault(it.type, 0), it.stack);
+                }
+                foreach (var type in got) hit[type] = hit.GetValueOrDefault(type) + 1;
+            }
+            var list = hit
+                .Select(kv => new
+                {
+                    id = kv.Key,
+                    chance = Math.Round((double)kv.Value / trials, 6),
+                    minStack = minStack[kv.Key],
+                    maxStack = maxStack[kv.Key],
+                })
+                .OrderByDescending(x => x.chance)
+                .ThenBy(x => x.id)
+                .ToArray();
+            result[crate] = list;
+            Console.WriteLine($"[drops] {crate} {ItemID.Search.GetName(crate)}: {list.Length} kinds");
+        }
+
+        var payload = new
+        {
+            meta = new
+            {
+                gameVersion = AssemblyVersion(),
+                trials,
+                source = "Monte Carlo Player.OpenFishingCrate() @ OTAPI " + AssemblyVersion(),
+                generatedBy = "tools/gamedump/Program.cs",
+                note = "木匣掉落为实测概率（trials 次模拟）：chance = 开出至少 1 个的概率，minStack/maxStack 为观察到的数量范围",
+            },
+            items = result,
+        };
+        File.WriteAllText(outPath, JsonSerializer.Serialize(payload));
+        Console.WriteLine($"[drops] {crates.Count} crates -> {outPath}");
     }
 
     // ── 可滚词缀集合 ────────────────────────────────────
@@ -110,11 +181,15 @@ internal static class Program
         if (Terraria.Main.player[0] == null) Terraria.Main.player[0] = new Terraria.Player();
         Terraria.Main.recipe = new Recipe[Recipe.maxRecipes];
         for (int i = 0; i < Recipe.maxRecipes; i++) Terraria.Main.recipe[i] = new Recipe();
+        // 模拟开木匣会走 Player.GetItem → PopupText.NewText（需要客户端 UI，会 NRE）；
+        // Main.showItemText=false 让 NewText 直接返回 -1（与服务器一致）。
+        Terraria.Main.showItemText = false;
     }
 
     // ── 配方 ────────────────────────────────────────────────
     private static void DumpRecipes(string outPath, List<GroupDef> groups,
-        Dictionary<int, int> itemTile, Dictionary<int, int> itemWall, Dictionary<int, List<int>> tileToItems)
+        Dictionary<int, int> itemTile, Dictionary<int, int> itemWall, Dictionary<int, List<int>> tileToItems,
+        Dictionary<int, int[]> tileDims, List<int> tileFrameImportant)
     {
         var recipes = new List<object>();
         for (int i = 0; i < Recipe.numRecipes; i++)
@@ -153,10 +228,48 @@ internal static class Program
             groups = groups.Select(g => new { g.Name, g.Key, g.Items }).ToArray(),
             itemTile,
             itemWall,
+            tileDims,
+            tileFrameImportant,
             recipes,
         };
         File.WriteAllText(outPath, JsonSerializer.Serialize(payload));
         Console.WriteLine($"[recipes] version={payload.gameVersion} items={payload.itemCount} recipes={payload.recipeCount} groups={groups.Count}");
+    }
+
+    // ── 图格摆放尺寸 ─────────────────────────────────────────
+    // 简单方块（Dirt/Stone 等）没有 TileObjectData，摆放尺寸即 1×1，不记录；
+    // 家具 / 多格图格（门、桌子、床、雕像……）取游戏自身的 TileObjectData.Width×Height。
+    // 有多个 style 时取 style 0 作代表（绝大多数图格各 style 同尺寸）。
+    // 另有极少数 frame-important 但无固定尺寸的图格（树、陷阱、铁轨……），
+    // 单独导出 tileFrameImportant 列表，前端据此显示「无固定尺寸」而不是误报 1×1。
+    // 数据来自运行期的 Terraria.ObjectData.TileObjectData / Main.tileFrameImportant，不手工枚举。
+    private static Dictionary<int, int[]> DumpTileDims(out List<int> frameImportant)
+    {
+        frameImportant = new List<int>();
+        var dims = new Dictionary<int, int[]>();
+        // Main.tileFrameImportant 由 Initialize_TileAndNPCData1/2 填充（幂等）。
+        TryInitTileData();
+        try
+        {
+            Terraria.ObjectData.TileObjectData.Initialize();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"[recipes] 警告：TileObjectData 初始化失败：{e.InnerException?.Message ?? e.Message}");
+            return dims;
+        }
+        for (int t = 0; t < TileID.Count; t++)
+        {
+            if (Terraria.Main.tileFrameImportant[t]) frameImportant.Add(t);
+            try
+            {
+                var od = Terraria.ObjectData.TileObjectData.GetTileData(t, 0);
+                if (od != null) dims[t] = new[] { od.Width, od.Height };
+            }
+            catch { }
+        }
+        Console.WriteLine($"[recipes] 图格尺寸 {dims.Count} 条，frameImportant {frameImportant.Count} 条");
+        return dims;
     }
 
     // ── 物品属性 ─────────────────────────────────────────────
@@ -182,6 +295,20 @@ internal static class Program
                 (it.createTile != 105 || ItemID.Sets.IsWireableStatue[it.type]);
             bool whip = it.shoot >= 0 && it.shoot < ProjectileID.Sets.IsAWhip.Length && ProjectileID.Sets.IsAWhip[it.shoot];
             bool hook = it.shoot >= 0 && it.shoot < projHook.Length && projHook[it.shoot];
+
+            // 微光分解（可微分）：与 WorldItem.GetShimmered 的分支顺序一致——
+            // 金币走 CoinLuck、有微光转换的走转换、4986/560/makeNPC 有各自分支，
+            // 只有落到最后一条的才会被「分解还原成材料」（ShimmerTransforms.GetDecraftingRecipeIndex）。
+            int shimmerEquiv = it.GetShimmerEquivalentType();
+            int decraftEquiv = it.GetShimmerEquivalentType(forDecrafting: true);
+            int decraftRecipe = Terraria.GameContent.ShimmerTransforms.GetDecraftingRecipeIndex(decraftEquiv);
+            int shimmerTransform = Terraria.GameContent.ShimmerTransforms.GetTransformToItem(shimmerEquiv);
+            bool canDecraft = decraftRecipe >= 0
+                && shimmerTransform <= 0
+                && !ItemID.Sets.CommonCoin[shimmerEquiv]
+                && shimmerEquiv != 4986 && shimmerEquiv != 560
+                && it.makeNPC <= 0;
+            int decraftStack = canDecraft ? Terraria.Main.recipe[decraftRecipe].createItem.stack : 0;
 
             string key = null;
             try { key = ItemID.Search.GetName(type); } catch { }
@@ -215,6 +342,7 @@ internal static class Program
                 tileWand = it.tileWand,
                 tooltipDamageMultiplier = type < ItemID.Sets.ToolTipDamageMultiplier.Length ? ItemID.Sets.ToolTipDamageMultiplier[type] : 1f,
                 wireable, whip, hook,
+                canDecraft, decraftStack,
                 container = it.createTile == 21 || it.createTile == 467,
                 wireTrigger = it.createTile == 441 || it.createTile == 468,
             };

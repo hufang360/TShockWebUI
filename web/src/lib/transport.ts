@@ -98,11 +98,54 @@ export interface ServerEvent {
   type: string
   text: string
   time: string
+  /** 同类型事件的来源（如 `type=chat` 时 `game` | `webui`）；旧插件可能不返回。 */
+  source?: string
 }
 
 export interface EventsPage {
   events: ServerEvent[]
   lastSeq: number
+  /** 最新一批的起始 seq（新插件的 tail 模式返回）；缺省为 0。 */
+  firstSeq?: number
+}
+
+/** SSE 事件流回调（由传输层解析后回调）。 */
+export interface EventsStreamHandlers {
+  /** 收到一条事件。 */
+  onEvent: (event: ServerEvent) => void
+  /** 收到一帧世界状态（徽标 / 游戏内时间）；未实现 / 旧后端可不提供。 */
+  onWorld?: (info: ServerInfoExtra) => void
+  /** 连接失败 / 中断（调用方据此降级为轮询）。 */
+  onError: (err: unknown) => void
+}
+
+/** `POST /api/chat`：网页发言的结果（name 为游戏内角色名或账号名）。 */
+export interface ChatSendResult {
+  name: string
+  text: string
+  /** 插件实际广播的那一行（含可配置前缀，默认 `[WebUI]`）。 */
+  line: string
+  /** 插件生成的消息 id（用于去重 / 发送状态）。 */
+  id?: string
+  /** 发送时间（UTC ISO-8601）。 */
+  time?: string
+  source?: string
+}
+
+/** `GET /api/plugin/status`：信使插件握手结果（版本 / 协议 / 能力 / 兼容性）。 */
+export interface PluginStatus {
+  installed: boolean
+  /** 旧版插件（无 `/webui/meta`）：按尽力兼容处理，但无法做版本/能力校验。 */
+  legacy: boolean
+  version?: string
+  protocol: number
+  minProtocol: number
+  capabilities: string[]
+  backendProtocol: number
+  compatible: boolean
+  missingCapabilities?: string[]
+  /** `ok` | `not_installed` | `legacy` | `protocol_mismatch` | `missing_capabilities` */
+  reason: string
 }
 
 /** 本插件铸造的一条 web 会话（不含 token 明文）。 */
@@ -319,8 +362,25 @@ export interface BackendTransport {
   serverInfoExtra(): Promise<ServerInfoExtra>
   /** 服务器动态事件流（轮询；since 为上次的 lastSeq）。 */
   events(since: number, limit?: number): Promise<EventsPage>
+  /**
+   * 取**最新** limit 条事件（升序），用于「打开网页先看最近 N 条」。
+   * 可选：未实现的传输层（如 Mock）会退回 `events(since=0)`。
+   */
+  eventsTail?(limit: number): Promise<EventsPage>
+  /**
+   * 打开服务器动态 SSE 长连接，返回关闭函数。
+   * 可选：未实现 / 连接失败时，hook 退回轮询。
+   */
+  eventsStream?(handlers: EventsStreamHandlers, since: number): () => void
+  /**
+   * 网页发言：把文本广播到游戏内聊天（会带 `[WebUI]` 前缀，与真实在线玩家区分）。
+   * 需要登录；插件缺失/无权限/限流时抛错。
+   */
+  sendChat(text: string): Promise<ChatSendResult>
   /** 本插件的 web 会话列表。 */
   sessions(): Promise<SessionInfo[]>
+  /** 信使插件握手结果（版本 / 协议 / 能力 / 兼容性）；用于「设置 → 信使插件」诊断。 */
+  pluginStatus(): Promise<PluginStatus>
   /** 吊销指定的 / 全部（保留当前）web 会话，返回吊销数量。 */
   revokeSessions(id?: string, all?: boolean): Promise<number>
 
@@ -355,6 +415,8 @@ export type TshockErrorKind =
   | 'token'
   | 'permission'
   | 'plugin_missing'
+  | 'plugin_outdated'
+  | 'plugin_protocol'
   | 'rate_limited'
   | 'unavailable'
   | 'timeout'

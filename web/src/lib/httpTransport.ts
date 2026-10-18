@@ -3,7 +3,9 @@ import {
   TshockRequestError,
   type BackendTransport,
   type BatchCapabilities,
+  type ChatSendResult,
   type EventsPage,
+  type EventsStreamHandlers,
   type FishBuyResult,
   type FishCapabilities,
   type FishGood,
@@ -13,7 +15,9 @@ import {
   type PlayerCapabilities,
   type PlayerLook,
   type PluginDataType,
+  type PluginStatus,
   type RuntimeCommand,
+  type ServerEvent,
   type ServerInfo,
   type ServerInfoExtra,
   type ServerStatus,
@@ -48,6 +52,10 @@ function kindFromCode(code: string | undefined): TshockErrorKind {
       return 'permission'
     case 'plugin_not_installed':
       return 'plugin_missing'
+    case 'plugin_outdated':
+      return 'plugin_outdated'
+    case 'plugin_protocol_mismatch':
+      return 'plugin_protocol'
     case 'player_offline':
     case 'online_auth_denied':
     case 'online_auth_error':
@@ -258,10 +266,96 @@ export class HttpTransport implements BackendTransport {
     return data
   }
 
+  async eventsTail(limit = 100): Promise<EventsPage> {
+    const res = await request(`/events?tail=${limit}`)
+    const data = (await res.json()) as EventsPage
+    if (!data.events) data.events = []
+    return data
+  }
+
+  eventsStream(handlers: EventsStreamHandlers, since: number): () => void {
+    const controller = new AbortController()
+    const headers = new Headers({ Accept: 'text/event-stream' })
+    const target = activeTargetHeader()
+    if (target) headers.set('X-TSWUI-Target', target)
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/events/stream?since=${since}`, {
+          headers,
+          credentials: 'same-origin',
+          signal: controller.signal,
+        })
+        if (!res.ok || !res.body) {
+          handlers.onError(new TshockRequestError('unavailable', `事件流连接失败（${res.status}）`))
+          return
+        }
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        for (;;) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          let idx: number
+          while ((idx = buffer.indexOf('\n\n')) >= 0) {
+            const frame = buffer.slice(0, idx)
+            buffer = buffer.slice(idx + 2)
+            const parsed = parseSseFrame(frame)
+            if (!parsed) continue
+            if (parsed.event === 'error') {
+              let kind: TshockErrorKind = 'bad_response'
+              try {
+                const d = JSON.parse(parsed.data) as { code?: string }
+                kind = kindFromCode(d.code)
+              } catch {
+                /* 保持 bad_response */
+              }
+              handlers.onError(new TshockRequestError(kind, '事件流中断'))
+              return
+            }
+            if (parsed.event === 'world') {
+              try {
+                handlers.onWorld?.(JSON.parse(parsed.data) as ServerInfoExtra)
+              } catch {
+                /* 忽略单帧坏数据 */
+              }
+              continue
+            }
+            try {
+              handlers.onEvent(JSON.parse(parsed.data) as ServerEvent)
+            } catch {
+              /* 忽略单帧坏数据 */
+            }
+          }
+        }
+        if (!controller.signal.aborted) {
+          handlers.onError(new TshockRequestError('unavailable', '事件流已断开'))
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return
+        handlers.onError(err)
+      }
+    })()
+    return () => controller.abort()
+  }
+
+  async sendChat(text: string): Promise<ChatSendResult> {
+    const res = await request('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    })
+    return (await res.json()) as ChatSendResult
+  }
+
   async sessions(): Promise<SessionInfo[]> {
     const res = await request('/sessions')
     const data = (await res.json()) as { sessions?: SessionInfo[] }
     return data.sessions ?? []
+  }
+
+  async pluginStatus(): Promise<PluginStatus> {
+    const res = await request('/plugin/status')
+    return (await res.json()) as PluginStatus
   }
 
   async revokeSessions(id?: string, all = false): Promise<number> {
@@ -323,6 +417,19 @@ export class HttpTransport implements BackendTransport {
     })
     return (await res.json()) as FishBuyResult
   }
+}
+
+/** 解析一帧 SSE（`event:` / `data:` 行，以空行分帧）。 */
+function parseSseFrame(frame: string): { event: string; data: string } | null {
+  let event = 'message'
+  const dataLines: string[] = []
+  for (const line of frame.split('\n')) {
+    if (line.startsWith(':')) continue
+    if (line.startsWith('event:')) event = line.slice(6).trim()
+    else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''))
+  }
+  if (dataLines.length === 0) return null
+  return { event, data: dataLines.join('\n') }
 }
 
 /** 从 Content-Disposition 解析文件名；优先 RFC 5987 的 `filename*=UTF-8''...`。 */

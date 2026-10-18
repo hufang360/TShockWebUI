@@ -1,8 +1,10 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { TshockRequestError, type BackendTransport } from '@/lib/tshock'
+import { playerStubs } from '@/test/playerStubs'
 import { makeDataset } from '@/test/fixtures'
-import { ServerFeedList, feedRefreshLabel, formatGameTime } from './ServerFeed'
+import { ServerFeedList, ServerFeedTab, feedRefreshLabel, formatEventTime, formatGameTime } from './ServerFeed'
 
 describe('formatGameTime', () => {
   it('白天从 4:30 起算', () => {
@@ -20,6 +22,26 @@ describe('formatGameTime', () => {
       key === 'home.feedRefreshedAt' ? `R:${vars?.time}` : `G:${vars?.time}`
     expect(feedRefreshLabel(t, 1000, { dayTime: true, time: 0 } as never)).toContain('G:04:30')
     expect(feedRefreshLabel(t, null, null)).toBeNull()
+  })
+})
+
+describe('formatEventTime', () => {
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    key === 'feed.timeMinutesAgo' ? `${vars?.n}m` : key
+  const now = new Date(2026, 0, 2, 12, 0, 0).getTime()
+
+  it('刚刚 / N 分钟前 / 当天 / 昨天 / 更早', () => {
+    expect(formatEventTime(t, new Date(now - 10_000).toISOString(), now)).toBe('feed.timeJustNow')
+    expect(formatEventTime(t, new Date(now - 5 * 60_000).toISOString(), now)).toBe('5m')
+    expect(formatEventTime(t, new Date(2026, 0, 2, 9, 30).toISOString(), now)).toBe('09:30')
+    expect(formatEventTime(t, new Date(2026, 0, 1, 23, 5).toISOString(), now)).toBe(
+      'feed.timeYesterday',
+    )
+    expect(formatEventTime(t, new Date(2025, 11, 30, 8, 0).toISOString(), now)).toBe('12-30 08:00')
+  })
+
+  it('非法时间返回空串', () => {
+    expect(formatEventTime(t, '', now)).toBe('')
   })
 })
 
@@ -67,6 +89,54 @@ describe('ServerFeedList', () => {
     expect(screen.getByText(/游戏内 05:30/)).toBeTruthy()
   })
 
+  it('事件按时间升序渲染（最旧在上、最新在下），旧记录可懒加载', () => {
+    const events = Array.from({ length: 31 }, (_, i) => ({
+      seq: i + 1,
+      type: 'join',
+      text: `玩家${i + 1} 加入了服务器`,
+      time: new Date(2026, 0, 1, 0, i).toISOString(),
+    }))
+    const { container } = render(
+      <I18nProvider lang="zh">
+        <ServerFeedList events={events} extra={null} />
+      </I18nProvider>,
+    )
+    // 窗口为 30：最旧的第 1 条默认被隐藏，最后一条可见。
+    expect(screen.queryByText('玩家1 加入了服务器')).toBeNull()
+    expect(screen.getByText('玩家31 加入了服务器')).toBeTruthy()
+    const texts = Array.from(container.querySelectorAll('li')).map((li) => li.textContent ?? '')
+    const p2 = texts.findIndex((s) => s.includes('玩家2 加入了服务器'))
+    const p30 = texts.findIndex((s) => s.includes('玩家30 加入了服务器'))
+    expect(p2).toBeGreaterThanOrEqual(0)
+    expect(p2).toBeLessThan(p30)
+
+    // 点「加载更早」后第 1 条出现。
+    fireEvent.click(screen.getByRole('button', { name: '加载更早的 1 条' }))
+    expect(screen.getByText('玩家1 加入了服务器')).toBeTruthy()
+  })
+
+  it('跨天时插入日期分隔线', () => {
+    const now = Date.now()
+    render(
+      <I18nProvider lang="zh">
+        <ServerFeedList
+          events={[
+            {
+              seq: 1,
+              type: 'join',
+              text: 'Alice 加入了服务器',
+              time: new Date(now - 26 * 3600_000).toISOString(),
+            },
+            { seq: 2, type: 'join', text: 'Bob 加入了服务器', time: new Date(now).toISOString() },
+          ]}
+          extra={null}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('今天')).toBeTruthy()
+    expect(screen.getByText('昨天')).toBeTruthy()
+  })
+
   it('插件缺失时显示提示而不是列表', () => {
     render(
       <I18nProvider lang="zh">
@@ -74,5 +144,138 @@ describe('ServerFeedList', () => {
       </I18nProvider>,
     )
     expect(screen.getByText('未安装插件')).toBeTruthy()
+  })
+})
+
+function makeTransport(overrides: Partial<BackendTransport> = {}): BackendTransport {
+  return {
+    mock: false,
+    label: 'test',
+    session: async () => ({ authenticated: true, username: 'hf' }),
+    servers: async () => ({ allowCustom: false, default: null }),
+    login: async () => ({ username: 'hf' }),
+    loginWithToken: async () => ({ username: 'hf' }),
+    logout: async () => {},
+    serverStatus: async () => ({ reachable: true }),
+    playersList: async () => [],
+    runCommand: async () => ({ status: 'ok', output: [] }),
+    ...playerStubs,
+    ...overrides,
+  }
+}
+
+function renderTab(transport: BackendTransport) {
+  return render(
+    <I18nProvider lang="zh">
+      <ServerFeedTab
+        transport={transport}
+        authenticated
+        serverId="default"
+        refreshInterval={60000}
+      />
+    </I18nProvider>,
+  )
+}
+
+describe('ServerFeedTab 网页发言', () => {
+  it('输入并发送后调用 sendChat，并提示已发送', async () => {
+    const sendChat = vi.fn(async (text: string) => ({ name: 'hf', text, line: `[WebUI] hf: ${text}` }))
+    const transport = makeTransport({ sendChat })
+    renderTab(transport)
+
+    const input = await screen.findByPlaceholderText('发消息给游戏内的玩家（会显示你是谁）')
+    fireEvent.change(input, { target: { value: '大家好啊' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送发言' }))
+
+    await waitFor(() => expect(sendChat).toHaveBeenCalledWith('大家好啊'))
+    expect(await screen.findByText(/已发送/)).toBeTruthy()
+  })
+
+  it('插件缺失时禁用输入框', async () => {
+    const transport = makeTransport({
+      serverInfoExtra: async () => {
+        throw new TshockRequestError('plugin_missing', '未安装')
+      },
+    })
+    renderTab(transport)
+
+    const input = await screen.findByPlaceholderText('未安装信使插件，无法发言')
+    await waitFor(() => expect(input).toHaveProperty('disabled', true))
+  })
+
+  it('事件流可用但发言端点 404 时，提示插件版本过旧', async () => {
+    const transport = makeTransport({
+      sendChat: async () => {
+        throw new TshockRequestError('plugin_missing', '未安装')
+      },
+    })
+    renderTab(transport)
+
+    const input = await screen.findByPlaceholderText('发消息给游戏内的玩家（会显示你是谁）')
+    fireEvent.change(input, { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送发言' }))
+
+    expect(await screen.findByText('服务器信使插件版本过旧，升级后可用网页发言')).toBeTruthy()
+  })
+
+  it('发言失败时保留输入，可就地重试', async () => {
+    let calls = 0
+    const sendChat = vi.fn(async (text: string) => {
+      calls += 1
+      if (calls === 1) throw new Error('网络错误')
+      return { name: 'hf', text, line: `[WebUI] hf: ${text}` }
+    })
+    const transport = makeTransport({ sendChat })
+    renderTab(transport)
+
+    const input = (await screen.findByPlaceholderText('发消息给游戏内的玩家（会显示你是谁）')) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '你好' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送发言' }))
+
+    expect(await screen.findByText('网络错误')).toBeTruthy()
+    expect(input.value).toBe('你好')
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(sendChat).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText(/已发送/)).toBeTruthy()
+    expect(input.value).toBe('')
+  })
+})
+
+describe('ServerFeedTab 类型筛选', () => {
+  it('点「聊天」后只显示聊天事件', async () => {
+    const transport = makeTransport({
+      events: async () => ({
+        events: [
+          { seq: 1, type: 'join', text: 'Alice 加入了服务器', time: new Date().toISOString() },
+          { seq: 2, type: 'chat', text: 'Bob: 你好', time: new Date().toISOString() },
+        ],
+        lastSeq: 2,
+      }),
+    })
+    renderTab(transport)
+
+    expect(await screen.findByText('Alice 加入了服务器')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '聊天' }))
+    expect(screen.queryByText('Alice 加入了服务器')).toBeNull()
+    expect(screen.getByText('Bob: 你好')).toBeTruthy()
+  })
+
+  it('「事件」筛选只显示世界公告', async () => {
+    const transport = makeTransport({
+      events: async () => ({
+        events: [
+          { seq: 1, type: 'join', text: 'Alice 加入了服务器', time: new Date().toISOString() },
+          { seq: 2, type: 'announce', text: '光之女皇已苏醒！', time: new Date().toISOString() },
+        ],
+        lastSeq: 2,
+      }),
+    })
+    renderTab(transport)
+
+    expect(await screen.findByText('Alice 加入了服务器')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '事件' }))
+    expect(screen.queryByText('Alice 加入了服务器')).toBeNull()
+    expect(screen.getByText('光之女皇已苏醒！')).toBeTruthy()
   })
 })

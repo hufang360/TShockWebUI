@@ -4,7 +4,6 @@ import { ConfirmButton } from '@/components/ConfirmButton'
 import {
   Badge,
   Button,
-  Checkbox,
   Input,
   Sheet,
   SheetContent,
@@ -232,8 +231,8 @@ export function HomeCardManager({
                     </div>
                   )}
                   {command && onToggleManual && (
-                    <label className="flex w-fit cursor-pointer items-center gap-1.5">
-                      <Checkbox
+                    <div className="flex w-fit items-center gap-2">
+                      <Switch
                         checked={!(isManual?.(id) ?? false)}
                         onCheckedChange={(v) => onToggleManual(id, v !== true)}
                         aria-label={`${label} ${t('home.autoExec')}`}
@@ -241,7 +240,7 @@ export function HomeCardManager({
                       <span className="text-[10px] font-normal text-muted-foreground">
                         {t('home.autoExec')}
                       </span>
-                    </label>
+                    </div>
                   )}
                 </div>
 

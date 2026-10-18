@@ -70,3 +70,25 @@ export function iconContentSize(
       : box / longest
   return { width: w * scale, height: h * scale }
 }
+
+/** NPC 贴图绘制时四周留白比例（与 `NpcSprite` / 物品图标一致，只影响需要缩小的贴图）。 */
+export const NPC_THUMB_FILL = 0.94
+
+/**
+ * NPC 贴图在 `box × box` 方框内实际占用的 CSS 像素尺寸。
+ *
+ * - `game`（默认，与游戏一致）：**只缩不放**。游戏里 NPC 就是原生像素大小，
+ *   小动物天生小、城镇 NPC 中等、Boss 天生大；之前一律 contain 填满方框把这些差异抹平了。
+ * - `fit`：contain 填满方框（详情大图用，否则 10px 的小虫在大框里看不见）。
+ */
+export function npcContentSize(
+  w: number,
+  h: number,
+  box: number,
+  mode: IconScaleMode = 'game',
+): { width: number; height: number } {
+  if (!(w > 0) || !(h > 0) || !(box > 0)) return { width: 0, height: 0 }
+  const fit = (box * NPC_THUMB_FILL) / Math.max(w, h)
+  const scale = mode === 'game' ? Math.min(1, fit) : fit
+  return { width: w * scale, height: h * scale }
+}

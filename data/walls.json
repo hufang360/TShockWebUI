@@ -1,0 +1,1848 @@
+{
+ "meta": {
+  "gameVersion": "1.4.5.8",
+  "count": 367,
+  "withItem": 292,
+  "withSize": 0,
+  "source": "Terraria.ID/WallID.cs + GameDump itemWall",
+  "generatedBy": "tools/gen-tile-wall.mjs",
+  "note": "item = 放置该图格/墙的代表物品 id（运行期用它解析本地化名）；null = 无对应物品，显示 key。"
+ },
+ "entries": [
+  {
+   "id": 0,
+   "key": "None",
+   "item": null
+  },
+  {
+   "id": 1,
+   "key": "Stone",
+   "item": 26
+  },
+  {
+   "id": 2,
+   "key": "DirtUnsafe",
+   "item": 5546
+  },
+  {
+   "id": 3,
+   "key": "EbonstoneUnsafe",
+   "item": null
+  },
+  {
+   "id": 4,
+   "key": "Wood",
+   "item": 93
+  },
+  {
+   "id": 5,
+   "key": "GrayBrick",
+   "item": 130
+  },
+  {
+   "id": 6,
+   "key": "RedBrick",
+   "item": 132
+  },
+  {
+   "id": 7,
+   "key": "BlueDungeonUnsafe",
+   "item": 5365
+  },
+  {
+   "id": 8,
+   "key": "GreenDungeonUnsafe",
+   "item": 5371
+  },
+  {
+   "id": 9,
+   "key": "PinkDungeonUnsafe",
+   "item": 5368
+  },
+  {
+   "id": 10,
+   "key": "GoldBrick",
+   "item": 142
+  },
+  {
+   "id": 11,
+   "key": "SilverBrick",
+   "item": 144
+  },
+  {
+   "id": 12,
+   "key": "CopperBrick",
+   "item": 146
+  },
+  {
+   "id": 13,
+   "key": "HellstoneBrickUnsafe",
+   "item": null
+  },
+  {
+   "id": 14,
+   "key": "ObsidianBrickUnsafe",
+   "item": null
+  },
+  {
+   "id": 15,
+   "key": "MudUnsafe",
+   "item": null
+  },
+  {
+   "id": 16,
+   "key": "Dirt",
+   "item": 30
+  },
+  {
+   "id": 17,
+   "key": "BlueDungeon",
+   "item": 135
+  },
+  {
+   "id": 18,
+   "key": "GreenDungeon",
+   "item": 138
+  },
+  {
+   "id": 19,
+   "key": "PinkDungeon",
+   "item": 140
+  },
+  {
+   "id": 20,
+   "key": "ObsidianBrick",
+   "item": 330
+  },
+  {
+   "id": 21,
+   "key": "Glass",
+   "item": 392
+  },
+  {
+   "id": 22,
+   "key": "PearlstoneBrick",
+   "item": 417
+  },
+  {
+   "id": 23,
+   "key": "IridescentBrick",
+   "item": 418
+  },
+  {
+   "id": 24,
+   "key": "MudstoneBrick",
+   "item": 419
+  },
+  {
+   "id": 25,
+   "key": "CobaltBrick",
+   "item": 420
+  },
+  {
+   "id": 26,
+   "key": "MythrilBrick",
+   "item": 421
+  },
+  {
+   "id": 27,
+   "key": "Planked",
+   "item": 479
+  },
+  {
+   "id": 28,
+   "key": "PearlstoneBrickUnsafe",
+   "item": null
+  },
+  {
+   "id": 29,
+   "key": "CandyCane",
+   "item": 587
+  },
+  {
+   "id": 30,
+   "key": "GreenCandyCane",
+   "item": 592
+  },
+  {
+   "id": 31,
+   "key": "SnowBrick",
+   "item": 595
+  },
+  {
+   "id": 32,
+   "key": "AdamantiteBeam",
+   "item": 605
+  },
+  {
+   "id": 33,
+   "key": "DemoniteBrick",
+   "item": 606
+  },
+  {
+   "id": 34,
+   "key": "SandstoneBrick",
+   "item": 608
+  },
+  {
+   "id": 35,
+   "key": "EbonstoneBrick",
+   "item": 610
+  },
+  {
+   "id": 36,
+   "key": "RedStucco",
+   "item": 615
+  },
+  {
+   "id": 37,
+   "key": "YellowStucco",
+   "item": 616
+  },
+  {
+   "id": 38,
+   "key": "GreenStucco",
+   "item": 617
+  },
+  {
+   "id": 39,
+   "key": "Gray",
+   "item": 618
+  },
+  {
+   "id": 40,
+   "key": "SnowWallUnsafe",
+   "item": null
+  },
+  {
+   "id": 41,
+   "key": "Ebonwood",
+   "item": 622
+  },
+  {
+   "id": 42,
+   "key": "RichMaogany",
+   "item": 623
+  },
+  {
+   "id": 43,
+   "key": "Pearlwood",
+   "item": 624
+  },
+  {
+   "id": 44,
+   "key": "RainbowBrick",
+   "item": 663
+  },
+  {
+   "id": 45,
+   "key": "TinBrick",
+   "item": 720
+  },
+  {
+   "id": 46,
+   "key": "TungstenBrick",
+   "item": 721
+  },
+  {
+   "id": 47,
+   "key": "PlatinumBrick",
+   "item": 722
+  },
+  {
+   "id": 48,
+   "key": "AmethystUnsafe",
+   "item": null
+  },
+  {
+   "id": 49,
+   "key": "TopazUnsafe",
+   "item": null
+  },
+  {
+   "id": 50,
+   "key": "SapphireUnsafe",
+   "item": null
+  },
+  {
+   "id": 51,
+   "key": "EmeraldUnsafe",
+   "item": null
+  },
+  {
+   "id": 52,
+   "key": "RubyUnsafe",
+   "item": null
+  },
+  {
+   "id": 53,
+   "key": "DiamondUnsafe",
+   "item": null
+  },
+  {
+   "id": 54,
+   "key": "CaveUnsafe",
+   "item": null
+  },
+  {
+   "id": 55,
+   "key": "Cave2Unsafe",
+   "item": null
+  },
+  {
+   "id": 56,
+   "key": "Cave3Unsafe",
+   "item": null
+  },
+  {
+   "id": 57,
+   "key": "Cave4Unsafe",
+   "item": null
+  },
+  {
+   "id": 58,
+   "key": "Cave5Unsafe",
+   "item": null
+  },
+  {
+   "id": 59,
+   "key": "Cave6Unsafe",
+   "item": null
+  },
+  {
+   "id": 60,
+   "key": "LivingLeaf",
+   "item": 3584
+  },
+  {
+   "id": 61,
+   "key": "Cave7Unsafe",
+   "item": null
+  },
+  {
+   "id": 62,
+   "key": "SpiderUnsafe",
+   "item": 5363
+  },
+  {
+   "id": 63,
+   "key": "GrassUnsafe",
+   "item": null
+  },
+  {
+   "id": 64,
+   "key": "JungleUnsafe",
+   "item": null
+  },
+  {
+   "id": 65,
+   "key": "FlowerUnsafe",
+   "item": null
+  },
+  {
+   "id": 66,
+   "key": "Grass",
+   "item": 745
+  },
+  {
+   "id": 67,
+   "key": "Jungle",
+   "item": 746
+  },
+  {
+   "id": 68,
+   "key": "Flower",
+   "item": 747
+  },
+  {
+   "id": 69,
+   "key": "CorruptGrassUnsafe",
+   "item": null
+  },
+  {
+   "id": 70,
+   "key": "HallowedGrassUnsafe",
+   "item": null
+  },
+  {
+   "id": 71,
+   "key": "IceUnsafe",
+   "item": null
+  },
+  {
+   "id": 72,
+   "key": "Cactus",
+   "item": 750
+  },
+  {
+   "id": 73,
+   "key": "Cloud",
+   "item": 752
+  },
+  {
+   "id": 74,
+   "key": "Mushroom",
+   "item": 764
+  },
+  {
+   "id": 75,
+   "key": "Bone",
+   "item": 768
+  },
+  {
+   "id": 76,
+   "key": "Slime",
+   "item": 769
+  },
+  {
+   "id": 77,
+   "key": "Flesh",
+   "item": 770
+  },
+  {
+   "id": 78,
+   "key": "LivingWood",
+   "item": 1723
+  },
+  {
+   "id": 79,
+   "key": "ObsidianBackUnsafe",
+   "item": null
+  },
+  {
+   "id": 80,
+   "key": "MushroomUnsafe",
+   "item": null
+  },
+  {
+   "id": 81,
+   "key": "CrimsonGrassUnsafe",
+   "item": null
+  },
+  {
+   "id": 82,
+   "key": "DiscWall",
+   "item": 825
+  },
+  {
+   "id": 83,
+   "key": "CrimstoneUnsafe",
+   "item": null
+  },
+  {
+   "id": 84,
+   "key": "IceBrick",
+   "item": 884
+  },
+  {
+   "id": 85,
+   "key": "Shadewood",
+   "item": 927
+  },
+  {
+   "id": 86,
+   "key": "HiveUnsafe",
+   "item": null
+  },
+  {
+   "id": 87,
+   "key": "LihzahrdBrickUnsafe",
+   "item": 5376
+  },
+  {
+   "id": 88,
+   "key": "PurpleStainedGlass",
+   "item": 1267
+  },
+  {
+   "id": 89,
+   "key": "YellowStainedGlass",
+   "item": 1268
+  },
+  {
+   "id": 90,
+   "key": "BlueStainedGlass",
+   "item": 1269
+  },
+  {
+   "id": 91,
+   "key": "GreenStainedGlass",
+   "item": 1270
+  },
+  {
+   "id": 92,
+   "key": "RedStainedGlass",
+   "item": 1271
+  },
+  {
+   "id": 93,
+   "key": "RainbowStainedGlass",
+   "item": 1272
+  },
+  {
+   "id": 94,
+   "key": "BlueDungeonSlabUnsafe",
+   "item": 5366
+  },
+  {
+   "id": 95,
+   "key": "BlueDungeonTileUnsafe",
+   "item": 5367
+  },
+  {
+   "id": 96,
+   "key": "PinkDungeonSlabUnsafe",
+   "item": 5369
+  },
+  {
+   "id": 97,
+   "key": "PinkDungeonTileUnsafe",
+   "item": 5370
+  },
+  {
+   "id": 98,
+   "key": "GreenDungeonSlabUnsafe",
+   "item": 5372
+  },
+  {
+   "id": 99,
+   "key": "GreenDungeonTileUnsafe",
+   "item": 5373
+  },
+  {
+   "id": 100,
+   "key": "BlueDungeonSlab",
+   "item": 1378
+  },
+  {
+   "id": 101,
+   "key": "BlueDungeonTile",
+   "item": 1379
+  },
+  {
+   "id": 102,
+   "key": "PinkDungeonSlab",
+   "item": 1380
+  },
+  {
+   "id": 103,
+   "key": "PinkDungeonTile",
+   "item": 1381
+  },
+  {
+   "id": 104,
+   "key": "GreenDungeonSlab",
+   "item": 1382
+  },
+  {
+   "id": 105,
+   "key": "GreenDungeonTile",
+   "item": 1383
+  },
+  {
+   "id": 106,
+   "key": "WoodenFence",
+   "item": 1447
+  },
+  {
+   "id": 107,
+   "key": "MetalFence",
+   "item": 1448
+  },
+  {
+   "id": 108,
+   "key": "Hive",
+   "item": 1126
+  },
+  {
+   "id": 109,
+   "key": "PalladiumColumn",
+   "item": 1590
+  },
+  {
+   "id": 110,
+   "key": "BubblegumBlock",
+   "item": 1592
+  },
+  {
+   "id": 111,
+   "key": "TitanstoneBlock",
+   "item": 1594
+  },
+  {
+   "id": 112,
+   "key": "LihzahrdBrick",
+   "item": 1102
+  },
+  {
+   "id": 113,
+   "key": "Pumpkin",
+   "item": 1726
+  },
+  {
+   "id": 114,
+   "key": "Hay",
+   "item": 1728
+  },
+  {
+   "id": 115,
+   "key": "SpookyWood",
+   "item": 1730
+  },
+  {
+   "id": 116,
+   "key": "ChristmasTreeWallpaper",
+   "item": 1948
+  },
+  {
+   "id": 117,
+   "key": "OrnamentWallpaper",
+   "item": 1949
+  },
+  {
+   "id": 118,
+   "key": "CandyCaneWallpaper",
+   "item": 1950
+  },
+  {
+   "id": 119,
+   "key": "FestiveWallpaper",
+   "item": 1951
+  },
+  {
+   "id": 120,
+   "key": "StarsWallpaper",
+   "item": 1952
+  },
+  {
+   "id": 121,
+   "key": "SquigglesWallpaper",
+   "item": 1953
+  },
+  {
+   "id": 122,
+   "key": "SnowflakeWallpaper",
+   "item": 1954
+  },
+  {
+   "id": 123,
+   "key": "KrampusHornWallpaper",
+   "item": 1955
+  },
+  {
+   "id": 124,
+   "key": "BluegreenWallpaper",
+   "item": 1956
+  },
+  {
+   "id": 125,
+   "key": "GrinchFingerWallpaper",
+   "item": 1957
+  },
+  {
+   "id": 126,
+   "key": "FancyGrayWallpaper",
+   "item": 2008
+  },
+  {
+   "id": 127,
+   "key": "IceFloeWallpaper",
+   "item": 2009
+  },
+  {
+   "id": 128,
+   "key": "MusicWallpaper",
+   "item": 2010
+  },
+  {
+   "id": 129,
+   "key": "PurpleRainWallpaper",
+   "item": 2011
+  },
+  {
+   "id": 130,
+   "key": "RainbowWallpaper",
+   "item": 2012
+  },
+  {
+   "id": 131,
+   "key": "SparkleStoneWallpaper",
+   "item": 2013
+  },
+  {
+   "id": 132,
+   "key": "StarlitHeavenWallpaper",
+   "item": 2014
+  },
+  {
+   "id": 133,
+   "key": "BubbleWallpaper",
+   "item": 2158
+  },
+  {
+   "id": 134,
+   "key": "CopperPipeWallpaper",
+   "item": 2159
+  },
+  {
+   "id": 135,
+   "key": "DuckyWallpaper",
+   "item": 2160
+  },
+  {
+   "id": 136,
+   "key": "Waterfall",
+   "item": 2169
+  },
+  {
+   "id": 137,
+   "key": "Lavafall",
+   "item": 2170
+  },
+  {
+   "id": 138,
+   "key": "EbonwoodFence",
+   "item": 2210
+  },
+  {
+   "id": 139,
+   "key": "RichMahoganyFence",
+   "item": 2211
+  },
+  {
+   "id": 140,
+   "key": "PearlwoodFence",
+   "item": 2212
+  },
+  {
+   "id": 141,
+   "key": "ShadewoodFence",
+   "item": 2213
+  },
+  {
+   "id": 142,
+   "key": "WhiteDynasty",
+   "item": 2263
+  },
+  {
+   "id": 143,
+   "key": "BlueDynasty",
+   "item": 2264
+  },
+  {
+   "id": 144,
+   "key": "ArcaneRunes",
+   "item": 2271
+  },
+  {
+   "id": 145,
+   "key": "IronFence",
+   "item": 2333
+  },
+  {
+   "id": 146,
+   "key": "CopperPlating",
+   "item": 2432
+  },
+  {
+   "id": 147,
+   "key": "StoneSlab",
+   "item": 2433
+  },
+  {
+   "id": 148,
+   "key": "Sail",
+   "item": 2434
+  },
+  {
+   "id": 149,
+   "key": "BorealWood",
+   "item": 2505
+  },
+  {
+   "id": 150,
+   "key": "BorealWoodFence",
+   "item": 2507
+  },
+  {
+   "id": 151,
+   "key": "PalmWood",
+   "item": 2506
+  },
+  {
+   "id": 152,
+   "key": "PalmWoodFence",
+   "item": 2508
+  },
+  {
+   "id": 153,
+   "key": "AmberGemspark",
+   "item": 2677
+  },
+  {
+   "id": 154,
+   "key": "AmethystGemspark",
+   "item": 2679
+  },
+  {
+   "id": 155,
+   "key": "DiamondGemspark",
+   "item": 2681
+  },
+  {
+   "id": 156,
+   "key": "EmeraldGemspark",
+   "item": 2683
+  },
+  {
+   "id": 157,
+   "key": "AmberGemsparkOff",
+   "item": 2678
+  },
+  {
+   "id": 158,
+   "key": "AmethystGemsparkOff",
+   "item": 2680
+  },
+  {
+   "id": 159,
+   "key": "DiamondGemsparkOff",
+   "item": 2682
+  },
+  {
+   "id": 160,
+   "key": "EmeraldGemsparkOff",
+   "item": 2684
+  },
+  {
+   "id": 161,
+   "key": "RubyGemsparkOff",
+   "item": 2686
+  },
+  {
+   "id": 162,
+   "key": "SapphireGemsparkOff",
+   "item": 2688
+  },
+  {
+   "id": 163,
+   "key": "TopazGemsparkOff",
+   "item": 2690
+  },
+  {
+   "id": 164,
+   "key": "RubyGemspark",
+   "item": 2685
+  },
+  {
+   "id": 165,
+   "key": "SapphireGemspark",
+   "item": 2687
+  },
+  {
+   "id": 166,
+   "key": "TopazGemspark",
+   "item": 2689
+  },
+  {
+   "id": 167,
+   "key": "TinPlating",
+   "item": 2691
+  },
+  {
+   "id": 168,
+   "key": "Confetti",
+   "item": 2696
+  },
+  {
+   "id": 169,
+   "key": "ConfettiBlack",
+   "item": 2698
+  },
+  {
+   "id": 170,
+   "key": "CaveWall",
+   "item": null
+  },
+  {
+   "id": 171,
+   "key": "CaveWall2",
+   "item": null
+  },
+  {
+   "id": 172,
+   "key": "Honeyfall",
+   "item": 2788
+  },
+  {
+   "id": 173,
+   "key": "ChlorophyteBrick",
+   "item": 2789
+  },
+  {
+   "id": 174,
+   "key": "CrimtaneBrick",
+   "item": 2790
+  },
+  {
+   "id": 175,
+   "key": "ShroomitePlating",
+   "item": 2791
+  },
+  {
+   "id": 176,
+   "key": "MartianConduit",
+   "item": 2861
+  },
+  {
+   "id": 177,
+   "key": "HellstoneBrick",
+   "item": 3067
+  },
+  {
+   "id": 178,
+   "key": "MarbleUnsafe",
+   "item": null
+  },
+  {
+   "id": 179,
+   "key": "MarbleBlock",
+   "item": 3083
+  },
+  {
+   "id": 180,
+   "key": "GraniteUnsafe",
+   "item": null
+  },
+  {
+   "id": 181,
+   "key": "GraniteBlock",
+   "item": 3089
+  },
+  {
+   "id": 182,
+   "key": "MeteoriteBrick",
+   "item": 3101
+  },
+  {
+   "id": 183,
+   "key": "Marble",
+   "item": 3082
+  },
+  {
+   "id": 184,
+   "key": "Granite",
+   "item": 3088
+  },
+  {
+   "id": 185,
+   "key": "Cave8Unsafe",
+   "item": null
+  },
+  {
+   "id": 186,
+   "key": "Crystal",
+   "item": 3238
+  },
+  {
+   "id": 187,
+   "key": "Sandstone",
+   "item": 5374
+  },
+  {
+   "id": 188,
+   "key": "CorruptionUnsafe1",
+   "item": null
+  },
+  {
+   "id": 189,
+   "key": "CorruptionUnsafe2",
+   "item": null
+  },
+  {
+   "id": 190,
+   "key": "CorruptionUnsafe3",
+   "item": null
+  },
+  {
+   "id": 191,
+   "key": "CorruptionUnsafe4",
+   "item": null
+  },
+  {
+   "id": 192,
+   "key": "CrimsonUnsafe1",
+   "item": null
+  },
+  {
+   "id": 193,
+   "key": "CrimsonUnsafe2",
+   "item": null
+  },
+  {
+   "id": 194,
+   "key": "CrimsonUnsafe3",
+   "item": null
+  },
+  {
+   "id": 195,
+   "key": "CrimsonUnsafe4",
+   "item": null
+  },
+  {
+   "id": 196,
+   "key": "DirtUnsafe1",
+   "item": null
+  },
+  {
+   "id": 197,
+   "key": "DirtUnsafe2",
+   "item": null
+  },
+  {
+   "id": 198,
+   "key": "DirtUnsafe3",
+   "item": null
+  },
+  {
+   "id": 199,
+   "key": "DirtUnsafe4",
+   "item": null
+  },
+  {
+   "id": 200,
+   "key": "HallowUnsafe1",
+   "item": null
+  },
+  {
+   "id": 201,
+   "key": "HallowUnsafe2",
+   "item": null
+  },
+  {
+   "id": 202,
+   "key": "HallowUnsafe3",
+   "item": null
+  },
+  {
+   "id": 203,
+   "key": "HallowUnsafe4",
+   "item": null
+  },
+  {
+   "id": 204,
+   "key": "JungleUnsafe1",
+   "item": null
+  },
+  {
+   "id": 205,
+   "key": "JungleUnsafe2",
+   "item": null
+  },
+  {
+   "id": 206,
+   "key": "JungleUnsafe3",
+   "item": null
+  },
+  {
+   "id": 207,
+   "key": "JungleUnsafe4",
+   "item": null
+  },
+  {
+   "id": 208,
+   "key": "LavaUnsafe1",
+   "item": null
+  },
+  {
+   "id": 209,
+   "key": "LavaUnsafe2",
+   "item": null
+  },
+  {
+   "id": 210,
+   "key": "LavaUnsafe3",
+   "item": null
+  },
+  {
+   "id": 211,
+   "key": "LavaUnsafe4",
+   "item": null
+  },
+  {
+   "id": 212,
+   "key": "RocksUnsafe1",
+   "item": null
+  },
+  {
+   "id": 213,
+   "key": "RocksUnsafe2",
+   "item": null
+  },
+  {
+   "id": 214,
+   "key": "RocksUnsafe3",
+   "item": null
+  },
+  {
+   "id": 215,
+   "key": "RocksUnsafe4",
+   "item": null
+  },
+  {
+   "id": 216,
+   "key": "HardenedSand",
+   "item": 5375
+  },
+  {
+   "id": 217,
+   "key": "CorruptHardenedSand",
+   "item": null
+  },
+  {
+   "id": 218,
+   "key": "CrimsonHardenedSand",
+   "item": null
+  },
+  {
+   "id": 219,
+   "key": "HallowHardenedSand",
+   "item": null
+  },
+  {
+   "id": 220,
+   "key": "CorruptSandstone",
+   "item": null
+  },
+  {
+   "id": 221,
+   "key": "CrimsonSandstone",
+   "item": null
+  },
+  {
+   "id": 222,
+   "key": "HallowSandstone",
+   "item": null
+  },
+  {
+   "id": 223,
+   "key": "DesertFossil",
+   "item": null
+  },
+  {
+   "id": 224,
+   "key": "LunarBrickWall",
+   "item": 3472
+  },
+  {
+   "id": 225,
+   "key": "CogWall",
+   "item": 3751
+  },
+  {
+   "id": 226,
+   "key": "SandFall",
+   "item": 3752
+  },
+  {
+   "id": 227,
+   "key": "SnowFall",
+   "item": 3753
+  },
+  {
+   "id": 228,
+   "key": "SillyBalloonPinkWall",
+   "item": 3760
+  },
+  {
+   "id": 229,
+   "key": "SillyBalloonPurpleWall",
+   "item": 3761
+  },
+  {
+   "id": 230,
+   "key": "SillyBalloonGreenWall",
+   "item": 3762
+  },
+  {
+   "id": 231,
+   "key": "IronBrick",
+   "item": 3952
+  },
+  {
+   "id": 232,
+   "key": "LeadBrick",
+   "item": 3954
+  },
+  {
+   "id": 233,
+   "key": "LesionBlock",
+   "item": 3956
+  },
+  {
+   "id": 234,
+   "key": "CrimstoneBrick",
+   "item": 4052
+  },
+  {
+   "id": 235,
+   "key": "SmoothSandstone",
+   "item": 4053
+  },
+  {
+   "id": 236,
+   "key": "Spider",
+   "item": 4140
+  },
+  {
+   "id": 237,
+   "key": "SolarBrick",
+   "item": 4233
+  },
+  {
+   "id": 238,
+   "key": "VortexBrick",
+   "item": 4234
+  },
+  {
+   "id": 239,
+   "key": "NebulaBrick",
+   "item": 4235
+  },
+  {
+   "id": 240,
+   "key": "StardustBrick",
+   "item": 4236
+  },
+  {
+   "id": 241,
+   "key": "OrangeStainedGlass",
+   "item": 4260
+  },
+  {
+   "id": 242,
+   "key": "GoldStarryGlassWall",
+   "item": 4279
+  },
+  {
+   "id": 243,
+   "key": "BlueStarryGlassWall",
+   "item": 4280
+  },
+  {
+   "id": 244,
+   "key": "LivingWoodUnsafe",
+   "item": 5545
+  },
+  {
+   "id": 245,
+   "key": "WroughtIronFence",
+   "item": 4424
+  },
+  {
+   "id": 246,
+   "key": "EbonstoneEcho",
+   "item": 4486
+  },
+  {
+   "id": 247,
+   "key": "MudWallEcho",
+   "item": 4487
+  },
+  {
+   "id": 248,
+   "key": "PearlstoneEcho",
+   "item": 4488
+  },
+  {
+   "id": 249,
+   "key": "SnowWallEcho",
+   "item": 4489
+  },
+  {
+   "id": 250,
+   "key": "AmethystEcho",
+   "item": 4490
+  },
+  {
+   "id": 251,
+   "key": "TopazEcho",
+   "item": 4491
+  },
+  {
+   "id": 252,
+   "key": "SapphireEcho",
+   "item": 4492
+  },
+  {
+   "id": 253,
+   "key": "EmeraldEcho",
+   "item": 4493
+  },
+  {
+   "id": 254,
+   "key": "RubyEcho",
+   "item": 4494
+  },
+  {
+   "id": 255,
+   "key": "DiamondEcho",
+   "item": 4495
+  },
+  {
+   "id": 256,
+   "key": "Cave1Echo",
+   "item": 4496
+  },
+  {
+   "id": 257,
+   "key": "Cave2Echo",
+   "item": 4497
+  },
+  {
+   "id": 258,
+   "key": "Cave3Echo",
+   "item": 4498
+  },
+  {
+   "id": 259,
+   "key": "Cave4Echo",
+   "item": 4499
+  },
+  {
+   "id": 260,
+   "key": "Cave5Echo",
+   "item": 4500
+  },
+  {
+   "id": 261,
+   "key": "Cave6Echo",
+   "item": 4501
+  },
+  {
+   "id": 262,
+   "key": "Cave7Echo",
+   "item": 4502
+  },
+  {
+   "id": 263,
+   "key": "SpiderEcho",
+   "item": 4503
+  },
+  {
+   "id": 264,
+   "key": "CorruptGrassEcho",
+   "item": 4504
+  },
+  {
+   "id": 265,
+   "key": "HallowedGrassEcho",
+   "item": 4505
+  },
+  {
+   "id": 266,
+   "key": "IceEcho",
+   "item": 4506
+  },
+  {
+   "id": 267,
+   "key": "ObsidianBackEcho",
+   "item": 4507
+  },
+  {
+   "id": 268,
+   "key": "CrimsonGrassEcho",
+   "item": 4508
+  },
+  {
+   "id": 269,
+   "key": "CrimstoneEcho",
+   "item": 4509
+  },
+  {
+   "id": 270,
+   "key": "CaveWall1Echo",
+   "item": 4510
+  },
+  {
+   "id": 271,
+   "key": "CaveWall2Echo",
+   "item": 4511
+  },
+  {
+   "id": 272,
+   "key": "MarbleEchoUnused",
+   "item": null
+  },
+  {
+   "id": 273,
+   "key": "GraniteEchoUnused",
+   "item": null
+  },
+  {
+   "id": 274,
+   "key": "Cave8Echo",
+   "item": 4512
+  },
+  {
+   "id": 275,
+   "key": "SandstoneEcho",
+   "item": 3273
+  },
+  {
+   "id": 276,
+   "key": "Corruption1Echo",
+   "item": 4513
+  },
+  {
+   "id": 277,
+   "key": "Corruption2Echo",
+   "item": 4514
+  },
+  {
+   "id": 278,
+   "key": "Corruption3Echo",
+   "item": 4515
+  },
+  {
+   "id": 279,
+   "key": "Corruption4Echo",
+   "item": 4516
+  },
+  {
+   "id": 280,
+   "key": "Crimson1Echo",
+   "item": 4517
+  },
+  {
+   "id": 281,
+   "key": "Crimson2Echo",
+   "item": 4518
+  },
+  {
+   "id": 282,
+   "key": "Crimson3Echo",
+   "item": 4519
+  },
+  {
+   "id": 283,
+   "key": "Crimson4Echo",
+   "item": 4520
+  },
+  {
+   "id": 284,
+   "key": "Dirt1Echo",
+   "item": 4521
+  },
+  {
+   "id": 285,
+   "key": "Dirt2Echo",
+   "item": 4522
+  },
+  {
+   "id": 286,
+   "key": "Dirt3Echo",
+   "item": 4523
+  },
+  {
+   "id": 287,
+   "key": "Dirt4Echo",
+   "item": 4524
+  },
+  {
+   "id": 288,
+   "key": "Hallow1Echo",
+   "item": 4525
+  },
+  {
+   "id": 289,
+   "key": "Hallow2Echo",
+   "item": 4526
+  },
+  {
+   "id": 290,
+   "key": "Hallow3Echo",
+   "item": 4527
+  },
+  {
+   "id": 291,
+   "key": "Hallow4Echo",
+   "item": 4528
+  },
+  {
+   "id": 292,
+   "key": "Jungle1Echo",
+   "item": 4529
+  },
+  {
+   "id": 293,
+   "key": "Jungle2Echo",
+   "item": 4530
+  },
+  {
+   "id": 294,
+   "key": "Jungle3Echo",
+   "item": 4531
+  },
+  {
+   "id": 295,
+   "key": "Jungle4Echo",
+   "item": 4532
+  },
+  {
+   "id": 296,
+   "key": "Lava1Echo",
+   "item": 4533
+  },
+  {
+   "id": 297,
+   "key": "Lava2Echo",
+   "item": 4534
+  },
+  {
+   "id": 298,
+   "key": "Lava3Echo",
+   "item": 4535
+  },
+  {
+   "id": 299,
+   "key": "Lava4Echo",
+   "item": 4536
+  },
+  {
+   "id": 300,
+   "key": "Rocks1Echo",
+   "item": 4537
+  },
+  {
+   "id": 301,
+   "key": "Rocks2Echo",
+   "item": 4538
+  },
+  {
+   "id": 302,
+   "key": "Rocks3Echo",
+   "item": 4539
+  },
+  {
+   "id": 303,
+   "key": "Rocks4Echo",
+   "item": 4540
+  },
+  {
+   "id": 304,
+   "key": "HardenedSandEcho",
+   "item": 3340
+  },
+  {
+   "id": 305,
+   "key": "CorruptHardenedSandEcho",
+   "item": 3341
+  },
+  {
+   "id": 306,
+   "key": "CrimsonHardenedSandEcho",
+   "item": 3342
+  },
+  {
+   "id": 307,
+   "key": "HallowHardenedSandEcho",
+   "item": 3343
+  },
+  {
+   "id": 308,
+   "key": "CorruptSandstoneEcho",
+   "item": 3344
+  },
+  {
+   "id": 309,
+   "key": "CrimsonSandstoneEcho",
+   "item": 3345
+  },
+  {
+   "id": 310,
+   "key": "HallowSandstoneEcho",
+   "item": 3346
+  },
+  {
+   "id": 311,
+   "key": "DesertFossilEcho",
+   "item": 3348
+  },
+  {
+   "id": 312,
+   "key": "BambooBlockWall",
+   "item": 4565
+  },
+  {
+   "id": 313,
+   "key": "LargeBambooBlockWall",
+   "item": 4548
+  },
+  {
+   "id": 314,
+   "key": "AmberStoneWallEcho",
+   "item": 4647
+  },
+  {
+   "id": 315,
+   "key": "BambooFence",
+   "item": 4667
+  },
+  {
+   "id": 316,
+   "key": "AshWood",
+   "item": 5216
+  },
+  {
+   "id": 317,
+   "key": "AshWoodFence",
+   "item": 5217
+  },
+  {
+   "id": 318,
+   "key": "EchoWall",
+   "item": 5291
+  },
+  {
+   "id": 319,
+   "key": "ReefWall",
+   "item": 5307
+  },
+  {
+   "id": 320,
+   "key": "PoopWall",
+   "item": 5396
+  },
+  {
+   "id": 321,
+   "key": "ShimmerBlockWall",
+   "item": 5397
+  },
+  {
+   "id": 322,
+   "key": "ShimmerBrickWall",
+   "item": 5399
+  },
+  {
+   "id": 323,
+   "key": "LunarRustBrickWall",
+   "item": 5409
+  },
+  {
+   "id": 324,
+   "key": "DarkCelestialBrickWall",
+   "item": 5410
+  },
+  {
+   "id": 325,
+   "key": "AstraBrickWall",
+   "item": 5411
+  },
+  {
+   "id": 326,
+   "key": "CosmicEmberBrickWall",
+   "item": 5412
+  },
+  {
+   "id": 327,
+   "key": "CryocoreBrickWall",
+   "item": 5413
+  },
+  {
+   "id": 328,
+   "key": "MercuryBrickWall",
+   "item": 5414
+  },
+  {
+   "id": 329,
+   "key": "StarRoyaleBrickWall",
+   "item": 5415
+  },
+  {
+   "id": 330,
+   "key": "HeavenforgeBrickWall",
+   "item": 5416
+  },
+  {
+   "id": 331,
+   "key": "AncientBlueBrickWall",
+   "item": 5418
+  },
+  {
+   "id": 332,
+   "key": "AncientGreenBrickWall",
+   "item": 5420
+  },
+  {
+   "id": 333,
+   "key": "AncientPinkBrickWall",
+   "item": 5422
+  },
+  {
+   "id": 334,
+   "key": "AncientGoldBrickWall",
+   "item": 5424
+  },
+  {
+   "id": 335,
+   "key": "AncientSilverBrickWall",
+   "item": 5426
+  },
+  {
+   "id": 336,
+   "key": "AncientCopperBrickWall",
+   "item": 5428
+  },
+  {
+   "id": 337,
+   "key": "AncientObsidianBrickWall",
+   "item": 5434
+  },
+  {
+   "id": 338,
+   "key": "AncientHellstoneBrickWall",
+   "item": 5436
+  },
+  {
+   "id": 339,
+   "key": "AncientCobaltBrickWall",
+   "item": 5430
+  },
+  {
+   "id": 340,
+   "key": "AncientMythrilBrickWall",
+   "item": 5432
+  },
+  {
+   "id": 341,
+   "key": "LavaMossBlockWall",
+   "item": 5445
+  },
+  {
+   "id": 342,
+   "key": "ArgonMossBlockWall",
+   "item": 5446
+  },
+  {
+   "id": 343,
+   "key": "KryptonMossBlockWall",
+   "item": 5447
+  },
+  {
+   "id": 344,
+   "key": "XenonMossBlockWall",
+   "item": 5448
+  },
+  {
+   "id": 345,
+   "key": "VioletMossBlockWall",
+   "item": 5449
+  },
+  {
+   "id": 346,
+   "key": "RainbowMossBlockWall",
+   "item": 5450
+  },
+  {
+   "id": 347,
+   "key": "Shimmerfall",
+   "item": 5494
+  },
+  {
+   "id": 348,
+   "key": "FallenStarWall",
+   "item": 5623
+  },
+  {
+   "id": 349,
+   "key": "StoneUnsafe",
+   "item": null
+  },
+  {
+   "id": 350,
+   "key": "UnbreakableBlockWall",
+   "item": null
+  },
+  {
+   "id": 351,
+   "key": "FeywoodWall",
+   "item": 5711
+  },
+  {
+   "id": 352,
+   "key": "HallowedBrickWall",
+   "item": 5734
+  },
+  {
+   "id": 353,
+   "key": "PineTreeBlockWall",
+   "item": 5919
+  },
+  {
+   "id": 354,
+   "key": "EasterBlockWall",
+   "item": 5921
+  },
+  {
+   "id": 355,
+   "key": "GothicBrickWall",
+   "item": 5923
+  },
+  {
+   "id": 356,
+   "key": "FlinxFurBlockWall",
+   "item": 5925
+  },
+  {
+   "id": 357,
+   "key": "JellyfishBlockWall",
+   "item": 5927
+  },
+  {
+   "id": 358,
+   "key": "PineWoodBlockWall",
+   "item": 5931
+  },
+  {
+   "id": 359,
+   "key": "HarpyBlockWall",
+   "item": 5954
+  },
+  {
+   "id": 360,
+   "key": "MoonplateBlockWall",
+   "item": 5997
+  },
+  {
+   "id": 361,
+   "key": "LibrarianBlockWall",
+   "item": 6020
+  },
+  {
+   "id": 362,
+   "key": "SpikeBlockWall",
+   "item": 6043
+  },
+  {
+   "id": 363,
+   "key": "OfficeBlockWall",
+   "item": 6066
+  },
+  {
+   "id": 364,
+   "key": "ForbiddenBlockWall",
+   "item": 6089
+  },
+  {
+   "id": 365,
+   "key": "WaterBlockWall",
+   "item": 6110
+  },
+  {
+   "id": 366,
+   "key": "BoulderBlockWall",
+   "item": 6133
+  }
+ ]
+}

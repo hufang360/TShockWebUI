@@ -129,6 +129,65 @@ it('登录只缓存 tswui:me，不持久化任何 token', async () => {
   expect(localStorage.getItem('tswui:me')).not.toContain('token')
 })
 
+it('检测到信使插件后自动开启「统一执行」（用户未手动设置过）', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  await loginAsAlice()
+
+  // MockTransport 的 batchCapabilities 返回 plugin=true → App 自动写入 homeBatch=true。
+  await waitFor(() => expect(localStorage.getItem('tswui:homeBatch')).toBe('true'))
+  expect(localStorage.getItem('tswui:homeBatchSet')).toBeNull()
+})
+
+it('用户手动关过「统一执行」后，重登不会被自动覆盖', async () => {
+  mockFetch()
+  localStorage.setItem('tswui:homeBatchSet', 'true')
+  localStorage.setItem('tswui:homeBatch', 'false')
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  await loginAsAlice()
+
+  await new Promise((r) => setTimeout(r, 50))
+  expect(localStorage.getItem('tswui:homeBatch')).toBe('false')
+})
+
+it('检测到玩家管理 / 鱼店插件后自动激活侧边栏入口（用户未手动设置过）', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  await loginAsAlice()
+
+  // MockTransport 的玩家管理 / 鱼店探测都返回 plugin + permission → App 自动写入已激活模块。
+  await waitFor(() => {
+    const prefs = JSON.parse(localStorage.getItem('tswui:modules') ?? '{}')
+    expect(prefs.byServer?.default ?? []).toEqual(expect.arrayContaining(['players', 'store']))
+  })
+  // 自动激活不算「用户手动设置过」。
+  expect(localStorage.getItem('tswui:modulesSet')).toBeNull()
+  // 侧边栏出现对应入口。
+  expect(screen.getAllByRole('button', { name: '玩家管理' }).length).toBeGreaterThan(0)
+  expect(screen.getAllByRole('button', { name: '鱼店' }).length).toBeGreaterThan(0)
+})
+
+it('用户手动关过的模块，重登不会被自动激活覆盖', async () => {
+  mockFetch()
+  localStorage.setItem(
+    'tswui:modulesSet',
+    JSON.stringify({ byServer: { default: ['players', 'store'] } }),
+  )
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  await loginAsAlice()
+
+  await new Promise((r) => setTimeout(r, 80))
+  expect(localStorage.getItem('tswui:modules')).toBeNull()
+})
+
 it('记住密码：登录后写入 tswui:login，重新打开自动回填账号密码', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)

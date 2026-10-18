@@ -155,6 +155,7 @@ export function HomePage({
     extra,
     available: eventsPlugin,
     refreshedAt: feedRefreshedAt,
+    refresh: refreshFeed,
   } = useServerFeed({
     transport,
     authenticated,
@@ -492,6 +493,7 @@ export function HomePage({
       emptyText={opts.emptyText}
       footerNote={opts.footerNote}
       action={isManual(autoExec, `home:${opts.id}`) ? 'run' : 'refresh'}
+      collapseKey={`home:${opts.id}`}
       onRefresh={opts.onRefresh}
       className="max-h-[48rem]"
       itemsById={dataset.itemsById}
@@ -619,6 +621,33 @@ export function HomePage({
           <Activity />
           {t('home.events')}
         </CardTitle>
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={refreshFeed}
+            aria-label={t('home.refresh')}
+            title={t('home.refresh')}
+          >
+            <RefreshCw data-icon="inline-start" />
+          </Button>
+          {eventsPlugin !== false && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={() => {
+                // 直接落到「指令 → 动态」tab（该 tab 装在 CommandPage 挂载时从本机读取）。
+                writeJson(StorageKeys.commandTab, 'events')
+                onNavigate('editor')
+              }}
+            >
+              {t('home.viewAll')}
+              <ArrowRight data-icon="inline-end" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardBody className="flex-1 flex flex-col gap-2">
         <ServerFeedList

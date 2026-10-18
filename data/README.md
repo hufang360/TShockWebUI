@@ -3,10 +3,11 @@
 ## 重新生成
 
 ```bash
-node tools/gen-data.mjs          # 1) 物品/词缀/指令 + loc.<culture>.json（官方本地化）
-python3 tools/gen-atlas.py       # 2) 图标图集（需 Pillow）
-python3 tools/gen-player-atlas.py # 3) 玩家角色图集（需 Pillow）
-bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<culture>.json + item-groups.json + shimmer.json（需 dotnet 9）
+node tools/gen-data.mjs           # 1) 物品/词缀/NPC/buff/指令 + 图格/墙枚举 + loc.<culture>.json
+python3 tools/gen-atlas.py         # 2) 物品图标图集（需 Pillow）
+python3 tools/gen-player-atlas.py  # 3) 玩家角色图集（需 Pillow）
+python3 tools/gen-npc-atlas.py     # 4) NPC 贴图图集（需 Pillow）
+bash tools/gen-game-data.sh        # 5) 合成表 + 属性 stats + item-tips + item-groups + shimmer + prefix + 图格/墙表（需 dotnet 9）
 ```
 
 数据对应 **Terraria 1.4.5.8**。版本不匹配时必须重新生成，否则物品 ID / 名称 / 图标可能错位。
@@ -17,6 +18,7 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 目的是让**没有游戏源码 / 解包资源**的机器也能直接构建前端与单文件二进制。代价是仓库体积与生成数据的 diff 噪音。
 
 - 图集 PNG 版权属 **Re-Logic**，随仓库提交，仅随本项目使用（见 `LICENSE`）。
+- 三个图集（items / player / npc）的 `*-atlas.json` 里都有 `meta.hash`（PNG 的内容哈希）：前端用 `?v=<hash>` 拉 PNG，图集一变 URL 就变，避免「新坐标 + 旧 PNG」的图标错位。
 - 升级游戏版本后必须按上文重新生成，并核对 `meta.json` 的 `gameVersion`。
 - 若后续想瘦身：可把生成物移出仓库、改由 CI / Docker 构建时生成（代价：构建机需备齐游戏资源）。
 
@@ -37,15 +39,18 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 | --- | --- | --- |
 | `items.json` | 物品：ID、内部名、图标、动画帧数、贴图尺寸、标签（**无名称**） | 6195 |
 | `prefixes.json` | 词缀：ID、内部名（**无名称**） | 97 |
-| `npcs.json` | NPC：ID、内部名（**无名称**，名称取 `loc.NPCName`；参数补全用） | 694 |
+| `npcs.json` | NPC：ID、内部名（**无名称**，名称取 `loc.NPCName`；参数补全用）、`/sb` 参数信息 | 694 |
+| `tiles.json` | 图格 ID：内部名（`TileID`）、代表物品 id、摆放尺寸 | 754 |
+| `walls.json` | 墙 ID：内部名（`WallID`）、代表物品 id | 367 |
 | `buffs.json` | Buff：ID、内部名（**无名称**，名称取 `loc.BuffName`；参数补全用） | 400 |
 | `commands.json` | TShock 核心指令（源码 best-effort 解析，含参数表 `paramSets`） | 95（70 条带参数表） |
 | `recipes.json` | 合成表：配方、配方组（**只有本地化 `key`**）、产出/材料倒排索引 | 3603 |
 | `item-stats.json` | 物品属性 `stats`（语言无关） | 6195 |
 | `item-groups.json` | 创意菜单物品分组（页签 + 每件物品的 ItemGroup / 组内顺序，语言无关） | 6195 |
 | `shimmer.json` | 微光转换：源物品 id → 目标物品 id（语言无关） | 316 |
-| `prefix-mods.json` | 词缀数值修正（乘/加；来自 `Item.cs`，与物品无关） | 78 |
+| `prefix-mods.json` | 词缀数值修正（乘/加；来自 `Item.cs`，与物品无关）+ `val` 评分 + 饰品词缀 `benefit` | 97 |
 | `prefix-sets.json` | 每件物品**可滚词缀**（`Item.GetRollablePrefixes()`；盔甲/材料不收录） | 886 |
+| `item-drops.json` | 木匣掉落（运行时模拟：物品 / 数量范围 / 实测概率） | 26 个木匣 |
 | `item-tips.zh-Hans.json` | 物品提示行（中文） | 6049 |
 | `item-tips.en-US.json` | 物品提示行（英文） | 6049 |
 | `loc.zh-Hans.json` | 官方本地化：`ItemName` / `Prefix` / `Misc` / `LegacyMisc` / `NPCName` / `BuffName` | — |
@@ -55,6 +60,8 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 | `items-atlas.png` | 图标图集（已入库；版权 Re-Logic） | — |
 | `player-atlas.json` | 玩家角色图集裁切信息 `{regions:{"b:<variant>:<part>:<role>" / "h:<hair>":[x,y,40,56]}}` | 507 |
 | `player-atlas.png` | 玩家角色图集（已入库；灰度遮罩，绘制时用玩家颜色相乘着色） | — |
+| `npc-atlas.json` | NPC 贴图图集裁切信息 `{regions:{npcId:[x,y,w,h]}}`（第一帧） | 694 |
+| `npc-atlas.png` | NPC 贴图图集（已入库；版权 Re-Logic） | — |
 
 ### commands.json 结构
 
@@ -137,7 +144,13 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 
 - `tip` 行顺序与文案复刻游戏 `Main.MouseText_DrawItemTooltip_GetLinesInfo()`；
   伤害/暴击为**物品基础值**（暴击已按无装备玩家 +4% 基础值处理），不含前缀与玩家/世界状态相关行。
-- `stats` 只保留非默认字段，供详情面板/筛选使用。
+  游戏内这几行会按当前角色属性重算，所以图鉴会对含这些行的物品显示一句「基础值 · 不含角色属性加成」。
+- 金币（ID 71–74）按「背包里没有 Coin Gun(905)」的默认行为处理：只显示「可放置」，不显示伤害/暴击行。
+- `stats` 只保留非默认字段，供详情面板/筛选使用。其中 `canDecraft` / `decraftStack` 是「可微分」相关：
+  `canDecraft` = 该物品丢进微光会走「分解还原材料」分支（严格复刻 `WorldItem.GetShimmered` 的分支顺序：
+  金币 / 有微光转换 / 4986·560 / `makeNPC` 优先，其余才看 `ShimmerTransforms.GetDecraftingRecipeIndex`）；
+  `decraftStack` = 分解所用的配方一次产出多少（>1 时要凑够这么多才能分解，如平台×2、箭矢×10）。
+  判定忽略世界进度锁（骷髅王前 / 石巨人前）与猩红/腐化世界的配方差异。
 
 ### item-groups.json 结构（创意菜单分组）
 
@@ -182,13 +195,16 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 
 ```jsonc
 {
-  "meta": { "count": 78, "source": "Terraria/Item.cs TryGetPrefixStatMultipliersForItem() @ 1.4.5.8", ... },
-  "mods": { "81": { "kb": 1.15, "dmg": 1.15, "crt": 5, "spd": 0.9, "size": 1.1 } }
+  "meta": { "count": 97, "source": "Terraria/Item.cs TryGetPrefixStatMultipliersForItem() @ 1.4.5.8", ... },
+  "mods": { "81": { "kb": 1.15, "dmg": 1.15, "crt": 5, "spd": 0.9, "size": 1.1, "val": 1.760248 } }
 }
 ```
 
 - 由 `tools/gen-prefix-mods.mjs` 解析（只保留非默认字段）。
 - 前端详情「词缀」下拉用它预览词缀加成（伤害/暴击/速度/击退）。
+- `val`：游戏自身的词缀评分（`Item.TryGetPrefixStatMultipliersForItem` 末尾的 `value` 公式 + 顶级倍率）。
+  前端 `web/src/lib/prefixes.ts` 用它取「最佳词缀」= 评分并列最高的那些（对应游戏 `Item.BestPrefixValue()` /
+  `rolledPrefixIsTopTier`）；饰品词缀 62–80 在 switch 里没有分支，`val` 只由顶级倍率决定（65/68/72/76/80 → 1.2）。
 
 ### prefix-sets.json 结构（可滚词缀）
 
@@ -204,6 +220,76 @@ bash tools/gen-game-data.sh      # 4) 合成表 + 属性 stats + item-tips.<cult
 
 - 由 `tools/gamedump` 导出 + `tools/gen-prefix-sets.mjs` 整理；`items` 只收录有词缀的物品。
 - 前端详情「词缀」下拉**只列该物品可滚的词缀**（盔甲等不显示下拉）。
+
+### item-drops.json 结构（木匣掉落）
+
+来源：**运行时模拟** `Player.OpenFishingCrate()`（掉落是命令式 `switch`，没有数据表）。
+`tools/gamedump` 对每个木匣（`ItemID.Sets.IsFishingCrate`，26 个）跑 `trials` 次，统计每种物品的出现次数与数量范围。
+
+```jsonc
+{
+  "meta": { "trials": 1000000, "source": "Monte Carlo Player.OpenFishingCrate()", ... },
+  "items": {
+    "2334": [ { "id": 3200, "chance": 0.0478, "minStack": 1, "maxStack": 1 }, ... ]
+  }
+}
+```
+
+- `chance` 是**实测概率**（开出至少 1 个的模拟频率），不是源码里的精确分数；UI 会标注模拟次数。
+- `minStack` / `maxStack` 是模拟中观察到的数量范围。
+- 只做木匣（掉落与专家/大师无关）；宝藏袋（`OpenBossBag`）含专家/大师分支，未纳入。
+
+### npcs.json 结构（`/sb` 参数）
+
+`npcs.json` 的每条除了 `id` / `key`，还会从 TShock `SpawnBoss()` 的 switch 解析出 Boss 信息（供「数据图鉴」的 Boss 筛选与「指令」页 `/sb` 补全使用）：
+
+```jsonc
+{
+  "id": 4,
+  "key": "EyeofCthulhu",
+  "sb": "eye of cthulhu",        // /sb 的规范写法（最长别名）；仅 Boss 有
+  "sbAliases": ["eoc", "eye", "eye of cthulhu"],  // 全部合法别名（多于一个时）
+  "sbAll": true                   // 是否包含在 /sb all 里
+}
+```
+
+- 来源：`TShockAPI/Commands.cs` 的 `SpawnBoss()`（`case` 标签 → `npc.SetDefaults(N)`；`NPC.SpawnWOF` → 113）。
+- 普通怪物没有这些字段；`/sm` 对任意 NPC 都可用（名称或数字 ID），所以图鉴总是给出 `/sm`。
+
+### tiles.json / walls.json 结构（数据图鉴）
+
+```jsonc
+{
+  "meta": { "gameVersion": "1.4.5.8", "count": 754, "withItem": 647, "withSize": 389, ... },
+  "entries": [
+    { "id": 0, "key": "Dirt",  "item": 2 },               // item = 放置该图格的代表物品 id
+    { "id": 14, "key": "Tables", "item": 1413, "size": [3, 2] }, // size = 摆放尺寸 [宽, 高]（格）
+    { "id": 5, "key": "Trees", "item": null, "frameImportant": true }, // 无固定尺寸（树 / 陷阱等）
+    { "id": 7, "key": "Copper", "item": 12 }              // 简单方块：无 size（1×1）
+  ]
+}
+```
+
+- 内部名来自 `Terraria.ID/TileID.cs` / `WallID.cs` 的常量名；`item` 来自 GameDump 的 `itemTile` / `itemWall`（同一图格有多个放置物时取 id 最小的）。
+- `size`（仅图格）：GameDump 的 `tileDims`，来自游戏运行期 `Terraria.ObjectData.TileObjectData` 的 `Width × Height`（style 0 作代表）；简单方块（`1×1`）省略该字段，墙没有尺寸概念。
+- `frameImportant`（仅图格）：GameDump 的 `tileFrameImportant` 里「frame-important 但无 `TileObjectData`」的图格（树 / 陷阱 / 铁轨……）；有 `size` 的条目不重复标。
+- 显示名在运行期由代表物品的官方本地化名解析（等价于游戏 `Lang.GetMapObjectName` 的常见情形）；没有代表物品时回退到内部名。
+- 由 `tools/gen-tile-wall.mjs` 整理（`tools/gen-game-data.sh` 调用，复用同一次 GameDump 的 `recipes-raw.json`）。
+
+### NPC 贴图图集（npc-atlas）
+
+「数据图鉴」用一张图集展示每个 NPC 的样子（第一帧）：
+```jsonc
+{
+  "meta": { "gameVersion": "1.4.5.8", "count": 694, "sheet": "npc-atlas.png", ... },
+  "regions": { "1": [0, 0, 32, 26], "4": [64, 0, 110, 166] }  // npcId -> [x, y, w, h]
+}
+```
+
+- 帧高 = 贴图高 / `Main.npcFrameCount[npcId]`（`Terraria/NPC.cs:FindFrame()`）；少数特殊 NPC 的 `frame.Width` 也按源码覆盖。
+- 第一帧几乎为空（多列 / 特殊布局）时回退到整张贴图的紧包围盒。
+- 由 `tools/gen-npc-atlas.py` 生成（需 Pillow，读 `NPC_<id>.png`）。
+- 图集 PNG 版权属 **Re-Logic**，随仓库提交（见 `LICENSE`）。
 
 ## items.json 单条结构
 

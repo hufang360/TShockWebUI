@@ -1,4 +1,4 @@
-import { loadAtlasImage } from '@/lib/atlas'
+import { ATLAS_JSON_FETCH, loadVerifiedAtlasImage } from '@/lib/atlas'
 import type { PlayerAtlas } from '@/types'
 
 const BASE = import.meta.env.BASE_URL
@@ -16,7 +16,7 @@ export function loadPlayerAtlas(): Promise<PlayerAtlas> {
     // Promise.resolve().then 包一层：Node 下相对 URL 可能让 fetch 同步抛错，
     // 统一转成 reject，调用方只处理异步失败。
     cache = Promise.resolve()
-      .then(() => fetch(`${BASE}data/player-atlas.json`, { credentials: 'same-origin' }))
+      .then(() => fetch(`${BASE}data/player-atlas.json`, ATLAS_JSON_FETCH))
       .then(async (res) => {
         if (!res.ok) throw new Error(`加载 player-atlas.json 失败：HTTP ${res.status}`)
         return (await res.json()) as PlayerAtlas
@@ -29,7 +29,7 @@ export function loadPlayerAtlas(): Promise<PlayerAtlas> {
   return cache
 }
 
-/** 加载角色图集 PNG（复用物品图集的单例缓存）。 */
+/** 加载角色图集 PNG（复用物品图集的单例缓存；会校验尺寸与裁切表一致）。 */
 export function loadPlayerAtlasImage(atlas: PlayerAtlas): Promise<HTMLImageElement> {
-  return loadAtlasImage(`${BASE}data/${atlas.meta.sheet}`)
+  return loadVerifiedAtlasImage(atlas)
 }

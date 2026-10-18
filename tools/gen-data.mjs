@@ -93,6 +93,48 @@ function parsePermMap(text) {
   return map;
 }
 
+/**
+ * 解析 TShock `SpawnBoss()` 的 switch（Commands.cs）。
+ * 返回 { byId, allIds }：
+ *   - byId:  npcId -> 该 NPC 可用的 /sb 参数别名（如 eye / eye of cthulhu / eoc）
+ *   - allIds: /sb all（或 *）一次生成的 Boss id 集合
+ * 这是 NPC 图鉴右栏展示「召唤指令」的事实来源；/sb 的合法参数以服务器实际版本为准。
+ */
+function parseSpawnBoss(text) {
+  const start = text.indexOf('private static void SpawnBoss(');
+  const end = text.indexOf('private static void SpawnMob(', start);
+  if (start < 0) return { byId: new Map(), allIds: new Set() };
+  const body = text.slice(start, end < 0 ? undefined : end);
+  const byId = new Map();
+  const allIds = new Set();
+  const parts = [...body.matchAll(/case\s+"([^"]+)"\s*:/g)];
+  let run = [];
+  for (let i = 0; i < parts.length; i++) {
+    const label = parts[i][1];
+    const segEnd = i + 1 < parts.length ? parts[i + 1].index : body.length;
+    const seg = body.slice(parts[i].index + parts[i][0].length, segEnd);
+    run.push(label);
+    const hasAction = /SetDefaults|SpawnWOF|int\[\]/.test(seg);
+    if (!hasAction) continue;
+    // run = 这一组连续的 case 标签；seg = 该组的动作代码。
+    const isAll = run.includes('*') || run.includes('all');
+    if (isAll) {
+      const arr = seg.match(/int\[\]\s+\w+\s*=\s*\{([^}]*)\}/);
+      if (arr) for (const n of arr[1].split(',')) { const v = Number(n.trim()); if (v) allIds.add(v); }
+    } else {
+      const ids = [...seg.matchAll(/npc\.SetDefaults\((\d+)\)/g)].map((m) => Number(m[1]));
+      if (ids.length === 0 && /NPC\.SpawnWOF/.test(seg)) ids.push(113); // Wall of Flesh 走 SpawnWOF
+      for (const id of ids) {
+        const list = byId.get(id) ?? [];
+        for (const l of run) if (!list.includes(l)) list.push(l);
+        byId.set(id, list);
+      }
+    }
+    run = [];
+  }
+  return { byId, allIds };
+}
+
 // gettext .po 解析：msgid -> msgstr（支持多行/转义，忽略 fuzzy 条目）
 function parsePoString(s) {
   const m = s.match(/^"((?:[^"\\]|\\.)*)"/);
@@ -583,7 +625,19 @@ function main() {
   // 与物品同一套做法：NPCID/BuffID 常量名就是官方本地化的 key。
   // 只取正数 ID（NPCID 里负数的是网络 ID，parseConstMap 已舍弃）。
   const npcId2key = parseConstMap(read(join(trSrc, 'Terraria.ID/NPCID.cs')), 'short');
-  const npcs = [...npcId2key.keys()].sort((a, b) => a - b).map((id) => ({ id, key: npcId2key.get(id) }));
+  // /sb (spawnboss) 的合法参数：从 TShock SpawnBoss() 的 switch 解析（用于 NPC 图鉴右栏）。
+  const { byId: sbById, allIds: sbAllIds } = parseSpawnBoss(read(join(tshockSrc, 'TShockAPI/Commands.cs')));
+  const npcs = [...npcId2key.keys()].sort((a, b) => a - b).map((id) => {
+    const entry = { id, key: npcId2key.get(id) };
+    const aliases = sbById.get(id);
+    if (aliases && aliases.length) {
+      // 取最长别名作为展示用的规范写法（如 "eye of cthulhu"），完整别名留在 sbAliases。
+      entry.sb = aliases.slice().sort((a, b) => b.length - a.length)[0];
+      if (aliases.length > 1) entry.sbAliases = aliases.slice().sort();
+    }
+    if (sbAllIds.has(id)) entry.sbAll = true;
+    return entry;
+  });
   const buffId2key = parseConstMap(read(join(trSrc, 'Terraria.ID/BuffID.cs')), 'int');
   const buffs = [...buffId2key.keys()].sort((a, b) => a - b).map((id) => ({ id, key: buffId2key.get(id) }));
   const prefixes = [...prefixId2key.keys()].sort((a, b) => a - b).map((id) => ({
@@ -695,7 +749,11 @@ function main() {
     prefixes,
   });
   writeJson('npcs.json', {
-    meta: { gameVersion, count: npcs.length, source: 'Terraria.ID/NPCID.cs + loc.NPCName' },
+    meta: {
+      gameVersion,
+      count: npcs.length,
+      source: 'Terraria.ID/NPCID.cs + loc.NPCName + TShockAPI/Commands.cs SpawnBoss()',
+    },
     npcs,
   });
   writeJson('buffs.json', {

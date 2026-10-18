@@ -97,7 +97,10 @@ function composeTip(it, names) {
 
   if (it.social && !it.vanity && !it.hasVanityEffects) push(T('LegacyTooltip.61'));
 
-  if (it.damage > 0 && (!it.notAmmo || it.useStyle !== 0)) {
+  // 金币（71–74）只在背包里有 CoinGun(905) 时才由游戏显示伤害/暴击/速度/击退行；
+  // 图鉴没有玩家上下文，按「没有 Coin Gun」的默认行为隐藏这些行（Main.cs:20873）。
+  const coinNeedsCoinGun = it.type >= 71 && it.type <= 74;
+  if (it.damage > 0 && (!it.notAmmo || it.useStyle !== 0) && !coinNeedsCoinGun) {
     const dmg = Math.trunc(it.damage * it.tooltipDamageMultiplier);
     const suffixKey = it.melee ? 'LegacyTooltip.2' : it.ranged ? 'LegacyTooltip.3'
       : it.magic ? 'LegacyTooltip.4' : it.summon ? 'LegacyTooltip.53' : 'LegacyTooltip.55';
@@ -200,9 +203,10 @@ try {
 
 const NUM_KEYS = ['damage', 'crit', 'knockBack', 'useAnimation', 'defense', 'pick', 'axe', 'hammer',
   'tileBoost', 'fishingPole', 'bait', 'mana', 'healLife', 'healMana', 'manaIncrease', 'lifeRegen',
-  'buffType', 'buffTime', 'rare', 'value', 'ammo', 'useAmmo', 'createTile', 'createWall', 'shoot', 'shootSpeed'];
+  'buffType', 'buffTime', 'rare', 'value', 'ammo', 'useAmmo', 'createTile', 'createWall', 'shoot', 'shootSpeed',
+  'decraftStack'];
 const BOOL_KEYS = ['autoReuse', 'melee', 'ranged', 'magic', 'summon', 'sentry', 'accessory', 'vanity',
-  'material', 'consumable', 'questItem', 'expert', 'whip', 'hook'];
+  'material', 'consumable', 'questItem', 'expert', 'whip', 'hook', 'canDecraft'];
 
 const items = {};
 const tipsZh = {};

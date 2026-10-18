@@ -18,6 +18,10 @@ server/internal/webdist/*
 tools/gamedump/bin/
 tools/gamedump/obj/
 
+# 用户自备的 NPC 贴图覆盖（只保留说明；登记表 tools/npc-overrides.json 入库）
+tools/npc-overrides/*
+!tools/npc-overrides/README.md
+
 # 信使插件（C#）构建产物
 plugin/**/bin/
 plugin/**/obj/

@@ -1,4 +1,5 @@
 import type { CommandDef, Dataset, Item } from '@/types'
+import { extraParamSetsFor } from '@/lib/commandMeta'
 
 export const testItems: Item[] = [
   {
@@ -139,9 +140,19 @@ export const testItemGroups: Dataset['itemGroups'] = {
   },
 }
 
-export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
-  const items = overrides.items ?? testItems
-  const commands = overrides.commands ?? testCommands
+/** 和运行期一致：把 commandMeta 里的额外多级参数形态合并进指令。 */
+function withCommandMeta(commands: CommandDef[]): CommandDef[] {
+  return commands.map((cmd) => {
+    const extra = extraParamSetsFor(cmd.name)
+    if (extra.length === 0) return cmd
+    const bySyntax = new Map((cmd.paramSets ?? []).map((s) => [s.syntax, s]))
+    for (const s of extra) bySyntax.set(s.syntax, s)
+    return { ...cmd, paramSets: [...bySyntax.values()] }
+  })
+}
+
+export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {  const items = overrides.items ?? testItems
+  const commands = withCommandMeta(overrides.commands ?? testCommands)
   const commandsByToken = new Map<string, CommandDef>()
   for (const cmd of commands) {
     commandsByToken.set(cmd.name.toLowerCase(), cmd)
@@ -163,12 +174,53 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
     prefixes: [{ id: 81, key: 'Legendary', name: '传奇' }],
     npcs: [
       { id: 1, key: 'BlueSlime', name: '蓝史莱姆' },
-      { id: 4, key: 'EyeOfCthulhu', name: '克苏鲁之眼' },
+      {
+        id: 4,
+        key: 'EyeOfCthulhu',
+        name: '克苏鲁之眼',
+        sb: 'eye of cthulhu',
+        sbAliases: ['eoc', 'eye'],
+        sbAll: true,
+      },
     ],
     buffs: [
       { id: 1, key: 'ObsidianSkin', name: '黑曜石皮' },
       { id: 2, key: 'Regeneration', name: '再生' },
     ],
+    tiles: overrides.tiles ?? {
+      meta: {
+        gameVersion: '1.4.5.8',
+        count: 2,
+        withItem: 1,
+        source: 'test',
+        generatedBy: 'test',
+        note: '',
+      },
+      entries: [
+        { id: 0, key: 'Dirt', item: null },
+        { id: 5, key: 'Trees', item: null, frameImportant: true },
+        { id: 1, key: 'Stone', item: 29, size: [3, 2] },
+      ],
+    },
+    walls: overrides.walls ?? {
+      meta: {
+        gameVersion: '1.4.5.8',
+        count: 1,
+        withItem: 1,
+        source: 'test',
+        generatedBy: 'test',
+        note: '',
+      },
+      entries: [{ id: 1, key: 'Stone', item: 29 }],
+    },
+    tilesById:
+      overrides.tilesById ??
+      new Map([
+        [0, { id: 0, key: 'Dirt', item: null }],
+        [5, { id: 5, key: 'Trees', item: null, frameImportant: true }],
+        [1, { id: 1, key: 'Stone', item: 29, size: [3, 2] }],
+      ]),
+    wallsById: overrides.wallsById ?? new Map([[1, { id: 1, key: 'Stone', item: 29 }]]),
     commands,
     atlas: {
       meta: {
@@ -189,7 +241,17 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
     prefixesById: new Map([[81, { id: 81, key: 'Legendary', name: '传奇' }]]),
     npcsById: new Map([
       [1, { id: 1, key: 'BlueSlime', name: '蓝史莱姆' }],
-      [4, { id: 4, key: 'EyeOfCthulhu', name: '克苏鲁之眼' }],
+      [
+        4,
+        {
+          id: 4,
+          key: 'EyeOfCthulhu',
+          name: '克苏鲁之眼',
+          sb: 'eye of cthulhu',
+          sbAliases: ['eoc', 'eye'],
+          sbAll: true,
+        },
+      ],
     ]),
     buffsById: new Map([
       [1, { id: 1, key: 'ObsidianSkin', name: '黑曜石皮' }],
@@ -251,6 +313,17 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
       items: {},
     },
     rollablePrefixesById: overrides.rollablePrefixesById ?? new Map(),
+    itemDrops: overrides.itemDrops ?? {
+      meta: {
+        gameVersion: '1.4.5.8',
+        trials: 0,
+        source: 'test',
+        generatedBy: 'test',
+        note: '',
+      },
+      items: {},
+    },
+    itemDropsById: overrides.itemDropsById ?? new Map(),
     commandsByToken,
     ...overrides,
   }

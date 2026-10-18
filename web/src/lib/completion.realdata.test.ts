@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { computeCompletions } from './completion'
+import { computeCompletions, paramHintFor } from './completion'
 import { makeDataset } from '@/test/fixtures'
 import type { CommandDef } from '@/types'
 
@@ -47,6 +47,106 @@ describe('真实命令数据（data/commands.json）', () => {
     const items = computeCompletions(at('/spawnboss moon'))
     expect(items.map((c) => c.insert)).toContain('"moon lord"') // 含空格 → 自动加引号
     expect(items.every((c) => c.kind === 'enum')).toBe(true)
+  })
+
+  it('/spawnboss：枚举取值带 NPC 显示名，且可按中文名搜索', () => {
+    const items = computeCompletions(at('/spawnboss eye'))
+    const hit = items.find((c) => c.label === 'eye of cthulhu')
+    expect(hit).toMatchObject({ kind: 'enum', detail: '克苏鲁之眼' })
+    // 输入中文名也能命中对应取值（夹具 NPC：克苏鲁之眼）
+    expect(computeCompletions(at('/spawnboss 克苏鲁')).map((c) => c.insert)).toContain(
+      '"eye of cthulhu"',
+    )
+  })
+
+  it('/worldevent /worldmode /time /clear：枚举取值带中文备注名', () => {
+    expect(computeCompletions(at('/worldevent blood'))[0]).toMatchObject({
+      kind: 'enum',
+      label: 'bloodmoon',
+      detail: '血月',
+    })
+    // 按中文备注名搜索
+    expect(computeCompletions(at('/worldevent 血')).map((c) => c.insert)).toContain('bloodmoon')
+    expect(computeCompletions(at('/worldmode exp'))[0]).toMatchObject({
+      label: 'expert',
+      detail: '专家',
+    })
+    expect(computeCompletions(at('/time mid'))[0]).toMatchObject({
+      label: 'midnight',
+      detail: '午夜',
+    })
+    expect(computeCompletions(at('/clear pro'))[0]).toMatchObject({
+      label: 'projectile',
+      detail: '弹幕',
+    })
+  })
+
+  it('/worldevent invasion：三级子命令（入侵类型）补全 + 备注', () => {
+    const kinds = computeCompletions(at('/worldevent invasion '))
+    expect(kinds.map((c) => c.label)).toContain('goblins')
+    expect(kinds.find((c) => c.label === 'goblins')?.detail).toBe('哥布林入侵')
+    expect(kinds.find((c) => c.label === 'martians')?.detail).toBe('火星暴乱')
+    // 前缀筛选
+    expect(computeCompletions(at('/worldevent invasion pir')).map((c) => c.label)).toContain(
+      'pirates',
+    )
+    // 波数是 number → 不给候选
+    expect(computeCompletions(at('/worldevent invasion pumpkinmoon '))).toHaveLength(0)
+  })
+
+  it('字面量子命令（/region、/warp、/group）二级补全带备注', () => {
+    const region = computeCompletions(at('/region '))
+    expect(region.map((c) => c.label)).toContain('define')
+    expect(region.find((c) => c.label === 'define')?.detail).toBe('定义区域')
+    expect(computeCompletions(at('/region re')).map((c) => c.label)).toEqual(
+      expect.arrayContaining(['resize', 'rename', 'remove']),
+    )
+    expect(computeCompletions(at('/warp ')).find((c) => c.label === 'send')?.detail).toBe(
+      '把玩家送到传送点',
+    )
+    expect(computeCompletions(at('/group ')).map((c) => c.label)).toContain('addperm')
+  })
+
+  it('插件字面量子命令（/pm、/wm、/fish）二级补全带备注', () => {
+    const pm: CommandDef = {
+      name: 'playermanager',
+      aliases: ['pm', 'ppm'],
+      permission: null,
+      help: '',
+      allowServer: false,
+      doLog: true,
+    }
+    const ds = makeDataset({ commands: [pm] })
+    const items = computeCompletions({ dataset: ds, text: '/pm ', caret: 4, players: [] })
+    expect(items.find((c) => c.label === 'export')?.detail).toBe('导出指定玩家 .plr')
+    expect(items.find((c) => c.label === 'look')?.detail).toBe('查看玩家（背包 / 存档）')
+  })
+
+  it('「不加参数 = 查看」提示：/fish jar 与 /wm 系列', () => {
+    const fish: CommandDef = {
+      name: 'fishshop',
+      aliases: ['fish', 'fs'],
+      permission: null,
+      help: '',
+      allowServer: true,
+      doLog: true,
+    }
+    const wm: CommandDef = {
+      name: 'worldmodify',
+      aliases: ['wm'],
+      permission: null,
+      help: '',
+      allowServer: true,
+      doLog: true,
+    }
+    const fishDs = makeDataset({ commands: [fish] })
+    expect(paramHintFor(fishDs, '/fish jar ', 10, 'zh')).toContain('不加参数 = 查看鱼罐')
+    expect(paramHintFor(fishDs, '/fish jar ', 10, 'en')).toContain('no arg = view jar')
+
+    const wmDs = makeDataset({ commands: [wm] })
+    expect(paramHintFor(wmDs, '/wm name ', 9, 'zh')).toContain('查看世界名')
+    expect(paramHintFor(wmDs, '/wm seed ', 9, 'zh')).toContain('查看种子')
+    expect(paramHintFor(wmDs, '/wm wind ', 9, 'zh')).toContain('查看风速')
   })
 
   it('/time 与 /clear：枚举取值不允许顺手弹玩家名', () => {

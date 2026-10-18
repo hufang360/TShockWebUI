@@ -1,50 +1,197 @@
-import type { ComponentProps } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useRef, useState, type ComponentProps, type FocusEvent, type KeyboardEvent } from 'react'
+import { History, X } from 'lucide-react'
 import { Button, InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { SEARCH_HISTORY_MAX, SEARCH_HISTORY_NARROW_MAX } from '@/lib/searchHistory'
 
 type SearchInputProps = Omit<ComponentProps<'input'>, 'onChange' | 'value'> & {
   value: string
   onValueChange: (value: string) => void
   /** 输入框自身的额外类（如整体大一号：`text-sm`）。 */
   inputClassName?: string
+  /** 「最近搜索」：在下方下拉框里展示（类似代码补全），点一下填入。 */
+  history?: readonly string[]
+  /** 点击「最近搜索」时的回调；缺省时回落到 `onValueChange`。 */
+  onHistorySelect?: (value: string) => void
+  /** 下拉框顶部的小标题（默认「最近搜索」）。 */
+  historyHeader?: string
+  /**
+   * 聚焦时是否立刻弹出「最近搜索」，**默认 `false`**。
+   *
+   * 页面进入时会自动聚焦搜索框，若有历史就会立刻盖住结果（像被强行塞了个菜单）。
+   * 现在的规则：**只在打字时**弹（边输边筛），想直接看历史就点输入框右侧的历史按钮；
+   * 需要旧行为可显式传 `true`。
+   */
+  historyOnFocus?: boolean
+  /** 是否在输入框内显示「最近搜索」按钮（有历史时才出现），默认 `true`。 */
+  historyToggle?: boolean
 }
 
 /**
  * 紧凑搜索框：右侧内嵌圆形 ✕（有内容时才出现），点击清空并保持焦点。
  * 基于 shadcn `InputGroup`（不用 relative + 绝对定位）。
+ *
+ * 带 `history` 时：**打字**（或点右侧历史按钮）会在下方下拉框里显示「最近搜索」，
+ * 可像代码补全那样边输边筛；**聚焦本身不弹**（页面进入会自动聚焦，见 `historyOnFocus`）。
  */
 export function SearchInput({
   value,
   onValueChange,
   className,
   inputClassName,
+  history,
+  onHistorySelect,
+  historyHeader,
+  historyOnFocus = false,
+  historyToggle = true,
+  onFocus,
+  onBlur,
+  onKeyDown,
   ...props
 }: SearchInputProps) {
   const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const [narrow, setNarrow] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const q = value.trim().toLowerCase()
+  const items = history && history.length > 0
+    ? q
+      ? history.filter((h) => h.toLowerCase().includes(q))
+      : history
+    : []
+  // 统一规则：宽区域最多展示 10 条，窄区域（< 420px）只展示前 5 条。
+  const shown = items.slice(0, narrow ? SEARCH_HISTORY_NARROW_MAX : SEARCH_HISTORY_MAX)
+
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const measure = () => setNarrow(el.clientWidth < 420)
+    measure()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined
+    ro?.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
+
+  const showList = open && shown.length > 0
+
+  // 点到输入框 / 历史按钮以外的地方收起下拉（历史按钮在容器内，不会误关）。
+  useEffect(() => {
+    if (!showList) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [showList])
+
+  const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
+    if (historyOnFocus) setOpen(true)
+    onFocus?.(e)
+  }
+  const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
+    // 延迟关闭，允许鼠标点候选（onMouseDown preventDefault 已避免失焦，这里兜底）。
+    window.setTimeout(() => setOpen(false), 150)
+    onBlur?.(e)
+  }
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape' && open) {
+      e.stopPropagation()
+      setOpen(false)
+    }
+    onKeyDown?.(e)
+  }
+
   return (
-    <InputGroup className={cn('h-8 w-full', className)}>
-      <InputGroupInput
-        value={value}
-        onChange={(e) => onValueChange(e.target.value)}
-        className={cn('px-2.5 text-xs', inputClassName)}
-        {...props}
-      />
-      {value.length > 0 && (
-        <InputGroupAddon align="inline-end">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="rounded-full text-muted-foreground hover:text-foreground"
-            aria-label={t('editor.clear')}
-            title={t('editor.clear')}
-            onClick={() => onValueChange('')}
-          >
-            <X data-icon="inline-start" />
-          </Button>
-        </InputGroupAddon>
+    <div ref={rootRef} className="relative w-full">
+      <InputGroup className={cn('h-8 w-full', className)}>
+        <InputGroupInput
+          value={value}
+          onChange={(e) => {
+            onValueChange(e.target.value)
+            // 输入时打开历史下拉（像补全一样边输边筛）；聚焦时是否弹由 historyOnFocus 决定。
+            setOpen(true)
+          }}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          className={cn('px-2.5 text-xs', inputClassName)}
+          {...props}
+        />
+        {((historyToggle && items.length > 0) || value.length > 0) && (
+          <InputGroupAddon align="inline-end">
+            {historyToggle && items.length > 0 && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className={cn(
+                  'rounded-full text-muted-foreground hover:text-foreground',
+                  showList && 'bg-accent text-foreground',
+                )}
+                aria-label={t('search.recent')}
+                aria-expanded={showList}
+                title={t('search.recent')}
+                // 不让输入框失焦（失焦会延迟关闭下拉）。
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setOpen((v) => !v)}
+              >
+                <History data-icon="inline-start" />
+              </Button>
+            )}
+            {value.length > 0 && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="rounded-full text-muted-foreground hover:text-foreground"
+                aria-label={t('editor.clear')}
+                title={t('editor.clear')}
+                onClick={() => {
+                  onValueChange('')
+                  setOpen(false)
+                }}
+              >
+                <X data-icon="inline-start" />
+              </Button>
+            )}
+          </InputGroupAddon>
+        )}
+      </InputGroup>
+      {showList && (
+        <ul
+          role="listbox"
+          data-testid="search-history-list"
+          className="absolute top-full left-0 z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-xl bg-popover py-1 shadow-xl"
+        >
+          <li className="px-3 py-1 text-[10px] text-muted-foreground">
+            {historyHeader ?? t('search.recent')}
+          </li>
+          {shown.map((h) => (
+            <li key={h}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={false}
+                data-testid="search-history-item"
+                // 防止点击时输入框失焦（失焦会触发延迟关闭）。
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (onHistorySelect) onHistorySelect(h)
+                  else onValueChange(h)
+                  setOpen(false)
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
+              >
+                <History className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{h}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
-    </InputGroup>
+    </div>
   )
 }

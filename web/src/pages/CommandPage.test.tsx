@@ -425,7 +425,7 @@ describe('CommandPage 历史', () => {
 })
 
 describe('CommandPage 结果持久化', () => {
-  it('执行结果存本机，重新挂载后仍在', async () => {
+  it('执行结果存本机（按服务器），重新挂载后仍在', async () => {
     localStorage.setItem('tswui:draft', JSON.stringify('/time'))
     const transport = fakeTransport(
       vi.fn().mockResolvedValue({ status: 'ok', output: ['已把时间设置为 12:00'], message: '' }),
@@ -449,11 +449,51 @@ describe('CommandPage 结果持久化', () => {
     const first = render(page())
     fireEvent.click(screen.getByRole('button', { name: '执行' }))
     await screen.findByText('已把时间设置为 12:00')
-    expect(JSON.parse(localStorage.getItem('tswui:commandResults') ?? '[]')).toHaveLength(1)
+    const stored = JSON.parse(localStorage.getItem('tswui:commandResults') ?? '{}') as Record<
+      string,
+      unknown[]
+    >
+    expect(stored.default).toHaveLength(1)
     first.unmount()
 
     render(page())
     expect(await screen.findByText('已把时间设置为 12:00')).toBeTruthy()
+  })
+
+  it('结果按服务器分开：切换服务器看不到另一台的结果', async () => {
+    localStorage.setItem('tswui:draft', JSON.stringify('/time'))
+    const transport = fakeTransport(
+      vi.fn().mockResolvedValue({ status: 'ok', output: ['服务器 A 的输出'], message: '' }),
+    )
+    const page = (serverId: string) => (
+      <I18nProvider lang="zh">
+        <CommandPage
+          dataset={makeDataset()}
+          transport={transport}
+          authenticated
+          settings={settings}
+          serverId={serverId}
+          players={[]}
+          ingameAllowed={false}
+          onTokenInvalid={vi.fn().mockResolvedValue(true)}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>
+    )
+
+    const first = render(page('server-a'))
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    await screen.findByText('服务器 A 的输出')
+    first.unmount()
+
+    // 换到另一台服务器：不应看到 A 的结果。
+    const second = render(page('server-b'))
+    expect(screen.queryByText('服务器 A 的输出')).toBeNull()
+    second.unmount()
+
+    // 切回 A：结果仍在。
+    render(page('server-a'))
+    expect(await screen.findByText('服务器 A 的输出')).toBeTruthy()
   })
 })
 

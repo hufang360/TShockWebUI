@@ -293,4 +293,55 @@ describe('真实数据：NPC / buff（参数补全数据源）', () => {
     expect(ds.buffsById.get(1)?.name).toBe('黑曜石皮')
     expect(ds.npcsById.get(1)?.key).toBe('BlueSlime')
   })
+
+  it('loadDataset 载入图格 / 墙 ID 表', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const rel = String(input).replace(/^.*\/data\//, '')
+        try {
+          return new Response(readFileSync(resolve(dataDir, rel)), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        } catch {
+          return new Response('not found', { status: 404 })
+        }
+      }),
+    )
+    const ds = await loadDataset('zh')
+    expect(ds.tiles.entries.length).toBeGreaterThan(700)
+    expect(ds.walls.entries.length).toBeGreaterThan(300)
+    expect(ds.tilesById.get(1)?.key).toBe('Stone')
+    expect(ds.tilesById.get(1)?.item).toBe(3)
+    expect(ds.tilesById.get(14)?.size).toEqual([3, 2])
+    expect(ds.tilesById.get(5)?.frameImportant).toBe(true)
+    expect(ds.wallsById.get(4)?.key).toBe('Wood')
+    // 墙没有尺寸概念（frameImportant/size 只属于图格）
+    expect(ds.wallsById.get(4)?.size).toBeUndefined()
+    expect(ds.wallsById.get(4)?.frameImportant).toBeUndefined()
+  })
+
+  it('npcs.json 带有 /sb（spawnboss）参数信息', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const rel = String(input).replace(/^.*\/data\//, '')
+        try {
+          return new Response(readFileSync(resolve(dataDir, rel)), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        } catch {
+          return new Response('not found', { status: 404 })
+        }
+      }),
+    )
+    const ds = await loadDataset('zh')
+    expect(ds.npcsById.get(4)?.sb).toBe('eye of cthulhu')
+    expect(ds.npcsById.get(50)?.sb).toBe('king slime')
+    expect(ds.npcsById.get(113)?.sb).toBe('wall of flesh')
+    // 普通怪物没有 /sb
+    expect(ds.npcsById.get(1)?.sb).toBeUndefined()
+  })
 })

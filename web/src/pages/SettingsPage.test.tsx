@@ -163,6 +163,36 @@ describe('SettingsPage 激活模块', () => {
     expect(onModulesChange).toHaveBeenCalledWith({ byServer: { default: ['players'] } })
   })
 
+  it('手动拨动开关会记录「用户选择过」（用于关闭自动激活）', async () => {
+    const onModuleUserSet = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={fakeTransport({
+            playerCapabilities: async () => ({ plugin: true, permission: true }),
+            fishCapabilities: async () => ({ plugin: true, permission: true }),
+          })}
+          authenticated
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          onModuleUserSet={onModuleUserSet}
+          customModules={[]}
+          onCustomModulesChange={vi.fn()}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
+    await waitFor(() => expect(sw.disabled).toBe(false))
+    fireEvent.click(sw)
+    expect(onModuleUserSet).toHaveBeenCalledWith('players')
+  })
+
   it('未安装插件的模块开关禁用并提示', async () => {
     render(
       <I18nProvider lang="zh">
@@ -336,7 +366,7 @@ describe('SettingsPage 激活模块', () => {
           authenticated
           modules={DEFAULT_MODULES}
           onModulesChange={vi.fn()}
-          customModules={[{ id: 'm:1', name: '旧名' }]}
+          customModules={[{ id: 'm:1', name: '旧名', command: '/old', desc: '' }]}
           onCustomModulesChange={onCustomModulesChange}
           onTokenInvalid={vi.fn()}
           onLogin={vi.fn()}
@@ -346,7 +376,69 @@ describe('SettingsPage 激活模块', () => {
 
     const input = screen.getByDisplayValue('旧名')
     fireEvent.change(input, { target: { value: '新名' } })
-    expect(onCustomModulesChange).toHaveBeenCalledWith([{ id: 'm:1', name: '新名' }])
+    expect(onCustomModulesChange).toHaveBeenCalledWith([{ id: 'm:1', name: '新名', command: '/old', desc: '' }])
+  })
+
+  it('修改自定义模块主指令会同步自动生成的「帮助」卡片', async () => {
+    localStorage.setItem(
+      'tswui:moduleCards',
+      JSON.stringify({ byServer: { default: { 'm:1': [{ id: 'c:1', name: '帮助', command: '/old help' }] } } }),
+    )
+    const onCustomModulesChange = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={fakeTransport({})}
+          authenticated
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          customModules={[{ id: 'm:1', name: '旧名', command: '/old', desc: '' }]}
+          onCustomModulesChange={onCustomModulesChange}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    fireEvent.change(screen.getByDisplayValue('/old'), { target: { value: '/new' } })
+    expect(onCustomModulesChange).toHaveBeenCalledWith([{ id: 'm:1', name: '旧名', command: '/new', desc: '' }])
+    await waitFor(() => {
+      const raw = JSON.parse(localStorage.getItem('tswui:moduleCards') ?? '{}') as {
+        byServer?: Record<string, Record<string, { command: string }[]>>
+      }
+      expect(raw.byServer?.default?.['m:1']?.[0]?.command).toBe('/new help')
+    })
+  })
+
+  it('自定义模块可修改顶部说明文字', () => {
+    const onCustomModulesChange = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={fakeTransport({})}
+          authenticated
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          customModules={[{ id: 'm:1', name: '旧名', command: '/old', desc: '' }]}
+          onCustomModulesChange={onCustomModulesChange}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('模块顶部说明（可留空）'), {
+      target: { value: '我的钓鱼模块' },
+    })
+    expect(onCustomModulesChange).toHaveBeenCalledWith([
+      { id: 'm:1', name: '旧名', command: '/old', desc: '我的钓鱼模块' },
+    ])
   })
 
   it('页面底部显示版本号', () => {

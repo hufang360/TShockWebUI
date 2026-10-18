@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Check, Copy, Star, Terminal, Trash2 } from 'lucide-react'
 import { CollapseChevron } from '@/components/CollapseChevron'
+import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
 import {
   Badge,
@@ -15,9 +16,14 @@ import {
   EmptyTitle,
   Spinner,
 } from '@/components/ui'
+import { useBottomList } from '@/hooks/useBottomList'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { hasTextSelection } from '@/lib/selection'
 import type { Atlas, CommandResult, CommandStatus, Item, Prefix } from '@/types'
+
+/** 结果卡片默认只渲染最近 N 条（与游戏内习惯一致），更早的用「加载更早」按钮按批展开。 */
+const RESULT_WINDOW = 5
 
 export const STATUS_TONE: Record<
   CommandStatus,
@@ -41,6 +47,8 @@ export interface ResultEntry {
   ts: number
   command: string
   result: CommandResult
+  /** 是否折叠（表头整块可点击切换）；持久化后切换模块回来状态还在。 */
+  collapsed?: boolean
 }
 
 function OutputBlock({
@@ -129,6 +137,7 @@ function ResultItem({
   onRemove,
   isFavorite,
   onToggleFavorite,
+  onToggleCollapse,
 }: {
   entry: ResultEntry
   itemsById?: Map<number, Item>
@@ -137,72 +146,84 @@ function ResultItem({
   onRemove?: (seq: number) => void
   isFavorite?: (cmd: string) => boolean
   onToggleFavorite?: (cmd: string) => void
+  /** 切换折叠状态（传入后会持久化，切换模块回来仍保持）。 */
+  onToggleCollapse?: (seq: number, collapsed: boolean) => void
 }) {
   const { t } = useI18n()
   const { result, command } = entry
-  const [collapsed, setCollapsed] = useState(false)
+  // 未提供持久化回调时退化为组件内 state。
+  const [localCollapsed, setLocalCollapsed] = useState(false)
+  const collapsed = entry.collapsed ?? localCollapsed
+  const setCollapsed = (next: boolean) => {
+    if (onToggleCollapse) onToggleCollapse(entry.seq, next)
+    else setLocalCollapsed(next)
+  }
   const abnormal = result.status !== 'ok'
   const favorited = isFavorite?.(command) ?? false
+  const toggleLabel = collapsed ? t('result.expand') : t('result.collapse')
   return (
     <div className="group/result rounded-xl border border-border/60 bg-card/40 p-3">
       <Collapsible open={!collapsed} onOpenChange={(o) => setCollapsed(!o)}>
-        {/* 表头：指令 + 收藏 + 删除（垃圾桶）+ 折叠箭头（大字号指令）。 */}
-        <div className="flex items-center gap-1.5">
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="group/title flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-left"
-              aria-label={collapsed ? t('result.expand') : t('result.collapse')}
+        {/* 表头整块可点击折叠：指令文本可鼠标选中复制（选中时不折叠）。 */}
+        <CollapsibleTrigger asChild>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={toggleLabel}
+            className="group/title flex cursor-pointer items-center gap-1.5 text-left select-text"
+            onClick={(e) => {
+              if (hasTextSelection()) e.preventDefault()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setCollapsed(!collapsed)
+              }
+            }}
+          >
+            <span
+              className={cn(
+                'min-w-0 flex-1 truncate font-pixel text-sm select-text',
+                abnormal ? 'text-destructive' : 'text-foreground',
+              )}
+              title={command}
             >
-              <span
-                className={cn(
-                  'min-w-0 flex-1 truncate font-pixel text-sm',
-                  abnormal ? 'text-destructive' : 'text-foreground',
-                )}
-                title={command}
-              >
-                {command}
-              </span>
-            </button>
-          </CollapsibleTrigger>
-          {/* 收藏 / 删除：hover 卡片才出现，与折叠箭头同时出现。 */}
-          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/result:opacity-100 focus-within:opacity-100">
-            {onToggleFavorite && result.status === 'ok' && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="shrink-0"
-                aria-pressed={favorited}
-                aria-label={favorited ? t('editor.unfavorite') : t('editor.favorite')}
-                title={favorited ? t('editor.unfavorite') : t('editor.favorite')}
-                onClick={() => onToggleFavorite(command)}
-              >
-                <Star className={cn(favorited && 'fill-current')} data-icon="inline-start" />
-              </Button>
-            )}
-            {onRemove && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="shrink-0"
-                aria-label={t('result.remove')}
-                title={t('result.remove')}
-                onClick={() => onRemove(entry.seq)}
-              >
-                <Trash2 data-icon="inline-start" />
-              </Button>
-            )}
+              {command}
+            </span>
+            {/* 收藏 / 删除：hover 卡片才出现；点击不触发展开 / 折叠。 */}
+            <div
+              className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/result:opacity-100 focus-within:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {onToggleFavorite && result.status === 'ok' && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0"
+                  aria-pressed={favorited}
+                  aria-label={favorited ? t('editor.unfavorite') : t('editor.favorite')}
+                  title={favorited ? t('editor.unfavorite') : t('editor.favorite')}
+                  onClick={() => onToggleFavorite(command)}
+                >
+                  <Star className={cn(favorited && 'fill-current')} data-icon="inline-start" />
+                </Button>
+              )}
+              {onRemove && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0"
+                  aria-label={t('result.remove')}
+                  title={t('result.remove')}
+                  onClick={() => onRemove(entry.seq)}
+                >
+                  <Trash2 data-icon="inline-start" />
+                </Button>
+              )}
+            </div>
+            <CollapseChevron open={!collapsed} reveal="group-hover/result:opacity-100" />
           </div>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="shrink-0 cursor-pointer"
-              aria-label={collapsed ? t('result.expand') : t('result.collapse')}
-            >
-              <CollapseChevron open={!collapsed} reveal="group-hover/result:opacity-100" />
-            </button>
-          </CollapsibleTrigger>
-        </div>
+        </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-2 flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -228,8 +249,8 @@ function ResultItem({
 }
 
 /**
- * 执行结果面板：把每次执行追加到后面并保留，容器可滚动，
- * 新结果出现时自动滚动到底部（不覆盖上次结果）。
+ * 执行结果面板：每次执行追加到后面并保留，容器可滚动；
+ * **默认停在最新一条**（贴底），用户向上回看时不打扰；更早的结果按批懒加载。
  */
 export function ResultPanel({
   entries,
@@ -240,6 +261,7 @@ export function ResultPanel({
   onRemove,
   isFavorite,
   onToggleFavorite,
+  onToggleCollapse,
 }: {
   entries: ResultEntry[]
   running: boolean
@@ -254,14 +276,15 @@ export function ResultPanel({
   isFavorite?: (cmd: string) => boolean
   /** 收藏 / 取消收藏某条指令。 */
   onToggleFavorite?: (cmd: string) => void
+  /** 切换某条结果的折叠状态（传入后会持久化）。 */
+  onToggleCollapse?: (seq: number, collapsed: boolean) => void
 }) {
   const { t } = useI18n()
-  const scrollRef = useRef<HTMLDivElement>(null)
-  // 新结果或执行状态变化时滚到底部（jsdom 下只是赋值，无副作用）。
-  useEffect(() => {
-    const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [entries.length, running])
+  // 默认停在最新一条（贴底），旧结果按批懒加载（jsdom 下赋值无副作用）。
+  const { ref, onScroll, start, hidden, loadEarlier, step } = useBottomList(entries.length, {
+    initial: RESULT_WINDOW,
+  })
+  const shown = entries.slice(start)
 
   if (entries.length === 0 && !running) {
     return (
@@ -277,8 +300,13 @@ export function ResultPanel({
     )
   }
   return (
-    <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
-      {entries.map((entry) => (
+    <div
+      ref={ref}
+      onScroll={onScroll}
+      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1"
+    >
+      <LoadEarlier hidden={hidden} step={step} onLoad={loadEarlier} />
+      {shown.map((entry) => (
         <ResultItem
           key={entry.seq}
           entry={entry}
@@ -288,6 +316,7 @@ export function ResultPanel({
           onRemove={onRemove}
           isFavorite={isFavorite}
           onToggleFavorite={onToggleFavorite}
+          onToggleCollapse={onToggleCollapse}
         />
       ))}
       {running && (

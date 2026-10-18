@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Fish, Globe2, House, Plug, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
+import { BookOpen, Fish, Globe2, House, LayoutGrid, Plug, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { AppShell, type NavItem } from '@/components/AppShell'
 import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
 import { LoginDialog } from '@/components/LoginDialog'
@@ -30,9 +30,11 @@ import {
   DEFAULT_MODULES,
   MODULE_BY_ID,
   MODULE_DEFS,
+  autoActivateModules,
   isCustomModuleId,
   isModuleEnabled,
   sanitizeModules,
+  setModuleEnabled,
   type ModulesPrefs,
 } from '@/lib/modules'
 import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
@@ -66,6 +68,7 @@ import { HomePage } from '@/pages/HomePage'
 import { ItemsPage } from '@/pages/ItemsPage'
 import { PlayerManagerPage } from '@/pages/PlayerManagerPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { CodexPage } from '@/pages/CodexPage'
 import { CommandModulePage } from '@/pages/CommandModulePage'
 import type { Dataset, Me, Settings, TabId, UiState } from '@/types'
 
@@ -185,12 +188,31 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   // 已激活模块（侧边栏入口）；「设置」里探测到插件并打开开关后写入。
   const [rawModules, setModules] = useLocalState<ModulesPrefs>(StorageKeys.modules, DEFAULT_MODULES)
   const modules = useMemo(() => sanitizeModules(rawModules), [rawModules])
+  // 用户手动改过开关的模块（按服务器记忆）：改过就不再被「检测到插件自动激活」覆盖。
+  const [rawModulesSet, setModulesSet] = useLocalState<ModulesPrefs>(
+    StorageKeys.modulesSet,
+    DEFAULT_MODULES,
+  )
+  const modulesSet = useMemo(() => sanitizeModules(rawModulesSet), [rawModulesSet])
+  // 供登录后的自动激活读取最新值，避免把 modules / modulesSet 塞进 effect 依赖。
+  const modulesRef = useRef({ prefs: modules, userSet: modulesSet })
+  useEffect(() => {
+    modulesRef.current = { prefs: modules, userSet: modulesSet }
+  }, [modules, modulesSet])
   // 用户自定义模块（名称 + 指令），存本机 `tswui:customModules`。
   const [rawCustomModules, setCustomModules] = useLocalState<CustomModule[]>(
     StorageKeys.customModules,
     [],
   )
   const customModules = useMemo(() => sanitizeCustomModules(rawCustomModules), [rawCustomModules])
+
+  // 「统一执行」（批量执行）偏好：检测到信使插件后自动开启；用户手动改过则不再自动开。
+  const [batchMode, setBatchMode] = useLocalState(StorageKeys.homeBatch, false)
+  const [batchModeSet] = useLocalState(StorageKeys.homeBatchSet, false)
+  const batchPrefsRef = useRef({ mode: batchMode, userSet: batchModeSet })
+  useEffect(() => {
+    batchPrefsRef.current = { mode: batchMode, userSet: batchModeSet }
+  }, [batchMode, batchModeSet])
 
   // 多服务器：列表与当前选中项（activeId 写入 localStorage，transport 每次请求读取）。
   const [servers, setServers] = useState<ServerTarget[]>(() => loadServerTargets())
@@ -203,6 +225,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       { id: 'home', label: t('nav.home'), icon: House },
       { id: 'editor', label: t('nav.editor'), icon: Terminal },
       { id: 'items', label: t('nav.items'), icon: BookOpen },
+      { id: 'codex', label: t('nav.codex'), icon: LayoutGrid },
     ]
     const icons: Record<string, typeof House> = { players: Users, store: Fish, world: Globe2 }
     for (const def of MODULE_DEFS) {
@@ -370,9 +393,31 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       }
       try {
         const cap = await transport.batchCapabilities()
-        if (!cancelled) setIngameAllowed(cap.ingame === true)
+        if (!cancelled) {
+          setIngameAllowed(cap.ingame === true)
+          // 「统一执行」：检测到信使插件后自动开启（用户手动关过则保持其选择）。
+          const { mode, userSet } = batchPrefsRef.current
+          if (cap.plugin === true && !userSet && !mode) setBatchMode(true)
+        }
       } catch {
         if (!cancelled) setIngameAllowed(false)
+      }
+      // 检测到插件（玩家管理 / 鱼店）→ 自动激活对应侧边栏入口；用户手动改过开关的不覆盖。
+      try {
+        const [playersCap, storeCap] = await Promise.all([
+          transport.playerCapabilities().catch(() => null),
+          transport.fishCapabilities().catch(() => null),
+        ])
+        if (!cancelled) {
+          const { prefs, userSet } = modulesRef.current
+          const next = autoActivateModules(prefs, userSet, activeServerId, {
+            players: playersCap?.plugin === true && playersCap.permission === true,
+            store: storeCap?.plugin === true && storeCap.permission === true,
+          })
+          if (next !== prefs) setModules(next)
+        }
+      } catch {
+        /* 探测失败就不自动激活，不影响其它能力 */
       }
       // 区域 / 传送点（插件缺失或权限不足时为空，不影响其它补全）。
       try {
@@ -393,7 +438,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     return () => {
       cancelled = true
     }
-  }, [dataset, session.authenticated, transport, activeServerId])
+  }, [dataset, session.authenticated, transport, activeServerId, setBatchMode, setModules])
 
   // 静态数据集 + 运行时指令目录（仅补充本地没有的插件指令）。
   const effectiveDataset = useMemo(
@@ -550,11 +595,13 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     </div>
   )
 
-  // 兼容旧版持久化的 activeTab='history'（早期曾用该 id 表示收藏页）/ 'favorites'（收藏已并入编辑器）；
+  // 兼容旧版持久化的 activeTab='history'（早期曾用该 id 表示收藏页）/ 'favorites'（收藏已并入编辑器）/
+  // 'npcs' / 'tiles'（NPC 图鉴与数据 ID 已合并为「数据图鉴」）；
   // 已停用模块的入口即使留存也不展示，回退到首页。
   const activeTab: TabId = (() => {
     const raw = ui.activeTab as string
     if (raw === 'history' || raw === 'favorites') return 'editor'
+    if (raw === 'npcs' || raw === 'tiles') return 'codex'
     if (
       (raw === 'players' || raw === 'store' || raw === 'world' || isCustomModuleId(raw)) &&
       !isModuleEnabled(modules, activeServerId, raw)
@@ -576,7 +623,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     <I18nProvider lang={settings.language}>
       <DatasetProvider value={view}>
         <ExecutionQueueProvider interval={settings.commandInterval}>
-        <CommandResultsProvider>
+        <CommandResultsProvider serverId={activeServerId}>
         <div className="h-full">
         <AppShell
           activeTab={activeTab}
@@ -666,6 +713,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               onFocusConsumed={consumeDexFocus}
             />
           )}
+          {activeTab === 'codex' && <CodexPage />}
           {activeTab === 'players' && (
             <PlayerManagerPage
               key={activeServerId}
@@ -731,7 +779,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
                 moduleId={mod.id}
                 keyPrefix={`${mod.id}:`}
                 title={mod.name || t('modules.custom.untitled')}
-                desc={t('modules.custom.hint')}
+                desc={mod.desc.trim() || t('modules.custom.hint')}
               />
             ))}
           {activeTab === 'settings' && (
@@ -743,6 +791,9 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               authenticated={session.authenticated}
               modules={modules}
               onModulesChange={setModules}
+              onModuleUserSet={(id) =>
+                setModulesSet((prev) => setModuleEnabled(prev, activeServerId, id, true))
+              }
               customModules={customModules}
               onCustomModulesChange={setCustomModules}
               onTokenInvalid={handleTokenInvalid}

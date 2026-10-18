@@ -1,13 +1,42 @@
+import { Fragment, useMemo, useState } from 'react'
+import { ArrowDown, RefreshCw } from 'lucide-react'
+import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
-import { Badge } from '@/components/ui'
+import { WebChatInput } from '@/components/WebChatInput'
+import { Badge, Button } from '@/components/ui'
+import { useBottomList } from '@/hooks/useBottomList'
+import { useNow } from '@/hooks/useNow'
 import { useServerFeed } from '@/hooks/useServerFeed'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import type { BackendTransport, ServerEvent, ServerInfoExtra } from '@/lib/tshock'
 import type { Atlas, Item, Prefix } from '@/types'
 
-/** 事件类型 → 圆点颜色（未知类型兜底为低对比灰）。 */
-function eventDot(type: string): string {
+/** 「动态」tab 默认渲染最近 N 条，更早的用「加载更早」按钮按批展开。 */
+const FEED_WINDOW = 30
+
+/** 「动态」tab 的事件类型筛选。 */
+const FEED_FILTERS = ['all', 'join', 'leave', 'boss', 'announce', 'npc', 'chat'] as const
+type FeedFilter = (typeof FEED_FILTERS)[number]
+const FEED_FILTER_LABEL: Record<FeedFilter, string> = {
+  all: 'feed.filterAll',
+  join: 'feed.filterJoin',
+  leave: 'feed.filterLeave',
+  boss: 'feed.filterBoss',
+  announce: 'feed.filterAnnounce',
+  npc: 'feed.filterNpc',
+  chat: 'feed.filterChat',
+}
+
+/** 事件是否属于某个筛选（旧插件的 `webui` 类型算进「聊天」）。 */
+function matchesFilter(e: ServerEvent, filter: FeedFilter): boolean {
+  if (filter === 'all') return true
+  if (filter === 'chat') return e.type === 'chat' || e.type === 'webui'
+  return e.type === filter
+}
+
+/** 事件类型 → 圆点颜色（未知类型兜底为低对比灰）。`source=webui` 的聊天用主色区分。 */
+function eventDot(type: string, source?: string): string {
   switch (type) {
     case 'join':
       return 'bg-success'
@@ -15,8 +44,17 @@ function eventDot(type: string): string {
       return 'bg-muted-foreground'
     case 'boss':
       return 'bg-warning'
+    // 世界公告（Boss 苏醒 / 事件开始 / 入侵）：用游戏内公告色（紫）。
+    case 'announce':
+      return 'bg-[#af4bff]'
+    // NPC 到达 / 离开（旅商等）：用游戏内 NPC 旅行公告色（蓝）。
+    case 'npc':
+      return 'bg-[#327dff]'
     case 'chat':
-      return 'bg-info'
+      return source === 'webui' ? 'bg-primary' : 'bg-info'
+    case 'webui':
+      // 旧插件（未统一为 chat+source）的兼容。
+      return 'bg-primary'
     default:
       return 'bg-foreground/40'
   }
@@ -73,6 +111,49 @@ export function feedRefreshLabel(
   return parts.length > 0 ? parts.join(' · ') : null
 }
 
+/** 一条事件的时间文案：刚刚 / N 分钟前 / HH:MM / 昨天 HH:MM / M-D HH:MM。 */
+export function formatEventTime(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  iso: string,
+  now: number,
+): string {
+  const d = new Date(iso)
+  const ms = d.getTime()
+  if (Number.isNaN(ms)) return ''
+  const diff = now - ms
+  if (diff >= 0 && diff < 60_000) return t('feed.timeJustNow')
+  if (diff >= 0 && diff < 3_600_000) return t('feed.timeMinutesAgo', { n: Math.floor(diff / 60_000) })
+  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const dayDiff = Math.round((startOfDay(new Date(now)) - startOfDay(d)) / 86_400_000)
+  if (dayDiff <= 0) return hhmm
+  if (dayDiff === 1) return t('feed.timeYesterday', { time: hhmm })
+  return `${d.getMonth() + 1}-${d.getDate()} ${hhmm}`
+}
+
+/** 本地日历日的 key（`Y-M-D`），用于按天分组。 */
+function dayKeyOf(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+}
+
+/** 日期分隔文案：今天 / 昨天 / M月D日。 */
+function formatEventDay(
+  lang: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  iso: string,
+  now: number,
+): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const dayDiff = Math.round((startOfDay(new Date(now)) - startOfDay(d)) / 86_400_000)
+  if (dayDiff <= 0) return t('feed.dayToday')
+  if (dayDiff === 1) return t('feed.dayYesterday')
+  return d.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric' })
+}
+
 interface ServerFeedListProps {
   events: ServerEvent[]
   extra: ServerInfoExtra | null
@@ -104,11 +185,17 @@ export function ServerFeedList({
   prefixesById,
   atlas,
 }: ServerFeedListProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  // 默认停在最新一条（贴底）；旧事件按批懒加载。
+  const { ref, onScroll, start, hidden, loadEarlier, step, atBottom, scrollToBottom } =
+    useBottomList<HTMLUListElement>(events.length, { initial: FEED_WINDOW })
+  const now = useNow()
   if (unavailable) {
     return <p className="text-xs text-warning">{unavailableText ?? t('editor.eventsPluginMissing')}</p>
   }
-  const shown = limit != null ? events.slice(0, limit) : events
+  // 首页卡片只显示最近 `limit` 条；「动态」tab 显示窗口内的全部（可加载更早）。
+  const shown = limit != null ? events.slice(-limit) : events.slice(start)
+  const canLoadEarlier = limit == null && hidden > 0
   const refreshLabel = feedRefreshLabel(t, refreshedAt ?? null, extra)
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -116,16 +203,63 @@ export function ServerFeedList({
       {shown.length === 0 ? (
         <p className="text-xs text-muted-foreground">{emptyText ?? t('home.eventsEmpty')}</p>
       ) : (
-        <ul className="min-h-0 flex-1 flex flex-col gap-1 overflow-y-auto pr-1">
-          {shown.map((e) => (
-            <li key={e.seq} className="flex items-start gap-2 text-xs">
-              <span className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', eventDot(e.type))} />
-              <span className="min-w-0 flex-1 break-words text-foreground/80">
-                <RichText text={e.text} itemsById={itemsById} prefixesById={prefixesById} atlas={atlas} />
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <ul
+            ref={ref}
+            onScroll={onScroll}
+            className="min-h-0 flex-1 flex flex-col gap-1 overflow-y-auto pr-1"
+          >
+            {canLoadEarlier && (
+              <li className="flex justify-center">
+                <LoadEarlier hidden={hidden} step={step} onLoad={loadEarlier} />
+              </li>
+            )}
+            {shown.map((e, i) => {
+              const label = formatEventTime(t, e.time, now)
+              const dayKey = dayKeyOf(e.time)
+              const prevKey = i > 0 ? dayKeyOf(shown[i - 1].time) : ''
+              const showDay = dayKey !== '' && dayKey !== prevKey
+              return (
+                <Fragment key={e.seq}>
+                  {showDay && (
+                    <li className="my-1 flex items-center gap-2 text-[10px] text-muted-foreground/70">
+                      <span className="h-px flex-1 bg-border" />
+                      <span className="shrink-0">{formatEventDay(lang, t, e.time, now)}</span>
+                      <span className="h-px flex-1 bg-border" />
+                    </li>
+                  )}
+                  <li className="flex items-start gap-2 text-xs">
+                    <span
+                      className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', eventDot(e.type, e.source))}
+                    />
+                    <span className="min-w-0 flex-1 break-words text-foreground/80">
+                      <RichText text={e.text} itemsById={itemsById} prefixesById={prefixesById} atlas={atlas} />
+                    </span>
+                    {label && (
+                      <time
+                        dateTime={e.time}
+                        title={new Date(e.time).toLocaleString()}
+                        className="shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground/70"
+                      >
+                        {label}
+                      </time>
+                    )}
+                  </li>
+                </Fragment>
+              )
+            })}
+          </ul>
+          {!atBottom && (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] text-primary-foreground shadow-md hover:bg-primary/90"
+            >
+              <ArrowDown className="size-3" />
+              {t('feed.jumpLatest')}
+            </button>
+          )}
+        </div>
       )}
       {refreshLabel && (
         <span className="text-[10px] text-muted-foreground">{refreshLabel}</span>
@@ -156,18 +290,50 @@ export function ServerFeedTab({
   atlas?: Atlas
 }) {
   const { t } = useI18n()
-  const { events, extra, available, refreshedAt } = useServerFeed({
+  const [filter, setFilter] = useState<FeedFilter>('all')
+  const { events, extra, available, refreshedAt, refresh } = useServerFeed({
     transport,
     authenticated,
     serverId,
-    maxEvents: 100,
+    maxEvents: 500,
     refreshInterval,
   })
+  const filtered = useMemo(
+    () => (filter === 'all' ? events : events.filter((e) => matchesFilter(e, filter))),
+    [events, filter],
+  )
+
+  // 插件缺失 / 未登录时禁用输入；发送成功后由 WebChatInput 回调刷新一次事件流。
+  const disabled = available === false || !authenticated
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <span className="text-[10px] text-muted-foreground">{t('editor.eventsNote')}</span>
+      <div className="flex flex-wrap items-center gap-1">
+        {FEED_FILTERS.map((f) => (
+          <Button
+            key={f}
+            size="sm"
+            variant={filter === f ? 'secondary' : 'ghost'}
+            className={cn('px-2', filter !== f && 'text-muted-foreground')}
+            aria-pressed={filter === f}
+            onClick={() => setFilter(f)}
+          >
+            {t(FEED_FILTER_LABEL[f])}
+          </Button>
+        ))}
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="ml-auto text-muted-foreground"
+          onClick={refresh}
+          aria-label={t('home.refresh')}
+          title={t('home.refresh')}
+        >
+          <RefreshCw data-icon="inline-start" />
+        </Button>
+      </div>
       <ServerFeedList
-        events={events}
+        events={filtered}
         extra={extra}
         unavailable={available === false}
         unavailableText={t('editor.eventsPluginMissing')}
@@ -175,6 +341,13 @@ export function ServerFeedTab({
         itemsById={itemsById}
         prefixesById={prefixesById}
         atlas={atlas}
+      />
+      <WebChatInput
+        transport={transport}
+        disabled={disabled}
+        pluginInstalled={available === true}
+        onSent={refresh}
+        className="shrink-0"
       />
     </div>
   )

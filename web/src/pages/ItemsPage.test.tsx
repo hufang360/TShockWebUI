@@ -100,7 +100,7 @@ describe('ItemsPage 图鉴', () => {
     expect(pageLabel().textContent).toBe('第 1 / 3 页')
   })
 
-  it('翻页控件可设置每页个数（50 / 100 / 200 / 360 / 500），改动后回到第 1 页', () => {
+  it('翻页控件可设置每页个数（50 / 100 / 200 / 360 / 500 / 1000），改动后回到第 1 页', () => {
     renderPage(makeItems(250))
     const sizeSelect = screen.getByLabelText('每页') as HTMLSelectElement
     expect(Array.from(sizeSelect.options).map((o) => o.value)).toEqual([
@@ -109,6 +109,7 @@ describe('ItemsPage 图鉴', () => {
       '200',
       '360',
       '500',
+      '1000',
     ])
     expect(Array.from(sizeSelect.options).map((o) => o.textContent)).toEqual([
       '50',
@@ -116,6 +117,7 @@ describe('ItemsPage 图鉴', () => {
       '200',
       '360',
       '500',
+      '1000',
     ])
 
     fireEvent.click(screen.getByRole('button', { name: '下一页' }))
@@ -333,29 +335,95 @@ describe('ItemsPage 图鉴', () => {
     expect(pageLabel().textContent).toBe('第 1 / 5 页')
   })
 
-  it('词缀下拉只列可滚词缀，选中后显示 [i/pXX:ID] 标签', () => {
+  it('词缀下拉按评分排序、展示并套用最佳词缀，选中后显示 [i/pXX:ID] 标签', () => {
     renderPage(
       makeDataset({
         items: makeItems(3),
         rollablePrefixesById: new Map([[1, [81]]]),
-        prefixModsById: new Map([[81, { dmg: 1.15 }]]),
+        prefixModsById: new Map([[81, { dmg: 1.15, val: 1.760248 }]]),
       }),
     )
     fireEvent.click(cell('物品1'))
     fireEvent.click(screen.getByLabelText('词缀'))
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['无词缀', '传奇'])
-    fireEvent.click(screen.getByRole('option', { name: '传奇' }))
+    // 下拉里带评分；并列最佳标 ⭐
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      '无词缀',
+      '传奇1.760',
+    ])
+    fireEvent.click(screen.getByRole('option', { name: /传奇/ }))
     expect(screen.getByText('[i/p81:1]')).toBeTruthy()
+    // 「最佳词缀：传奇」可点击直接套用
+    expect(screen.getByText(/最佳词缀：传奇/)).toBeTruthy()
+  })
+
+  it('合成表「单列显示合成记录」：默认不勾选，勾选后变单列', () => {
+    renderPage(
+      makeDataset({
+        items: makeItems(3),
+        recipes: {
+          meta: { gameVersion: '1.4.5.8', count: 1, groupCount: 0, source: 'test', generatedBy: 'test' },
+          groups: {},
+          recipes: [
+            {
+              result: { id: 1, stack: 1 },
+              ingredients: [{ id: 2, stack: 1 }],
+              station: -1,
+              stationItems: [],
+              env: [],
+              flags: [],
+            },
+          ],
+          byResult: { '1': [0] },
+          byIngredient: { '2': [0] },
+        },
+      }),
+    )
+    fireEvent.click(cell('物品1'))
+    const cb = screen.getByLabelText('单列显示合成记录')
+    expect(cb.getAttribute('data-state')).toBe('unchecked')
+    fireEvent.click(cb)
+    expect(cb.getAttribute('data-state')).toBe('checked')
+    expect(within(detail()).getByText('合成表（1）')).toBeTruthy()
+    expect(detail().querySelector('.grid.grid-cols-1')).toBeTruthy()
+  })
+
+  it('饰品不显示「最佳词缀」行（下拉里已带 ⭐ 与效果）', () => {
+    renderPage(
+      makeDataset({
+        items: makeItems(3),
+        rollablePrefixesById: new Map([[1, [81]]]),
+        prefixModsById: new Map([[81, { dmg: 1.15, val: 1.760248 }]]),
+        itemStats: {
+          meta: { gameVersion: '1.4.5.8', itemCount: 3, itemsWithTip: 0, source: 'test', generatedBy: 'test', note: '' },
+          items: { '1': { stats: { accessory: true, damage: 100, useAnimation: 20, knockBack: 5 } } },
+        },
+      }),
+    )
+    fireEvent.click(cell('物品1'))
+    expect(screen.queryByText(/最佳词缀/)).toBeNull()
   })
 
   it('数据版本与统计同排（移入翻页器，不再是主操作区的 Badge）', () => {
     renderPage(makeItems(3))
     const pager = screen.getByTestId('dex-pager')
-    const version = within(pager).getByText(/数据版本 1\.4\.5\.8 · 3 件/)
+    // 顺序：共 N 件 | N 件 · 数据版本 X
+    const version = within(pager).getByText(/3 件 · 数据版本 1\.4\.5\.8/)
     expect(version.closest('button')).toBeNull()
     // 与旁边的「共 N 件」同字号
     const summary = within(pager).getByText(/共 3 件/)
     expect(version.className).not.toContain('font-pixel')
     expect(summary.className).not.toContain('font-pixel')
+  })
+
+  it('最近搜索：搜过的词进历史，可点回搜', async () => {
+    renderPage([{ ...makeItem(1), name: '木匣' }, makeItem(2)])
+    const input = screen.getByLabelText('物品图鉴')
+    fireEvent.change(input, { target: { value: '木匣' } })
+    const chip = await screen.findByTestId('search-history-item')
+    expect(chip.textContent).toBe('木匣')
+    // 清空后点历史 → 又搜「木匣」
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.click(screen.getByTestId('search-history-item'))
+    expect((input as HTMLInputElement).value).toBe('木匣')
   })
 })

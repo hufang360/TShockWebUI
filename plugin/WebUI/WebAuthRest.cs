@@ -53,6 +53,16 @@ namespace WebUI
         }
 
         /// <summary>
+        /// 协议握手：版本号 + 协议号 + 能力清单。供后端判断插件是否安装 / 版本是否兼容 / 某能力是否可用。
+        /// 不需要 token（登录前就要能探测），需要 secret 时同样校验。
+        /// </summary>
+        public static object Meta(RestRequestArgs args)
+        {
+            if (!CheckSecret(args, out var forbidden)) return forbidden;
+            return WebUI.Meta.Describe();
+        }
+
+        /// <summary>
         /// 取调用方的来源 IP（= TShock 限流桶的 key）。
         /// 用反射读 <c>RestRequestArgs.Context.RemoteEndPoint.Address</c>：
         /// 这两个类型来自 TShock 附带的 HttpServer.dll，插件没有引用该程序集，
@@ -111,12 +121,23 @@ namespace WebUI
 
         public static object Events(RestRequestArgs args)
         {
+            // tail=N：取最新 N 条（升序），用于「打开网页先看最近 N 条」。
+            var tailRaw = (args.Parameters["tail"] ?? "").Trim();
+            if (tailRaw.Length > 0)
+            {
+                int tail;
+                int.TryParse(tailRaw, out tail);
+                return EventLog.Tail(tail);
+            }
             long since = 0;
             long.TryParse(args.Parameters["since"] ?? "", out since);
             var limit = 0;
             int.TryParse(args.Parameters["limit"] ?? "", out limit);
             return EventLog.Since(since, limit);
         }
+
+        /// <summary>网页发言：任意有效 token；带 [WebUI] 前缀广播，并记入事件流（type=webui）。</summary>
+        public static object Chat(RestRequestArgs args) => Extras.SendChat(args.TokenData, args.Parameters["text"]);
 
         public static object Sessions(RestRequestArgs args)
         {

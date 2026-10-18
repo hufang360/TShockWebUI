@@ -61,7 +61,7 @@ function renderPage(transport: BackendTransport) {
     <I18nProvider lang="zh">
       <DatasetProvider value={makeDataset()}>
         <ExecutionQueueProvider interval={0}>
-          <CommandResultsProvider>
+          <CommandResultsProvider serverId="default">
             <FishShopPage
               serverId="default"
               transport={transport}

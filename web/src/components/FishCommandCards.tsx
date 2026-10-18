@@ -261,6 +261,7 @@ export function FishCommandCards({
             result={results[`fish:${card.key}`]}
             loading={busy(`fish:${card.key}`)}
             unavailable={!authenticated}
+            collapseKey={`fish:${card.key}`}
             onRefresh={authenticated ? () => runOne(card.key, card.command) : undefined}
             itemsById={dataset?.itemsById}
             prefixesById={dataset?.prefixesById}

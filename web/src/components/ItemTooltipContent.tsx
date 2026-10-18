@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { useI18n, type I18n } from '@/lib/i18n'
 import { useItemFavorites } from '@/lib/itemFavoritesContext'
 import { rarityColor } from '@/lib/items'
+import { prefixDeltaLines } from '@/lib/prefixes'
 import type { Atlas, Item, ItemStatEntry, PrefixMods } from '@/types'
 
 const EMPTY_LINES: string[] = []
@@ -52,6 +53,24 @@ function applyPrefix(
 }
 
 /**
+ * 词缀会改变物品稀有度（`Item.Prefix()`）：value ≥ 1.2 → rare+2，≥ 1.05 → +1，
+ * ≤ 0.8 → -2，≤ 0.95 → -1（然后按游戏规则夹到 [-1, 11]）。名称颜色随 rare 变。
+ */
+function prefixedRare(baseRare: number, val: number | undefined): number {
+  if (typeof val !== 'number') return baseRare
+  let r = baseRare
+  if (val >= 1.2) r += 2
+  else if (val >= 1.05) r += 1
+  else if (val <= 0.8) r -= 2
+  else if (val <= 0.95) r -= 1
+  if (r > -11) {
+    if (r < -1) r = -1
+    if (r > 11) r = 11
+  }
+  return r
+}
+
+/**
  * 游戏同款物品提示（**全项目唯一的一套样式**：图标 28px / 名称 15px semibold / 属性行 14px / 页脚 12px）。
  *
  * 事实来源：`Terraria.Main.MouseText_DrawItemTooltip_GetLinesInfo`（属性行文本由 tools/gen-item-stats.mjs 生成）；
@@ -94,13 +113,26 @@ export function ItemTooltipContent({
   const favorited = favorites ? favorites.isFavorited(item.id) : false
   // tip 行在载入数据集时已按当前界面语言解析好。
   const baseLines = stat?.tip ?? EMPTY_LINES
-  // 选了词缀就用修正重算属性行（伤害/暴击/速度/击退）。
+  // 选了词缀就用修正重算属性行（伤害/暴击/速度/击退），并补上「变化行」（红/绿）。
   const lines = useMemo(
     () => (prefix && prefixMods ? applyPrefix(baseLines, stat?.stats, prefixMods, t) : baseLines),
     [baseLines, stat?.stats, prefix, prefixMods, t],
   )
-  const rare = typeof stat?.stats?.rare === 'number' ? stat.stats.rare : 0
+  /** 词缀相对未附词缀物品的变化行（+15%伤害 / -10%速度 …），颜色复刻游戏。 */
+  const deltaLines = useMemo(
+    () => (prefix && prefixMods ? prefixDeltaLines(stat?.stats, prefixMods, t) : []),
+    [prefix, prefixMods, stat?.stats, t],
+  )
+  const rare = prefixedRare(
+    typeof stat?.stats?.rare === 'number' ? stat.stats.rare : 0,
+    prefixMods?.val,
+  )
   const showStack = stack != null && stack > 1
+  // 游戏 tooltip 的伤害/暴击/击退/蓝耗按当前角色属性重算，图鉴只给物品基础值；
+  // 对含这些行的物品补一句说明，避免误以为图鉴数值有误（见 docs/功能-合成表与物品提示.md §7）。
+  const showBaseNote =
+    (typeof stat?.stats?.damage === 'number' && stat.stats.damage > 0) ||
+    (typeof stat?.stats?.mana === 'number' && stat.stats.mana > 0)
 
   if (variant === 'panel') {
     return (
@@ -115,12 +147,20 @@ export function ItemTooltipContent({
             <span className="font-pixel text-sm text-muted-foreground">x{stack}</span>
           ) : null}
         </div>
-        {lines.length > 0 && (
+        {(lines.length > 0 || deltaLines.length > 0) && (
           <div className="flex flex-col gap-0.5 text-sm leading-5 text-foreground/80">
             {lines.map((line, i) => (
               <p key={i}>{line}</p>
             ))}
+            {deltaLines.map((d, i) => (
+              <p key={`d${i}`} style={{ color: d.tone === 'down' ? '#be7878' : '#78be78' }}>
+                {d.text}
+              </p>
+            ))}
           </div>
+        )}
+        {showBaseNote && (
+          <p className="text-xs text-muted-foreground">{t('tooltip.baseStatsNote')}</p>
         )}
         <IdKeyFooter item={item} className="text-muted-foreground" />
       </div>
@@ -169,7 +209,7 @@ export function ItemTooltipContent({
         </div>
       )}
       {hideHeader && favoriteButton && <div className="mb-1 flex items-center">{favoriteButton}</div>}
-      {lines.length > 0 && (
+      {(lines.length > 0 || deltaLines.length > 0) && (
         <div
           className={cn(
             'flex flex-col gap-0.5 text-sm leading-5 text-zinc-300',
@@ -179,7 +219,15 @@ export function ItemTooltipContent({
           {lines.map((line, i) => (
             <p key={i}>{line}</p>
           ))}
+          {deltaLines.map((d, i) => (
+            <p key={`d${i}`} style={{ color: d.tone === 'down' ? '#be7878' : '#78be78' }}>
+              {d.text}
+            </p>
+          ))}
         </div>
+      )}
+      {showBaseNote && (
+        <p className="mt-1 text-xs text-zinc-400/90">{t('tooltip.baseStatsNote')}</p>
       )}
       <IdKeyFooter item={item} className="text-zinc-400/90" />
     </div>

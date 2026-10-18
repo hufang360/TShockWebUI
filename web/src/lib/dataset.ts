@@ -9,6 +9,8 @@ import type {
   ItemStatsData,
   ItemTipsData,
   ItemGroupsData,
+  ItemDropsData,
+  ItemDropEntry,
   ShimmerData,
   PrefixModsData,
   PrefixSetsData,
@@ -17,8 +19,11 @@ import type {
   Npc,
   Prefix,
   RecipesData,
+  TileWallData,
 } from '@/types'
+import { ATLAS_JSON_FETCH } from './atlas'
 import { readJson, removeKey, StorageKeys, writeJson } from './storage'
+import { extraParamSetsFor } from './commandMeta'
 import type { RuntimeCommand } from './transport'
 
 const BASE = import.meta.env.BASE_URL
@@ -28,8 +33,8 @@ export function cultureOf(lang: Lang): string {
   return lang === 'en' ? 'en-US' : 'zh-Hans'
 }
 
-async function fetchJson<T>(file: string): Promise<T> {
-  const res = await fetch(`${BASE}data/${file}`, { credentials: 'same-origin' })
+async function fetchJson<T>(file: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}data/${file}`, { credentials: 'same-origin', ...init })
   if (!res.ok) {
     throw new Error(`加载 ${file} 失败：HTTP ${res.status}`)
   }
@@ -48,6 +53,25 @@ function buildCommandIndex(commands: CommandDef[]): Map<string, CommandDef> {
 }
 
 /**
+ * 把手工维护的额外参数形态（多级子命令，见 `lib/commandMeta.ts`）合并进指令：
+ * 按 `syntax` 覆盖同名形态（幂等），并重建补全索引。
+ * `loadDataset`（核心指令）与 `withRuntimeCommands`（插件运行时指令）都会调它。
+ */
+function withCommandMeta(base: Dataset): Dataset {
+  let changed = false
+  const commands = base.commands.map((cmd) => {
+    const extra = extraParamSetsFor(cmd.name)
+    if (extra.length === 0) return cmd
+    const bySyntax = new Map((cmd.paramSets ?? []).map((s) => [s.syntax, s]))
+    for (const s of extra) bySyntax.set(s.syntax, s)
+    changed = true
+    return { ...cmd, paramSets: [...bySyntax.values()] }
+  })
+  if (!changed) return base
+  return { ...base, commands, commandsByToken: buildCommandIndex(commands) }
+}
+
+/**
  * 载入指定语言的数据集。
  *
  * 语言相关数据一律只在运行期取当前语言那一份：
@@ -57,14 +81,14 @@ function buildCommandIndex(commands: CommandDef[]): Map<string, CommandDef> {
  */
 export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
   const culture = cultureOf(lang)
-  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, loc] = await Promise.all([
+  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, loc, tiles, walls, drops] = await Promise.all([
     fetchJson<{ items: Omit<Item, 'name'>[] }>('items.json'),
     fetchJson<{ prefixes: Omit<Prefix, 'name'>[] }>('prefixes.json'),
     fetchJson<{ npcs: Omit<Npc, 'name'>[] }>('npcs.json'),
     fetchJson<{ buffs: Omit<Buff, 'name'>[] }>('buffs.json'),
     fetchJson<{ commands: CommandDef[] }>('commands.json'),
     fetchJson<DatasetMeta>('meta.json'),
-    fetchJson<Atlas>('items-atlas.json'),
+    fetchJson<Atlas>('items-atlas.json', ATLAS_JSON_FETCH),
     fetchJson<RecipesData>('recipes.json'),
     fetchJson<ItemStatsBaseData>('item-stats.json'),
     fetchJson<ItemTipsData>(`item-tips.${culture}.json`),
@@ -73,6 +97,9 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     fetchJson<PrefixModsData>('prefix-mods.json'),
     fetchJson<PrefixSetsData>('prefix-sets.json'),
     fetchJson<LocalizationBundle>(`loc.${culture}.json`),
+    fetchJson<TileWallData>('tiles.json'),
+    fetchJson<TileWallData>('walls.json'),
+    fetchJson<ItemDropsData>('item-drops.json'),
   ])
 
   // 名字从官方本地化解析（不再落在 items.json / prefixes.json 里）。
@@ -115,12 +142,23 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     if (set) rollablePrefixesById.set(Number(id), set)
   }
 
-  return {
+  const itemDropsById = new Map<number, ItemDropEntry[]>()
+  for (const [id, list] of Object.entries(drops.items)) itemDropsById.set(Number(id), list)
+
+  return withCommandMeta({
     meta,
     items,
     prefixes,
     commands: commandsFile.commands,
     npcs,
+    /** `data/tiles.json`：图格 ID 表 */
+    tiles,
+    /** `data/walls.json`：墙 ID 表 */
+    walls,
+    /** tiles.id -> tile */
+    tilesById: new Map(tiles.entries.map((t) => [t.id, t])),
+    /** walls.id -> wall */
+    wallsById: new Map(walls.entries.map((w) => [w.id, w])),
     buffs,
     atlas,
     recipes,
@@ -133,13 +171,15 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     prefixModsById,
     prefixSets,
     rollablePrefixesById,
+    itemDrops: drops,
+    itemDropsById,
     loc,
     itemsById: new Map(items.map((it) => [it.id, it])),
     prefixesById: new Map(prefixes.map((p) => [p.id, p])),
     npcsById: new Map(npcs.map((n) => [n.id, n])),
     buffsById: new Map(buffs.map((b) => [b.id, b])),
     commandsByToken: buildCommandIndex(commandsFile.commands),
-  }
+  })
 }
 
 /**
@@ -172,7 +212,7 @@ export function withRuntimeCommands(base: Dataset, runtime: RuntimeCommand[]): D
   }
   if (added.length === 0) return base
   const commands = [...base.commands, ...added]
-  return { ...base, commands, commandsByToken: buildCommandIndex(commands) }
+  return withCommandMeta({ ...base, commands, commandsByToken: buildCommandIndex(commands) })
 }
 
 /**

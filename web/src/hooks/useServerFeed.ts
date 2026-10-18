@@ -6,8 +6,17 @@ import {
   type ServerInfoExtra,
 } from '@/lib/tshock'
 
+/** 插件缺失时的慢速重试间隔：装好插件后能自动恢复，又不会狂打 404。 */
+const MISSING_RETRY_MS = 30000
+
+/**
+ * 单次拉取下限：即使只保留少量事件（如首页 20 条），也至少请求 50 条，
+ * 以便「加载更早」有足够的数据可用。
+ */
+const EVENTS_FETCH_MIN = 50
+
 export interface ServerFeedState {
-  /** 最近的事件（最新在前，最多 `maxEvents` 条）。 */
+  /** 最近的事件（按 seq 升序：最旧在前、最新在后；最多 `maxEvents` 条）。 */
   events: ServerEvent[]
   /** 世界状态徽标来源（困难模式 / 血月 / …）；插件缺失或未拉到时为 null。 */
   extra: ServerInfoExtra | null
@@ -15,15 +24,20 @@ export interface ServerFeedState {
   available: boolean | null
   /** 上次成功刷新的本地时间戳；未刷新过为 null。 */
   refreshedAt: number | null
+  /** 手动立即刷新一次（如发言成功后）。 */
+  refresh: () => void
 }
 
 /**
  * 服务器动态（首页卡片 + 指令页「动态」tab 共用）。
  *
- * - 挂载即刷新一次（进入首页 / 指令模块即触发）；
- * - 之后每 `refreshInterval` 毫秒刷新（间隔在「设置 → 服务器动态刷新间隔」里选）；
- * - `refreshToken` 变化时也会立刻刷新（「页面数据刷新间隔」触发时连带刷新）；
- * - 刷新 = 拉一次增强状态（含游戏内时间）+ 事件流增量。
+ * - 挂载即刷新一次：先取 `eventsTail`（最近 N 条，新插件走磁盘历史；旧插件 / 未实现则退回
+ *   `events(since=0)`）并拉一次增强状态；
+ * - **实时**：传输层实现 `eventsStream`（SSE）时优先长连接推送；连接失败 / 未实现则按
+ *   `refreshInterval` 轮询插件事件；
+ * - 世界状态（游戏内时间 / 徽标）仍按 `refreshInterval` 拉一次；
+ * - `refreshToken` 变化时立刻刷新（「页面数据刷新间隔」触发）；
+ * - 页面隐藏时断开 SSE，回到前台重连，省连接与 TShock REST 限额。
  */
 export function useServerFeed(opts: {
   transport: BackendTransport
@@ -42,7 +56,9 @@ export function useServerFeed(opts: {
   const [available, setAvailable] = useState<boolean | null>(null)
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null)
   const lastSeqRef = useRef(0)
-  const tickRef = useRef<() => void>(() => {})
+  // 是否已经拉过一次「最近 N 条」历史；避免 lastSeq=0 时每次都重新 tail。
+  const historyLoadedRef = useRef(false)
+  const refreshRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     // 用同一套「清空」逻辑处理登出与切换服务器；用函数式更新保持空引用不变，避免无谓重渲染。
@@ -52,6 +68,7 @@ export function useServerFeed(opts: {
       setAvailable((prev) => (prev === null ? prev : null))
       setRefreshedAt((prev) => (prev === null ? prev : null))
       lastSeqRef.current = 0
+      historyLoadedRef.current = false
     }
     if (!authenticated) {
       reset()
@@ -59,37 +76,139 @@ export function useServerFeed(opts: {
     }
     let cancelled = false
     let timer: number | undefined
+    let running = false
+    let pending = false
+    let closeStream: (() => void) | null = null
+    // SSE 失败后的冷却：避免后端不支持流式时每次 tick 都重试造成紧凑循环。
+    let streamCooldownUntil = 0
     // 切换服务器 / 重新登录：清空上一条流，避免把两个服务器的事件拼在一起。
     reset()
 
+    /** 按 seq 升序合并、去重，只保留最近 maxEvents 条。 */
+    const mergeEvents = (incoming: ServerEvent[]) => {
+      if (incoming.length === 0) return
+      setEvents((prev) => {
+        const merged = [...prev, ...incoming].sort((a, b) => a.seq - b.seq)
+        const deduped = merged.filter((e, i) => i === 0 || e.seq !== merged[i - 1].seq)
+        return deduped.length > maxEvents ? deduped.slice(-maxEvents) : deduped
+      })
+    }
+
+    const schedule = (ms: number) => {
+      if (cancelled) return
+      timer = window.setTimeout(() => void tick(), Math.max(10000, ms))
+    }
+
+    /** 打开 SSE（若有）；失败即关闭并立刻用轮询补一次。 */
+    const openStream = () => {
+      if (cancelled || closeStream || !transport.eventsStream || Date.now() < streamCooldownUntil) return
+      closeStream = transport.eventsStream(
+        {
+          onEvent: (e) => {
+            if (cancelled) return
+            lastSeqRef.current = Math.max(lastSeqRef.current, e.seq)
+            mergeEvents([e])
+            setRefreshedAt(Date.now())
+          },
+          onError: () => {
+            if (cancelled) return
+            closeStream?.()
+            closeStream = null
+            streamCooldownUntil = Date.now() + 60000
+            // 立刻用轮询补一次，别等一个刷新间隔。
+            refreshRef.current()
+          },
+          onWorld: (info) => {
+            if (cancelled) return
+            // 世界状态随流推送，不再单独轮询 /api/serverinfo。
+            setExtra(info)
+            setAvailable(true)
+            setRefreshedAt(Date.now())
+          },
+        },
+        lastSeqRef.current,
+      )
+    }
+
     const tick = async () => {
+      // 已有请求在跑：记一个待办，跑完立刻再来一次（手动刷新 / 发言后触发）。
+      if (running) {
+        pending = true
+        return
+      }
+      running = true
+      // 清除已排期的自动轮询，避免手动刷新后出现两条定时链。
+      if (timer) {
+        window.clearTimeout(timer)
+        timer = undefined
+      }
       try {
-        const info = await transport.serverInfoExtra()
-        if (cancelled) return
-        setExtra(info)
-        const page = await transport.events(lastSeqRef.current)
-        if (cancelled) return
-        lastSeqRef.current = page.lastSeq
+        // SSE 活跃时：世界状态由流里的 world 帧推送，事件由流推进 —— 不再打插件。
+        if (!closeStream) {
+          const info = await transport.serverInfoExtra()
+          if (cancelled) return
+          setExtra(info)
+          if (!historyLoadedRef.current && transport.eventsTail) {
+            // 打开页面先看最近 N 条（新插件 = 磁盘历史；旧插件后端会自动降级取尾部）。
+            const page = await transport.eventsTail(maxEvents)
+            if (cancelled) return
+            lastSeqRef.current = page.lastSeq
+            historyLoadedRef.current = true
+            mergeEvents(page.events.slice(-maxEvents))
+          } else {
+            const page = await transport.events(
+              lastSeqRef.current,
+              Math.max(maxEvents, EVENTS_FETCH_MIN),
+            )
+            if (cancelled) return
+            lastSeqRef.current = page.lastSeq
+            mergeEvents(page.events)
+          }
+        }
         setAvailable(true)
         setRefreshedAt(Date.now())
-        if (page.events.length > 0) {
-          setEvents((prev) => [...page.events, ...prev].slice(0, maxEvents))
-        }
+        openStream()
+        schedule(refreshInterval)
       } catch (err) {
         if (cancelled) return
         if (err instanceof TshockRequestError && err.kind === 'plugin_missing') {
           setAvailable(false)
           setExtra(null)
-          if (timer) window.clearInterval(timer)
+          // 插件可能稍后才装 / 后端二进制过期：**不要永久停摆**，慢速重试直到恢复。
+          schedule(MISSING_RETRY_MS)
+        } else {
+          // 瞬时错误（超时 / 服务不可用）：按正常间隔重试，避免卡死。
+          schedule(refreshInterval)
+        }
+      } finally {
+        running = false
+        if (pending) {
+          pending = false
+          void tick()
         }
       }
     }
-    tickRef.current = () => void tick()
+
+    // 页面隐藏 → 断开 SSE；回到前台 → 立刻刷新（含重连 SSE）。
+    const onVisibility = () => {
+      if (cancelled) return
+      if (document.visibilityState === 'hidden') {
+        closeStream?.()
+        closeStream = null
+      } else {
+        void tick()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    refreshRef.current = () => void tick()
     void tick()
-    timer = window.setInterval(() => void tick(), Math.max(10000, refreshInterval))
     return () => {
       cancelled = true
-      if (timer) window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+      if (timer) window.clearTimeout(timer)
+      closeStream?.()
+      closeStream = null
     }
   }, [authenticated, transport, serverId, maxEvents, refreshInterval])
 
@@ -99,8 +218,8 @@ export function useServerFeed(opts: {
     if (refreshToken == null) return
     if (refreshToken === lastTokenRef.current) return
     lastTokenRef.current = refreshToken
-    tickRef.current()
+    refreshRef.current()
   }, [refreshToken])
 
-  return { events, extra, available, refreshedAt }
+  return { events, extra, available, refreshedAt, refresh: () => refreshRef.current() }
 }

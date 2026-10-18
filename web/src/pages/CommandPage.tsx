@@ -73,10 +73,12 @@ function sanitizeResults(value: unknown): ResultEntry[] {
       ? r.output.filter((line): line is string => typeof line === 'string')
       : []
     const ts = (raw as { ts?: unknown }).ts
+    const collapsed = (raw as { collapsed?: unknown }).collapsed
     out.push({
       seq,
       ts: typeof ts === 'number' && Number.isFinite(ts) ? ts : Date.now(),
       command,
+      collapsed: collapsed === true,
       result: {
         status: r.status as CommandStatus,
         output,
@@ -136,19 +138,30 @@ export function CommandPage({
   const [text, setText] = useLocalState(StorageKeys.draft, '')
   const [rawHistory, setRawHistory] = useLocalState<HistoryEntry[]>(StorageKeys.history, [])
   const history = useMemo(() => sanitizeHistory(rawHistory), [rawHistory])
-  // 最近几条结果卡片（含输出内容）存本机，刷新后仍在。
-  const [rawResults, setRawResults] = useLocalState<ResultEntry[]>(
+  // 最近几条结果卡片（含输出内容）存本机，刷新后仍在；**按服务器分开**（不同服务器结果不一样）。
+  const [rawResultsByServer, setRawResultsByServer] = useLocalState<Record<string, ResultEntry[]>>(
     StorageKeys.commandResults,
-    [],
+    {},
   )
-  const results = useMemo(() => sanitizeResults(rawResults), [rawResults])
+  const results = useMemo(
+    () => sanitizeResults(rawResultsByServer[serverId]),
+    [rawResultsByServer, serverId],
+  )
+  /** 更新当前服务器的结果列表（每次都做一次 sanitize）。 */
+  const setResults = useCallback(
+    (updater: (prev: ResultEntry[]) => ResultEntry[]) => {
+      setRawResultsByServer((prev) => ({
+        ...prev,
+        [serverId]: updater(sanitizeResults(prev[serverId])),
+      }))
+    },
+    [serverId, setRawResultsByServer],
+  )
   const [running, setRunning] = useState(false)
   // 记忆右侧当前 tab（刷新 / 切页后保持）。
   const [tab, setTab] = useLocalState<SidebarTab>(StorageKeys.commandTab, 'items')
   // 右栏整列可折叠。
   const [panelOpen, setPanelOpen] = useState(true)
-  // 序号接着已恢复的结果，避免 key / seq 冲突。
-  const resultSeq = useRef(Math.max(0, ...results.map((r) => r.seq)))
   const [insertRequest, setInsertRequest] = useState<{ token: number; text: string } | null>(null)
   const insertSeq = useRef(0)
   // 递增令牌：让指令输入框重新聚焦并把光标移到末尾（载入指令 / 历史时）。
@@ -248,8 +261,8 @@ export function CommandPage({
 
   // 当前参数的用法串（TShock 源码原文），显示在编辑器下方（参数提示）。
   const getParamHint = useCallback(
-    (value: string, caret: number) => paramHintFor(dataset, value, caret),
-    [dataset],
+    (value: string, caret: number) => paramHintFor(dataset, value, caret, settings.language),
+    [dataset, settings.language],
   )
 
   const pushHistory = useCallback(
@@ -259,16 +272,32 @@ export function CommandPage({
     [setRawHistory],
   )
 
-  /** 追加一条执行结果（不覆盖上次），最多保留 RESULT_LIMIT 条。 */
-  const appendResult = useCallback((command: string, result: CommandResult) => {
-    resultSeq.current += 1
-    const entry: ResultEntry = { seq: resultSeq.current, ts: Date.now(), command, result }
-    setRawResults((prev) => [...sanitizeResults(prev), entry].slice(-RESULT_LIMIT))
-  }, [setRawResults])
+  /** 追加一条执行结果（不覆盖上次），最多保留 RESULT_LIMIT 条；seq 接着当前服务器已有结果。 */
+  const appendResult = useCallback(
+    (command: string, result: CommandResult) => {
+      setResults((prev) => {
+        const seq = (prev.length ? Math.max(...prev.map((e) => e.seq)) : 0) + 1
+        const entry: ResultEntry = { seq, ts: Date.now(), command, result }
+        return [...prev, entry].slice(-RESULT_LIMIT)
+      })
+    },
+    [setResults],
+  )
 
-  const removeResult = useCallback((seq: number) => {
-    setRawResults((prev) => sanitizeResults(prev).filter((e) => e.seq !== seq))
-  }, [setRawResults])
+  const removeResult = useCallback(
+    (seq: number) => {
+      setResults((prev) => prev.filter((e) => e.seq !== seq))
+    },
+    [setResults],
+  )
+
+  /** 记忆某条结果卡片的折叠状态（切换模块回来时仍保持）。 */
+  const toggleResultCollapse = useCallback(
+    (seq: number, collapsed: boolean) => {
+      setResults((prev) => prev.map((e) => (e.seq === seq ? { ...e, collapsed } : e)))
+    },
+    [setResults],
+  )
 
   /** 执行任意指令文本（收藏 / 首页等入口复用），追加结果卡片与历史。 */
   const runCommandText = useCallback(
@@ -403,7 +432,7 @@ export function CommandPage({
           <div className="flex items-center gap-2">
             {transport.mock && <Badge tone="mock">{t('editor.mockOutput')}</Badge>}
             <ConfirmButton
-              onConfirm={() => setRawResults([])}
+              onConfirm={() => setResults(() => [])}
               disabled={results.length === 0}
               confirmLabel={t('action.clearConfirm')}
             >
@@ -421,6 +450,7 @@ export function CommandPage({
             onRemove={removeResult}
             isFavorite={isFavorite}
             onToggleFavorite={toggleFavoriteCommand}
+            onToggleCollapse={toggleResultCollapse}
           />
         </CardBody>
         <Separator />
@@ -439,6 +469,7 @@ export function CommandPage({
             insertRequest={insertRequest}
             onInsertHandled={() => setInsertRequest(null)}
             focusRequest={focusSeq}
+            history={history.map((h) => h.cmd)}
           />
           <TagAssist dataset={dataset} text={text} />
         </div>

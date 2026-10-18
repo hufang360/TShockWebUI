@@ -54,10 +54,9 @@ describe('RecipePanel', () => {
     expect(screen.getByText('3')).toBeTruthy()
     // 不再有 "×3" 文字，且图标没有外框格子
     expect(screen.queryByText(/×3/)).toBeNull()
-    // 灵雾用物品图标 4358 代替文字；notDecraftable → 紫色「不微光」标签
+    // 灵雾用物品图标 4358 代替文字；`notDecraftable` 不在配方行里显示（已改为物品级「可微分」）
     expect(screen.getByRole('img', { name: '墓地八音盒' })).toBeTruthy()
-    expect(screen.getByText('不微光')).toBeTruthy()
-    expect(screen.queryByText('不可微光拆解')).toBeNull()
+    expect(screen.queryByText('不微光')).toBeNull()
   })
 
   it('iconOnly：只留图标（名称隐藏，数量角标保留）', () => {
@@ -114,5 +113,49 @@ describe('RecipePanel', () => {
     const text = writeText.mock.calls[0][0] as string
     expect(text).toContain('铁矿')
     expect(text).not.toContain('[i:')
+  })
+
+  it('「可丢微光分解」跟着合成表记录一起显示（数据来自 itemStats.canDecraft）', () => {
+    const ds: Dataset = makeDataset({
+      items: [ironOre, ironBar],
+      recipes: {
+        meta: { gameVersion: '1.4.5.8', count: 1, groupCount: 0, source: 'test', generatedBy: 'test' },
+        groups: {},
+        recipes: [
+          {
+            result: { id: 22, stack: 1 },
+            ingredients: [{ id: 11, stack: 3 }],
+            station: 17,
+            stationItems: [],
+            env: [],
+            flags: [],
+          },
+        ],
+        byResult: { '22': [0] },
+        byIngredient: { '11': [0] },
+      },
+      itemStats: {
+        meta: { gameVersion: '1.4.5.8', itemCount: 2, itemsWithTip: 0, source: 'test', generatedBy: 'test', note: '' },
+        items: { '22': { stats: { canDecraft: true, decraftStack: 2 } } },
+      },
+    })
+    render(
+      <I18nProvider lang="zh">
+        <RecipePanel itemId={22} dataset={ds} />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('可丢微光分解')).toBeTruthy()
+    expect(screen.getByText('每 2 个分解一次')).toBeTruthy()
+  })
+
+  it('单列显示：网格改 grid-cols-1', () => {
+    const { container } = render(
+      <I18nProvider lang="zh">
+        <RecipePanel itemId={22} dataset={dataset} singleColumn />
+      </I18nProvider>,
+    )
+    const grids = [...container.querySelectorAll('.grid')]
+    expect(grids.some((g) => g.className.includes('grid-cols-1'))).toBe(true)
+    expect(grids.some((g) => g.className.includes('auto-fill'))).toBe(false)
   })
 })

@@ -1,7 +1,15 @@
 import { searchItems } from './items'
+import { enumLabelsFor } from './commandMeta'
 import type { CommandDef, CommandParam, CommandParamSet, Dataset, Item, Lang } from '@/types'
 
 export type CompletionKind = 'command' | 'item' | 'player' | 'prefix' | 'enum' | 'npc' | 'buff' | 'region' | 'warp'
+
+/**
+ * 参数候选（取值 / 字面量子命令）最多列出多少条。
+ * 比指令 / 玩家名的 12 条宽：多级子命令 + 取值可能几十条，太少会截断（如 `/fish` 有 18 个子命令）。
+ * 下拉框自身可滚动，最多 72rem 高（见 CommandEditor）。
+ */
+const PARAM_SUGGESTION_LIMIT = 50
 
 export interface CompletionItem {
   id: string
@@ -170,6 +178,10 @@ export interface ParamSlot {
   word: string
   start: number
   end: number
+  /** 光标所在参数词的序号（用于列出所有匹配形态的字面量子命令） */
+  editingIdx: number
+  /** 参数词（引号感知，含 start/end） */
+  tokens: ArgToken[]
 }
 
 /** 计算光标所在的参数位（纯函数）。指令只有一段或没有参数表时返回 null。 */
@@ -210,13 +222,62 @@ export function matchParamSlot(dataset: Dataset, text: string, caret: number): P
     word,
     start,
     end,
+    editingIdx,
+    tokens,
   }
 }
 
-/** 指令的参数用法串（用于编辑器下方的参数提示）。 */
-export function paramHintFor(dataset: Dataset, text: string, caret: number): string | null {
+/** 指令的参数用法串（用于编辑器下方的参数提示）；有 `noteZh` / `noteEn` 时拼在后面。 */
+export function paramHintFor(
+  dataset: Dataset,
+  text: string,
+  caret: number,
+  lang: Lang = 'zh',
+): string | null {
   const slot = matchParamSlot(dataset, text, caret)
-  return slot ? slot.set.syntax : null
+  if (!slot) return null
+  const note = lang === 'en' ? slot.set.noteEn : slot.set.noteZh
+  return note ? `${slot.set.syntax}　${note}` : slot.set.syntax
+}
+
+/**
+ * 字面量子命令补全（如 `/pm export`、`/region define`、`/worldevent invasion`）。
+ *
+ * `matchParamSlot` 只会挑出一个“最佳形态”，列不全同一层的子命令；
+ * 这里拿当前光标位置，遍历**所有**形态，把能匹配前置词的字面量都收集起来。
+ */
+function computeLiteralCompletions(
+  dataset: Dataset,
+  slot: ParamSlot,
+  lang: Lang,
+): CompletionItem[] {
+  const prior = slot.tokens.slice(0, slot.editingIdx)
+  const labels = enumLabelsFor(slot.command.name, lang, dataset.npcs)
+  const out: CompletionItem[] = []
+  const seen = new Set<string>()
+  for (const set of slot.command.paramSets ?? []) {
+    const hit = alignSet(set, prior)
+    if (!hit) continue
+    const arg = set.args[hit.argIdx]
+    if (!arg?.literal || seen.has(arg.literal)) continue
+    seen.add(arg.literal)
+    out.push({
+      id: `param:literal:${slot.command.name}:${arg.literal}`,
+      kind: 'enum',
+      label: arg.literal,
+      detail: labels[arg.literal] ?? (lang === 'en' ? 'Sub-command' : '子命令'),
+      insert: arg.literal,
+      range: { start: slot.start, end: slot.end },
+      suffix: ' ',
+    })
+  }
+  const lower = slot.word.toLowerCase()
+  if (!lower) return out.slice(0, PARAM_SUGGESTION_LIMIT)
+  const starts = out.filter((c) => c.label.toLowerCase().startsWith(lower))
+  const matched = starts.length
+    ? starts
+    : out.filter((c) => c.label.toLowerCase().includes(lower))
+  return matched.slice(0, PARAM_SUGGESTION_LIMIT)
 }
 
 /** 计算当前光标处的补全候选（纯函数，便于测试）。 */
@@ -311,6 +372,11 @@ export function computeParamCompletions({
 }: CompletionInput & { limit?: number }): CompletionItem[] {
   const slot = matchParamSlot(dataset, text, caret)
   if (!slot?.arg) return []
+
+  // 字面量子命令（如 /pm export、/region define、/worldevent invasion）：
+  // 把所有匹配形态里的字面量收集起来，与下面的按类型候选合并。
+  const literalItems = computeLiteralCompletions(dataset, slot, lang)
+
   const { arg, word, start, end } = slot
   const range = { start, end }
   const lower = word.toLowerCase()
@@ -421,13 +487,16 @@ export function computeParamCompletions({
         })
       }
       break
-    case 'enum':
-      for (const v of filter(arg.values ?? [], (v) => [v])) {
+    case 'enum': {
+      // enum 取值在补全里附上可读备注名（如 spawnboss 的 brain → 克苏鲁之脑）；
+      // 同时允许按备注名搜索（输入「克苏鲁」也能命中 brain）。
+      const labels = enumLabelsFor(slot.command.name, lang, dataset.npcs)
+      for (const v of filter(arg.values ?? [], (v) => [v, labels[v] ?? ''])) {
         out.push({
           id: `param:enum:${v}`,
           kind: 'enum',
           label: v,
-          detail: zh ? '可选值' : 'Allowed value',
+          detail: labels[v] ?? (zh ? '可选值' : 'Allowed value'),
           // 含空格的值必须加双引号（Commands.cs:755 ParseParameters 支持引号）
           insert: /\s/.test(v) ? `"${v}"` : v,
           range,
@@ -435,6 +504,7 @@ export function computeParamCompletions({
         })
       }
       break
+    }
     case 'command':
       for (const cmd of filter(dataset.commands, (c) => [c.name, ...c.aliases]).slice(0, limit)) {
         out.push({
@@ -450,7 +520,16 @@ export function computeParamCompletions({
       }
       break
     default:
-      return []
+      break
   }
-  return out.slice(0, limit)
+  // 字面量子命令排在前，再拼按类型候选；同 kind+insert 去重。
+  const merged = [...literalItems]
+  const seen = new Set(literalItems.map((c) => `${c.kind}:${c.insert}`))
+  for (const c of out) {
+    const key = `${c.kind}:${c.insert}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(c)
+  }
+  return merged.slice(0, PARAM_SUGGESTION_LIMIT)
 }

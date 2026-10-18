@@ -1,0 +1,34 @@
+import { ATLAS_JSON_FETCH, loadVerifiedAtlasImage } from '@/lib/atlas'
+import type { NpcAtlas } from '@/types'
+
+const BASE = import.meta.env.BASE_URL
+
+let cache: Promise<NpcAtlas> | null = null
+
+/**
+ * 懒加载 NPC 图集（`data/npc-atlas.json`）。
+ *
+ * 只在「NPC 图鉴」真正渲染贴图时调用，不进入首屏 dataset；
+ * 失败时清缓存，下次重试（与 `loadPlayerAtlas` 同策略）。
+ */
+export function loadNpcAtlas(): Promise<NpcAtlas> {
+  if (!cache) {
+    // Promise.resolve().then 包一层：Node 下相对 URL 可能让 fetch 同步抛错，统一转成 reject。
+    cache = Promise.resolve()
+      .then(() => fetch(`${BASE}data/npc-atlas.json`, ATLAS_JSON_FETCH))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`加载 npc-atlas.json 失败：HTTP ${res.status}`)
+        return (await res.json()) as NpcAtlas
+      })
+      .catch((err: unknown) => {
+        cache = null
+        throw err
+      })
+  }
+  return cache
+}
+
+/** 加载 NPC 图集 PNG（复用物品图集的单例缓存；会校验尺寸与裁切表一致）。 */
+export function loadNpcAtlasImage(atlas: NpcAtlas): Promise<HTMLImageElement> {
+  return loadVerifiedAtlasImage(atlas)
+}

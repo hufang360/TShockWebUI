@@ -37,7 +37,9 @@
 | `bad_credentials` | 401 | 账号或密码错误 | 提示「账号或密码错误」 |
 | `no_api_permission` | 403 | 账号所属组缺 `tshock.rest.useapi` | 提示联系管理员赋权 |
 | `no_permission` | 403 | 已有 token 但缺所需权限（如 `tshock.rest.command`、`playermanager`） | 提示权限不足 |
-| `plugin_not_installed` | 501 | 服务器未安装对应第三方 TShock 插件（PlayerManager / FishShop） | 提示「未安装插件」，隐藏模块 |
+| `plugin_not_installed` | 501 | 服务器未安装对应第三方 TShock 插件（PlayerManager / FishShop）或信使插件 | 提示「未安装插件」，隐藏模块 |
+| `plugin_outdated` | 501 | 信使插件在装，但版本过旧缺少该端点/能力（如新版才有的 `/webui/chat`） | 提示「插件版本过旧，请升级」（`message` 含版本/能力） |
+| `plugin_protocol_mismatch` | 501 | 信使插件与后端协议不兼容 | 提示升级插件或后端；设置页「信使插件诊断」可查看两侧版本 |
 | `player_offline` | 404 | 在线授权：目标玩家不在线 | 提示「该玩家不在线」 |
 | `online_auth_denied` | 403 | 在线授权：玩家在游戏内拒绝 | 提示「玩家已拒绝授权」 |
 | `online_auth_timeout` | 504 | 在线授权：等待确认超时 | 提示重新发起 |
@@ -148,6 +150,33 @@ The token 仍只在后端内存；插件铸造的 token 与 `/v2/token/create` �
 ```
 - 后端用**空 `name`** 调一次插件 `/webui/auth/request`：404 = 未安装，其它 = 已安装。
 - 前端据此决定「在线授权」入口是否可用（未安装时禁用并提示）。
+
+---
+
+## 1.3 `GET /api/plugin/status`（信使插件协议握手 / 诊断）
+
+无需会话：后端用共享 `secret` 调插件 `/webui/meta`（登录前就能探测）。
+
+```json
+{
+  "installed": true,
+  "legacy": false,
+  "version": "0.1.0.0",
+  "protocol": 1,
+  "minProtocol": 1,
+  "capabilities": ["auth", "batch", "chat", "commands", "data", "events", "me", "restlimit", "serverinfo", "sessions"],
+  "backendProtocol": 1,
+  "compatible": true,
+  "missingCapabilities": [],
+  "reason": "ok"
+}
+```
+
+- `reason ∈ ok | not_installed | legacy | protocol_mismatch | missing_capabilities`。
+- **兼容规则**：`minProtocol ≤ backendProtocol ≤ protocol`，且 `capabilities` 覆盖后端所需能力。
+- `legacy=true`：插件在装但没有 `/webui/meta`（旧版），按尽力兼容处理，建议升级。
+- 契约与“如何新增能力 / 何时改协议号”见 `docs/插件接入规范.md` §协议握手。
+- 前端展示：设置 → 「信使插件诊断」（版本 / 协议 / 能力 / 兼容性）。
 
 ---
 
@@ -504,10 +533,34 @@ TShock **运行时**指令目录（含 `/fish`、`/pm`、本插件的 `/web` 等
 世界事件 / Boss 进度等：`{ name, difficulty, hardMode, dayTime, time, bloodMoon, eclipse,
 invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosses{} }`。
 
-### `GET /api/events?since=&limit=`
-服务器动态事件流：`{ events: [{ seq, type, text, time }], lastSeq }`；`type ∈ join|leave|boss|chat`
-（`chat` 为玩家聊天，插件配置 `RecordChat` 可关）。
-循环缓冲（最近 200 条，重启即清空）；轮询时传上次的 `lastSeq`。
+### `GET /api/events?since=&limit=&tail=`
+服务器动态事件流：`{ events: [{ seq, type, text, time, source? }], lastSeq, firstSeq? }`；
+`type ∈ join|leave|boss|announce|npc|chat`（`webui` 为旧插件的兼容值；`announce` = 世界公告如 Boss 苏醒 / 事件开始；`npc` = 旅商到达）。
+- **增量轮询**：传 `since=` 上次的 `lastSeq`，返回之后的事件（插件缺失 / 旧插件均可用）。
+- **取最近 N 条**：传 `tail=N` 返回**最新** N 条（升序），用于「打开网页先看最近 N 条」。
+  新插件走磁盘历史（`/webui/events?tail=N`）；**旧插件（含 RC2）后端自动降级**：拉一页 `since=0` 再取尾部。
+- 聊天的 `source ∈ game|webui`（`webui` = 网页发言，见下）；旧插件可能不返回 `source`。
+- `chat` 为玩家聊天（插件配置 `RecordChat` 可关）；事件在插件内存（新插件另按天落盘，见插件文档），重启不一定清空。
+
+### `GET /api/events/stream?since=`（SSE）
+以 `text/event-stream` 持续推送（网页打开「动态」时用）：
+- `event: message` + `data: <ServerEvent>`：一条事件；
+- `event: world` + `data: <ServerInfoExtra>`：世界状态（约 20s 一帧；前端用它更新徽标 / 游戏内时间）；
+- 心跳为注释帧 `: ping`；错误用 `event: error` + `data: {"code":"..."}` 后断开，前端据此降级为轮询。
+- 需要登录；后端**每个上游共享一个轮询器**（`feedhub.go`）拉 `/webui/events?since=`，fan-out 给所有订阅者，
+  因此 TShock REST 请求数与在线人数无关；轮询间隔空闲自适应（2.5s → 5s → 10s）。
+- 传输层接口见 `BackendTransport.eventsStream?`（可选：未实现 / 连接失败时前端退回 `events()` 轮询）。
+
+### `POST /api/chat`
+网页发言：把文本广播到游戏内聊天（需要登录；插件缺失 → `plugin_not_installed`）。
+
+- 请求：`{ "text": "..." }`（trim 后非空，≤200 字符）。
+- 响应：`{ name, text, line, id?, time?, source? }`；`name` 为游戏内角色名（在线时）或账号名，
+  `line` 是插件实际广播的那一行（前缀默认 `[WebUI]`，可配 `ChatPrefix`），`id`/`time` 供前端做发送状态。
+- **不伪造身份**：插件统一加前缀并标明账号名（如 `[WebUI] hf: 你好`），与真实在线玩家的 `chat` 事件区分。
+- 错误：空内容 → `400 bad_request`；插件关闭网页发言 → `403 no_permission`（保留插件原文）；
+  超出每账号每分钟上限 → `429 rate_limited`（保留插件原文）；未登录 → `401 not_authenticated`。
+- 插件侧开关 / 限流：`AllowWebChat`（默认开）、`MaxWebChatPerMinute`（默认 20）、`ChatPrefix`（默认 `[WebUI]`）。
 
 ### `GET /api/sessions`
 本插件铸造的 web 会话列表（不含 token 明文）：`{ sessions: [{ id, created, expires, current }] }`。
@@ -557,6 +610,15 @@ export interface BackendTransport {
   playersList(): Promise<string[]>                 // 见第 5 节
   runCommand(cmd: string): Promise<CommandResult>   // 见第 6 节
 
+  me(): Promise<MeInfo>                                              // 见第 6.3 节
+  events(since: number, limit?: number): Promise<EventsPage>         // 见第 6.3 节
+  eventsTail?(limit: number): Promise<EventsPage>                    // 见第 6.3 节（可选）
+  eventsStream?(handlers: EventsStreamHandlers, since: number): () => void // SSE（可选）
+  sendChat(text: string): Promise<ChatSendResult>                    // 见第 6.3 节「POST /api/chat」
+  sessions(): Promise<SessionInfo[]>                                 // 见第 6.3 节
+  revokeSessions(id?: string, all?: boolean): Promise<number>        // 见第 6.3 节
+  pluginStatus(): Promise<PluginStatus>                              // 见第 1.3 节
+
   playerCapabilities(): Promise<PlayerCapabilities>                    // 见第 5.1 节
   playerLook(name: string): Promise<PlayerLook>                        // 见第 5.2 节
   playerExport(name: string): Promise<{ filename: string; blob: Blob }> // 见第 5.3 节
@@ -574,6 +636,7 @@ export interface BackendTransport {
 - `POST /api/login/online`：`player_offline` / `online_auth_denied` → `('validation')`；`online_auth_timeout` → `('timeout')`；`online_auth_error` → `('validation')`（展示 `message`）。
 - `POST /api/command`：直接返回 body 作为 `CommandResult`（HTTP 200）。
 - `plugin_not_installed` → `('plugin_missing')`（前端提示「服务器未安装对应插件」）。
+- `rate_limited` → `('rate_limited')`（如网页发言超出每账号每分钟上限，`message` 保留插件原文）。
 - `fishshop_error` → `('validation')`（业务失败，`message` 原样展示给玩家）。
 - 网络错误/504 → `('timeout')`；502 → `('unavailable')`。
 - `serverStatus` 失败不抛错，返回 `{reachable:false}`。
