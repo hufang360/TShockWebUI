@@ -5,6 +5,7 @@ import { DEFAULT_MODULES } from '@/lib/modules'
 import { playerStubs } from '@/test/playerStubs'
 import type { BackendTransport } from '@/lib/tshock'
 import type { Settings } from '@/types'
+import { APP_VERSION } from '@/lib/version'
 import { SettingsPage } from './SettingsPage'
 
 const settings: Settings = {
@@ -459,6 +460,6 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
-    expect(screen.getByText(/TShockWebUI 0\.1\.0-rc\.2/)).toBeTruthy()
+    expect(screen.getByText(`TShockWebUI ${APP_VERSION}`)).toBeTruthy()
   })
 })
