@@ -80,7 +80,7 @@
 | 空态统一 | `Empty` 新增 `size="sm"` 紧凑变体；`recentEmpty` / `eventsEmpty` / `cards.empty` / `sessionsEmpty` / `noMatch` 裸 `<p>` 已改用 `Empty`+`EmptyDescription` | 已完成 |
 | 破坏性删除确认一致 | 模块卡片 / 自定义模块 / 服务器 / 首页自定义卡片改为 `ConfirmButton` 二次确认（新增 `action.deleteConfirm`）；`ConfirmButton` 的 `children` 改可选以支持纯图标按钮 | 已完成 |
 | 手写彩色提示改 `Alert` | `PlayerManagerPage`（错误）、`FishShopPage`（购买成功）已改为 `Alert variant="destructive|success"` | 已完成 |
-| 巨型组件拆分 | PlayerManagerPage 1057→597（抽 `player/PlayerLookView` + 共享 `Notice`）、CodexPage 819→476（`codex/CodexViews`）、FishShopPage 781→663（`fishshop/GoodCells`）、CommandPage 712→574（`command/HistoryPanel`）、ItemsPage 抽 `items/DexCell`、HomePage 抽 `home/commandCards` | **部分完成**；剩余 `App`(865) / `ItemsPage`(939) / `HomePage`(835) / `SettingsPage`(611) 待后续 |
+| 巨型组件拆分 | 新增 `player/PlayerLookView`、`codex/CodexViews`、`fishshop/GoodCells`、`command/HistoryPanel`、`items/DexCell`、`items/DexPagination`、`items/PrefixPicker`、`home/commandCards`、`home/HomeOverviewCards`、`settings/CustomModulesSection`、`settings/PreferencesCards`、`AppRoutes` 与共享 `Notice`；PlayerManagerPage 1057→597、CodexPage 819→476、FishShopPage 781→663、CommandPage 712→574、ItemsPage 989→820、HomePage 872→640、SettingsPage 611→382、App 865→753 | 已完成 |
 | 首页卡片拖拽无障碍 | 原生 HTML5 DnD + `GripVertical` 手柄之外，新增「上移 / 下移」图标按钮（键盘 / 触屏可用，首尾禁用），见 `components/CardManagerSheet.tsx` | 已完成 |
 | 事件流 SSE 推送 + 可选持久化 + 更多事件类型 | 统一聊天模型（`type=chat` + `source=game\|webui`）已完成；现仍为轮询 | SSE 推送（REST 降级）；有上限的追加文件保存历史；更多事件类型 + 前端过滤/高亮 | 待定（研究） |
 | 网页聊天：回复/引用 + 导航可排序 + 骨架屏 | 消息模型（`id`/`time` + 失败重试）已完成 | 点消息引用、侧栏拖拽排序、大块内容骨架 | 待定（P3） |

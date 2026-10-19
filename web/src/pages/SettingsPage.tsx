@@ -1,26 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { AlertTriangle, Plug, Plus, ShieldAlert, Trash2 } from 'lucide-react'
+import { AlertTriangle, Plug, ShieldAlert } from 'lucide-react'
 import {
   Badge,
   Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  Field,
-  FieldLabel,
-  FieldTitle,
-  Input,
-  NativeSelect,
-  NativeSelectOption,
-  Separator,
-  Slider,
   Spinner,
   Switch,
-  ToggleGroup,
-  ToggleGroupItem,
 } from '@/components/ui'
 import { CollapseChevron } from '@/components/CollapseChevron'
-import { ConfirmButton } from '@/components/ConfirmButton'
 import { CollapsibleCard } from '@/components/CollapsibleCard'
 import { LoginGate } from '@/components/LoginGate'
 import { useI18n } from '@/lib/i18n'
@@ -28,6 +17,8 @@ import { APP_VERSION } from '@/lib/version'
 import { useLocalState } from '@/hooks/useLocalState'
 import { PluginDiagnosticsCard } from '@/components/PluginDiagnosticsCard'
 import { WebAccountSection } from '@/components/WebAccountSection'
+import { CustomModulesSection } from '@/components/settings/CustomModulesSection'
+import { PreferencesCards } from '@/components/settings/PreferencesCards'
 import { MODULE_DEFS, isModuleEnabled, setModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
 import { createCustomModule, type CustomModule } from '@/lib/customModules'
 import { normalizeCustomCommand } from '@/lib/homeCards'
@@ -41,7 +32,7 @@ import {
 } from '@/lib/moduleCards'
 import { StorageKeys } from '@/lib/storage'
 import { TshockRequestError, type BackendTransport } from '@/lib/tshock'
-import type { Lang, Settings } from '@/types'
+import type { Settings } from '@/types'
 
 interface SettingsPageProps {
   settings: Settings
@@ -328,248 +319,37 @@ export function SettingsPage({
         </CollapsibleGroup>
 
         <CollapsibleGroup title={t('modules.tab.custom')}>
-            <p className="text-2xs text-muted-foreground">{t('modules.custom.hint')}</p>
-            <div className="flex flex-col gap-2">
-            {customModules.length > 0 && (
-              <ul className="flex flex-col gap-2">
-                {customModules.map((mod) => (
-                  <li
-                    key={mod.id}
-                    className="flex flex-col gap-2 rounded-xl bg-accent/40 p-3"
-                  >
-                    <div className="flex flex-wrap items-center gap-3">
-                      {/* 名称可直接改：创建后仍能重命名。 */}
-                      <Input
-                        value={mod.name}
-                        onChange={(e) => updateCustomModule(mod.id, { name: e.target.value })}
-                        placeholder={t('modules.custom.namePlaceholder')}
-                        aria-label={t('modules.custom.name')}
-                        className="h-8 min-w-0 flex-1 text-xs"
-                      />
-                      <Switch
-                        checked={isModuleEnabled(modules, serverId, mod.id)}
-                        disabled={!authenticated}
-                        onCheckedChange={(v) => toggle(mod.id, v)}
-                        aria-label={mod.name || t('modules.custom.untitled')}
-                      />
-                      <ConfirmButton
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={t('modules.custom.remove')}
-                        title={t('modules.custom.remove')}
-                        onConfirm={() =>
-                          onCustomModulesChange(customModules.filter((x) => x.id !== mod.id))
-                        }
-                        confirmLabel={t('action.deleteConfirm')}
-                        icon={<Trash2 aria-hidden />}
-                      />
-                    </div>
-                    {/* 主指令可直接改：改时会同步更新自动生成的「帮助」卡片。 */}
-                    <Input
-                      value={mod.command}
-                      onChange={(e) => updateCustomModule(mod.id, { command: e.target.value })}
-                      placeholder={t('modules.custom.commandPlaceholder')}
-                      aria-label={t('modules.custom.command')}
-                      className="h-8 font-pixel text-xs"
-                    />
-                    {/* 模块页顶部说明：可留空（留空时回退为默认提示）。 */}
-                    <Input
-                      value={mod.desc}
-                      onChange={(e) => updateCustomModule(mod.id, { desc: e.target.value })}
-                      placeholder={t('modules.custom.descPlaceholder')}
-                      aria-label={t('modules.custom.desc')}
-                      className="h-8 text-xs"
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex flex-col gap-2 rounded-xl bg-accent/40 p-3 sm:flex-row sm:items-end">
-              <Field className="min-w-0 flex-1">
-                <FieldLabel htmlFor="custom-module-name">{t('modules.custom.name')}</FieldLabel>
-                <Input
-                  id="custom-module-name"
-                  value={newModuleName}
-                  onChange={(e) => setNewModuleName(e.target.value)}
-                  placeholder={t('modules.custom.namePlaceholder')}
-                  className="h-8 text-xs"
-                />
-              </Field>
-              <Field className="min-w-0 flex-1">
-                <FieldLabel htmlFor="custom-module-command">
-                  {t('modules.custom.command')}
-                </FieldLabel>
-                <Input
-                  id="custom-module-command"
-                  value={newModuleCommand}
-                  onChange={(e) => setNewModuleCommand(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') createModule()
-                  }}
-                  placeholder={t('modules.custom.commandPlaceholder')}
-                  className="h-8 font-pixel text-xs"
-                />
-              </Field>
-              <Button size="sm" variant="primary" onClick={createModule}>
-                <Plus data-icon="inline-start" />
-                {t('modules.custom.create')}
-              </Button>
-            </div>
-            </div>
+          <CustomModulesSection
+            customModules={customModules}
+            modules={modules}
+            serverId={serverId}
+            authenticated={authenticated}
+            onToggle={toggle}
+            onUpdate={updateCustomModule}
+            onRemove={(id) => onCustomModulesChange(customModules.filter((x) => x.id !== id))}
+            newName={newModuleName}
+            newCommand={newModuleCommand}
+            onNewNameChange={setNewModuleName}
+            onNewCommandChange={setNewModuleCommand}
+            onCreate={createModule}
+          />
         </CollapsibleGroup>
       </CollapsibleCard>
         </div>
 
         {/* 右列：界面偏好 / 数据刷新 / 在线授权 / 账户 */}
         <div className="flex min-w-0 flex-col gap-4">
-      <CollapsibleCard title={t('settings.heading')} bodyClassName="flex flex-col gap-0 pt-0">
-          <SettingRow label={t('settings.fontSize')}>
-            <div className="flex items-center gap-2">
-              <Slider
-                className="w-32"
-                min={13}
-                max={18}
-                step={1}
-                value={[settings.fontSize]}
-                onValueChange={(v) => onChange({ fontSize: v[0] })}
-                aria-label={t('settings.fontSize')}
-              />
-              <span className="w-5 text-right text-xs text-muted-foreground">
-                {settings.fontSize}
-              </span>
-            </div>
-          </SettingRow>
-          <Separator />
-          <SettingRow label={t('settings.compact')}>
-            <Switch
-              checked={settings.compact}
-              onCheckedChange={(v) => onChange({ compact: v })}
-              aria-label={t('settings.compact')}
-            />
-          </SettingRow>
-          <Separator />
-          <SettingRow label={t('settings.language')}>
-            <ToggleGroup
-              size="sm"
-              value={settings.language}
-              onValueChange={(v) => v && onChange({ language: v as Lang })}
-              aria-label={t('settings.language')}
-            >
-              <ToggleGroupItem value="zh">中文</ToggleGroupItem>
-              <ToggleGroupItem value="en">English</ToggleGroupItem>
-            </ToggleGroup>
-          </SettingRow>
-          <Separator />
-          <SettingRow label={t('settings.theme')}>
-            <ToggleGroup
-              size="sm"
-              value={settings.theme}
-              onValueChange={(v) => v && onChange({ theme: v as Settings['theme'] })}
-              aria-label={t('settings.theme')}
-            >
-              <ToggleGroupItem value="auto">{t('settings.theme.auto')}</ToggleGroupItem>
-              <ToggleGroupItem value="light">{t('settings.theme.light')}</ToggleGroupItem>
-              <ToggleGroupItem value="dark">{t('settings.theme.dark')}</ToggleGroupItem>
-            </ToggleGroup>
-          </SettingRow>
-      </CollapsibleCard>
-
-      <CollapsibleCard title={t('settings.dataRefresh')} bodyClassName="flex flex-col gap-0 pt-0">
-          <SettingRow label={t('settings.commandInterval')}>
-            <NativeSelect
-              size="sm"
-              value={settings.commandInterval}
-              onChange={(e) => onChange({ commandInterval: Number(e.target.value) })}
-              aria-label={t('settings.commandInterval')}
-            >
-              <NativeSelectOption value={0}>{t('settings.commandIntervalOff')}</NativeSelectOption>
-              <NativeSelectOption value={1000}>
-                {t('settings.commandIntervalSeconds', { n: 1 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={2000}>
-                {t('settings.commandIntervalSeconds', { n: 2 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={5000}>
-                {t('settings.commandIntervalSeconds', { n: 5 })}
-              </NativeSelectOption>
-            </NativeSelect>
-          </SettingRow>
-          <Separator />
-          <div className="flex flex-col gap-1 py-2">
-            <Field orientation="horizontal" className="flex-nowrap justify-between gap-3">
-              <FieldTitle>{t('settings.eventsInterval')}</FieldTitle>
-              <NativeSelect
-                size="sm"
-                value={settings.eventsRefreshInterval}
-                onChange={(e) => onChange({ eventsRefreshInterval: Number(e.target.value) })}
-                aria-label={t('settings.eventsInterval')}
-              >
-                <NativeSelectOption value={60000} disabled={!canFastEvents}>
-                  {t('settings.refreshIntervalMinutes', { n: 1 })}
-                </NativeSelectOption>
-                <NativeSelectOption value={180000}>
-                  {t('settings.refreshIntervalMinutes', { n: 3 })}
-                </NativeSelectOption>
-                <NativeSelectOption value={300000}>
-                  {t('settings.refreshIntervalMinutes', { n: 5 })}
-                </NativeSelectOption>
-                <NativeSelectOption value={900000}>
-                  {t('settings.refreshIntervalMinutes', { n: 15 })}
-                </NativeSelectOption>
-              </NativeSelect>
-            </Field>
-            {!canFastEvents && (
-              <p className="text-2xs leading-4 text-muted-foreground">
-                {t('settings.eventsIntervalFastHint')}
-              </p>
-            )}
-          </div>
-          <Separator />
-          <SettingRow label={t('settings.refreshInterval')}>
-            <NativeSelect
-              size="sm"
-              value={settings.refreshInterval}
-              onChange={(e) => onChange({ refreshInterval: Number(e.target.value) })}
-              aria-label={t('settings.refreshInterval')}
-            >
-              <NativeSelectOption value={0}>{t('settings.refreshIntervalOff')}</NativeSelectOption>
-              <NativeSelectOption value={60000}>
-                {t('settings.refreshIntervalMinutes', { n: 1 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={120000}>
-                {t('settings.refreshIntervalMinutes', { n: 2 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={300000}>
-                {t('settings.refreshIntervalMinutes', { n: 5 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={600000}>
-                {t('settings.refreshIntervalMinutes', { n: 10 })}
-              </NativeSelectOption>
-            </NativeSelect>
-          </SettingRow>
-          <Separator />
-          <Field orientation="horizontal" className="flex-nowrap items-center justify-between gap-3 py-2">
-            <div className="flex flex-col gap-0.5">
-              <FieldTitle>{t('home.batch')}</FieldTitle>
-              <p className="text-2xs leading-4 text-muted-foreground">
-                {batchPlugin === true ? t('home.batchHint') : t('home.batchUnavailable')}
-              </p>
-            </div>
-            {batchPlugin === null ? (
-              <Spinner className="text-muted-foreground" />
-            ) : (
-              <Switch
-                checked={batchPlugin === true && batchMode}
-                disabled={batchPlugin !== true}
-                onCheckedChange={(v) => {
-                  setBatchMode(v)
-                  setBatchModeSet(true)
-                }}
-                aria-label={t('home.batch')}
-              />
-            )}
-          </Field>
-      </CollapsibleCard>
+      <PreferencesCards
+        settings={settings}
+        onChange={onChange}
+        canFastEvents={canFastEvents}
+        batchPlugin={batchPlugin}
+        batchMode={batchMode}
+        onBatchModeChange={(v) => {
+          setBatchMode(v)
+          setBatchModeSet(true)
+        }}
+      />
 
           <PluginDiagnosticsCard transport={transport} serverId={serverId} />
           <WebAccountSection transport={transport} authenticated={authenticated} serverId={serverId} />
@@ -579,15 +359,6 @@ export function SettingsPage({
       {/* 底部版本号 */}
       <p className="pt-1 text-center text-2xs text-muted-foreground">TShockWebUI {APP_VERSION}</p>
     </div>
-  )
-}
-
-function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Field orientation="horizontal" className="flex-nowrap justify-between gap-3 py-2">
-      <FieldTitle>{label}</FieldTitle>
-      {children}
-    </Field>
   )
 }
 

@@ -5,6 +5,8 @@ import { ItemTooltipContent } from '@/components/ItemTooltipContent'
 import { RecipePanel } from '@/components/RecipePanel'
 import { ItemDropsPanel } from '@/components/ItemDropsPanel'
 import { DexCell } from '@/components/items/DexCell'
+import { DexPagination } from '@/components/items/DexPagination'
+import { PrefixPicker } from '@/components/items/PrefixPicker'
 import { SearchInput } from '@/components/SearchInput'
 import {
   Button,
@@ -15,16 +17,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  FieldLabel,
   NativeSelect,
   NativeSelectOption,
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
   Select,
   SelectContent,
   SelectGroup,
@@ -64,15 +58,13 @@ import { readDexState, rememberDexState, rememberDexPageSize, DEFAULT_GAME_TAB, 
 import { ItemFavoritesProvider, type ItemFavoritesApi } from '@/lib/itemFavoritesContext'
 import { formatItemTag, searchItems, wikiUrl } from '@/lib/items'
 import {
-  PAGE_SIZES,
   clampPage,
   paginate,
-  paginationRange,
   totalPages,
 } from '@/lib/pagination'
 import { StorageKeys } from '@/lib/storage'
 import { computeVirtualGrid } from '@/lib/virtualGrid'
-import { rankPrefixes, formatBenefit } from '@/lib/prefixes'
+import { rankPrefixes } from '@/lib/prefixes'
 import type { Dataset, Item, ItemFavorite } from '@/types'
 
 /** 一行目标数量（格子宽度据此自适应，9~11 个）。 */
@@ -654,85 +646,19 @@ export function ItemsPage({
         )}
       </div>
 
-      {/* 翻页器（底部固定）：件数 + 数据版本 + 每页数量 + shadcn Pagination */}
-      <div
-        data-testid="dex-pager"
-        className="flex shrink-0 flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground"
-      >
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span>{t('dex.summary', { n: ordered.length })}</span>
-          <Separator orientation="vertical" className="h-3.5" />
-          <span>
-            {t('dex.version', {
-              version: dataset.meta.gameVersion,
-              count: dataset.meta.itemCount,
-            })}
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <FieldLabel htmlFor="dex-page-size" className="font-normal text-muted-foreground">
-              {t('dex.pageSize')}
-            </FieldLabel>
-            <NativeSelect
-              id="dex-page-size"
-              size="sm"
-              className="w-20"
-              value={state.pageSize}
-              onChange={(e) => {
-                const size = Number(e.target.value)
-                patch({ pageSize: size, page: 1 })
-                rememberDexPageSize(size)
-              }}
-            >
-              {PAGE_SIZES.map((size) => (
-                <NativeSelectOption key={size} value={size}>
-                  {size}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </div>
-          <span className="sr-only" aria-live="polite">
-            {t('dex.page', { page, pages: pageCount })}
-          </span>
-          <Pagination aria-label={t('dex.pagination')} className="mx-0 w-auto">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  aria-label={t('dex.prev')}
-                  disabled={page <= 1}
-                  onClick={() => goToPage(page - 1)}
-                />
-              </PaginationItem>
-              {paginationRange(page, pageCount).map((p, index) =>
-                p === 'ellipsis' ? (
-                  <PaginationItem key={`ellipsis-${index}`}>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                ) : (
-                  <PaginationItem key={p}>
-                    <PaginationLink
-                      isActive={p === page}
-                      aria-label={t('dex.goToPage', { page: p })}
-                      onClick={() => goToPage(p)}
-                    >
-                      {p}
-                    </PaginationLink>
-                  </PaginationItem>
-                ),
-              )}
-              <PaginationItem>
-                <PaginationNext
-                  aria-label={t('dex.next')}
-                  disabled={page >= pageCount}
-                  onClick={() => goToPage(page + 1)}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </div>
-
+      <DexPagination
+        total={ordered.length}
+        gameVersion={dataset.meta.gameVersion}
+        itemCount={dataset.meta.itemCount}
+        page={page}
+        pageCount={pageCount}
+        pageSize={state.pageSize}
+        onPage={goToPage}
+        onPageSize={(size) => {
+          patch({ pageSize: size, page: 1 })
+          rememberDexPageSize(size)
+        }}
+      />
       {/* 详情：右侧抽屉（合成区域较长，抽屉比分栏弹框更好用） */}
       <Sheet
         open={selected != null}
@@ -767,63 +693,18 @@ export function ItemsPage({
                   {/* 词缀与下拉作为一个 group，放在 tips 右侧；切换后 tips 属性值随之变化。
                       下拉按游戏自身的词缀评分排序，评分最高的即「顶级词缀」（可能并列）。 */}
                   {rollablePrefixes.length > 0 && (
-                    <div className="flex w-40 shrink-0 flex-col gap-1.5 rounded-lg bg-accent/50 p-2 text-xs text-muted-foreground">
-                      <span className="shrink-0">{t('prefix.label')}</span>
-                      <Select
-                        value={String(state.prefixId)}
-                        onValueChange={(v) => patch({ prefixId: Number(v) })}
-                      >
-                        <SelectTrigger size="sm" aria-label={t('prefix.label')} className="max-w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-[min(20rem,50vh)]">
-                          <SelectGroup>
-                            <SelectItem value="0">{t('prefix.none')}</SelectItem>
-                            {prefixRanks.map(({ id, val }) => {
-                              const pf = dataset.prefixesById.get(id)
-                              if (!pf) return null
-                              const mods = dataset.prefixModsById.get(id)
-                              const isBest = bestPrefixIds.has(id)
-                              return (
-                                <SelectItem key={id} value={String(id)}>
-                                  <span className="flex items-center gap-1">
-                                    {isBest && (
-                                      <Star className="size-3 shrink-0 fill-current text-warning" />
-                                    )}
-                                    {pf.name}
-                                    {mods?.benefit ? (
-                                      <span className="text-muted-foreground/70">
-                                        {formatBenefit(mods.benefit, t)}
-                                      </span>
-                                    ) : val > 0 ? (
-                                      <span className="text-muted-foreground/70">
-                                        {val.toFixed(3)}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                </SelectItem>
-                              )
-                            })}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      {/* 饰品不显示「最佳词缀」行：下拉里已带 ⭐ 与效果，足够明显。 */}
-                      {bestPrefixIds.size > 0 && selectedStat?.stats?.accessory !== true && (
-                        <button
-                          type="button"
-                          className="shrink-0 cursor-pointer text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
-                          title={t('prefix.bestHint')}
-                          onClick={() => patch({ prefixId: [...bestPrefixIds][0]! })}
-                        >
-                          {t('prefix.best')}：{bestPrefixNames.join(' / ')}
-                        </button>
-                      )}
-                      {selectedPrefix && (
-                        <code className="rounded bg-accent px-1.5 py-0.5 font-pixel text-2xs text-foreground">
-                          {formatItemTag(selected.id, { prefixId: state.prefixId })}
-                        </code>
-                      )}
-                    </div>
+                    <PrefixPicker
+                      item={selected}
+                      prefixId={state.prefixId}
+                      onPrefixChange={(id) => patch({ prefixId: id })}
+                      prefixRanks={prefixRanks}
+                      bestPrefixIds={bestPrefixIds}
+                      bestPrefixNames={bestPrefixNames}
+                      prefix={selectedPrefix}
+                      accessory={selectedStat?.stats?.accessory === true}
+                      dataset={dataset}
+                      formatTag={formatItemTag}
+                    />
                   )}
                 </div>
 

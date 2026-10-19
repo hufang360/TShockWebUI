@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Fish, Globe2, House, LayoutGrid, Plug, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { AppShell, type NavItem } from '@/components/AppShell'
+import { AppRoutes } from '@/components/AppRoutes'
 import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
 import { LoginDialog } from '@/components/LoginDialog'
 import { QuickPreferences } from '@/components/QuickPreferences'
@@ -28,7 +29,6 @@ import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { I18nProvider, translate } from '@/lib/i18n'
 import {
   DEFAULT_MODULES,
-  MODULE_BY_ID,
   MODULE_DEFS,
   autoActivateModules,
   isCustomModuleId,
@@ -62,14 +62,6 @@ import {
   type ServerStatus,
   type Session,
 } from '@/lib/tshock'
-import { CommandPage } from '@/pages/CommandPage'
-import { FishShopPage } from '@/pages/FishShopPage'
-import { HomePage } from '@/pages/HomePage'
-import { ItemsPage } from '@/pages/ItemsPage'
-import { PlayerManagerPage } from '@/pages/PlayerManagerPage'
-import { SettingsPage } from '@/pages/SettingsPage'
-import { CodexPage } from '@/pages/CodexPage'
-import { CommandModulePage } from '@/pages/CommandModulePage'
 import type { Dataset, Me, Settings, TabId, UiState } from '@/types'
 
 const DEFAULT_SETTINGS: Settings = {
@@ -667,142 +659,38 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             </>
           }
         >
-          {activeTab === 'home' && (
-            <HomePage
-              dataset={view}
-              transport={transport}
-              authenticated={session.authenticated}
-              username={username}
-              serverId={activeServerId}
-              modules={modules}
-              refreshInterval={settings.refreshInterval}
-              eventsRefreshInterval={settings.eventsRefreshInterval}
-              onTokenInvalid={handleTokenInvalid}
-              onLogin={() => {
-                setLoginReason(null)
-                setLoginOpen(true)
-              }}
-              onNavigate={(activeTab) => setUi({ ...ui, activeTab })}
-            />
-          )}
-          {activeTab === 'editor' && (
-            <CommandPage
-              dataset={view}
-              transport={transport}
-              authenticated={session.authenticated}
-              settings={settings}
-              serverId={activeServerId}
-              players={players}
-              ingameAllowed={ingameAllowed}
-              runtimeValues={runtimeParams}
-              onTokenInvalid={handleTokenInvalid}
-              onLogin={() => {
-                setLoginReason(null)
-                setLoginOpen(true)
-              }}
-              onOpenInDex={(itemId) => {
-                setDexFocus(itemId)
-                setUi({ ...ui, activeTab: 'items' })
-              }}
-            />
-          )}
-          {activeTab === 'items' && (
-            <ItemsPage
-              dataset={view}
-              focusItemId={dexFocus}
-              onFocusConsumed={consumeDexFocus}
-            />
-          )}
-          {activeTab === 'codex' && <CodexPage />}
-          {activeTab === 'players' && (
-            <PlayerManagerPage
-              key={activeServerId}
-              serverId={activeServerId}
-              transport={transport}
-              authenticated={session.authenticated}
-              username={username}
-              players={players}
-              onTokenInvalid={handleTokenInvalid}
-              onLogin={() => {
-                setLoginReason(null)
-                setLoginOpen(true)
-              }}
-            />
-          )}
-          {activeTab === 'store' && (
-            <FishShopPage
-              serverId={activeServerId}
-              transport={transport}
-              authenticated={session.authenticated}
-              refreshInterval={settings.refreshInterval}
-              onTokenInvalid={handleTokenInvalid}
-              onLogin={() => {
-                setLoginReason(null)
-                setLoginOpen(true)
-              }}
-            />
-          )}
-          {activeTab === 'world' && (
-            <CommandModulePage
-              dataset={view}
-              transport={transport}
-              authenticated={session.authenticated}
-              serverId={activeServerId}
-              refreshInterval={settings.refreshInterval}
-              onTokenInvalid={handleTokenInvalid}
-              onLogin={() => {
-                setLoginReason(null)
-                setLoginOpen(true)
-              }}
-              moduleId="world"
-              keyPrefix="world:"
-              title={t('nav.world')}
-              desc={t('page.world.desc')}
-              fixedCards={MODULE_BY_ID.get('world')?.cards}
-            />
-          )}
-          {customModules
-            .filter((mod) => mod.id === activeTab)
-            .map((mod) => (
-              <CommandModulePage
-                key={mod.id}
-                dataset={view}
-                transport={transport}
-                authenticated={session.authenticated}
-                serverId={activeServerId}
-                refreshInterval={settings.refreshInterval}
-                onTokenInvalid={handleTokenInvalid}
-                onLogin={() => {
-                  setLoginReason(null)
-                  setLoginOpen(true)
-                }}
-                moduleId={mod.id}
-                keyPrefix={`${mod.id}:`}
-                title={mod.name || t('modules.custom.untitled')}
-                desc={mod.desc.trim() || t('modules.custom.hint')}
-              />
-            ))}
-          {activeTab === 'settings' && (
-            <SettingsPage
-              settings={settings}
-              onChange={(patch) => setSettings({ ...settings, ...patch })}
-              serverId={activeServerId}
-              transport={transport}
-              authenticated={session.authenticated}
-              modules={modules}
-              onModulesChange={setModules}
-              onModuleUserSet={(id) =>
-                setModulesSet((prev) => setModuleEnabled(prev, activeServerId, id, true))
-              }
-              customModules={customModules}
-              onCustomModulesChange={setCustomModules}
-              onTokenInvalid={handleTokenInvalid}
-              onLogin={() => {
-                setLoginReason(null)
-                setLoginOpen(true)
-              }}
-            />
-          )}
+          <AppRoutes
+            activeTab={activeTab}
+            dataset={view}
+            transport={transport}
+            authenticated={session.authenticated}
+            username={username}
+            serverId={activeServerId}
+            modules={modules}
+            settings={settings}
+            players={players}
+            ingameAllowed={ingameAllowed}
+            runtimeValues={runtimeParams}
+            customModules={customModules}
+            dexFocus={dexFocus}
+            onNavigate={(activeTab) => setUi({ ...ui, activeTab })}
+            onLogin={() => {
+              setLoginReason(null)
+              setLoginOpen(true)
+            }}
+            onTokenInvalid={handleTokenInvalid}
+            onFocusConsumed={consumeDexFocus}
+            onOpenInDex={(itemId) => {
+              setDexFocus(itemId)
+              setUi({ ...ui, activeTab: 'items' })
+            }}
+            onModulesChange={setModules}
+            onModuleUserSet={(id) =>
+              setModulesSet((prev) => setModuleEnabled(prev, activeServerId, id, true))
+            }
+            onCustomModulesChange={setCustomModules}
+            onSettingsChange={(patch) => setSettings({ ...settings, ...patch })}
+          />
         </AppShell>
 
         <Dialog open={confirmLogoutOpen} onOpenChange={setConfirmLogoutOpen}>

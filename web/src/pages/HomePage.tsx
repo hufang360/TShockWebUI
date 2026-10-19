@@ -1,24 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  Activity,
-  ArrowRight,
-  BookOpen,
-  Fish,
-  History,
   RefreshCw,
-  Server,
-  Settings,
   SlidersHorizontal,
   Terminal,
-  Users,
 } from 'lucide-react'
 import { COMMAND_CARD_BY_ID, type CommandCardId } from '@/components/home/commandCards'
+import {
+  EventsCard,
+  QuickLinksCard,
+  RecentCard,
+  ServerStatusCard,
+} from '@/components/home/HomeOverviewCards'
 import { HomeCardManager } from '@/components/HomeCardManager'
 import { CommandCard } from '@/components/CommandCard'
 import { LoginGate } from '@/components/LoginGate'
-import { ServerFeedList } from '@/components/ServerFeed'
-import { isModuleEnabled, DEFAULT_MODULES, type ModulesPrefs } from '@/lib/modules'
+import { DEFAULT_MODULES, type ModulesPrefs } from '@/lib/modules'
 import {
   Badge,
   Button,
@@ -26,9 +23,6 @@ import {
   CardBody,
   CardHeader,
   CardTitle,
-  Empty,
-  EmptyDescription,
-  Separator,
   Spinner,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
@@ -39,7 +33,6 @@ import {
   setManual,
 } from '@/lib/autoExec'
 import { useServerFeed } from '@/hooks/useServerFeed'
-import { cn } from '@/lib/cn'
 import { isRefreshDue, lastRefreshedAt, markRefreshed, refreshScope } from '@/lib/refreshGate'
 import { useCommandResults } from '@/lib/commandResults'
 import { useExecutionQueue } from '@/lib/executionQueue'
@@ -62,8 +55,6 @@ import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
 /** 右栏「概览」卡片（固定放在右列，顺序：服务器状态 / 服务器动态 / 快捷入口 / 最近执行）。 */
 const RIGHT_COLUMN_IDS = new Set<string>(['server', 'events', 'quick', 'recent'])
 /** 「最近执行」固定一个合适的高度，内容超出时内部滚动。 */
-const RECENT_CARD_HEIGHT = 'xl:h-56'
-
 const RECENT_LIMIT = 5
 
 interface HomePageProps {
@@ -426,7 +417,6 @@ export function HomePage({
     [onNavigate],
   )
 
-  const reachable = status?.reachable === true
   const customById = useMemo(() => new Map(prefs.custom.map((c) => [c.id, c])), [prefs.custom])
   // 首页有指令在排队 / 执行中（或状态正在刷新）时禁用「刷新」。
   const refreshingAll = loadingStatus || busyPrefix('home:')
@@ -519,207 +509,30 @@ export function HomePage({
     })
   }
 
-  const renderServerCard = () => (
-    <Card key="server" className="flex flex-col">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Server />
-          {t('home.server')}
-        </CardTitle>
-        <Badge tone={status === null ? 'neutral' : reachable ? 'success' : 'danger'}>
-          {status === null
-            ? t('home.connecting')
-            : reachable
-              ? t('status.online')
-              : t('home.offline')}
-        </Badge>
-      </CardHeader>
-      <CardBody className="flex-1">
-        {status === null ? (
-          <p className="text-xs text-muted-foreground">{t('home.connecting')}</p>
-        ) : !reachable ? (
-          <p className="text-sm text-destructive">{t('home.offline')}</p>
-        ) : (
-          <dl className="flex flex-col">
-            {(
-              [
-                { label: t('home.nameLabel'), value: status?.name || '—' },
-                { label: t('home.serverVersionLabel'), value: status?.serverversion ?? '—' },
-                { label: t('home.tshockVersionLabel'), value: status?.tshockversion ?? '—' },
-                { label: t('home.worldLabel'), value: status?.world || '—' },
-                {
-                  label: t('home.playersLabel'),
-                  value: `${status?.playercount ?? 0} / ${status?.maxplayers ?? 0}`,
-                },
-                { label: t('home.port'), value: status?.port ?? '—' },
-                { label: t('home.uptime'), value: status?.uptime || '—' },
-                {
-                  label: t('home.password'),
-                  value: (
-                    <Badge tone={status?.serverpassword ? 'warn' : 'neutral'}>
-                      {status?.serverpassword ? t('home.passwordRequired') : t('home.passwordNone')}
-                    </Badge>
-                  ),
-                },
-              ] as { label: string; value: ReactNode }[]
-            ).map((row, index) => (
-              <div key={row.label}>
-                {index > 0 && <Separator />}
-                <InfoRow label={row.label} value={row.value} />
-              </div>
-            ))}
-          </dl>
-        )}
-        {lastStatusAt && (
-          <p className="mt-2 text-2xs text-muted-foreground">
-            {t('home.lastRefresh', { time: new Date(lastStatusAt).toLocaleTimeString() })}
-          </p>
-        )}
-      </CardBody>
-    </Card>
-  )
-
-  const renderEventsCard = () => (
-    <Card key="events" className="flex flex-col">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity />
-          {t('home.events')}
-        </CardTitle>
-        <div className="flex items-center gap-1">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-muted-foreground"
-            onClick={refreshFeed}
-            aria-label={t('home.refresh')}
-            title={t('home.refresh')}
-          >
-            <RefreshCw data-icon="inline-start" />
-          </Button>
-          {eventsPlugin !== false && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground"
-              onClick={() => {
-                // 直接落到「指令 → 动态」tab（该 tab 装在 CommandPage 挂载时从本机读取）。
-                writeJson(StorageKeys.commandTab, 'events')
-                onNavigate('editor')
-              }}
-            >
-              {t('home.viewAll')}
-              <ArrowRight data-icon="inline-end" />
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardBody className="flex-1 flex flex-col gap-2">
-        <ServerFeedList
-          events={events}
-          extra={extra}
-          refreshedAt={feedRefreshedAt}
-          limit={6}
-          emptyText={t('home.eventsEmpty')}
-          itemsById={dataset.itemsById}
-          prefixesById={dataset.prefixesById}
-          atlas={dataset.atlas}
-        />
-      </CardBody>
-    </Card>
-  )
-
-  const renderRecentCard = () => (
-    <Card key="recent" className={cn('flex flex-col', RECENT_CARD_HEIGHT)}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <History />
-          {t('home.recent')}
-        </CardTitle>
-      </CardHeader>
-      <CardBody className="flex-1 overflow-y-auto">
-        {recent.length === 0 ? (
-          <Empty size="sm">
-            <EmptyDescription>{t('home.recentEmpty')}</EmptyDescription>
-          </Empty>
-        ) : (
-          <ul className="flex flex-col gap-1.5">
-            {recent.map((h) => (
-              <li key={h.cmd}>
-                <Button
-                  variant="ghost"
-                  className="h-auto w-full justify-start gap-2 px-1.5 py-1 font-normal"
-                  onClick={() => openInEditor(h.cmd)}
-                  title={h.cmd}
-                >
-                  <code
-                    className={cn(
-                      'min-w-0 flex-1 truncate text-left font-pixel text-xs',
-                      h.ok ? 'text-foreground' : 'text-destructive',
-                    )}
-                  >
-                    {h.cmd}
-                  </code>
-                  <ArrowRight className="text-muted-foreground" data-icon="inline-end" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardBody>
-    </Card>
-  )
-
-  const renderQuickCard = () => (
-    <Card key="quick" className="flex flex-col">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Terminal />
-          {t('home.quick')}
-        </CardTitle>
-      </CardHeader>
-      <CardBody className="flex flex-1 flex-col justify-center gap-2">
-        <div className="grid grid-cols-2 gap-2">
-          <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('editor')}>
-            <Terminal data-icon="inline-start" />
-            {t('nav.editor')}
-          </Button>
-          <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('items')}>
-            <BookOpen data-icon="inline-start" />
-            {t('nav.items')}
-          </Button>
-          {isModuleEnabled(modules, serverId, 'store') && (
-            <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('store')}>
-              <Fish data-icon="inline-start" />
-              {t('nav.store')}
-            </Button>
-          )}
-          {isModuleEnabled(modules, serverId, 'players') && (
-            <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('players')}>
-              <Users data-icon="inline-start" />
-              {t('nav.players')}
-            </Button>
-          )}
-          <Button size="sm" variant="outline" className="justify-start" onClick={() => onNavigate('settings')}>
-            <Settings data-icon="inline-start" />
-            {t('settings.title')}
-          </Button>
-        </div>
-      </CardBody>
-    </Card>
-  )
-
   const renderCard = (id: string): ReactNode => {
     if (isBuiltinCardId(id)) {
       switch (id) {
         case 'server':
-          return renderServerCard()
+          return <ServerStatusCard key={id} status={status} lastStatusAt={lastStatusAt} />
         case 'recent':
-          return renderRecentCard()
+          return <RecentCard key={id} recent={recent} onOpen={openInEditor} />
         case 'events':
-          return renderEventsCard()
+          return (
+            <EventsCard
+              key={id}
+              events={events}
+              extra={extra}
+              refreshedAt={feedRefreshedAt}
+              eventsPlugin={eventsPlugin}
+              dataset={dataset}
+              onRefresh={refreshFeed}
+              onNavigate={onNavigate}
+            />
+          )
         case 'quick':
-          return renderQuickCard()
+          return (
+            <QuickLinksCard key={id} modules={modules} serverId={serverId} onNavigate={onNavigate} />
+          )
         default:
           return renderBuiltinCommandCard(id as CommandCardId)
       }
@@ -816,14 +629,6 @@ export function HomePage({
   )
 }
 
-function InfoRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 truncate text-right text-sm text-foreground">{value}</dd>
-    </div>
-  )
-}
 
 /**
  * 判断一次执行结果是否说明「指令不存在」（插件未安装）。
