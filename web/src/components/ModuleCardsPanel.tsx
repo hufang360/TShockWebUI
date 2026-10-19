@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Settings2 } from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
 import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
-import { Button, Spinner } from '@/components/ui'
+import { Button, Empty, EmptyDescription, Spinner } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { DEFAULT_AUTO_EXEC, isManual, sanitizeAutoExec, setManual } from '@/lib/autoExec'
 import { useCommandResults } from '@/lib/commandResults'
@@ -208,7 +208,7 @@ export function ModuleCardsPanel({
         <div className="flex items-center gap-2">
           {lastRefreshAt && (
             <span
-              className="text-[11px] text-muted-foreground"
+              className="text-2xs text-muted-foreground"
               title={new Date(lastRefreshAt).toLocaleString()}
             >
               {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
@@ -238,7 +238,9 @@ export function ModuleCardsPanel({
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {cards.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t('modules.cards.empty')}</p>
+          <Empty size="sm">
+            <EmptyDescription>{t('modules.cards.empty')}</EmptyDescription>
+          </Empty>
         ) : (
           cards.map((card) => (
             <CommandCard

@@ -174,7 +174,7 @@ export function CommandCard({
               )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
-              <code className="font-pixel text-[10px] text-muted-foreground">{command ?? '—'}</code>
+              <code className="font-pixel text-2xs text-muted-foreground">{command ?? '—'}</code>
               {footerNote}
             </div>
           </CardBody>

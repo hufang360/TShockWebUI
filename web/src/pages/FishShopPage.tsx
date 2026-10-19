@@ -2,13 +2,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { AlertTriangle, Droplets, Fish, RefreshCw, ShieldAlert, ShoppingCart } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
+import { Notice } from '@/components/Notice'
 import { CommandOutput } from '@/components/ResultPanel'
 import { FishCommandCards } from '@/components/FishCommandCards'
+import { CELL_ICON_SIZE, GoodCell, GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
 import { cn } from '@/lib/cn'
 import {
   Alert,
   AlertDescription,
-  AlertTitle,
   Badge,
   Button,
   Card,
@@ -37,10 +38,8 @@ import { useModuleState } from '@/hooks/useModuleState'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
 import { isRefreshDue, markRefreshed, refreshScope } from '@/lib/refreshGate'
-import { parseRichText } from '@/lib/richtext'
 import { TshockRequestError } from '@/lib/tshock'
 import type { BackendTransport, FishBuyResult, FishCapabilities, FishGood, FishShop } from '@/lib/tshock'
-import type { Dataset, Item } from '@/types'
 
 /**
  * 鱼店（TShock 第三方插件 FishShop）。
@@ -70,42 +69,6 @@ interface FishUiState extends Record<string, unknown> {
 const DEFAULT_STATE: FishUiState = { query: '' }
 
 /** 网格图标尺寸：与「物品图鉴」一致（64px）。 */
-const CELL_ICON_SIZE = 64
-
-interface GoodItemTag {
-  itemId: number
-  stack?: number
-  prefix?: number
-}
-
-/** 解析一段富文本里的第一个 `[i:..]` 标签。 */
-function firstItemTag(source: string | undefined): GoodItemTag | null {
-  if (!source) return null
-  for (const token of parseRichText(source)) {
-    if (token.kind === 'item') {
-      return { itemId: token.itemId, stack: token.stack, prefix: token.prefixId }
-    }
-  }
-  return null
-}
-
-/**
- * 是否「原生物品」：插件的 `desc` 里带 `[i:..]`（物品类商品都是这样）。
- * 服务 / 指令类商品的 `desc` 只有文字，`icon` 只是借来当识别的图（例如一本书），
- * 因此不算原生物品 → **不显示物品提示**（货架格子与详情页一致）。
- */
-function goodIsNativeItem(good: FishGood): boolean {
-  return firstItemTag(good.desc) !== null
-}
-
-/**
- * 从商品里取展示图标：优先插件返回的 `icon` 字段（服务类商品的 desc 只有文字），
- * 其次再解析 `desc` 里的第一个 `[i:..]` 标签。都没有则返回 null（走名称首字占位）。
- */
-function goodIcon(good: FishGood): GoodItemTag | null {
-  return firstItemTag(good.icon) ?? firstItemTag(good.desc)
-}
-
 export function FishShopPage({ serverId, transport, authenticated, refreshInterval, onTokenInvalid, onLogin }: FishShopPageProps) {
   const { t } = useI18n()
   const dataset = useDataset()
@@ -444,7 +407,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   </TooltipProvider>
                 </InputGroupAddon>
               </InputGroup>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-2xs text-muted-foreground">
                 {t('fish.total', { n: goods.length })}
               </span>
               {error && !selected && (
@@ -528,7 +491,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
                 {/* 价格：标签在上、内容在下 */}
                 <div className="flex flex-col gap-1">
-                  <span className="text-[11px] text-muted-foreground">{t('fish.cost')}</span>
+                  <span className="text-2xs text-muted-foreground">{t('fish.cost')}</span>
                   <div className="min-w-0">
                     {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
                   </div>
@@ -556,16 +519,16 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                         ? t('fish.buyConfirmArgs', { args: args.trim() })
                         : t('fish.buyConfirm', { n: buyAmount })}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">{t('fish.buyHint')}</p>
+                    <p className="text-2xs text-muted-foreground">{t('fish.buyHint')}</p>
                     {selected.refund && (
-                      <p className="text-[11px] text-warning">{t('fish.refundHint')}</p>
+                      <p className="text-2xs text-warning">{t('fish.refundHint')}</p>
                     )}
                   </div>
                 )}
 
                 {!confirming && needArgs && (
                   <div className="flex items-center gap-2">
-                    <span className="w-9 shrink-0 text-right text-[11px] text-muted-foreground">
+                    <span className="w-9 shrink-0 text-right text-2xs text-muted-foreground">
                       {t('fish.args')}
                     </span>
                     <Input
@@ -581,7 +544,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
                 {!confirming && adjustable && (
                   <div className="flex items-center gap-2">
-                    <span className="w-9 shrink-0 text-right text-[11px] text-muted-foreground">
+                    <span className="w-9 shrink-0 text-right text-2xs text-muted-foreground">
                       {t('fish.amount')}
                     </span>
                     <Input
@@ -593,7 +556,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                       aria-label={t('fish.amount')}
                       className="w-24"
                     />
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-2xs text-muted-foreground">
                       {t('fish.buyMaxNote', { n: maxBuy })}
                     </span>
                   </div>
@@ -606,21 +569,23 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 )}
 
                 {buyResult && (
-                  <div
-                    className={cn(
-                      'flex flex-col gap-1 rounded-md bg-success/15 px-3 py-2',
-                      buyCooldown > 0 && 'tswui-flash',
-                    )}
+                  <Alert
+                    variant="success"
+                    className={cn('flex flex-col gap-1', buyCooldown > 0 && 'tswui-flash')}
                   >
-                    {renderRich(
-                      t('fish.buyOk', {
-                        name: buyResult.name || selected.name,
-                        n: buyResult.amount,
-                        cost: buyResult.cost,
-                      }),
-                    )}
-                    <p className="text-[11px] font-medium text-foreground">{t('fish.successHint')}</p>
-                  </div>
+                    <AlertDescription>
+                      {renderRich(
+                        t('fish.buyOk', {
+                          name: buyResult.name || selected.name,
+                          n: buyResult.amount,
+                          cost: buyResult.cost,
+                        }),
+                      )}
+                    </AlertDescription>
+                    <AlertDescription className="font-medium text-foreground">
+                      {t('fish.successHint')}
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
 
@@ -687,93 +652,12 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   )
 }
 
-/** 商品里物品的词缀名（若有）；用于提示与名称前的词缀显示。 */
-function goodPrefixName(good: FishGood, dataset: Dataset | null): string | undefined {
-  const icon = goodIcon(good)
-  return icon?.prefix != null ? dataset?.prefixesById.get(icon.prefix)?.name : undefined
-}
-
-/** 网格格子：图标 + 名称 + 编号。图标取自 icon 字段（其次 desc 的 [i:..] 标签）。 */
-function GoodCell({
-  good,
-  dataset,
-  onSelect,
-}: {
-  good: FishGood
-  dataset: Dataset | null
-  onSelect: (good: FishGood) => void
-}) {
-  const prefixName = goodPrefixName(good, dataset)
-  return (
-    <Button
-      variant="ghost"
-      onClick={() => onSelect(good)}
-      aria-label={good.name}
-      className="grid h-auto cursor-pointer place-items-center gap-1 rounded-xl px-1.5 py-1.5 font-normal hover:-translate-y-0.5 hover:bg-primary/10"
-    >
-      <GoodThumb good={good} dataset={dataset} size={CELL_ICON_SIZE} />
-      <span className="w-full truncate text-center text-xs leading-4 text-foreground">
-        {prefixName ? <span className="text-warning">{prefixName} </span> : null}
-        {good.name}
-      </span>
-      <span className="font-pixel text-[10px] leading-none text-muted-foreground">#{good.serial}</span>
-    </Button>
-  )
-}
-
-/**
- * 商品图标：有物品标签用图集图标，否则用名称首字占位。
- * 只有**原生物品**（`desc` 带 `[i:..]`）悬停才显示物品提示；借来的识别图不显示。
- */
-function GoodThumb({ good, dataset, size }: { good: FishGood; dataset: Dataset | null; size: number }) {
-  const icon = goodIcon(good)
-  const item: Item | undefined = icon ? dataset?.itemsById.get(icon.itemId) : undefined
-  if (item) {
-    return (
-      <ItemIcon
-        item={item}
-        atlas={dataset?.atlas}
-        size={size}
-        stack={icon?.stack}
-        prefix={goodPrefixName(good, dataset)}
-        tooltip={goodIsNativeItem(good)}
-      />
-    )
-  }
-  return (
-    <span
-      className="grid shrink-0 place-items-center rounded-lg bg-accent/60 text-sm text-foreground"
-      style={{ width: size, height: size }}
-    >
-      {good.name.slice(0, 1) || '?'}
-    </span>
-  )
-}
-
 /** 固定标签列 + 内容，保证「价格 / 解锁 / 别名 / 商品 / 备注」左侧对齐。 */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2">
-      <dt className="mt-0.5 w-9 shrink-0 text-right text-[11px] text-muted-foreground">{label}</dt>
+      <dt className="mt-0.5 w-9 shrink-0 text-right text-2xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0 flex-1">{children}</dd>
     </div>
-  )
-}
-
-function Notice({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode
-  title: string
-  children?: React.ReactNode
-}) {
-  return (
-    <Alert variant="warning">
-      {icon}
-      <AlertTitle>{title}</AlertTitle>
-      {children && <AlertDescription>{children}</AlertDescription>}
-    </Alert>
   )
 }

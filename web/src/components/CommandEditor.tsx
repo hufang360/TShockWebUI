@@ -233,7 +233,7 @@ export function CommandEditor({
     <div className="relative">
       {paramHint && (
         <p
-          className="mb-1.5 truncate pl-4 font-pixel text-[11px] text-muted-foreground"
+          className="mb-1.5 truncate pl-4 font-pixel text-2xs text-muted-foreground"
           title={`/${paramHint}`}
         >
           /{paramHint}
@@ -333,7 +333,7 @@ export function CommandEditor({
                   ) : (
                     <span
                       className={cn(
-                        'grid size-[26px] shrink-0 place-items-center rounded-md font-pixel text-[11px]',
+                        'grid size-[26px] shrink-0 place-items-center rounded-md font-pixel text-2xs',
                         item.kind === 'command' ? 'bg-accent text-foreground' : 'bg-warning/25 text-foreground',
                       )}
                     >
@@ -354,7 +354,7 @@ export function CommandEditor({
                     {item.kind === 'command' && (
                       <span
                         className={cn(
-                          'mt-0.5 block truncate font-pixel text-[10px]',
+                          'mt-0.5 block truncate font-pixel text-2xs',
                           item.command?.permission ? 'text-warning' : 'text-muted-foreground',
                         )}
                       >
@@ -366,7 +366,7 @@ export function CommandEditor({
                   </span>
                   {item.inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
                   {item.kind === 'item' && (
-                    <span className="font-pixel text-[10px] text-muted-foreground">
+                    <span className="font-pixel text-2xs text-muted-foreground">
                       ID {(item.item?.id ?? 0)}
                     </span>
                   )}
@@ -378,7 +378,7 @@ export function CommandEditor({
               不放进滚动列表，避免选中最底部时被提示条遮住一半。 */}
           <div
             role="presentation"
-            className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground"
+            className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-1.5 text-2xs text-muted-foreground"
           >
             <span className="flex items-center gap-1">
               <Kbd>↑</Kbd>

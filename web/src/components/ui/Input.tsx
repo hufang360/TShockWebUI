@@ -22,7 +22,7 @@ export function Kbd({ className, children, ...props }: HTMLAttributes<HTMLElemen
       data-slot="kbd"
       className={cn(
         'inline-flex min-w-5 items-center justify-center rounded bg-accent px-1.5 py-0.5',
-        'font-pixel text-[10px] text-foreground',
+        'font-pixel text-2xs text-foreground',
         className,
       )}
       {...props}

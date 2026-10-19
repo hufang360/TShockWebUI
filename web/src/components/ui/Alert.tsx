@@ -53,7 +53,7 @@ export function AlertDescription({ className, ...props }: ComponentProps<'div'>)
     <div
       data-slot="alert-description"
       className={cn(
-        'col-start-2 grid justify-items-start gap-1 text-[11px] leading-4 text-current/80',
+        'col-start-2 grid justify-items-start gap-1 text-2xs leading-4 text-current/80',
         '[&_p]:leading-relaxed',
         className,
       )}

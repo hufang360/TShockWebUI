@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { Badge, Button, Spinner } from '@/components/ui'
+import { Badge, Button, Empty, EmptyDescription, Spinner } from '@/components/ui'
 import { CollapsibleCard } from '@/components/CollapsibleCard'
 import { useI18n } from '@/lib/i18n'
 import { TshockRequestError, type BackendTransport, type MeInfo, type SessionInfo } from '@/lib/tshock'
@@ -105,8 +105,8 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
           </Button>
         }
       >
-        <p className="text-[11px] text-muted-foreground">{t('account.unavailable')}</p>
-        <p className="mt-1 text-[11px] text-muted-foreground">{t('account.unavailableHint')}</p>
+        <p className="text-2xs text-muted-foreground">{t('account.unavailable')}</p>
+        <p className="mt-1 text-2xs text-muted-foreground">{t('account.unavailableHint')}</p>
       </CollapsibleCard>
     )
   }
@@ -144,13 +144,15 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
             )}
           </div>
           {sessions.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">{t('account.sessionsEmpty')}</p>
+            <Empty size="sm">
+              <EmptyDescription>{t('account.sessionsEmpty')}</EmptyDescription>
+            </Empty>
           ) : (
             <ul className="flex flex-col gap-1">
               {sessions.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-accent/40 px-2 py-1 text-[11px]"
+                  className="flex items-center justify-between gap-2 rounded-lg bg-accent/40 px-2 py-1 text-2xs"
                 >
                   {s.current ? (
                     <Badge tone="success">{t('account.current')}</Badge>
@@ -167,7 +169,7 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
             </ul>
           )}
         </div>
-        {notice && <p className="text-[11px] text-muted-foreground">{notice}</p>}
+        {notice && <p className="text-2xs text-muted-foreground">{notice}</p>}
     </CollapsibleCard>
   )
 }

@@ -134,15 +134,9 @@ describe('HomePage 卡片管理', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('卡片名称'), { target: { value: '全服 公告' } })
+    fireEvent.change(within(dialog).getByLabelText('指令'), { target: { value: 'say hello' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '添加' }))
-
-    const nameInput = within(dialog).getByPlaceholderText('卡片名称')
-    const cmdInput = within(dialog).getByPlaceholderText('/指令')
-    // 点击「添加」后自动聚焦到名称输入框。
-    expect(document.activeElement).toBe(nameInput)
-    fireEvent.change(nameInput, { target: { value: '全服 公告' } })
-    fireEvent.change(cmdInput, { target: { value: 'say hello' } })
-    fireEvent.blur(cmdInput)
 
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
     await waitFor(() => expect(screen.getByText('全服 公告')).toBeTruthy())
@@ -162,6 +156,7 @@ describe('HomePage 卡片管理', () => {
     const dialog = screen.getByRole('dialog')
     const row = within(dialog).getByRole('listitem', { name: '钓鲈鱼' })
     fireEvent.click(within(row).getByRole('button', { name: '删除卡片' }))
+    fireEvent.click(within(row).getByRole('button', { name: '确认删除' }))
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
 
     await waitFor(() => expect(screen.queryByText('钓鲈鱼')).toBeNull())

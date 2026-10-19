@@ -101,7 +101,7 @@ export function SidebarAccountMenu({
                 </span>
                 {mock && <Badge tone="mock">Mock</Badge>}
               </span>
-              <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
                 <span
                   className={cn(
                     'size-1.5 shrink-0 rounded-full',
@@ -121,7 +121,7 @@ export function SidebarAccountMenu({
               <span className="truncate text-xs font-semibold">
                 {username ?? t('account.notLoggedIn')}
               </span>
-              <span className="truncate text-[10px] font-normal text-muted-foreground">
+              <span className="truncate text-2xs font-normal text-muted-foreground">
                 {serverLabel}
               </span>
             </span>

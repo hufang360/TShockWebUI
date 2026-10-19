@@ -110,7 +110,7 @@ export function WebChatInput({
         </InputGroup>
       </form>
       {error ? (
-        <p className={cn('flex flex-wrap items-center gap-2 text-destructive', compact ? 'text-[10px]' : 'text-[11px]')}>
+        <p className={cn('flex flex-wrap items-center gap-2 text-destructive', compact ? 'text-2xs' : 'text-2xs')}>
           {error}
           {canRetry && (
             <button type="button" className="cursor-pointer underline underline-offset-2" onClick={() => void send()}>
@@ -119,7 +119,7 @@ export function WebChatInput({
           )}
         </p>
       ) : notice ? (
-        <p className={compact ? 'text-[10px] text-muted-foreground' : 'text-[11px] text-muted-foreground'}>{notice}</p>
+        <p className={compact ? 'text-2xs text-muted-foreground' : 'text-2xs text-muted-foreground'}>{notice}</p>
       ) : null}
     </div>
   )

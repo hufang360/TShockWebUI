@@ -128,7 +128,7 @@ export function CommandPickerPanel({
       {view === 'favorites' ? (
         <>
           <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
               {batch.active
                 ? t('batch.hint')
                 : t('favorites.commands', { n: filteredFavorites.length })}
@@ -184,7 +184,7 @@ export function CommandPickerPanel({
                         )}
                       >
                         {batch.active && <SelectIndicator checked={batch.has(key)} />}
-                        <code className="min-w-0 flex-1 truncate text-left font-pixel text-[11px] text-foreground">
+                        <code className="min-w-0 flex-1 truncate text-left font-pixel text-2xs text-foreground">
                           {fav.cmd}
                         </code>
                       </Button>
@@ -198,7 +198,7 @@ export function CommandPickerPanel({
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <section className="flex flex-col gap-1.5">
-            <h3 className="text-[11px] text-muted-foreground">
+            <h3 className="text-2xs text-muted-foreground">
               {t('cmd.all', { n: commands.length })}
             </h3>
             <ul>
@@ -222,7 +222,7 @@ export function CommandPickerPanel({
                         <span className="font-pixel text-xs text-foreground">/{cmd.name}</span>
                         {inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
                       </span>
-                      <span className="block w-full truncate text-left text-[10px] text-muted-foreground">
+                      <span className="block w-full truncate text-left text-2xs text-muted-foreground">
                         {cmd.helpZh ?? cmd.help}
                       </span>
                     </Button>
@@ -230,7 +230,7 @@ export function CommandPickerPanel({
                 )
               })}
               {commands.length === 0 && (
-                <li className="px-2 py-2 text-[11px] text-muted-foreground">{t('cmd.noMatch')}</li>
+                <li className="px-2 py-2 text-2xs text-muted-foreground">{t('cmd.noMatch')}</li>
               )}
             </ul>
           </section>

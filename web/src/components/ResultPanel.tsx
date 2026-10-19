@@ -231,7 +231,7 @@ function ResultItem({
               {abnormal && (
                 <Badge tone={STATUS_TONE[result.status]}>{t(`status.${result.status}`)}</Badge>
               )}
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-2xs text-muted-foreground">
                 {new Date(entry.ts).toLocaleTimeString()}
               </span>
             </div>

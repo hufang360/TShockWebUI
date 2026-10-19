@@ -127,9 +127,11 @@ describe('ServerSwitcherDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it('删除已保存的上游', () => {
+  it('删除已保存的上游需要二次确认', () => {
     const { onRemove } = renderDialog({ servers: [saved] })
     fireEvent.click(screen.getByRole('button', { name: '删除' }))
+    expect(onRemove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
     expect(onRemove).toHaveBeenCalledWith(saved.id)
   })
 

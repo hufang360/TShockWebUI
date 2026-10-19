@@ -20,10 +20,10 @@ export function TagAssist({ dataset, text }: { dataset: Dataset; text: string })
   return (
     <div className="rounded-xl bg-accent/50 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] tracking-wide text-muted-foreground uppercase">
+        <span className="text-2xs tracking-wide text-muted-foreground uppercase">
           {t('tag.title')}
         </span>
-        <span className="text-[11px] text-muted-foreground">{t('tag.count', { n: tags.length })}</span>
+        <span className="text-2xs text-muted-foreground">{t('tag.count', { n: tags.length })}</span>
       </div>
       <ul className="flex flex-wrap gap-2">
         {tags.map((tag) => {
@@ -46,7 +46,7 @@ export function TagAssist({ dataset, text }: { dataset: Dataset; text: string })
                 <span className="block text-xs text-foreground">
                   {item ? item.name : t('tag.unknown', { id: tag.itemId })}
                 </span>
-                <span className="block font-pixel text-[10px] text-muted-foreground">
+                <span className="block font-pixel text-2xs text-muted-foreground">
                   ID {tag.itemId}
                   {tag.stack != null && ` × ${tag.stack}`}
                   {prefix && ` · ${prefix}`}

@@ -75,9 +75,9 @@ export function PluginDiagnosticsCard({ transport, serverId }: PluginDiagnostics
       }
     >
       {checking && !status ? (
-        <p className="text-[11px] text-muted-foreground">{t('plugins.checking')}</p>
+        <p className="text-2xs text-muted-foreground">{t('plugins.checking')}</p>
       ) : !status ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-2xs text-muted-foreground">
           {failed ? t('plugins.checkFailed') : t('plugins.checking')}
         </p>
       ) : (
@@ -94,14 +94,14 @@ export function PluginDiagnosticsCard({ transport, serverId }: PluginDiagnostics
             )}
             {status.legacy && <Badge tone="warn">{t('plugins.legacy')}</Badge>}
           </div>
-          <p className={status.compatible && !status.legacy ? 'text-[11px] text-muted-foreground' : 'text-[11px] text-warning'}>
+          <p className={status.compatible && !status.legacy ? 'text-2xs text-muted-foreground' : 'text-2xs text-warning'}>
             {t(reasonKey)}
           </p>
           {missing.length > 0 && (
-            <p className="text-[11px] text-warning">{t('plugins.missing', { list: missing.join(', ') })}</p>
+            <p className="text-2xs text-warning">{t('plugins.missing', { list: missing.join(', ') })}</p>
           )}
           {status.capabilities.length > 0 && (
-            <p className="font-pixel text-[10px] break-all text-muted-foreground">
+            <p className="font-pixel text-2xs break-all text-muted-foreground">
               {t('plugins.capabilities', { list: status.capabilities.join(', ') })}
             </p>
           )}

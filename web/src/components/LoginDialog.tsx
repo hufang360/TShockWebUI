@@ -395,7 +395,7 @@ export function LoginDialog({
                       <AlertDescription className="min-w-0 justify-items-stretch">
                         <p>{t('login.permissionHint')}</p>
                         <div className="mt-1 flex w-full min-w-0 items-center gap-2">
-                          <code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-1 font-pixel text-[10px]">
+                          <code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-1 font-pixel text-2xs">
                             {PERM_COMMAND}
                           </code>
                           <Button size="sm" variant="ghost" onClick={() => void copyPermCommand()}>
@@ -506,11 +506,11 @@ export function LoginDialog({
                     onFocusOutside={() => setHelpOpen(false)}
                     onInteractOutside={() => setHelpOpen(false)}
                   >
-                    <p className="text-[11px] leading-4 whitespace-pre-line text-foreground/70">
+                    <p className="text-2xs leading-4 whitespace-pre-line text-foreground/70">
                       {helpText}
                     </p>
                     {mode === 'password' && !transport.mock && (
-                      <p className="pt-1.5 text-[11px] leading-4 whitespace-pre-line text-foreground/70">
+                      <p className="pt-1.5 text-2xs leading-4 whitespace-pre-line text-foreground/70">
                         {t('login.help.registerHint')}
                       </p>
                     )}

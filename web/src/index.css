@@ -137,6 +137,9 @@
   --radius-xl: calc(var(--radius) + 4px);
   /* 项目自定义：等宽像素字体（非颜色） */
   --font-pixel: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  /* 微字号刻度：辅助文字统一用 text-2xs（11px），正文用 text-xs（12px）。
+     不要再用 text-[10px] / text-[11px] 任意值（例外：Terraria 物品提示的 15px 游戏字号）。 */
+  --text-2xs: 0.6875rem;
 }
 
 @layer base {

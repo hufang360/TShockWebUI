@@ -15,6 +15,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { ConfirmButton } from '@/components/ConfirmButton'
 import {
   BUILTIN_ID,
   DEFAULT_TSHOCK_PORT,
@@ -242,16 +243,16 @@ export function ServerSwitcherDialog({
                   <Pencil data-icon="inline-start" />
                 </Button>
               )}
-              <Button
+              <ConfirmButton
                 size="icon-sm"
                 variant="ghost"
                 className="mr-1 shrink-0"
                 aria-label={t('servers.remove')}
                 title={t('servers.remove')}
-                onClick={() => onRemove(s.id)}
-              >
-                <Trash2 data-icon="inline-start" />
-              </Button>
+                onConfirm={() => onRemove(s.id)}
+                confirmLabel={t('action.deleteConfirm')}
+                icon={<Trash2 data-icon="inline-start" />}
+              />
             </li>
           ))}
         </ul>
@@ -263,7 +264,7 @@ export function ServerSwitcherDialog({
               {t('servers.addServer')}
             </Button>
           ) : (
-            <p className="text-[10px] text-muted-foreground">{t('servers.customDisabled')}</p>
+            <p className="text-2xs text-muted-foreground">{t('servers.customDisabled')}</p>
           )
         ) : (
           <div className="flex flex-col gap-2">
@@ -322,7 +323,7 @@ export function ServerSwitcherDialog({
                 {t('servers.https')}
               </FieldLabel>
             </div>
-            {error && <p className="text-[10px] text-destructive">{error}</p>}
+            {error && <p className="text-2xs text-destructive">{error}</p>}
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={resetForm}>
                 {t('action.cancel')}

@@ -226,7 +226,7 @@ export function FishCommandCards({
         <div className="flex items-center gap-2">
           {lastRefreshAt && (
             <span
-              className="text-[11px] text-muted-foreground"
+              className="text-2xs text-muted-foreground"
               title={new Date(lastRefreshAt).toLocaleString()}
             >
               {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}

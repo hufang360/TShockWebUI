@@ -64,7 +64,7 @@
 | --- | --- | --- |
 | `scripts/build-binary.ps1` 未在 Windows 实机验证 | 只做了语法复核（本机无 pwsh）；README 已标注 | 待定 |
 | Windows 二进制未在 Windows 上运行 | 只验证了能交叉编译出 `tswui.exe`（15MB） | 待定 |
-| 前端 i18n 键需人工对齐 zh/en | `i18n.tsx` 两份字面量，无「键集合一致性」测试 | 待定（可加一个单测：两语言的 key 集合相等） |
+| 前端 i18n 键需人工对齐 zh/en | 已加 `web/src/lib/i18n.test.ts`：校验 zh/en 键集合与占位符一致（`dicts` 导出以便测试） | 已完成 |
 | 命令执行限流按会话计数 | 多标签页共享额度（符合「每个玩家」语义）；如需按标签页可再议 | 已完成，仅备注 |
 
 ---
@@ -75,13 +75,13 @@
 
 | 项 | 现状 / 证据 | 方案 | 状态 |
 | --- | --- | --- | --- |
-| 抽共享 `CardManagerSheet`，彻底统一「管理卡片」 | 首页 `HomeCardManager` 与模块/鱼店 `ModuleCardManagerDialog` 两套交互（自动执行控件、添加流程、排序/可见性、底部操作区均不一致；首页 `Checkbox`→`Switch` 已先统一） | 抽一个可配置的卡片管理 Sheet（添加=底部表单、自动执行=Switch、删除、说明；排序/可见性/恢复默认作为可选能力注入），两处复用 | 待定（P1） |
-| 微型字号刻度统一 | `text-[10px]`(44) + `text-[11px]`(47) 任意值泛滥，与 12/14px 刻度脱节 | 在 `index.css` 定义 2 个微字号刻度（如 `text-2xs`）并全站替换 | 待定（P2） |
-| 空态统一 | 已有 `Empty`(33 处)，仍有裸 `<p>`（recentEmpty / eventsEmpty / cards.empty / sessionsEmpty / noMatch） | 统一 `Empty`（可加紧凑变体） | 待定（P2） |
-| 破坏性删除确认一致 | 清空类用 `ConfirmButton`；模块卡片 / 自定义模块 / 服务器是单击即删 | 不能撤销的用 `ConfirmButton`；可撤销的用「删除 + 撤销」 | 待定（P2） |
-| 手写彩色提示改 `Alert` | `PlayerManagerPage:529`、`FishShopPage:611` | 改 `Alert variant="destructive|success"` | 待定（P3） |
-| 巨型组件拆分 | `PlayerManagerPage` 1057 / `ItemsPage` 868 / `HomePage` 839 / `App` 827 行… | 按数据/视图/子面板拆分 | 待定（P2） |
-| 首页卡片拖拽无障碍 | 原生 HTML5 DnD，无键盘可达 | dnd-kit 或键盘上移/下移 | 待定（P2） |
+| 抽共享 `CardManagerSheet`，彻底统一「管理卡片」 | 首页 `HomeCardManager` 与模块/鱼店 `ModuleCardManagerDialog` 都改为复用共享 `components/CardManagerSheet.tsx`（添加=底部表单、自动执行=`Switch`、删除=`ConfirmButton`；排序/可见性/恢复默认按需注入） | 已完成 |
+| 微型字号刻度统一 | 已在 `index.css` 定义 `--text-2xs`(11px)；全站 `text-[10px]`/`text-[11px]`（共 99 处）→ `text-2xs`，与 `text-xs`(12px) 组成两级微字号刻度（例外：Terraria 物品提示的 15px 游戏字号） | 已完成 |
+| 空态统一 | `Empty` 新增 `size="sm"` 紧凑变体；`recentEmpty` / `eventsEmpty` / `cards.empty` / `sessionsEmpty` / `noMatch` 裸 `<p>` 已改用 `Empty`+`EmptyDescription` | 已完成 |
+| 破坏性删除确认一致 | 模块卡片 / 自定义模块 / 服务器 / 首页自定义卡片改为 `ConfirmButton` 二次确认（新增 `action.deleteConfirm`）；`ConfirmButton` 的 `children` 改可选以支持纯图标按钮 | 已完成 |
+| 手写彩色提示改 `Alert` | `PlayerManagerPage`（错误）、`FishShopPage`（购买成功）已改为 `Alert variant="destructive|success"` | 已完成 |
+| 巨型组件拆分 | PlayerManagerPage 1057→597（抽 `player/PlayerLookView` + 共享 `Notice`）、CodexPage 819→476（`codex/CodexViews`）、FishShopPage 781→663（`fishshop/GoodCells`）、CommandPage 712→574（`command/HistoryPanel`）、ItemsPage 抽 `items/DexCell`、HomePage 抽 `home/commandCards` | **部分完成**；剩余 `App`(865) / `ItemsPage`(939) / `HomePage`(835) / `SettingsPage`(611) 待后续 |
+| 首页卡片拖拽无障碍 | 原生 HTML5 DnD + `GripVertical` 手柄之外，新增「上移 / 下移」图标按钮（键盘 / 触屏可用，首尾禁用），见 `components/CardManagerSheet.tsx` | 已完成 |
 | 事件流 SSE 推送 + 可选持久化 + 更多事件类型 | 统一聊天模型（`type=chat` + `source=game\|webui`）已完成；现仍为轮询 | SSE 推送（REST 降级）；有上限的追加文件保存历史；更多事件类型 + 前端过滤/高亮 | 待定（研究） |
 | 网页聊天：回复/引用 + 导航可排序 + 骨架屏 | 消息模型（`id`/`time` + 失败重试）已完成 | 点消息引用、侧栏拖拽排序、大块内容骨架 | 待定（P3） |
 | 插件能力探测重复 | `batchCapabilities` 在多处各自探测 | 收敛为统一能力矩阵（可与 `/api/plugin/status` 合并） | 待定（P3） |

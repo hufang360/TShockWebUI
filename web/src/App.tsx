@@ -566,7 +566,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     <div className="flex flex-col">
       {transport.mock && (
         <Alert variant="info" className="rounded-none px-4 py-1.5">
-          <AlertDescription className="flex flex-wrap items-center gap-2 text-[11px] text-foreground">
+          <AlertDescription className="flex flex-wrap items-center gap-2 text-2xs text-foreground">
             <Badge tone="mock">Mock</Badge>
             <span>{t('app.mockBanner', { label: transport.label })}</span>
           </AlertDescription>
@@ -574,7 +574,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       )}
       {versionMismatch && (
         <Alert variant="warning" className="rounded-none px-4 py-1.5">
-          <AlertDescription className="text-[11px]">
+          <AlertDescription className="text-2xs">
             {t('app.versionMismatch', {
               server: status?.serverversion ?? '?',
               data: dataset.meta.gameVersion,
@@ -584,7 +584,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       )}
       {notice && (
         <Alert variant="default" className="rounded-none px-4 py-1.5">
-          <AlertDescription className="flex items-center justify-between gap-2 text-[11px] text-foreground">
+          <AlertDescription className="flex items-center justify-between gap-2 text-2xs text-foreground">
             <span>{notice}</span>
             <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>
               {t('app.gotIt')}

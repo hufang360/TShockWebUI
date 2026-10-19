@@ -80,7 +80,7 @@ export function DropdownMenuShortcut({ className, ...props }: ComponentProps<'sp
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn('ml-auto text-[10px] tracking-widest text-muted-foreground', className)}
+      className={cn('ml-auto text-2xs tracking-widest text-muted-foreground', className)}
       {...props}
     />
   )

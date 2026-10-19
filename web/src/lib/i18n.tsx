@@ -43,6 +43,7 @@ const zh: Dict = {
   'action.cancel': '取消',
   'action.clearConfirm': '确认清空',
   'action.delete': '删除',
+  'action.deleteConfirm': '确认删除',
   'action.deleteCount': '删除（{n}）',
   'action.dedupeConfirm': '确认去重',
   'action.close': '关闭',
@@ -293,8 +294,11 @@ const zh: Dict = {
   'home.manageNoCommand': '无指令',
   'home.manageUntitled': '未命名卡片',
   'home.manageNamePlaceholder': '卡片名称',
+  'home.manageCommand': '指令',
   'home.manageCommandPlaceholder': '/指令',
   'home.manageDrag': '拖动排序',
+  'home.manageMoveUp': '上移',
+  'home.manageMoveDown': '下移',
   'home.manageHide': '隐藏',
   'home.manageShow': '显示',
   'home.manageDelete': '删除卡片',
@@ -522,6 +526,7 @@ const zh: Dict = {
   'modules.cards.command': '指令',
   'modules.cards.commandPlaceholder': '/指令',
   'modules.cards.remove': '删除卡片',
+  'modules.cards.done': '完成',
   'modules.cards.empty': '暂无卡片。点「添加卡片」填名称与指令即可。',
   'page.world.desc': '世界信息 / Boss 进度 / 复活 NPC / 清理墓碑（依赖 WorldModify 插件，权限由 TShock 判定）。',
 
@@ -703,6 +708,7 @@ const en: Dict = {
   'action.cancel': 'Cancel',
   'action.clearConfirm': 'Confirm clear',
   'action.delete': 'Delete',
+  'action.deleteConfirm': 'Confirm delete',
   'action.deleteCount': 'Delete ({n})',
   'action.dedupeConfirm': 'Confirm dedupe',
   'action.close': 'Close',
@@ -953,8 +959,11 @@ const en: Dict = {
   'home.manageNoCommand': 'No command',
   'home.manageUntitled': 'Untitled card',
   'home.manageNamePlaceholder': 'Card name',
+  'home.manageCommand': 'Command',
   'home.manageCommandPlaceholder': '/command',
   'home.manageDrag': 'Drag to reorder',
+  'home.manageMoveUp': 'Move up',
+  'home.manageMoveDown': 'Move down',
   'home.manageHide': 'Hide',
   'home.manageShow': 'Show',
   'home.manageDelete': 'Delete card',
@@ -1182,6 +1191,7 @@ const en: Dict = {
   'modules.cards.command': 'Command',
   'modules.cards.commandPlaceholder': '/command',
   'modules.cards.remove': 'Remove card',
+  'modules.cards.done': 'Done',
   'modules.cards.empty': 'No cards yet. Use "Add card" to enter a name and command.',
   'page.world.desc': 'World info / boss progress / relive NPCs / clear tombstones (WorldModify plugin; permissions by TShock).',
 
@@ -1326,7 +1336,7 @@ const en: Dict = {
   'editor.notLoggedIn': 'Please sign in before running commands',
 }
 
-const dicts: Record<Lang, Dict> = { zh, en }
+export const dicts: Record<Lang, Dict> = { zh, en }
 
 /** 非组件场景（如 App 构造 banner）也可用的翻译函数。 */
 export function translate(

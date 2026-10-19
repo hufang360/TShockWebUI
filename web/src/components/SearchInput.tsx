@@ -166,7 +166,7 @@ export function SearchInput({
           data-testid="search-history-list"
           className="absolute top-full left-0 z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-xl bg-popover py-1 shadow-xl"
         >
-          <li className="px-3 py-1 text-[10px] text-muted-foreground">
+          <li className="px-3 py-1 text-2xs text-muted-foreground">
             {historyHeader ?? t('search.recent')}
           </li>
           {shown.map((h) => (

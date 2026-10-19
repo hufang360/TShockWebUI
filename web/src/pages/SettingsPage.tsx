@@ -20,6 +20,7 @@ import {
   ToggleGroupItem,
 } from '@/components/ui'
 import { CollapseChevron } from '@/components/CollapseChevron'
+import { ConfirmButton } from '@/components/ConfirmButton'
 import { CollapsibleCard } from '@/components/CollapsibleCard'
 import { LoginGate } from '@/components/LoginGate'
 import { useI18n } from '@/lib/i18n'
@@ -253,7 +254,7 @@ export function SettingsPage({
           <p className="text-xs text-muted-foreground">{t('settings.note')}</p>
         </div>
         <LoginGate onLogin={onLogin} />
-        <p className="pt-1 text-center text-[10px] text-muted-foreground">TShockWebUI {APP_VERSION}</p>
+        <p className="pt-1 text-center text-2xs text-muted-foreground">TShockWebUI {APP_VERSION}</p>
       </div>
     )
   }
@@ -279,7 +280,7 @@ export function SettingsPage({
         }
       >
         <CollapsibleGroup title={t('modules.tab.builtin')}>
-          <p className="text-[11px] text-muted-foreground">{t('modules.activateHint')}</p>
+          <p className="text-2xs text-muted-foreground">{t('modules.activateHint')}</p>
           <ul className="flex flex-col gap-2">
             {MODULE_DEFS.map((def) => {
               const cap = caps[def.id]
@@ -295,15 +296,15 @@ export function SettingsPage({
                       <span className="text-sm text-foreground">{t(def.titleKey)}</span>
                       <CapBadge status={cap.status} text={statusText(cap.status)} />
                     </div>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">{t(def.requiresKey)}</p>
+                    <p className="mt-0.5 text-2xs text-muted-foreground">{t(def.requiresKey)}</p>
                     {cap.status === 'error' && cap.message && (
-                      <p className="mt-0.5 flex items-center gap-1 text-[10px] text-destructive">
+                      <p className="mt-0.5 flex items-center gap-1 text-2xs text-destructive">
                         <AlertTriangle className="size-3" />
                         {cap.message}
                       </p>
                     )}
                     {cap.status === 'no-permission' && (
-                      <p className="mt-0.5 flex items-center gap-1 text-[10px] text-warning">
+                      <p className="mt-0.5 flex items-center gap-1 text-2xs text-warning">
                         <ShieldAlert className="size-3" />
                         {t('modules.noPermissionHint')}
                       </p>
@@ -323,11 +324,11 @@ export function SettingsPage({
               )
             })}
           </ul>
-          <p className="text-[10px] text-muted-foreground">{t('modules.note')}</p>
+          <p className="text-2xs text-muted-foreground">{t('modules.note')}</p>
         </CollapsibleGroup>
 
         <CollapsibleGroup title={t('modules.tab.custom')}>
-            <p className="text-[11px] text-muted-foreground">{t('modules.custom.hint')}</p>
+            <p className="text-2xs text-muted-foreground">{t('modules.custom.hint')}</p>
             <div className="flex flex-col gap-2">
             {customModules.length > 0 && (
               <ul className="flex flex-col gap-2">
@@ -351,17 +352,17 @@ export function SettingsPage({
                         onCheckedChange={(v) => toggle(mod.id, v)}
                         aria-label={mod.name || t('modules.custom.untitled')}
                       />
-                      <Button
+                      <ConfirmButton
                         size="icon-sm"
                         variant="ghost"
                         aria-label={t('modules.custom.remove')}
                         title={t('modules.custom.remove')}
-                        onClick={() =>
+                        onConfirm={() =>
                           onCustomModulesChange(customModules.filter((x) => x.id !== mod.id))
                         }
-                      >
-                        <Trash2 aria-hidden />
-                      </Button>
+                        confirmLabel={t('action.deleteConfirm')}
+                        icon={<Trash2 aria-hidden />}
+                      />
                     </div>
                     {/* 主指令可直接改：改时会同步更新自动生成的「帮助」卡片。 */}
                     <Input
@@ -518,7 +519,7 @@ export function SettingsPage({
               </NativeSelect>
             </Field>
             {!canFastEvents && (
-              <p className="text-[10px] leading-4 text-muted-foreground">
+              <p className="text-2xs leading-4 text-muted-foreground">
                 {t('settings.eventsIntervalFastHint')}
               </p>
             )}
@@ -550,7 +551,7 @@ export function SettingsPage({
           <Field orientation="horizontal" className="flex-nowrap items-center justify-between gap-3 py-2">
             <div className="flex flex-col gap-0.5">
               <FieldTitle>{t('home.batch')}</FieldTitle>
-              <p className="text-[10px] leading-4 text-muted-foreground">
+              <p className="text-2xs leading-4 text-muted-foreground">
                 {batchPlugin === true ? t('home.batchHint') : t('home.batchUnavailable')}
               </p>
             </div>
@@ -576,7 +577,7 @@ export function SettingsPage({
       </div>
 
       {/* 底部版本号 */}
-      <p className="pt-1 text-center text-[10px] text-muted-foreground">TShockWebUI {APP_VERSION}</p>
+      <p className="pt-1 text-center text-2xs text-muted-foreground">TShockWebUI {APP_VERSION}</p>
     </div>
   )
 }

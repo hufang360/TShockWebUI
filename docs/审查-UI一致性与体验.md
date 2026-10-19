@@ -114,12 +114,18 @@
 | 网页聊天消息模型（§2.2.1） | `/webui/chat` 返回 `id`/`time`/`source`；前端失败保留输入、可就地「重试」，不造假成功 |
 | 前缀可配（§2.2.3） | 插件配置 `ChatPrefix`（默认 `[WebUI]`），不再硬编码 |
 | 发言入口可发现性（§2.2.5） | 抽出共享 `components/WebChatInput.tsx`；当时首页「服务器动态」卡片底部也放了入口。**后续改动**：首页卡片太小，已移除首页入口，回复玩家统一在「指令 → 动态」 |
+| 手写彩色提示改 `Alert`（U5） | `PlayerManagerPage` 错误提示、`FishShopPage` 购买成功提示去掉手写 `bg-destructive/15`、`bg-success/15` div，改用 `Alert variant="destructive|success"` |
+| i18n 键一致性单测 | 新增 `web/src/lib/i18n.test.ts`：zh/en 键集合相等 + 同键占位符一致 |
+| 抽共享 `CardManagerSheet`（U1） | 新增 `components/CardManagerSheet.tsx`；首页 `HomeCardManager` 与模块/鱼店 `ModuleCardManagerDialog` 都改为复用：添加=底部表单、自动执行=`Switch`、删除=`ConfirmButton`、说明；排序/可见性/恢复默认按需注入 |
+| 微型字号刻度统一（U2） | `index.css` 新增 `--text-2xs`（11px）；全站 `text-[10px]`/`text-[11px]`（共 99 处）→ `text-2xs` |
+| 空态统一（U3） | `Empty` 新增 `size="sm"`；`recentEmpty` / `eventsEmpty` / `cards.empty` / `sessionsEmpty` / `noMatch` 裸 `<p>` 改用 `Empty`+`EmptyDescription` |
+| 破坏性删除确认一致（U4） | 模块卡片 / 自定义模块 / 服务器 / 首页自定义卡片改 `ConfirmButton` 二次确认（新增 `action.deleteConfirm`） |
+| 首页卡片拖拽无障碍（U7） | `CardManagerSheet` 在拖拽手柄外新增「上移 / 下移」按钮（首尾禁用），键盘 / 触屏可用 |
+| 巨型组件拆分（U6，部分） | 新增 `components/player/PlayerLookView.tsx`、`components/codex/CodexViews.tsx`、`components/fishshop/GoodCells.tsx`、`components/command/HistoryPanel.tsx`、`components/items/DexCell.tsx`、`components/home/commandCards.tsx`、共享 `components/Notice.tsx`；PlayerManagerPage 1057→597、CodexPage 819→476、FishShopPage 781→663、CommandPage 712→574 |
 
 ## 6. 待分解（roadmap → 详见 `docs/TODO.md`）
 
-- P4-1 抽共享 `CardManagerSheet`，彻底统一「管理卡片」（U1）。
-- P4-2 微型字号刻度统一（U2）。
-- P4-3 空态 / 破坏性确认 / `Alert` 收敛（U3/U4/U5）。
-- P4-4 巨型组件拆分（U6）。
+- U1/U2/U3/U4/U5/U7：**已完成**（见 §5）。
+- U6 巨型组件拆分：**部分完成**（PlayerManagerPage / CodexPage / FishShopPage / CommandPage 已拆，并抽了 `DexCell` / `commandCards` / 共享 `Notice`）；剩余 `App`(865) / `ItemsPage`(939) / `HomePage`(835) / `SettingsPage`(611)。
 - P4-5 事件流：**SSE 推送**（统一模型已完成）、可选持久化、更多事件类型 + 前端过滤/高亮（§2.1）。
 - P4-6 网页聊天：回复/引用、导航可排序、加载骨架（消息模型已完成）（§2.2/§2.3）。

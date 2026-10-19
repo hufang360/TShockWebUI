@@ -4,8 +4,8 @@ import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 
 interface ConfirmButtonProps {
-  /** 未确认时按钮上的内容。 */
-  children: ReactNode
+  /** 未确认时按钮上的内容（图标按钮可留空）。 */
+  children?: ReactNode
   /** 二次确认按钮上的文案（如「确认清空」）。 */
   confirmLabel: ReactNode
   onConfirm: () => void

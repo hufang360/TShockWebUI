@@ -122,8 +122,8 @@ function QueueItem({
         <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[11px] text-foreground">{label}</div>
-        <code className="mt-0.5 block break-all font-pixel text-[10px] text-muted-foreground">
+        <div className="truncate text-2xs text-foreground">{label}</div>
+        <code className="mt-0.5 block break-all font-pixel text-2xs text-muted-foreground">
           {command}
         </code>
       </div>
@@ -139,7 +139,7 @@ function QueueItem({
           <X data-icon="inline-start" />
         </Button>
       ) : (
-        <span className="shrink-0 text-[10px] text-muted-foreground">{t('queue.running')}</span>
+        <span className="shrink-0 text-2xs text-muted-foreground">{t('queue.running')}</span>
       )}
     </li>
   )

@@ -137,7 +137,9 @@ export function ItemSearchPanel({
               </EmptyHeader>
             </Empty>
           ) : (
-            <p className="p-3 text-xs text-muted-foreground">{t('items.noMatch')}</p>
+            <Empty size="sm" className="p-3">
+              <EmptyDescription>{t('items.noMatch')}</EmptyDescription>
+            </Empty>
           )
         ) : (
           <ul>
@@ -159,11 +161,11 @@ export function ItemSearchPanel({
                   <ItemIcon item={item} atlas={dataset.atlas} size={24} />
                   <span className="min-w-0 flex-1 text-left">
                     <span className="block truncate text-sm text-foreground">{item.name}</span>
-                    <span className="block truncate font-pixel text-[10px] text-muted-foreground">
+                    <span className="block truncate font-pixel text-2xs text-muted-foreground">
                       {item.key}
                     </span>
                   </span>
-                  <span className="font-pixel text-[11px] text-muted-foreground">{item.id}</span>
+                  <span className="font-pixel text-2xs text-muted-foreground">{item.id}</span>
                 </Button>
               </li>
             ))}
@@ -177,7 +179,7 @@ export function ItemSearchPanel({
             <ItemIcon item={selected} atlas={dataset.atlas} size={40} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">{selected.name}</p>
-              <p className="truncate font-pixel text-[11px] text-muted-foreground">
+              <p className="truncate font-pixel text-2xs text-muted-foreground">
                 {selected.id} · {selected.key}
               </p>
             </div>

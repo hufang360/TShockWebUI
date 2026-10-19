@@ -3,22 +3,17 @@ import type { ReactNode } from 'react'
 import {
   Activity,
   ArrowRight,
-  Backpack,
   BookOpen,
-  Clock,
-  Crown,
   Fish,
-  Globe2,
   History,
   RefreshCw,
   Server,
   Settings,
-  Skull,
   SlidersHorizontal,
-  Swords,
   Terminal,
   Users,
 } from 'lucide-react'
+import { COMMAND_CARD_BY_ID, type CommandCardId } from '@/components/home/commandCards'
 import { HomeCardManager } from '@/components/HomeCardManager'
 import { CommandCard } from '@/components/CommandCard'
 import { LoginGate } from '@/components/LoginGate'
@@ -31,6 +26,8 @@ import {
   CardBody,
   CardHeader,
   CardTitle,
+  Empty,
+  EmptyDescription,
   Separator,
   Spinner,
 } from '@/components/ui'
@@ -61,38 +58,6 @@ import { useI18n } from '@/lib/i18n'
 import { readJson, StorageKeys, writeJson } from '@/lib/storage'
 import { resultFromError, TshockRequestError, type BackendTransport, type ServerStatus } from '@/lib/tshock'
 import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
-
-/** 会自动执行、可获取数据的内置指令卡片。 */
-type CommandCardId = Extract<
-  BuiltinCardId,
-  'online' | 'time' | 'world' | 'bossinfo' | 'bossdamage' | 'alldeath' | 'lookbag'
->
-
-interface CommandCardDef {
-  id: CommandCardId
-  icon: ReactNode
-  /** 按当前用户名生成要执行的指令；返回 null 表示缺必要信息（如未登录）。 */
-  cmd: (username: string | null) => string | null
-  /** 卡片底部备注（可选）。 */
-  noteKey?: string
-}
-
-const COMMAND_CARDS: CommandCardDef[] = [
-  { id: 'online', icon: <Users />, cmd: () => '/who' },
-  { id: 'time', icon: <Clock />, cmd: () => '/time' },
-  { id: 'world', icon: <Globe2 />, cmd: () => '/worldinfo' },
-  { id: 'bossinfo', icon: <Crown />, cmd: () => '/bossinfo' },
-  { id: 'bossdamage', icon: <Swords />, cmd: () => '/bossdamage' },
-  { id: 'alldeath', icon: <Skull />, cmd: () => '/alldeath', noteKey: 'home.alldeathNote' },
-  {
-    id: 'lookbag',
-    icon: <Backpack />,
-    // /lookbag 需要一个玩家名；「我的背包」用当前登录用户名。
-    cmd: (username) => (username ? `/lookbag ${username}` : null),
-  },
-]
-
-const COMMAND_CARD_BY_ID = new Map(COMMAND_CARDS.map((c) => [c.id, c]))
 
 /** 右栏「概览」卡片（固定放在右列，顺序：服务器状态 / 服务器动态 / 快捷入口 / 最近执行）。 */
 const RIGHT_COLUMN_IDS = new Set<string>(['server', 'events', 'quick', 'recent'])
@@ -516,7 +481,7 @@ export function HomePage({
       unavailable: !authenticated || !cmd,
       onRefresh: cmd ? () => queueCommand(id, cmd) : undefined,
       footerNote: def.noteKey ? (
-        <span className="text-[10px] leading-4 text-muted-foreground">{t(def.noteKey)}</span>
+        <span className="text-2xs leading-4 text-muted-foreground">{t(def.noteKey)}</span>
       ) : undefined,
     })
   }
@@ -550,7 +515,7 @@ export function HomePage({
       unavailable: !authenticated,
       emptyText: t('home.customClickRefresh'),
       onRefresh: () => queueCustomCommand(id, title, cmd),
-      footerNote: <span className="text-[10px] leading-4 text-muted-foreground">{t('home.customNoAuto')}</span>,
+      footerNote: <span className="text-2xs leading-4 text-muted-foreground">{t('home.customNoAuto')}</span>,
     })
   }
 
@@ -606,7 +571,7 @@ export function HomePage({
           </dl>
         )}
         {lastStatusAt && (
-          <p className="mt-2 text-[10px] text-muted-foreground">
+          <p className="mt-2 text-2xs text-muted-foreground">
             {t('home.lastRefresh', { time: new Date(lastStatusAt).toLocaleTimeString() })}
           </p>
         )}
@@ -674,7 +639,9 @@ export function HomePage({
       </CardHeader>
       <CardBody className="flex-1 overflow-y-auto">
         {recent.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t('home.recentEmpty')}</p>
+          <Empty size="sm">
+            <EmptyDescription>{t('home.recentEmpty')}</EmptyDescription>
+          </Empty>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {recent.map((h) => (
@@ -795,7 +762,7 @@ export function HomePage({
         <div className="flex items-center gap-2">
           {lastRefreshAt && (
             <span
-              className="hidden text-[11px] text-muted-foreground sm:inline"
+              className="hidden text-2xs text-muted-foreground sm:inline"
               title={new Date(lastRefreshAt).toLocaleString()}
             >
               {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
@@ -833,7 +800,7 @@ export function HomePage({
       </div>
 
       {transport.mock && (
-        <p className="text-center text-[11px] text-muted-foreground">{t('home.mockNote')}</p>
+        <p className="text-center text-2xs text-muted-foreground">{t('home.mockNote')}</p>
       )}
 
       <HomeCardManager

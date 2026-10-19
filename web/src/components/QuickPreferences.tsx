@@ -52,7 +52,7 @@ export function QuickPreferences({
       <Button
         variant="ghost"
         size="icon-sm"
-        className="text-[10px] font-semibold"
+        className="text-2xs font-semibold"
         onClick={() => onLanguageChange(language === 'zh' ? 'en' : 'zh')}
         aria-label={t('settings.language.toggle', { name: languageName })}
         title={t('settings.language.toggle', { name: languageName })}

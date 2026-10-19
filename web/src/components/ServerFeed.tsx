@@ -3,7 +3,7 @@ import { ArrowDown, RefreshCw } from 'lucide-react'
 import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
 import { WebChatInput } from '@/components/WebChatInput'
-import { Badge, Button } from '@/components/ui'
+import { Badge, Button, Empty, EmptyDescription } from '@/components/ui'
 import { useBottomList } from '@/hooks/useBottomList'
 import { useNow } from '@/hooks/useNow'
 import { useServerFeed } from '@/hooks/useServerFeed'
@@ -201,7 +201,9 @@ export function ServerFeedList({
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <ServerFeedFlags extra={extra} />
       {shown.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{emptyText ?? t('home.eventsEmpty')}</p>
+        <Empty size="sm">
+          <EmptyDescription>{emptyText ?? t('home.eventsEmpty')}</EmptyDescription>
+        </Empty>
       ) : (
         <div className="relative flex min-h-0 flex-1 flex-col">
           <ul
@@ -222,7 +224,7 @@ export function ServerFeedList({
               return (
                 <Fragment key={e.seq}>
                   {showDay && (
-                    <li className="my-1 flex items-center gap-2 text-[10px] text-muted-foreground/70">
+                    <li className="my-1 flex items-center gap-2 text-2xs text-muted-foreground/70">
                       <span className="h-px flex-1 bg-border" />
                       <span className="shrink-0">{formatEventDay(lang, t, e.time, now)}</span>
                       <span className="h-px flex-1 bg-border" />
@@ -239,7 +241,7 @@ export function ServerFeedList({
                       <time
                         dateTime={e.time}
                         title={new Date(e.time).toLocaleString()}
-                        className="shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground/70"
+                        className="shrink-0 pt-0.5 text-2xs tabular-nums text-muted-foreground/70"
                       >
                         {label}
                       </time>
@@ -253,7 +255,7 @@ export function ServerFeedList({
             <button
               type="button"
               onClick={scrollToBottom}
-              className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] text-primary-foreground shadow-md hover:bg-primary/90"
+              className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-2xs text-primary-foreground shadow-md hover:bg-primary/90"
             >
               <ArrowDown className="size-3" />
               {t('feed.jumpLatest')}
@@ -262,7 +264,7 @@ export function ServerFeedList({
         </div>
       )}
       {refreshLabel && (
-        <span className="text-[10px] text-muted-foreground">{refreshLabel}</span>
+        <span className="text-2xs text-muted-foreground">{refreshLabel}</span>
       )}
     </div>
   )
