@@ -139,7 +139,7 @@ export function AppShell({
             {sidebarExtra}
             {headerRight}
           </SidebarFooter>
-          <SidebarRail />
+          <SidebarRail aria-label={t('nav.toggleSidebar')} title={t('nav.toggleSidebar')} />
         </Sidebar>
 
         <SidebarInset className="min-h-0 flex-1 overflow-y-auto">

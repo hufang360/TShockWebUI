@@ -17,6 +17,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Field,
+  FieldLabel,
   NativeSelect,
   NativeSelectOption,
   Select,
@@ -720,32 +722,49 @@ export function ItemsPage({
                     copyTags={recipeCopyTag}
                     singleColumn={recipeSingleColumn}
                   />
+                  {/* 勾选项统一用 Field（horizontal）+ FieldLabel：label 与控件靠 htmlFor 关联，
+                      不再裸 `<label>` 包 Checkbox + 重复的 aria-label（见 docs/UI组件.md）。 */}
                   {hasRecipeInfo && (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <label className="flex cursor-pointer items-center gap-1.5">
+                      <Field orientation="horizontal" className="w-auto">
                         <Checkbox
+                          id="dex-recipe-icon-only"
                           checked={recipeIconOnly}
                           onCheckedChange={(v) => setRecipeIconOnly(v === true)}
-                          aria-label={t('dex.recipeIconOnly')}
                         />
-                        <span>{t('dex.recipeIconOnly')}</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-1.5">
+                        <FieldLabel
+                          htmlFor="dex-recipe-icon-only"
+                          className="cursor-pointer font-normal text-muted-foreground"
+                        >
+                          {t('dex.recipeIconOnly')}
+                        </FieldLabel>
+                      </Field>
+                      <Field orientation="horizontal" className="w-auto">
                         <Checkbox
+                          id="dex-recipe-single-column"
                           checked={recipeSingleColumn}
                           onCheckedChange={(v) => setRecipeSingleColumn(v === true)}
-                          aria-label={t('dex.recipeSingleColumn')}
                         />
-                        <span>{t('dex.recipeSingleColumn')}</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-1.5">
+                        <FieldLabel
+                          htmlFor="dex-recipe-single-column"
+                          className="cursor-pointer font-normal text-muted-foreground"
+                        >
+                          {t('dex.recipeSingleColumn')}
+                        </FieldLabel>
+                      </Field>
+                      <Field orientation="horizontal" className="w-auto">
                         <Checkbox
+                          id="dex-recipe-copy-tag"
                           checked={recipeCopyTag}
                           onCheckedChange={(v) => setRecipeCopyTag(v === true)}
-                          aria-label={t('dex.recipeCopyTag')}
                         />
-                        <span>{t('dex.recipeCopyTag')}</span>
-                      </label>
+                        <FieldLabel
+                          htmlFor="dex-recipe-copy-tag"
+                          className="cursor-pointer font-normal text-muted-foreground"
+                        >
+                          {t('dex.recipeCopyTag')}
+                        </FieldLabel>
+                      </Field>
                     </div>
                   )}
                 </div>

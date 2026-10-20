@@ -60,6 +60,21 @@
   中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框。
 - **带「最近搜索」的搜索框用 `SearchInput`**：历史下拉**默认聚焦时不弹、打字时弹**，另有输入框内的
   历史按钮可手动展开（`historyOnFocus` / `historyToggle`，见 `docs/功能-搜索记录.md`）。
+- **勾选项（Checkbox + 文字）用 `Field orientation="horizontal"` + `FieldLabel htmlFor`**：
+  `Field` 加 `w-auto` 才不会被 `w-full` 撑满整行，工具栏里可横向排列；`FieldLabel` 默认带 `text-foreground`，
+  放进 `text-muted-foreground` 容器时需显式覆盖颜色。**不要**裸 `<label>` 包 `Checkbox` 再重复写 `aria-label`。
+
+## 已核实的例外（不要当违规重复报）
+
+全站基本盘已按 shadcn Critical Rules 收敛（无 `space-y-*`、类名不用模板字符串三元、无 `dark:` 颜色覆盖、
+等宽高用 `size-*`、图标进组件用 `data-icon`）。以下是**核实过、刻意保留**的偏差：
+
+| 位置 | 偏差 | 为什么保留 |
+| --- | --- | --- |
+| `components/ItemTooltipContent.tsx` | 大量硬编码色（`text-zinc-100` / `bg-black/85` / `text-amber-300` …） | 复刻 Terraria 游戏内物品提示的观感（名称按稀有度着色、半透明黑底、无模糊）；**不随站点明暗主题变化**，是游戏原样表现，换成语义令牌反而失真。详见 [`功能-合成表与物品提示.md`](功能-合成表与物品提示.md) |
+| `components/ItemTooltip.tsx` | `className="... z-[100]"` | 自研提示（非 shadcn `Tooltip`），会从 `Sheet` / `Dialog`（`z-50`）内部触发，portal 到 `body` 后必须盖在它们上面；没有可复用的组件堆叠机制 |
+| `components/ui/*` 内建 `aria-label`（`Close` / `Loading` / `pagination` …） | 英文硬编码 | 这些是 shadcn 原样组件，不依赖 `lib/i18n`（避免 ui 层耦合业务 i18n）。**业务侧调用时用 `aria-label` / `title` 覆盖**（如 `AppShell` 给 `SidebarRail` / `SidebarTrigger` 传 `nav.toggleSidebar` / `nav.openMenu`） |
+| `components/ui/Card.tsx` | `Card` / `CardHeader` / `CardTitle` / `CardBody`，没有 `CardContent` / `CardFooter` | 项目自有命名（见组件清单）；布局语义一致，`CardFooter` 由 `DialogFooter` / `SheetFooter` 承担 |
 
 ## 卡片的「主 / 次」层次
 
@@ -182,7 +197,8 @@
 
 ## 后端服务器弹框（`components/ServerSwitcher.tsx`）
 
-侧栏账号卡片与登录框都会打开它。\n
+侧栏账号卡片与登录框都会打开它。
+
 - **列表行**：整行（地址 + 操作按钮）共用背景/hover；每行显示**完整 URL**（`scheme://host:port`，`lib/servers.ts` 的 `targetUrl()`），不再单列 http/https 标签；账号卡片 / 登录框等「外面」仍用 `hostPortLabel()` 的 `host:port` 简略形式。
 - **连通性检测**：每行一个**图标按钮**（在垃圾桶左边；内置项没有垃圾桶，就这一个）。图标随状态：已连通 = `Wifi`（绿）、无法连接 = `WifiOff`（红）、检测中 = `LoaderCircle` 转圈。点击该行按钮重新检测（`transport.serverStatus(header)`，内置项传空串）。打开 / 列表变化时自动全量探测一次。
 - **新增**：默认收起表单，列表下方一个通栏 `variant="outline"` 「添加服务器」按钮；点开才出现「协议（只读）+ 主机 + 端口 + HTTPS 勾选」一行。**新增只入库、不自动切换**（`App.addServer` 不再调 `selectServer`）。
@@ -192,6 +208,13 @@
 - 错误 / 无权限提示仍在出错时才出现（含可复制的赋权命令）。
 
 ## 变更记录
+
+- v1.37：按 shadcn Critical Rules 做了一次全量核对（styling / forms / composition / icons），只发现零星偏差并修正：
+  物品图鉴的「仅显示图标 / 单列 / 复制含标签」三项与数据图鉴的「两列表格」改为 `Field orientation="horizontal"` + `FieldLabel htmlFor`
+  （不再裸 `<label>` 包 `Checkbox` 再重复写 `aria-label`）；侧栏账号菜单的 `DropdownMenuLabel` 包进 `DropdownMenuGroup`；
+  侧栏拖动条（`SidebarRail`）的中文无障碍名称改由 `AppShell` 传入（新增键 `nav.toggleSidebar`）。
+  审核结论与**刻意保留的例外**（物品提示的游戏原样配色、`ItemTooltip` 的 `z-[100]`、`ui/` 内建英文 `aria-label`、`Card` 自有命名）
+  已记入本文「已核实的例外」，以后不用重复报。
 
 - v1.36：指令结果卡片与指令卡片（首页 / 模块 / 鱼店）：**表头整块可点击**折叠 / 展开（收藏 / 删除按钮除外），标题 / 指令文字可鼠标选中。新增 `hooks/useCollapsed.ts`（`tswui:collapsedCards`）按 key 记忆展开状态，`ResultEntry.collapsed` 随结果持久化；`useBottomList` 补 `ResizeObserver`，容器量高 / 尺寸变化后重新贴底（结果区总是停在最新一条）。新增 `lib/selection.ts` 的 `hasTextSelection()`：选中文字时不折叠。**结果按服务器分开存储**：指令页 `tswui:commandResults` 改为 `serverId -> ResultEntry[]`，内存结果 `CommandResultsProvider` 接收 `serverId` 并按服务器分桶。
 - v1.35：「NPC 图鉴」与「数据 ID」合并为**数据图鉴**（侧边栏「数据图鉴」，`CodexPage`）：同一套网格切换 NPC / 图格 / 墙，翻页器改走物品图鉴底部那套（件数 ｜ 数据版本 + 每页 + `Pagination`），NPC 与图格 / 墙的详情一律改**右侧抽屉**（`Sheet`）。`SearchInput` 的「最近搜索」改为**聚焦不弹、打字才弹**，并新增输入框内的历史按钮（`historyOnFocus` / `historyToggle`），物品图鉴同步生效。

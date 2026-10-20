@@ -32,6 +32,7 @@ const zh: Dict = {
   'nav.worldHint': '世界 / Boss / 清理',
   'nav.hideSidebar': '隐藏侧栏',
   'nav.showSidebar': '显示侧栏',
+  'nav.toggleSidebar': '收起 / 展开侧栏',
   'nav.openMenu': '打开菜单',
 
   'status.online': '服务在线',
@@ -697,6 +698,7 @@ const en: Dict = {
   'nav.worldHint': 'World / bosses / cleanup',
   'nav.hideSidebar': 'Hide sidebar',
   'nav.showSidebar': 'Show sidebar',
+  'nav.toggleSidebar': 'Collapse / expand sidebar',
   'nav.openMenu': 'Open menu',
 
   'status.online': 'Online',

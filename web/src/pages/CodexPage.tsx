@@ -10,6 +10,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Field,
   FieldLabel,
   NativeSelect,
   NativeSelectOption,
@@ -284,15 +285,17 @@ export function CodexPage() {
               <>
                 <Separator orientation="vertical" className="h-5" />
                 {/* 两列表格开关（默认开）：图格 / 墙表格列少，大屏左右两张表更短更好读 */}
-                <label className="flex cursor-pointer items-center gap-1.5">
+                <Field orientation="horizontal" className="w-auto">
                   <Checkbox
+                    id="codex-two-cols"
                     checked={twoCols}
                     onCheckedChange={(v) => setTwoCols(v === true)}
-                    aria-label={t('codex.table.twoCols')}
                     data-testid="codex-two-cols"
                   />
-                  {t('codex.table.twoCols')}
-                </label>
+                  <FieldLabel htmlFor="codex-two-cols" className="cursor-pointer font-normal">
+                    {t('codex.table.twoCols')}
+                  </FieldLabel>
+                </Field>
               </>
             )}
           </div>

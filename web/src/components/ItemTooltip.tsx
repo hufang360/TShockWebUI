@@ -185,6 +185,9 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
             role="tooltip"
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
+            /* 唯一手写 z-index：提示会从 Sheet / Dialog（都是 z-50）内部触发，portal 到 body 后
+               必须盖在它们上面。属于自研 Terraria 风格富文本提示（非 shadcn Tooltip），
+               无法复用组件的自管堆叠。见 docs/UI组件.md「已核实的例外」。 */
             className="pointer-events-auto fixed z-[100]"
             style={{
               left: tip.x,

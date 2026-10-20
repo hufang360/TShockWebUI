@@ -115,17 +115,20 @@ export function SidebarAccountMenu({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" className="w-60">
-          <DropdownMenuLabel className="flex items-center gap-2">
-            {avatar}
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-xs font-semibold">
-                {username ?? t('account.notLoggedIn')}
+          {/* 菜单项 / 标签一律包在 DropdownMenuGroup 里（composition 规则）。 */}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="flex items-center gap-2">
+              {avatar}
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-xs font-semibold">
+                  {username ?? t('account.notLoggedIn')}
+                </span>
+                <span className="truncate text-2xs font-normal text-muted-foreground">
+                  {serverLabel}
+                </span>
               </span>
-              <span className="truncate text-2xs font-normal text-muted-foreground">
-                {serverLabel}
-              </span>
-            </span>
-          </DropdownMenuLabel>
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuItem onSelect={() => setServerOpen(true)}>
