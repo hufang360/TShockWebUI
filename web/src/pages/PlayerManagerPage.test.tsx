@@ -44,6 +44,17 @@ function renderPage(transport: BackendTransport, authenticated = true, username:
   )
 }
 
+/** 渲染并切到「玩家背包」tab（默认 tab 是「查看存档」）。 */
+function renderManage(
+  transport: BackendTransport,
+  authenticated = true,
+  username: string | null = 'Alice',
+) {
+  const view = renderPage(transport, authenticated, username)
+  fireEvent.mouseDown(screen.getByRole('tab', { name: '玩家背包' }))
+  return view
+}
+
 beforeEach(() => {
   Object.defineProperty(URL, 'createObjectURL', { writable: true, value: vi.fn(() => 'blob:mock') })
   Object.defineProperty(URL, 'revokeObjectURL', { writable: true, value: vi.fn() })
@@ -57,20 +68,27 @@ afterEach(() => {
 })
 
 describe('PlayerManagerPage', () => {
-  it('未登录时提示先登录', () => {
+  it('未登录也能用「查看存档」；「玩家背包」tab 才提示先登录', () => {
     renderPage(makeTransport(), false)
+    // 默认 tab 是查看存档：不需要登录，导入入口在
+    expect(screen.getByRole('button', { name: /导入 \.plr/ })).toBeTruthy()
+    expect(screen.queryByText('请先登录！')).toBeNull()
+    expect(screen.queryByLabelText('简约视图')).toBeNull()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: '玩家背包' }))
     expect(screen.getByText('请先登录！')).toBeTruthy()
   })
 
   it('服务器未安装插件时给出提醒', async () => {
     const cap: PlayerCapabilities = { plugin: false, permission: false }
-    renderPage(makeTransport({ playerCapabilities: async () => cap }))
+    renderManage(makeTransport({ playerCapabilities: async () => cap }))
     expect(await screen.findByText(/未安装 PlayerManager 插件/)).toBeTruthy()
+    expect(screen.queryByLabelText('简约视图')).toBeNull()
   })
 
   it('查到「自己」时把外观记入侧栏头像缓存', async () => {
     const playerLook = vi.fn(async (name: string) => emptyPlayerLook(name))
-    renderPage(makeTransport({ playerLook }))
+    renderManage(makeTransport({ playerLook }))
 
     // 默认自动查当前登录账号（Alice）。
     await waitFor(() => expect(getSelfAvatar('default')?.name).toBe('Alice'))
@@ -78,7 +96,7 @@ describe('PlayerManagerPage', () => {
 
   it('没有 playermanager 权限时给出提醒', async () => {
     const cap: PlayerCapabilities = { plugin: true, permission: false }
-    renderPage(makeTransport({ playerCapabilities: async () => cap }))
+    renderManage(makeTransport({ playerCapabilities: async () => cap }))
     expect(await screen.findByText(/你没有 playermanager 权限/)).toBeTruthy()
   })
 
@@ -95,7 +113,7 @@ describe('PlayerManagerPage', () => {
       ],
     }
     const playerLook = vi.fn(async () => look)
-    renderPage(makeTransport({ playerLook }))
+    renderManage(makeTransport({ playerLook }))
 
     const input = await screen.findByPlaceholderText(/输入玩家名/)
     fireEvent.change(input, { target: { value: 'hf' } })
@@ -118,7 +136,7 @@ describe('PlayerManagerPage', () => {
       favorited: false,
     }))
     const look: PlayerLook = { ...emptyPlayerLook('hf'), items }
-    renderPage(makeTransport({ playerLook: async () => look }))
+    renderManage(makeTransport({ playerLook: async () => look }))
 
     const input = await screen.findByPlaceholderText(/输入玩家名/)
     fireEvent.change(input, { target: { value: 'hf' } })
@@ -151,13 +169,13 @@ describe('PlayerManagerPage', () => {
     const transport = makeTransport({ playerLook })
 
     // 首次进入：默认玩家名 = 当前登录用户，并自动拉取
-    const first = renderPage(transport)
+    const first = renderManage(transport)
     await waitFor(() => expect(playerLook).toHaveBeenCalledWith('Alice'))
     expect(await screen.findByText('Alice')).toBeTruthy()
 
     // 切到别的模块再回来（卸载后重新挂载，同一 transport）：不再探测/拉取
     first.unmount()
-    renderPage(transport)
+    renderManage(transport)
     expect(await screen.findByText('Alice')).toBeTruthy()
     expect(playerLook).toHaveBeenCalledTimes(1)
 
@@ -171,7 +189,7 @@ describe('PlayerManagerPage', () => {
       filename: `${name}.plr`,
       blob: new Blob([new Uint8Array([1, 2, 3])]),
     }))
-    renderPage(makeTransport({ playerExport }))
+    renderManage(makeTransport({ playerExport }))
 
     const input = await screen.findByPlaceholderText(/输入玩家名/)
     fireEvent.change(input, { target: { value: 'hf' } })
@@ -181,33 +199,43 @@ describe('PlayerManagerPage', () => {
     expect(URL.createObjectURL).toHaveBeenCalled()
   })
 
-  it('导入 .plr：本地解析、标记「本地导入」并禁用导出', async () => {
+  it('「查看存档」：未登录导入 .plr 也能展示（本地导入徽章 + 导出图片）', async () => {
     const look: PlayerLook = {
       ...emptyPlayerLook('本地角色', false),
       items: [{ slot: 0, id: 4956, stack: 1, prefix: 0, favorited: false }],
     }
     const importPlayer = vi.fn(async () => look)
-    const { container } = renderPage(makeTransport({ importPlayer }))
+    renderPage(makeTransport({ importPlayer }), false)
 
-    await screen.findByPlaceholderText(/输入玩家名/)
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement
-    expect(fileInput).toBeTruthy()
+    // 默认就是「查看存档」tab，不需要登录
+    const fileInput = screen.getByTestId('players-plr-input') as HTMLInputElement
     const file = new File([new Uint8Array([1, 2, 3])], 'x.plr')
     fireEvent.change(fileInput, { target: { files: [file] } })
 
     await waitFor(() => expect(importPlayer).toHaveBeenCalled())
     expect(await screen.findByText('本地导入')).toBeTruthy()
     expect(screen.getByText('本地角色')).toBeTruthy()
-    // 导入的角色不能从服务器导出
-    const exportBtn = screen.getByRole('button', { name: /下载存档/ }) as HTMLButtonElement
-    expect(exportBtn.disabled).toBe(true)
+    expect(screen.getByRole('button', { name: /导出图片/ })).toBeTruthy()
+    expect(screen.getByLabelText('简约视图')).toBeTruthy()
+  })
+
+  it('拖入 .plr 文件同样可以查看', async () => {
+    const importPlayer = vi.fn(async () => emptyPlayerLook('拖进来的', false))
+    renderPage(makeTransport({ importPlayer }), false)
+
+    const drop = screen.getByTestId('players-save-drop')
+    const file = new File([new Uint8Array([1, 2, 3])], 'drop.plr')
+    fireEvent.drop(drop, { dataTransfer: { files: [file] } })
+
+    await waitFor(() => expect(importPlayer).toHaveBeenCalled())
+    expect(await screen.findByText('拖进来的')).toBeTruthy()
   })
 
   it('输入时清除上一次的错误', async () => {
     const playerLook = vi.fn(async () => {
       throw new TshockRequestError('bad_response', 'boom')
     })
-    renderPage(makeTransport({ playerLook }))
+    renderManage(makeTransport({ playerLook }))
 
     const input = await screen.findByPlaceholderText(/输入玩家名/)
     fireEvent.change(input, { target: { value: 'hf' } })
@@ -222,7 +250,7 @@ describe('PlayerManagerPage', () => {
     const playerLook = vi.fn(async () => {
       throw new TshockRequestError('validation', '找不到名为 hf 的玩家!')
     })
-    renderPage(makeTransport({ playerLook }))
+    renderManage(makeTransport({ playerLook }))
 
     const input = await screen.findByPlaceholderText(/输入玩家名/)
     fireEvent.change(input, { target: { value: 'hf' } })
@@ -240,7 +268,7 @@ describe('PlayerManagerPage', () => {
     }))
     // 给猪猪存钱罐放一件物品，让分组真的渲染出来
     items[99] = { slot: 99, id: 74, stack: 1, prefix: 0, favorited: false }
-    renderPage(makeTransport({ playerLook: async () => ({ ...emptyPlayerLook('hf'), items }) }))
+    renderManage(makeTransport({ playerLook: async () => ({ ...emptyPlayerLook('hf'), items }) }))
 
     const input = await screen.findByPlaceholderText(/输入玩家名/)
     fireEvent.change(input, { target: { value: 'hf' } })
@@ -263,9 +291,9 @@ describe('PlayerManagerPage 探测失败（旧后端 / 网络异常）', () => {
         throw new Error('Unexpected token <')
       },
     })
-    renderPage(transport)
+    renderManage(transport)
     expect(await screen.findByText('无法检测 PlayerManager 插件')).toBeTruthy()
-    // 不应再是纯空白：仍有页面标题
-    expect(screen.getByText('玩家管理')).toBeTruthy()
+    // 不应再是纯空白：顶部 tab 仍可见，页面不再渲染重复标题。
+    expect(screen.getByRole('tab', { name: '查看存档' })).toBeTruthy()
   })
 })

@@ -186,9 +186,12 @@ PlayerManager 不是 Pryaxis 官方组件；服务器未安装时，TShock 对 `
 ### 5.1 图集合成（本轮新增，已实现并验证）
 
 参考本机 `FishShopConfig/img/`：
-- 它把全部图标合成 `items.png`（**1024 × 4584**），并在 `items.js` 里存裁切表
+- 它把全部图标合成 `items.png`（密排；本项目生成的图集是 **1024 × 4906**，见下方差异）
   （`itemsPngInfo[id] = {x, y, w, h}`，动画物品存第一帧尺寸）。
-- 摆法：按「高降序、宽升序」排序，逐行摆放，超过 1024 宽换行；无 padding。
+- 摆法：按「高降序、宽升序」排序，逐行摆放，超过 1024 宽换行。
+- **每格之间留 1px 透明缝**（`--padding 1`，三张图集一致）：前端缩小图标时会开插值，
+  紧贴摆放时双线性采样会读到邻居精灵的纹素，图标边缘出现 1px 亮/暗线（见
+  `docs/功能-富文本解析.md` §6.2）。参考项目是无 padding 的密排，本项目刻意不同。
 - 前端 `ctx.drawImage(atlas, x, y, w, h, ...)`，采样用双线性（`imageSmoothingEnabled=true`，对齐游戏的 `LinearClamp`）。
 
 本项目实现 `tools/gen-atlas.py`（Python + Pillow），已实际运行：
@@ -197,14 +200,14 @@ PlayerManager 不是 Pryaxis 官方组件；服务器未安装时，TShock 对 `
 | --- | --- |
 | 物品数 | 6195 |
 | 唯一贴图 | 6133 |
-| 图集尺寸 | 1024 × 4584 |
+| 图集尺寸 | 1024 × 4906（含每格 1px 缝；无 padding 时 1024 × 4584） |
 | 体积 | 2.0 MB |
 | 耗时 | 合成 1.16s + 编码约 4s |
 | 校验 | `75 → [560,3042,22,26]`、`4956 → [658,152,56,56]`，裁切结果与源图第一帧逐像素一致 |
 
 - 裁切 key 是**贴图 id**（`items.json` 里的 `item.icon`）；动画物品的 `w/h` 已是单帧尺寸。
 - 62 个无自身贴图的物品通过 `icon` 复用回退贴图的区域，不需要额外名额。
-- 高度 4584 < 8192，单张图集在所有主流浏览器可用；若将来超过需分页。
+- 高度 4906 < 8192，单张图集在所有主流浏览器可用；若将来超过需分页（或调小每格 padding）。
 - 输出 `items-atlas.png` + `items-atlas.json`（均随仓库提交）。
 
 ## 6. `[i:...]` 标签语法
@@ -262,6 +265,12 @@ TShock 的错误与命令输出都经过 i18n（`i18n/zh_CN/TShockAPI.po`）。�
 
 1. **403 语义不靠文案**：先调 `/tokentest`；返回 2xx → `no_permission`，401/403 → `token_invalid`。
 2. **命令输出判定含中英文标记**：`classifyOutput` 同时匹配英文原文与 zh_CN 译文。
+   匹配前先归一化（转小写 + 空白合并），并按句式区分两类：
+   - 「指令不存在」（`command_not_found`，说明提供该指令的插件没装）：
+     en `Invalid command entered. …`（带 `entered`）/ zh `输入的命令无效。…`；
+   - 其余「无效指令」类（`command_error`，用法/参数写错）：例如插件自己打印的 `无效指令：xxx`、
+     `语法错误，输入 /fish help 查询用法` —— **故意不把这两类混在一起**，
+     否则首页依赖插件的卡片会被误判成「插件未安装」而隐藏。
 
 实测：`rawcmd /time`（simpleToken 所属组缺 `tshock.rest.command`）→ 后端分类
 `no_permission`（而非 `token_invalid`）；`ServerStatus` 版本规范化为 `1.4.5.8`。

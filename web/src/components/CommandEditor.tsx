@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { Send, User } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Badge, Button, Kbd, Spinner } from '@/components/ui'
@@ -28,6 +28,8 @@ export interface CommandEditorProps {
   history?: string[]
   /** 只能在游戏内执行（allowServer=false）：输入文本标红提示。 */
   invalid?: boolean
+  /** 发送按钮左侧的附加操作（如指令 / 聊天模式切换）。 */
+  beforeSend?: ReactNode
 }
 
 export function CommandEditor({
@@ -44,8 +46,10 @@ export function CommandEditor({
   focusRequest,
   history,
   invalid = false,
+  beforeSend,
 }: CommandEditorProps) {
   const { t } = useI18n()
+  const inputId = useId()
   const taRef = useRef<HTMLTextAreaElement>(null)
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [caret, setCaret] = useState(0)
@@ -248,10 +252,12 @@ export function CommandEditor({
       >
         <textarea
           ref={taRef}
+          id={inputId}
+          name={inputId}
           rows={1}
           wrap="off"
           className={cn(
-            'editor h-12 min-w-0 flex-1 resize-none overflow-x-auto overflow-y-hidden bg-transparent py-2.5',
+            'editor h-11 min-w-0 flex-1 resize-none overflow-x-auto overflow-y-hidden bg-transparent py-2',
             'text-foreground placeholder:text-muted-foreground focus:outline-none',
             invalid && 'text-destructive caret-destructive',
           )}
@@ -295,17 +301,20 @@ export function CommandEditor({
             window.setTimeout(() => setOpen(false), 150)
           }}
         />
-        <Button
-          size="icon"
-          variant="primary"
-          className="my-1.5 shrink-0 rounded-full"
-          onClick={onExecute}
-          disabled={busy}
-          aria-label={busy ? t('editor.running') : t('editor.execute')}
-          title={busy ? t('editor.running') : t('editor.execute')}
-        >
-          {busy ? <Spinner aria-hidden /> : <Send data-icon="inline-start" />}
-        </Button>
+        <div className="my-1 flex shrink-0 items-center gap-1">
+          {beforeSend}
+          <Button
+            size="icon"
+            variant="primary"
+            className="size-9 shrink-0 rounded-full"
+            onClick={onExecute}
+            disabled={busy}
+            aria-label={busy ? t('editor.running') : t('editor.execute')}
+            title={busy ? t('editor.running') : t('editor.execute')}
+          >
+            {busy ? <Spinner aria-hidden /> : <Send data-icon="inline-start" />}
+          </Button>
+        </div>
       </div>
 
       {open && items.length > 0 && (
@@ -324,7 +333,7 @@ export function CommandEditor({
                   onMouseEnter={() => setHighlight(idx)}
                   onClick={() => accept(item)}
                   className={cn(
-                    'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
+                    'flex w-full items-center gap-3 px-3 py-2 text-left text-sm focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                     idx === highlight ? 'bg-accent' : 'hover:bg-accent',
                   )}
                 >

@@ -23,7 +23,7 @@ export interface ItemCollection {
   ids: number[]
 }
 
-/** 分组展示顺序（下拉框 optgroup）。 */
+/** 分组展示顺序（Popover 折叠区）：ID 范围紧跟在「制作界面」之后。 */
 export const COLLECTION_GROUPS: CollectionGroup[] = ['range', 'category', 'class', 'friend']
 
 /** 生成闭区间 [start, end] 的 ID 列表（用于「ID 区间」集合）。 */

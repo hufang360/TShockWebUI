@@ -23,13 +23,13 @@ export function ItemDropsPanel({
   itemId,
   dataset,
   iconOnly = false,
-  singleColumn = false,
+  twoColumn = false,
 }: {
   itemId: number
   dataset: Dataset
   iconOnly?: boolean
-  /** 单列显示掉落记录（与合成表同一个勾选框）。 */
-  singleColumn?: boolean
+  /** 固定两列显示掉落记录（与合成表同一个勾选框）。 */
+  twoColumn?: boolean
 }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(true)
@@ -53,18 +53,18 @@ export function ItemDropsPanel({
         <div
           className={cn(
             'grid gap-1',
-            singleColumn ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]',
+            // 与合成表一致：小屏（<sm）即使勾选两列也按单列排。
+            twoColumn ? 'grid-cols-2 max-sm:grid-cols-1' : 'grid-cols-1',
           )}
         >
           {drops.map((drop) => {
             const item = dataset.itemsById.get(drop.id)
             const stack =
               drop.minStack === drop.maxStack ? String(drop.minStack) : `${drop.minStack}~${drop.maxStack}`
-            return (
-              <div
-                key={drop.id}
-                className="flex min-w-0 items-center gap-2 rounded-lg bg-accent/40 px-2.5 py-2"
-              >
+            const rowClass =
+              'flex min-w-0 items-center gap-2 rounded-lg bg-accent/40 px-2.5 py-2'
+            const body = (
+              <>
                 <ItemIcon item={item} atlas={dataset.atlas} size={24} />
                 {!iconOnly && (
                   <span className="min-w-0 flex-1 truncate text-sm text-foreground/90">
@@ -79,6 +79,12 @@ export function ItemDropsPanel({
                     {formatRate(drop.chance)}
                   </span>
                 )}
+              </>
+            )
+            // 小图标/条目本身不可点：要看详情就悬停出提示，点提示底部的「合成表」。
+            return (
+              <div key={drop.id} className={rowClass}>
+                {body}
               </div>
             )
           })}

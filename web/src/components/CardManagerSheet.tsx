@@ -1,9 +1,11 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import {
   Button,
+  Checkbox,
   Field,
+  FieldGroup,
   FieldLabel,
   Input,
   Sheet,
@@ -91,8 +93,8 @@ export interface CardManagerSheetProps {
  * 统一的「管理卡片」Sheet（首页 `HomeCardManager` 与模块 / 鱼店 `ModuleCardManagerDialog` 共用）。
  *
  * 约定（见 `docs/审查-UI一致性与体验.md` §4 U1）：
- * - 添加卡片 = 底部表单（名称 + 指令 + 添加）；
- * - 自动执行 = `Switch`；
+ * - 添加卡片 = 顶部按钮按需展开表单（名称 + 指令 + 添加）；
+ * - 自动执行 = `Checkbox`；显示 / 隐藏（若启用）= `Switch`；
  * - 删除走 `ConfirmButton` 二次确认；
  * - 排序（拖拽 + 上移 / 下移）与可见性作为可选能力注入。
  */
@@ -126,6 +128,8 @@ export function CardManagerSheet({
   const [handleArmed, setHandleArmed] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [command, setCommand] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) return
@@ -134,15 +138,19 @@ export function CardManagerSheet({
     setHandleArmed(null)
     setName('')
     setCommand('')
+    setShowAddForm(false)
+    setEditingId(null)
   }, [open])
 
+  const canAdd = Boolean(add && name.trim() && normalizeCustomCommand(command))
+
   const submitAdd = () => {
-    if (!add) return
+    if (!add || !canAdd) return
     const cmd = normalizeCustomCommand(command)
-    if (!cmd) return
     add.onAdd(name.trim(), cmd)
     setName('')
     setCommand('')
+    setShowAddForm(false)
   }
 
   /** 拖拽落到目标行：把源卡片移动到目标索引。 */
@@ -163,14 +171,64 @@ export function CardManagerSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+        className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
       >
         <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <SheetTitle>{title}</SheetTitle>
+              <SheetDescription>{description}</SheetDescription>
+            </div>
+            {add && (
+              <Button
+                size="sm"
+                variant={showAddForm ? 'secondary' : 'primary'}
+                className="shrink-0"
+                onClick={() => setShowAddForm((v) => !v)}
+                aria-expanded={showAddForm}
+              >
+                <Plus data-icon="inline-start" />
+                {t('home.manageAddCard')}
+              </Button>
+            )}
+          </div>
         </SheetHeader>
 
-        <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-4">
+        {add && showAddForm && (
+          <div className="shrink-0 border-b bg-accent/20 px-5 py-3">
+            <FieldGroup className="gap-2 sm:flex-row sm:items-end">
+              <Field className="min-w-0 flex-1">
+                <FieldLabel htmlFor={nameInputId}>{add.nameLabel}</FieldLabel>
+                <Input
+                  id={nameInputId}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={add.namePlaceholder}
+                  className="h-8 text-xs"
+                />
+              </Field>
+              <Field className="min-w-0 flex-1">
+                <FieldLabel htmlFor={commandInputId}>{add.commandLabel}</FieldLabel>
+                <Input
+                  id={commandInputId}
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitAdd()
+                  }}
+                  placeholder={add.commandPlaceholder}
+                  className="h-8 font-pixel text-xs"
+                />
+              </Field>
+              <Button size="sm" variant="primary" onClick={submitAdd} disabled={!canAdd}>
+                <Plus data-icon="inline-start" />
+                {add.createLabel}
+              </Button>
+            </FieldGroup>
+          </div>
+        )}
+
+        <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-5 py-4">
           {cards.map((card, index) => {
             const label = card.name || card.command
             const suggestionListId = `${suggestionBaseId}-${index}`
@@ -209,15 +267,15 @@ export function CardManagerSheet({
                 }
                 onDragEnd={ordering ? resetDrag : undefined}
                 className={cn(
-                  'flex items-start gap-2 rounded-xl bg-accent/40 p-2.5 transition-shadow',
+                  'flex flex-col gap-2.5 rounded-xl bg-accent/40 p-3 transition-shadow',
                   dragId === card.id && 'opacity-50',
                   dragId && overId === card.id && dragId !== card.id && 'ring-2 ring-ring',
                   (card.hidden || card.disabled) && 'opacity-60',
                 )}
                 aria-label={label}
               >
-                {ordering && (
-                  <div className="mt-0.5 flex shrink-0 items-center gap-0.5">
+                <div className="flex min-w-0 items-start gap-1.5">
+                  {ordering ? (
                     <Button
                       size="icon-sm"
                       variant="ghost"
@@ -226,114 +284,143 @@ export function CardManagerSheet({
                       onMouseLeave={() => setHandleArmed((v) => (v === card.id ? null : v))}
                       aria-label={ordering.dragLabel}
                       title={ordering.dragLabel}
-                      className="cursor-grab active:cursor-grabbing"
+                      className="shrink-0 cursor-grab active:cursor-grabbing"
                     >
                       <GripVertical data-icon="inline-start" />
                     </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      disabled={index === 0}
-                      aria-label={ordering.moveUpLabel}
-                      title={ordering.moveUpLabel}
-                      onClick={() => ordering.onMove(card.id, -1)}
-                    >
-                      <ChevronUp data-icon="inline-start" />
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      disabled={index === cards.length - 1}
-                      aria-label={ordering.moveDownLabel}
-                      title={ordering.moveDownLabel}
-                      onClick={() => ordering.onMove(card.id, 1)}
-                    >
-                      <ChevronDown data-icon="inline-start" />
-                    </Button>
+                  ) : null}
+
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    {card.custom && editingId === card.id ? (
+                      <>
+                        <Input
+                          value={card.name}
+                          onChange={(e) => onUpdate?.(card.id, { name: e.target.value })}
+                          placeholder={nameLabel}
+                          aria-label={nameLabel}
+                          className="h-8 text-xs"
+                        />
+                        <Input
+                          value={card.command}
+                          onChange={(e) => onUpdate?.(card.id, { command: e.target.value })}
+                          onBlur={(e) =>
+                            onUpdate?.(card.id, { command: normalizeCustomCommand(e.target.value) })
+                          }
+                          list={commandSuggestions?.length ? suggestionListId : undefined}
+                          placeholder={commandLabel}
+                          aria-label={commandLabel}
+                          className="h-8 font-pixel text-xs"
+                        />
+                        {commandSuggestions?.length ? (
+                          <datalist id={suggestionListId}>
+                            {commandSuggestions.map((cmd) => (
+                              <option key={cmd} value={cmd} />
+                            ))}
+                          </datalist>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                          {card.badges}
+                        </div>
+                        {card.command ? (
+                          <code className="truncate font-pixel text-2xs text-muted-foreground">
+                            {card.command}
+                          </code>
+                        ) : (
+                          <span className="text-2xs text-muted-foreground">
+                            {t('home.manageNoCommand')}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
-                )}
 
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  {card.custom ? (
-                    <div className="flex flex-col gap-1.5">
-                      <Input
-                        value={card.name}
-                        onChange={(e) => onUpdate?.(card.id, { name: e.target.value })}
-                        placeholder={nameLabel}
-                        aria-label={nameLabel}
-                        className="h-8 text-xs"
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {card.custom && (
+                      <Button
+                        size="icon-sm"
+                        variant={editingId === card.id ? 'secondary' : 'ghost'}
+                        aria-label={editingId === card.id ? t('action.done') : t('action.edit')}
+                        title={editingId === card.id ? t('action.done') : t('action.edit')}
+                        onClick={() => setEditingId((id) => (id === card.id ? null : card.id))}
+                      >
+                        <Pencil data-icon="inline-start" />
+                      </Button>
+                    )}
+                    {card.custom && (
+                      <ConfirmButton
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={removeLabel}
+                        title={removeLabel}
+                        onConfirm={() => onRemove?.(card.id)}
+                        confirmLabel={t('action.deleteConfirm')}
+                        icon={<Trash2 data-icon="inline-start" />}
                       />
-                      <Input
-                        value={card.command}
-                        onChange={(e) => onUpdate?.(card.id, { command: e.target.value })}
-                        onBlur={(e) =>
-                          onUpdate?.(card.id, { command: normalizeCustomCommand(e.target.value) })
-                        }
-                        list={commandSuggestions?.length ? suggestionListId : undefined}
-                        placeholder={commandLabel}
-                        aria-label={commandLabel}
-                        className="h-8 font-pixel text-xs"
-                      />
-                      {commandSuggestions?.length ? (
-                        <datalist id={suggestionListId}>
-                          {commandSuggestions.map((cmd) => (
-                            <option key={cmd} value={cmd} />
-                          ))}
-                        </datalist>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm text-foreground">{label}</span>
-                        {card.badges}
-                      </div>
-                      {card.command ? (
-                        <code className="font-pixel text-2xs text-muted-foreground">
-                          {card.command}
-                        </code>
-                      ) : (
-                        <span className="text-2xs text-muted-foreground">
-                          {t('home.manageNoCommand')}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {autoExec && (
-                    <div className="flex w-fit items-center gap-2">
-                      <Switch
-                        checked={!autoExec.isManual(card.id)}
-                        onCheckedChange={(v) => autoExec.onToggle(card.id, v !== true)}
-                        aria-label={`${label} ${autoExec.label}`}
-                      />
-                      <span className="text-2xs font-normal text-muted-foreground">
-                        {autoExec.label}
-                      </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex shrink-0 flex-col items-center gap-1.5">
-                  {visibility && (
-                    <Switch
-                      checked={!visibility.isHidden(card.id)}
-                      onCheckedChange={() => visibility.onToggle(card.id)}
-                      aria-label={
-                        visibility.isHidden(card.id) ? visibility.showLabel : visibility.hideLabel
-                      }
-                    />
-                  )}
-                  {card.custom && (
-                    <ConfirmButton
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={removeLabel}
-                      title={removeLabel}
-                      onConfirm={() => onRemove?.(card.id)}
-                      confirmLabel={t('action.deleteConfirm')}
-                      icon={<Trash2 data-icon="inline-start" />}
-                    />
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    {autoExec && card.command.trim().length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`auto-exec-${card.id}`}
+                          checked={!autoExec.isManual(card.id)}
+                          onCheckedChange={(v) => autoExec.onToggle(card.id, v !== true)}
+                          aria-label={`${label} ${autoExec.label}`}
+                        />
+                        <label
+                          htmlFor={`auto-exec-${card.id}`}
+                          className="cursor-pointer text-xs text-muted-foreground"
+                        >
+                          {autoExec.label}
+                        </label>
+                      </div>
+                    )}
+                    {visibility && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!visibility.isHidden(card.id)}
+                          onCheckedChange={() => visibility.onToggle(card.id)}
+                          aria-label={
+                            visibility.isHidden(card.id) ? visibility.showLabel : visibility.hideLabel
+                          }
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {visibility.isHidden(card.id) ? visibility.showLabel : visibility.hideLabel}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {ordering && (
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        disabled={index === 0}
+                        aria-label={ordering.moveUpLabel}
+                        title={ordering.moveUpLabel}
+                        onClick={() => ordering.onMove(card.id, -1)}
+                      >
+                        <ChevronUp data-icon="inline-start" />
+                      </Button>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        disabled={index === cards.length - 1}
+                        aria-label={ordering.moveDownLabel}
+                        title={ordering.moveDownLabel}
+                        onClick={() => ordering.onMove(card.id, 1)}
+                      >
+                        <ChevronDown data-icon="inline-start" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </li>
@@ -342,37 +429,6 @@ export function CardManagerSheet({
         </ul>
 
         <div className="flex shrink-0 flex-col gap-2 border-t px-5 py-3">
-          {add && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <Field className="min-w-0 flex-1">
-                <FieldLabel htmlFor={nameInputId}>{add.nameLabel}</FieldLabel>
-                <Input
-                  id={nameInputId}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={add.namePlaceholder}
-                  className="h-8 text-xs"
-                />
-              </Field>
-              <Field className="min-w-0 flex-1">
-                <FieldLabel htmlFor={commandInputId}>{add.commandLabel}</FieldLabel>
-                <Input
-                  id={commandInputId}
-                  value={command}
-                  onChange={(e) => setCommand(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitAdd()
-                  }}
-                  placeholder={add.commandPlaceholder}
-                  className="h-8 font-pixel text-xs"
-                />
-              </Field>
-              <Button size="sm" variant="primary" onClick={submitAdd}>
-                <Plus data-icon="inline-start" />
-                {add.createLabel}
-              </Button>
-            </div>
-          )}
           {(footerExtra || doneLabel) && (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">{footerExtra}</div>
@@ -385,7 +441,7 @@ export function CardManagerSheet({
           )}
         </div>
 
-        {note && <p className="shrink-0 px-5 pb-4 text-2xs text-muted-foreground">{note}</p>}
+        {note && <p className="shrink-0 px-5 pb-4 text-xs text-muted-foreground">{note}</p>}
       </SheetContent>
     </Sheet>
   )

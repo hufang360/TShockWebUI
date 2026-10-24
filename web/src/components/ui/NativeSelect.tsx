@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react'
+import { useId, type ComponentProps } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +12,16 @@ type NativeSelectProps = Omit<ComponentProps<'select'>, 'size'> & {
  * `className` 作用在**外层容器**（宽度/对齐等布局），内部 `<select>` 的外观由组件决定；
  * `size="sm"` 用于翻页器/紧凑工具条。`aria-label` 等透传到 `<select>` 本身。
  */
-export function NativeSelect({ className, size = 'md', children, ...props }: NativeSelectProps) {
+export function NativeSelect({
+  className,
+  size = 'md',
+  children,
+  id,
+  name,
+  ...props
+}: NativeSelectProps) {
+  const generatedId = useId()
+  const selectId = id ?? generatedId
   return (
     <div
       data-slot="native-select-wrapper"
@@ -20,6 +29,8 @@ export function NativeSelect({ className, size = 'md', children, ...props }: Nat
       className={cn('group/native-select relative w-fit has-[select:disabled]:opacity-50', className)}
     >
       <select
+        id={selectId}
+        name={name ?? selectId}
         data-slot="native-select"
         data-size={size}
         className={cn(

@@ -32,7 +32,7 @@ function atlasWith(keys: string[]): PlayerAtlas {
       width: 1000,
       height: 952,
       limitWidth: 1024,
-      padding: 0,
+      padding: 1,
       frameWidth: 40,
       frameHeight: 56,
       variants: 12,

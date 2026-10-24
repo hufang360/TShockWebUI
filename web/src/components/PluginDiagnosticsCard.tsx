@@ -60,6 +60,7 @@ export function PluginDiagnosticsCard({ transport, serverId }: PluginDiagnostics
     <CollapsibleCard
       title={t('plugins.title')}
       icon={<Plug />}
+      defaultOpen={false}
       bodyClassName="flex flex-col gap-2 pt-0"
       headerExtra={
         <Button

@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react'
+import { useId, type ComponentProps } from 'react'
 import { cn } from '@/lib/utils'
 
 /* ── InputGroup（shadcn/ui）──────────────────────────────────────
@@ -42,9 +42,13 @@ export function InputGroupAddon({
   )
 }
 
-export function InputGroupInput({ className, ...props }: ComponentProps<'input'>) {
+export function InputGroupInput({ className, id, name, ...props }: ComponentProps<'input'>) {
+  const generatedId = useId()
+  const inputId = id ?? generatedId
   return (
     <input
+      id={inputId}
+      name={name ?? inputId}
       data-slot="input-group-control"
       className={cn(
         'h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground',

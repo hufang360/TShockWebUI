@@ -38,6 +38,13 @@ export interface Npc {
   sbAll?: boolean
 }
 
+/** 图格子 ID（同一 TileID 下的 placeStyle / 样式）。 */
+export interface TileStyle {
+  subId: number
+  /** 该样式的代表物品 id；`null` = 无对应物品。 */
+  item: number | null
+}
+
 /** 图格 / 墙 ID 表条目（`data/tiles.json` / `data/walls.json`）。 */
 export interface TileWallEntry {
   id: number
@@ -52,6 +59,12 @@ export interface TileWallEntry {
   size?: [number, number]
   /** frame-important 但无固定尺寸（树 / 陷阱 / 铁轨…）：显示「无固定尺寸」而不是 1×1。 */
   frameImportant?: true
+  /** 同一 TileID 下的子 ID（样式）；只有多样式图格才有。 */
+  styles?: TileStyle[]
+  /** 展开子 ID 时由前端合成：当前行的样式下标。 */
+  subId?: number
+  /** 展开子 ID 时由前端合成：该样式对应物品 id。 */
+  styleItem?: number | null
 }
 
 export interface TileWallData {
@@ -302,6 +315,26 @@ export interface NpcAtlas {
   regions: AtlasRegions
 }
 
+/** Buff 图标图集（`data/buff-atlas.json`）：`regions[buffId] = [x, y, w, h]`（静态图标，无动画帧）。 */
+export interface BuffAtlas {
+  meta: {
+    gameVersion: string
+    width: number
+    height: number
+    limitWidth: number
+    padding: number
+    count: number
+    missing: number
+    sheet: string
+    /** 图集 PNG 内容哈希（缓存失效用）。 */
+    hash?: string
+    generatedBy: string
+    source: string
+    note: string
+  }
+  regions: AtlasRegions
+}
+
 /** 创意菜单页签（游戏 `Terraria.GameContent.Creative.ItemFilters` 的过滤器列表）。 */
 export interface ItemGroupTab {
   /** 前端 i18n 键后缀：`dex.tab.<id>` */
@@ -464,6 +497,8 @@ export interface Dataset {
 /** 前端统一的指令执行结果模型（设计原则与约束 §5）。 */
 export type CommandStatus =
   | 'ok'
+  /** 指令不存在（多为提供该指令的插件未安装）；首页内置卡片据此隐藏。 */
+  | 'command_not_found'
   | 'command_error'
   | 'no_permission'
   | 'token_invalid'
@@ -563,9 +598,10 @@ export type TabId =
   | 'home'
   | 'editor'
   | 'items'
-  | 'codex'
+  | 'dataid'
   | 'players'
   | 'store'
+  | 'requisition'
   | 'world'
   | 'settings'
   | (string & {})

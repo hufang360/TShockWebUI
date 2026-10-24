@@ -7,7 +7,7 @@ import type { NpcAtlas } from '@/types'
  * 按 NPC 图集裁切表绘制某个 NPC 的第一帧（等比放入 size×size 的方框）。
  *
  * - 图集按需懒加载（首次渲染时拉取 `npc-atlas.json` + PNG），不进入首屏 dataset；
- * - 加载中 / 区域缺失时绘制占位，绝不抛错；
+ * - 加载中 / 区域缺失时保持透明，绝不抛错；
  * - 尺寸与采样：`game` 模式**只缩不放**，保留 NPC 之间的原生大小差异（与游戏一致，小动物小、Boss 大）；
  *   像素风放缩用最近邻，缩小用插值（与 `ItemIcon` 同策略）。
  */
@@ -58,17 +58,8 @@ export function NpcSprite({
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     const region = atlas && id != null ? atlas.regions[String(id)] : undefined
-    if (!atlas || id == null || !region || failed) {
-      // 占位：暗色方框 + 问号
-      ctx.fillStyle = '#27334a'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.fillStyle = '#64748b'
-      ctx.font = `${Math.round(size * 0.5 * dpr)}px sans-serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText('?', canvas.width / 2, canvas.height / 2)
-      return
-    }
+    // 加载中 / 缺失时保持透明，不绘制暗色方框与问号占位。
+    if (!atlas || id == null || !region || failed) return
 
     const [x, y, w, h] = region
     // 尺寸规则见 lib/iconScale.ts 的 npcContentSize：game 只缩不放（保留游戏里的相对大小）。
@@ -84,10 +75,11 @@ export function NpcSprite({
         if (cancelled) return
         // 采样：缩小插值（同游戏）、1:1 与放大用最近邻（像素完美，避免透明边缘渗色）。
         ctx.imageSmoothingEnabled = shouldSmooth(w, cssW)
+        // 图集每格之间留 1px 透明缝（`--padding 1`），插值越界读到的是透明缝而不是邻居贴图。
         ctx.drawImage(img, x, y, w, h, dx, dy, dw, dh)
       })
       .catch(() => {
-        /* 图集缺失时保持占位 */
+        /* 图集缺失时保持透明 */
       })
     return () => {
       cancelled = true

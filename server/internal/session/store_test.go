@@ -9,7 +9,7 @@ import (
 func TestCreateGetDelete(t *testing.T) {
 	s := New(time.Hour, 10)
 
-	sess, err := s.Create("Alice", "tok-1")
+	sess, err := s.Create("Alice", "tok-1", "")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestRandomIDIsUnique(t *testing.T) {
 	s := New(time.Hour, 100)
 	seen := make(map[string]bool)
 	for i := 0; i < 50; i++ {
-		sess, err := s.Create("u", "t")
+		sess, err := s.Create("u", "t", "")
 		if err != nil {
 			t.Fatalf("Create: %v", err)
 		}
@@ -51,7 +51,7 @@ func TestExpiry(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	s.SetClock(func() time.Time { return now })
 
-	sess, err := s.Create("Alice", "tok")
+	sess, err := s.Create("Alice", "tok", "")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -80,12 +80,12 @@ func TestGCOnCreate(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	s.SetClock(func() time.Time { return now })
 
-	if _, err := s.Create("a", "t"); err != nil {
+	if _, err := s.Create("a", "t", ""); err != nil {
 		t.Fatal(err)
 	}
 	now = now.Add(2 * time.Minute) // 第一条过期
 	// 上限 2，但有 1 条过期；gcLocked 应先清理。
-	if _, err := s.Create("b", "t"); err != nil {
+	if _, err := s.Create("b", "t", ""); err != nil {
 		t.Fatalf("清理后不应超限：%v", err)
 	}
 	if s.Len() != 1 {
@@ -95,13 +95,13 @@ func TestGCOnCreate(t *testing.T) {
 
 func TestMaxSessions(t *testing.T) {
 	s := New(time.Hour, 2)
-	if _, err := s.Create("a", "t"); err != nil {
+	if _, err := s.Create("a", "t", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Create("b", "t"); err != nil {
+	if _, err := s.Create("b", "t", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Create("c", "t"); err == nil {
+	if _, err := s.Create("c", "t", ""); err == nil {
 		t.Fatal("超过上限时应返回错误")
 	}
 }
@@ -120,7 +120,7 @@ func TestConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sess, err := s.Create("u", "t")
+			sess, err := s.Create("u", "t", "")
 			if err != nil {
 				t.Errorf("Create: %v", err)
 				return

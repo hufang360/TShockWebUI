@@ -28,12 +28,15 @@ function NotebookCard({ moduleId }: { moduleId: string }) {
       </CardHeader>
       <CardBody className="flex min-h-0 flex-1 flex-col">
         <textarea
+          id={`module-notes-${moduleId}`}
+          name={`module-notes-${moduleId}`}
           value={notes}
           onChange={(e) => {
             setNotes(e.target.value)
             writeJson(key, e.target.value)
           }}
           placeholder={t('modules.notebookPlaceholder')}
+          aria-label={t('modules.notebook')}
           className="min-h-52 flex-1 resize-y rounded-lg bg-accent p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </CardBody>
@@ -98,7 +101,7 @@ export function CommandModulePage({
     [fixedCards, cards, t, keyPrefix],
   )
 
-  const heading = (
+  const loginHeading = (
     <div className="flex flex-col gap-1">
       <h2 className="text-lg font-semibold">{title}</h2>
       {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
@@ -109,7 +112,7 @@ export function CommandModulePage({
   if (!authenticated) {
     return (
       <div className="flex flex-col gap-4">
-        {heading}
+        {loginHeading}
         <LoginGate onLogin={onLogin} />
       </div>
     )
@@ -117,7 +120,6 @@ export function CommandModulePage({
 
   return (
     <div className="flex flex-col gap-4">
-      {heading}
       {isCustomModuleId(moduleId) ? (
         // 自定义模块：左 = 指令卡片（第一张为「帮助」），右 = 记事本。
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -130,7 +132,8 @@ export function CommandModulePage({
               refreshInterval={refreshInterval}
               onTokenInvalid={onTokenInvalid}
               keyPrefix={keyPrefix}
-              title={t('modules.cards.title')}
+              title={title}
+              desc={desc}
               cards={allCards}
               onAddCard={add}
               onUpdateCard={update}
@@ -148,7 +151,8 @@ export function CommandModulePage({
           refreshInterval={refreshInterval}
           onTokenInvalid={onTokenInvalid}
           keyPrefix={keyPrefix}
-          title={t('modules.cards.title')}
+          title={title}
+          desc={desc}
           cards={allCards}
           onAddCard={add}
           onUpdateCard={update}

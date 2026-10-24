@@ -48,6 +48,20 @@ export const NPC_COLLECTIONS: NpcCollection[] = [
   },
 ]
 
+/**
+ * 额外归入「Boss」筛选的 NPC：多段 Boss 的身体 / 手 / 尾巴等无法用 `/sb` 单独召唤的 id，
+ * 或没有登记 `sb` 的 Boss 变体。与 `npcs.json` 里的 `sb` 取并集。
+ */
+export const EXTRA_BOSS_IDS = new Set<number>([
+  14, 15, 36, 114, 115, 116, 135, 136, 128, 129, 130, 131, 246, 247, 248, 249, 263, 264, 265, 396,
+  397, 400, 564, 576,
+])
+
+/** 是否属于「Boss」分类（可召唤的 `sb` 或上面登记的分段 / 变体）。 */
+export function isBossNpc(npc: { id: number; sb?: string }): boolean {
+  return Boolean(npc.sb) || EXTRA_BOSS_IDS.has(npc.id)
+}
+
 export const NPC_COLLECTION_BY_ID = new Map(NPC_COLLECTIONS.map((c) => [c.id, c]))
 
 /** 取分类显示名（按界面语言）。 */

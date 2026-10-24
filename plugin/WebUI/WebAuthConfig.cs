@@ -98,6 +98,42 @@ namespace WebUI
         /// <summary>事件历史保留天数（默认 7；&lt;=0 表示不按天清理）。</summary>
         public int HistoryDays = 7;
 
+        // ---------- 物资申请（/webui/requests*、/web req） ----------
+
+        /// <summary>是否启用物资申请（默认开）。关闭后不再接受新申请，已存在的仍可审核 / 查看。</summary>
+        public bool RequestsEnabled = true;
+
+        /// <summary>一次申请最多几种物品（默认 10；&lt;=0 回退 10）。</summary>
+        public int RequestMaxItems = 10;
+
+        /// <summary>每种物品最多几组（默认 10；按物品 maxStack 计算；&lt;=0 回退 10）。</summary>
+        public int RequestMaxStacksPerLine = 10;
+
+        /// <summary>单条申请的总组数上限（默认 30；&lt;=0 回退 30）。</summary>
+        public int RequestMaxTotalStacks = 30;
+
+        /// <summary>每个账号最多同时存在的待审核申请数（默认 3；&lt;=0 不限）。</summary>
+        public int RequestMaxPendingPerPlayer = 3;
+
+        /// <summary>每个账号每天最多提交的申请数（默认 10；&lt;=0 不限）。</summary>
+        public int RequestMaxPerDayPerPlayer = 10;
+
+        /// <summary>同一账号两次提交的最小间隔（秒，默认 10；&lt;=0 不限）。</summary>
+        public int RequestMinIntervalSeconds = 10;
+
+        /// <summary>全服待审核申请上限（默认 200；&lt;=0 不限）。</summary>
+        public int RequestMaxPendingTotal = 200;
+
+        /// <summary>已结束的申请保留天数（默认 30；&lt;=0 不按天清理）。</summary>
+        public int RequestHistoryDays = 30;
+
+        /// <summary>审核通过后是否自动发放（在线直接给，离线下次登录给；默认开）。
+        /// 关掉后只标记「已批准」，服主用 /web req give 或网页「补发」发放。</summary>
+        public bool RequestAutoDeliver = true;
+
+        /// <summary>新申请时是否给在线审核人发游戏内提示（默认开）。</summary>
+        public bool RequestNotifyReviewers = true;
+
         /// <summary>事件历史目录总大小上限 MB（默认 50；&lt;=0 表示不按大小清理）。</summary>
         public int HistoryMaxMB = 50;
 
@@ -140,6 +176,14 @@ namespace WebUI
             if (MaxWebChatPerMinute < 0) MaxWebChatPerMinute = 0;
             if (HistoryDays < 0) HistoryDays = 0;
             if (HistoryMaxMB < 0) HistoryMaxMB = 0;
+            if (RequestMaxItems <= 0) RequestMaxItems = 10;
+            if (RequestMaxStacksPerLine <= 0) RequestMaxStacksPerLine = 10;
+            if (RequestMaxTotalStacks <= 0) RequestMaxTotalStacks = 30;
+            if (RequestMaxPendingPerPlayer < 0) RequestMaxPendingPerPlayer = 0;
+            if (RequestMaxPerDayPerPlayer < 0) RequestMaxPerDayPerPlayer = 0;
+            if (RequestMinIntervalSeconds < 0) RequestMinIntervalSeconds = 0;
+            if (RequestMaxPendingTotal < 0) RequestMaxPendingTotal = 0;
+            if (RequestHistoryDays < 0) RequestHistoryDays = 0;
             if (string.IsNullOrWhiteSpace(ChatPrefix)) ChatPrefix = "[WebUI]";
             if (Secret == null) Secret = "";
             return this;

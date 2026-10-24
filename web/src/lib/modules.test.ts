@@ -53,18 +53,20 @@ describe('modules（按服务器分开记忆）', () => {
 })
 
 describe('autoActivateModules（探测到插件自动激活）', () => {
-  const detected = { players: true, store: true }
+  const detected = { players: true, store: true, requisition: true }
 
   it('探测到插件的模块自动开启', () => {
     const next = autoActivateModules(DEFAULT_MODULES, DEFAULT_MODULES, 'default', detected)
     expect(isModuleEnabled(next, 'default', 'players')).toBe(true)
     expect(isModuleEnabled(next, 'default', 'store')).toBe(true)
+    expect(isModuleEnabled(next, 'default', 'requisition')).toBe(true)
   })
 
   it('未探测到插件的模块不激活', () => {
     const next = autoActivateModules(DEFAULT_MODULES, DEFAULT_MODULES, 'default', {
       players: false,
       store: true,
+      requisition: false,
     })
     expect(isModuleEnabled(next, 'default', 'players')).toBe(false)
     expect(isModuleEnabled(next, 'default', 'store')).toBe(true)
@@ -89,6 +91,7 @@ describe('autoActivateModules（探测到插件自动激活）', () => {
     const next = autoActivateModules(DEFAULT_MODULES, DEFAULT_MODULES, 'default', {
       players: false,
       store: false,
+      requisition: false,
     })
     expect(next).toBe(DEFAULT_MODULES)
   })

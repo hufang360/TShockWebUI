@@ -6,7 +6,6 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  Spinner,
   Switch,
 } from '@/components/ui'
 import { CollapseChevron } from '@/components/CollapseChevron'
@@ -31,7 +30,7 @@ import {
   updateModuleCard,
 } from '@/lib/moduleCards'
 import { StorageKeys } from '@/lib/storage'
-import { TshockRequestError, type BackendTransport } from '@/lib/tshock'
+import { TshockRequestError, type BackendTransport, type ServerCapabilities } from '@/lib/tshock'
 import type { Settings } from '@/types'
 
 interface SettingsPageProps {
@@ -53,7 +52,7 @@ interface SettingsPageProps {
 }
 
 /** 单个模块依赖插件的探测结果。 */
-type CapStatus = 'checking' | 'ready' | 'no-permission' | 'missing' | 'error' | 'auth'
+type CapStatus = 'checking' | 'ready' | 'no-permission' | 'missing' | 'outdated' | 'error' | 'auth'
 
 interface CapState {
   status: CapStatus
@@ -62,7 +61,7 @@ interface CapState {
 
 /**
  * 设置（作为右侧正文内容，而非弹框）。
- * 「激活模块」会实时探测插件：安装并授权后才能打开开关，入口随之出现在侧边栏。
+ * 「激活模块」会实时探测插件并展示状态；开关本身只控制侧边栏入口显隐，不受安装状态限制。
  */
 export function SettingsPage({
   settings,
@@ -82,6 +81,7 @@ export function SettingsPage({
   const [caps, setCaps] = useState<Record<ModuleId, CapState>>({
     players: { status: 'checking' },
     store: { status: 'checking' },
+    requisition: { status: 'checking' },
     // 世界管理不探测插件（无法可靠探知 WorldModify），只要登录即可激活。
     world: { status: 'ready' },
   })
@@ -116,27 +116,35 @@ export function SettingsPage({
   const canFastEvents =
     group != null && ['gm', 'superadmin', 'vip'].includes(group.trim().toLowerCase())
 
-  const probe = useCallback(async (id: ModuleId): Promise<CapState> => {
-    if (id === 'world') return { status: 'ready' }
-    try {
-      const cap = id === 'players' ? await transport.playerCapabilities() : await transport.fishCapabilities()
-      if (!cap.plugin) return { status: 'missing' }
-      if (!cap.permission) return { status: 'no-permission' }
-      return { status: 'ready' }
-    } catch (err) {
-      if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
-        onTokenInvalid()
-        return { status: 'auth' }
+  /** 模块 id → 能力状态（纯函数，便于统一解释「缺插件 / 无权限 / 版本过旧」）。 */
+  const capStateOf = useCallback(
+    (id: ModuleId, caps: ServerCapabilities): CapState => {
+      if (id === 'world') return { status: 'ready' }
+      if (id === 'requisition') {
+        if (!caps.requests.plugin) return { status: 'missing' }
+        if (!caps.requests.submit && !caps.requests.review) return { status: 'no-permission' }
+        return { status: 'ready' }
       }
-      return { status: 'error', message: err instanceof Error ? err.message : t('modules.probeFailed') }
-    }
-  }, [transport, onTokenInvalid, t])
+      if (id === 'players') {
+        if (!caps.player.plugin) return { status: 'missing' }
+        if (!caps.player.permission) return { status: 'no-permission' }
+        return { status: 'ready' }
+      }
+      if (!caps.fish.plugin) return { status: 'missing' }
+      // 装了 v1.6.2 之前的老版本 FishShop：只有游戏内指令，没有 REST 接口。
+      if (!caps.fish.rest) return { status: 'outdated' }
+      if (!caps.fish.permission) return { status: 'no-permission' }
+      return { status: 'ready' }
+    },
+    [],
+  )
 
   const probeAll = useCallback(async () => {
     if (!authenticated) {
       setCaps({
         players: { status: 'auth' },
         store: { status: 'auth' },
+        requisition: { status: 'auth' },
         world: { status: 'auth' },
       })
       setBatchPlugin(null)
@@ -145,24 +153,55 @@ export function SettingsPage({
     setCaps({
       players: { status: 'checking' },
       store: { status: 'checking' },
+      requisition: { status: 'checking' },
       world: { status: 'ready' },
     })
     setBatchPlugin(null)
-    const [players, store] = await Promise.all([probe('players'), probe('store')])
-    setCaps({ players, store, world: { status: 'ready' } })
+    // 统一能力矩阵：一次请求拿到全部插件状态（以前是 4 个端点各探一轮）。
+    // fresh=true 绕过服务端 3 秒微缓存，保证「设置页」看到的是刚装上插件后的真实状态。
     try {
-      const cap = await transport.batchCapabilities()
-      setBatchPlugin(cap.plugin)
-    } catch {
-      setBatchPlugin(false)
+      const caps = await transport.capabilities(true)
+      if (!caps.reachable) {
+        // TShock 不可达：不给出「缺插件」的误导结论。
+        const down: CapState = { status: 'error', message: t('modules.probeFailed') }
+        setCaps({ players: down, store: down, requisition: down, world: { status: 'ready' } })
+        setBatchPlugin(null)
+        return
+      }
+      setCaps({
+        players: capStateOf('players', caps),
+        store: capStateOf('store', caps),
+        requisition: capStateOf('requisition', caps),
+        world: { status: 'ready' },
+      })
+      setBatchPlugin(caps.batch.plugin)
+    } catch (err) {
+      if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
+        onTokenInvalid()
+        setCaps({
+          players: { status: 'auth' },
+          store: { status: 'auth' },
+          requisition: { status: 'auth' },
+          world: { status: 'auth' },
+        })
+        setBatchPlugin(null)
+        return
+      }
+      const failed: CapState = {
+        status: 'error',
+        message: err instanceof Error ? err.message : t('modules.probeFailed'),
+      }
+      setCaps({ players: failed, store: failed, requisition: failed, world: { status: 'ready' } })
+      setBatchPlugin(null)
     }
-  }, [authenticated, probe, transport])
+  }, [authenticated, capStateOf, transport, onTokenInvalid, t])
 
   // 切换服务器后必须重新探测（不同服务器安装的插件不同）。
   useEffect(() => {
     setCaps({
       players: { status: 'checking' },
       store: { status: 'checking' },
+      requisition: { status: 'checking' },
       world: { status: 'ready' },
     })
     setBatchPlugin(null)
@@ -231,6 +270,20 @@ export function SettingsPage({
     [customModules, onCustomModulesChange, setRawModuleCards, serverId],
   )
 
+  // 自定义模块顺序即侧栏顺序：上移 / 下移与拖拽共用同一个数组重排。
+  const moveCustomModule = useCallback(
+    (id: string, delta: number) => {
+      const from = customModules.findIndex((m) => m.id === id)
+      const to = from + delta
+      if (from < 0 || to < 0 || to >= customModules.length) return
+      const next = [...customModules]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      onCustomModulesChange(next)
+    },
+    [customModules, onCustomModulesChange],
+  )
+
   const statusText = useMemo(
     () => (s: CapStatus): string => t(`modules.status.${s}`),
     [t],
@@ -271,12 +324,11 @@ export function SettingsPage({
         }
       >
         <CollapsibleGroup title={t('modules.tab.builtin')}>
-          <p className="text-2xs text-muted-foreground">{t('modules.activateHint')}</p>
+          <p className="text-xs text-muted-foreground">{t('modules.activateHint')}</p>
           <ul className="flex flex-col gap-2">
             {MODULE_DEFS.map((def) => {
               const cap = caps[def.id]
               const enabled = isModuleEnabled(modules, serverId, def.id)
-              const usable = cap.status === 'ready'
               return (
                 <li
                   key={def.id}
@@ -287,35 +339,36 @@ export function SettingsPage({
                       <span className="text-sm text-foreground">{t(def.titleKey)}</span>
                       <CapBadge status={cap.status} text={statusText(cap.status)} />
                     </div>
-                    <p className="mt-0.5 text-2xs text-muted-foreground">{t(def.requiresKey)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t(def.requiresKey)}</p>
                     {cap.status === 'error' && cap.message && (
-                      <p className="mt-0.5 flex items-center gap-1 text-2xs text-destructive">
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-destructive">
                         <AlertTriangle className="size-3" />
                         {cap.message}
                       </p>
                     )}
                     {cap.status === 'no-permission' && (
-                      <p className="mt-0.5 flex items-center gap-1 text-2xs text-warning">
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-warning">
                         <ShieldAlert className="size-3" />
                         {t('modules.noPermissionHint')}
                       </p>
                     )}
+                    {cap.status === 'outdated' && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-warning">
+                        <AlertTriangle className="size-3" />
+                        {t('modules.outdatedHint')}
+                      </p>
+                    )}
                   </div>
-                  {cap.status === 'checking' ? (
-                    <Spinner className="text-muted-foreground" />
-                  ) : (
-                    <Switch
-                      checked={enabled}
-                      disabled={!usable}
-                      onCheckedChange={(v) => toggle(def.id, v)}
-                      aria-label={t(def.titleKey)}
-                    />
-                  )}
+                  <Switch
+                    checked={enabled}
+                    onCheckedChange={(v) => toggle(def.id, v)}
+                    aria-label={t(def.titleKey)}
+                  />
                 </li>
               )
             })}
           </ul>
-          <p className="text-2xs text-muted-foreground">{t('modules.note')}</p>
+          <p className="text-xs text-muted-foreground">{t('modules.note')}</p>
         </CollapsibleGroup>
 
         <CollapsibleGroup title={t('modules.tab.custom')}>
@@ -327,6 +380,7 @@ export function SettingsPage({
             onToggle={toggle}
             onUpdate={updateCustomModule}
             onRemove={(id) => onCustomModulesChange(customModules.filter((x) => x.id !== id))}
+            onMove={moveCustomModule}
             newName={newModuleName}
             newCommand={newModuleCommand}
             onNewNameChange={setNewModuleName}
@@ -363,7 +417,14 @@ export function SettingsPage({
 }
 
 function CapBadge({ status, text }: { status: CapStatus; text: string }) {
-  const tone = status === 'ready' ? 'success' : status === 'missing' ? 'danger' : status === 'no-permission' ? 'warn' : 'neutral'
+  const tone =
+    status === 'ready'
+      ? 'success'
+      : status === 'missing'
+        ? 'danger'
+        : status === 'no-permission' || status === 'outdated'
+          ? 'warn'
+          : 'neutral'
   return <Badge tone={tone}>{text}</Badge>
 }
 

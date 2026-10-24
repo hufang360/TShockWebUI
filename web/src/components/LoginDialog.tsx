@@ -227,7 +227,7 @@ export function LoginDialog({
     <button
       type="button"
       onClick={() => setServerOpen(true)}
-      className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-accent/50 px-3 py-2 text-left transition-colors hover:bg-accent"
+      className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-accent/50 px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={`${t('login.server')}: ${serverLabel}`}
     >
       <Server className="size-4 shrink-0 text-muted-foreground" />
@@ -436,7 +436,7 @@ export function LoginDialog({
               {submitting && mode === 'online' && (
                 <button
                   type="button"
-                  className="mx-auto cursor-pointer text-xs font-medium text-foreground/75 transition-colors hover:text-foreground hover:underline"
+                  className="mx-auto cursor-pointer rounded-sm text-xs font-medium text-foreground/75 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={cancelWait}
                 >
                   {t('login.onlineCancel')}
@@ -488,7 +488,7 @@ export function LoginDialog({
                       type="button"
                       onPointerEnter={openHelp}
                       onPointerLeave={scheduleCloseHelp}
-                      className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      className="flex cursor-pointer items-center gap-1 rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <CircleHelp className="size-3.5" />
                       {t('login.help')}
@@ -506,11 +506,11 @@ export function LoginDialog({
                     onFocusOutside={() => setHelpOpen(false)}
                     onInteractOutside={() => setHelpOpen(false)}
                   >
-                    <p className="text-2xs leading-4 whitespace-pre-line text-foreground/70">
+                    <p className="text-xs leading-5 whitespace-pre-line text-foreground/70">
                       {helpText}
                     </p>
                     {mode === 'password' && !transport.mock && (
-                      <p className="pt-1.5 text-2xs leading-4 whitespace-pre-line text-foreground/70">
+                      <p className="pt-1.5 text-xs leading-5 whitespace-pre-line text-foreground/70">
                         {t('login.help.registerHint')}
                       </p>
                     )}

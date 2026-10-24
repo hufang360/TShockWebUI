@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { PanelLeft, PanelLeftClose } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import {
   Button,
   Sidebar,
@@ -8,6 +8,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -22,10 +23,24 @@ import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import type { TabId } from '@/types'
 
+export type NavGroup =
+  | 'primary'
+  | 'library'
+  | 'players'
+  | 'world'
+  | 'store'
+  | 'services'
+  | 'custom'
+  | 'system'
+
 export interface NavItem {
   id: TabId
   label: string
   icon: LucideIcon
+  /** 侧栏分组；省略时归入“常用”。 */
+  group?: NavGroup
+  /** 悬停 / 聚焦导航项时预取目标页面。 */
+  onPrefetch?: () => void
 }
 
 interface AppShellProps {
@@ -57,24 +72,52 @@ function SidebarNav({
   activeTab: TabId
   onTabChange: (tab: TabId) => void
 }) {
+  const { t } = useI18n()
   const { isMobile, setOpenMobile } = useSidebar()
+  const groups: { id: NavGroup; label?: string }[] = [
+    { id: 'primary' },
+    { id: 'library', label: t('nav.group.library') },
+    { id: 'players', label: t('nav.group.players') },
+    { id: 'world', label: t('nav.group.world') },
+    { id: 'store', label: t('nav.group.store') },
+    { id: 'services', label: t('nav.group.services') },
+    { id: 'custom', label: t('nav.group.custom') },
+    { id: 'system' },
+  ]
   return (
-    <SidebarMenu>
-      {nav.map((item) => (
-        <SidebarMenuItem key={item.id}>
-          <SidebarMenuButton
-            isActive={activeTab === item.id}
-            onClick={() => {
-              onTabChange(item.id)
-              if (isMobile) setOpenMobile(false)
-            }}
-          >
-            <item.icon />
-            <span className="truncate">{item.label}</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      ))}
-    </SidebarMenu>
+    <>
+      {groups.map((group) => {
+        const items = nav.filter((item) => (item.group ?? 'primary') === group.id)
+        if (items.length === 0) return null
+        return (
+          <SidebarGroup key={group.id} className="gap-1 p-2">
+            {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {items.map((item) => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      isActive={activeTab === item.id}
+                      aria-current={activeTab === item.id ? 'page' : undefined}
+                      onClick={() => {
+                        onTabChange(item.id)
+                        if (isMobile) setOpenMobile(false)
+                      }}
+                      onPointerEnter={item.onPrefetch}
+                      onPointerDown={item.onPrefetch}
+                      onFocus={item.onPrefetch}
+                    >
+                      <item.icon />
+                      <span className="truncate">{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )
+      })}
+    </>
   )
 }
 
@@ -95,6 +138,14 @@ export function AppShell({
   const activeLabel =
     nav.find((item) => item.id === activeTab)?.label ??
     (activeTab === 'settings' ? t('settings.title') : '')
+  const previousTab = useRef(activeTab)
+
+  // 页面切换后把焦点交给主内容；配合路由骨架的 aria-live，读屏能感知新页面正在加载。
+  useEffect(() => {
+    if (previousTab.current === activeTab) return
+    previousTab.current = activeTab
+    document.getElementById('main-content')?.focus({ preventScroll: true })
+  }, [activeTab])
 
   return (
     <SidebarProvider
@@ -104,6 +155,12 @@ export function AppShell({
         if (open === sidebarCollapsed) onToggleSidebar()
       }}
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-lg"
+      >
+        {t('nav.skipToContent')}
+      </a>
       <div className="flex h-full w-full overflow-hidden bg-background text-foreground">
         <Sidebar collapsible="offcanvas" data-testid="sidebar">
           <SidebarHeader>
@@ -128,11 +185,7 @@ export function AppShell({
           </SidebarHeader>
 
           <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarNav nav={nav} activeTab={activeTab} onTabChange={onTabChange} />
-              </SidebarGroupContent>
-            </SidebarGroup>
+            <SidebarNav nav={nav} activeTab={activeTab} onTabChange={onTabChange} />
           </SidebarContent>
 
           <SidebarFooter>
@@ -142,7 +195,7 @@ export function AppShell({
           <SidebarRail aria-label={t('nav.toggleSidebar')} title={t('nav.toggleSidebar')} />
         </Sidebar>
 
-        <SidebarInset className="min-h-0 flex-1 overflow-y-auto">
+        <SidebarInset id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto">
           {/* 移动端顶栏（打开抽屉）/ 桌面端收起时的展开按钮；桌面展开时不渲染，避免多出一条空导航条 */}
           <div
             className={cn(

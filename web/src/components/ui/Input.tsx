@@ -1,9 +1,13 @@
-import type { ComponentProps, HTMLAttributes } from 'react'
+import { useId, type ComponentProps, type HTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
-export function Input({ className, ...props }: ComponentProps<'input'>) {
+export function Input({ className, id, name, ...props }: ComponentProps<'input'>) {
+  const generatedId = useId()
+  const inputId = id ?? generatedId
   return (
     <input
+      id={inputId}
+      name={name ?? inputId}
       data-slot="input"
       className={cn(
         'h-9 w-full rounded-lg bg-accent px-3 text-sm text-foreground',

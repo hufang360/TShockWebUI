@@ -4,6 +4,7 @@ export { Card, CardBody, CardHeader, CardTitle } from './Card'
 export { Badge, badgeVariants } from './Badge'
 export type { BadgeProps } from './Badge'
 export { Input, Kbd } from './Input'
+export { Textarea } from './Textarea'
 export { Label } from './Label'
 export { Spinner } from './Spinner'
 export { Alert, AlertTitle, AlertDescription } from './Alert'
@@ -46,7 +47,22 @@ export {
   SelectSeparator,
 } from './Select'
 export { Separator } from './Separator'
+export {
+  Drawer,
+  DrawerTrigger,
+  DrawerClose,
+  DrawerPortal,
+  DrawerOverlay,
+  DrawerSwipeHandle,
+  DrawerContent,
+  DrawerHeader,
+  DrawerFooter,
+  DrawerTitle,
+  DrawerDescription,
+} from './Drawer'
+export type { DrawerSwipeDirection } from './Drawer'
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from './Collapsible'
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './Accordion'
 export {
   Sheet,
   SheetTrigger,
@@ -109,3 +125,4 @@ export {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
 } from './DropdownMenu'
+export { Skeleton } from './Skeleton'

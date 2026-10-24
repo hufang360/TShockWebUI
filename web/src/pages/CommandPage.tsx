@@ -1,5 +1,15 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Activity, BookOpen, History, Package, ShoppingBasket, Star } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import {
+  Activity,
+  BookOpen,
+  History,
+  MessageCircle,
+  Package,
+  PanelRight,
+  ShoppingBasket,
+  Star,
+  Terminal,
+} from 'lucide-react'
 import { HistoryPanel } from '@/components/command/HistoryPanel'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { CommandEditor } from '@/components/CommandEditor'
@@ -10,21 +20,35 @@ import { LoginGate } from '@/components/LoginGate'
 import { ResultPanel, type ResultEntry } from '@/components/ResultPanel'
 import { ServerFeedTab } from '@/components/ServerFeed'
 import { TagAssist } from '@/components/TagAssist'
+import { WebChatInput } from '@/components/WebChatInput'
 import {
   Badge,
+  Button,
   Card,
   CardBody,
   CardHeader,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   Separator,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
   Tabs,
   TabsList,
   TabsTrigger,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useLocalState } from '@/hooks/useLocalState'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { usePageHeight } from '@/hooks/usePageHeight'
 import { inspectCommand, type CommandCheck } from '@/lib/commands'
 import { computeCompletions, paramHintFor } from '@/lib/completion'
 import type { CompletionItem } from '@/lib/completion'
@@ -154,38 +178,30 @@ export function CommandPage({
   const [tab, setTab] = useLocalState<SidebarTab>(StorageKeys.commandTab, 'items')
   // 右栏整列可折叠。
   const [panelOpen, setPanelOpen] = useState(true)
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false)
+  const [composerMode, setComposerMode] = useState<'command' | 'chat'>('command')
+  const [chatText, setChatText] = useState('')
+  const [feedRefreshToken, setFeedRefreshToken] = useState(0)
   const [insertRequest, setInsertRequest] = useState<{ token: number; text: string } | null>(null)
   const insertSeq = useRef(0)
   // 递增令牌：让指令输入框重新聚焦并把光标移到末尾（载入指令 / 历史时）。
   const [focusSeq, setFocusSeq] = useState(0)
   const focusEnd = useCallback(() => setFocusSeq((n) => n + 1), [])
-  // 左列至少铺满 main 的可见高度：输入框是 sticky bottom-0，只有容器真正到屏幕底部，
-  // 它才会贴在底部，而不是停在结果卡片下方的屏幕中间（图鉴页同款量法）。
+  const wideLayout = useMediaQuery('(min-width: 1280px)')
+  const openTools = useCallback(
+    (nextTab: SidebarTab) => {
+      setTab(nextTab)
+      if (!wideLayout) {
+        setMobileToolsOpen(true)
+      } else {
+        setPanelOpen(true)
+      }
+    },
+    [setTab, wideLayout],
+  )
+  // 页面始终占满主内容区：结果区自己滚动，输入框固定在页面底部。
   const rootRef = useRef<HTMLDivElement>(null)
-  const [fillHeight, setFillHeight] = useState<number | undefined>(undefined)
-  useLayoutEffect(() => {
-    const el = rootRef.current
-    const scroller = el?.closest('main')
-    if (!el || !(scroller instanceof HTMLElement)) return
-    const measure = () => {
-      const box = scroller.getBoundingClientRect()
-      const top = el.getBoundingClientRect().top - box.top + scroller.scrollTop
-      // 内容区外层（AppShell 的 p-3 / md:p-6 包裹层）的底边距。
-      let wrap: HTMLElement | null = el
-      while (wrap && wrap.parentElement !== scroller) wrap = wrap.parentElement
-      const padBottom = wrap ? Number.parseFloat(getComputedStyle(wrap).paddingBottom) || 0 : 0
-      setFillHeight(Math.max(280, Math.round(scroller.clientHeight - top - padBottom)))
-    }
-    measure()
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined
-    ro?.observe(scroller)
-    window.addEventListener('resize', measure)
-    return () => {
-      ro?.disconnect()
-      window.removeEventListener('resize', measure)
-    }
-    // 依赖 authenticated：未登录时先渲染 LoginGate，rootRef 尚未挂载；登录后需重新量高。
-  }, [authenticated])
+  const fillHeight = usePageHeight(rootRef, authenticated)
 
   const check = useMemo(() => inspectCommand(text, dataset), [text, dataset])
 
@@ -409,45 +425,28 @@ export function CommandPage({
     )
   }
 
-  return (
-    <ItemFavoritesProvider api={favoritesApi}>
-    <div
-      ref={rootRef}
-      // 两列锁到实测可用高度：左卡片内结果区滚动、输入框贴卡片底部（图鉴/鱼店同款量法）。
-      className="grid gap-4 xl:h-[var(--cmd-fill)] xl:grid-cols-[minmax(0,1fr)_360px]"
-      style={fillHeight ? ({ '--cmd-fill': `${fillHeight}px` } as CSSProperties) : undefined}
+  const emptyState = results.length === 0 && !running
+  const modeToggle = (
+    <Button
+      size="icon"
+      variant="ghost"
+      className="size-9 shrink-0 rounded-full"
+      onClick={() => setComposerMode((mode) => (mode === 'command' ? 'chat' : 'command'))}
+      aria-label={
+        composerMode === 'command' ? t('editor.mode.switchToChat') : t('editor.mode.switchToCommand')
+      }
+      title={
+        composerMode === 'command' ? t('editor.mode.switchToChat') : t('editor.mode.switchToCommand')
+      }
+      aria-pressed={composerMode === 'chat'}
     >
-      {/* 主列：单卡片 = 头部 + 可滚动结果区 + 底部输入框（透明底、无投影） */}
-      <Card className="flex min-w-0 flex-col bg-transparent shadow-none xl:min-h-0">
-        <CardHeader className="shrink-0">
-          <h2 className="text-lg font-semibold text-foreground">{t('editor.title')}</h2>
-          <div className="flex items-center gap-2">
-            {transport.mock && <Badge tone="mock">{t('editor.mockOutput')}</Badge>}
-            <ConfirmButton
-              onConfirm={() => setResults(() => [])}
-              disabled={results.length === 0}
-              confirmLabel={t('action.clearConfirm')}
-            >
-              {t('result.clear')}
-            </ConfirmButton>
-          </div>
-        </CardHeader>
-        <CardBody className="flex min-h-0 flex-1 flex-col pt-0">
-          <ResultPanel
-            entries={results}
-            running={running}
-            itemsById={dataset.itemsById}
-            prefixesById={dataset.prefixesById}
-            atlas={dataset.atlas}
-            onRemove={removeResult}
-            isFavorite={isFavorite}
-            onToggleFavorite={toggleFavoriteCommand}
-            onToggleCollapse={toggleResultCollapse}
-          />
-        </CardBody>
-        <Separator />
-        {/* 输入框贴在卡片底部（固定高度时不动，只滚动上方结果区）。 */}
-        <div className="shrink-0 px-4 py-3">
+      {composerMode === 'command' ? <MessageCircle /> : <Terminal />}
+    </Button>
+  )
+  const composer = (
+    <>
+      {composerMode === 'command' ? (
+        <>
           <CommandEditor
             value={text}
             onChange={setText}
@@ -462,112 +461,251 @@ export function CommandPage({
             onInsertHandled={() => setInsertRequest(null)}
             focusRequest={focusSeq}
             history={history.map((h) => h.cmd)}
+            beforeSend={modeToggle}
           />
           <TagAssist dataset={dataset} text={text} />
-        </div>
-      </Card>
+        </>
+      ) : (
+        <WebChatInput
+          transport={transport}
+          value={chatText}
+          onValueChange={setChatText}
+          onSent={() => setFeedRefreshToken((n) => n + 1)}
+          beforeSend={modeToggle}
+        />
+      )}
+    </>
+  )
 
-      {/* 右侧栏：物品 / 指令 / 收藏 / 历史 / 动态；整列可折叠 */}
-      <div className={cn('min-w-0', panelOpen && 'xl:min-h-0')}>
-        <Card className={cn('flex min-h-0 flex-col', panelOpen && 'h-full')}>
-          <Collapsible
-            open={panelOpen}
-            onOpenChange={setPanelOpen}
-            className="flex min-h-0 flex-1 flex-col"
-          >
-          <CardHeader className="shrink-0">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="group/title flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
-              >
-                <ShoppingBasket className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm font-semibold tracking-wide text-foreground">
-                  {t('editor.panel')}
-                </span>
-                <CollapseChevron open={panelOpen} className="ml-auto" />
-              </button>
-            </CollapsibleTrigger>
-          </CardHeader>
-          <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
-          <CardHeader className="shrink-0 border-t border-border/60">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as SidebarTab)} className="w-full">
-              <TabsList className="w-full">
-                <TabsTrigger value="items">
-                  <Package data-icon="inline-start" />
-                  {t('editor.tab.items')}
-                </TabsTrigger>
-                <TabsTrigger value="commands">
-                  <BookOpen data-icon="inline-start" />
-                  {t('editor.tab.commands')}
-                </TabsTrigger>
-                <TabsTrigger value="favorites">
-                  <Star data-icon="inline-start" />
-                  {t('editor.tab.favorites')}
-                </TabsTrigger>
-                <TabsTrigger value="history">
-                  <History data-icon="inline-start" />
-                  {t('editor.tab.history')}
-                </TabsTrigger>
-                <TabsTrigger value="events">
-                  <Activity data-icon="inline-start" />
-                  {t('editor.tab.events')}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-          <CardBody className="min-h-0 flex-1 pt-0">
-            {tab === 'events' && (
-              <ServerFeedTab
-                transport={transport}
-                authenticated={authenticated}
-                serverId={serverId}
-                refreshInterval={settings.eventsRefreshInterval}
-                itemsById={dataset.itemsById}
-                prefixesById={dataset.prefixesById}
-                atlas={dataset.atlas}
-              />
-            )}
-            {tab === 'items' && (
-              <ItemSearchPanel
-                dataset={dataset}
-                onInsert={insertText}
-                onOpenInDex={onOpenInDex}
-                favorites={itemFavorites}
-                onInsertFavorite={(id) => {
-                  appendItemId(id)
-                  removeItemFav(id)
-                }}
-              />
-            )}
-            {tab === 'commands' && (
-              <CommandPickerPanel view="commands" dataset={dataset} onLoad={loadText} />
-            )}
-            {tab === 'favorites' && (
-              <CommandPickerPanel
-                view="favorites"
-                dataset={dataset}
-                favorites={favorites}
-                onRemoveFavorite={removeFavorite}
-                onClearFavorites={clearFavorites}
-                onLoad={loadText}
-              />
-            )}
-            {tab === 'history' && (
-              <HistoryPanel
-                history={history}
-                onLoad={loadText}
-                onRemove={removeHistory}
-                onDedupe={dedupeHistory}
-                onClear={() => setRawHistory([])}
-              />
-            )}
-          </CardBody>
-          </CollapsibleContent>
-          </Collapsible>
-        </Card>
+  const toolsContent = (
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as SidebarTab)} className="w-full gap-0">
+        <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
+          <TabsTrigger value="items" className="min-w-14 shrink-0">
+            <Package data-icon="inline-start" />
+            {t('editor.tab.items')}
+          </TabsTrigger>
+          <TabsTrigger value="commands" className="min-w-14 shrink-0">
+            <BookOpen data-icon="inline-start" />
+            {t('editor.tab.commands')}
+          </TabsTrigger>
+          <TabsTrigger value="favorites" className="min-w-14 shrink-0">
+            <Star data-icon="inline-start" />
+            {t('editor.tab.favorites')}
+          </TabsTrigger>
+          <TabsTrigger value="history" className="min-w-14 shrink-0">
+            <History data-icon="inline-start" />
+            {t('editor.tab.history')}
+          </TabsTrigger>
+          <TabsTrigger value="events" className="min-w-14 shrink-0">
+            <Activity data-icon="inline-start" />
+            {t('editor.tab.events')}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {tab === 'events' && (
+          <ServerFeedTab
+            transport={transport}
+            authenticated={authenticated}
+            serverId={serverId}
+            refreshInterval={settings.eventsRefreshInterval}
+            refreshToken={feedRefreshToken}
+            itemsById={dataset.itemsById}
+            prefixesById={dataset.prefixesById}
+            atlas={dataset.atlas}
+          />
+        )}
+        {tab === 'items' && (
+          <ItemSearchPanel
+            dataset={dataset}
+            onInsert={insertText}
+            onOpenInDex={onOpenInDex}
+            favorites={itemFavorites}
+            onInsertFavorite={(id) => {
+              appendItemId(id)
+              removeItemFav(id)
+            }}
+          />
+        )}
+        {tab === 'commands' && (
+          <CommandPickerPanel
+            view="commands"
+            dataset={dataset}
+            onLoad={loadText}
+          />
+        )}
+        {tab === 'favorites' && (
+          <CommandPickerPanel
+            view="favorites"
+            dataset={dataset}
+            favorites={favorites}
+            onRemoveFavorite={removeFavorite}
+            onClearFavorites={clearFavorites}
+            onLoad={loadText}
+          />
+        )}
+        {tab === 'history' && (
+          <HistoryPanel
+            history={history}
+            onLoad={loadText}
+            onRemove={removeHistory}
+            onDedupe={dedupeHistory}
+            onClear={() => setRawHistory([])}
+          />
+        )}
       </div>
     </div>
+  )
+
+  return (
+    <ItemFavoritesProvider api={favoritesApi}>
+      <div
+        ref={rootRef}
+        data-testid="command-workspace"
+        className="flex h-full min-h-[360px] min-w-0 flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_360px]"
+        style={fillHeight ? { height: fillHeight } : undefined}
+      >
+        {/* 主列：头部 + 可滚动结果区 + 始终贴底的输入框。 */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <CardHeader className="shrink-0">
+            <h2 className="text-lg font-semibold text-foreground">{t('editor.title')}</h2>
+            <div className="flex items-center gap-1.5">
+              {transport.mock && <Badge tone="mock">{t('editor.mockOutput')}</Badge>}
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="xl:hidden"
+                onClick={() => setMobileToolsOpen(true)}
+                aria-label={t('editor.openPanel')}
+                title={t('editor.openPanel')}
+              >
+                <PanelRight data-icon="inline-start" />
+              </Button>
+              <ConfirmButton
+                onConfirm={() => setResults(() => [])}
+                disabled={results.length === 0}
+                confirmLabel={t('action.clearConfirm')}
+              >
+                {t('result.clear')}
+              </ConfirmButton>
+            </div>
+          </CardHeader>
+          <CardBody className="flex min-h-0 flex-1 flex-col overflow-hidden pt-0">
+            {emptyState ? (
+              <Empty className="h-full min-h-0 w-full self-center border border-dashed p-5 sm:p-8">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Terminal />
+                  </EmptyMedia>
+                  <EmptyTitle>{t('editor.emptyTitle')}</EmptyTitle>
+                  <EmptyDescription>{t('editor.emptyHint')}</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent className="max-w-xl">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => openTools('commands')}
+                    >
+                      <BookOpen data-icon="inline-start" />
+                      {t('editor.browseCommands')}
+                    </Button>
+                    {favorites.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openTools('favorites')}
+                      >
+                        <Star data-icon="inline-start" />
+                        {t('editor.tab.favorites')} · {favorites.length}
+                      </Button>
+                    )}
+                  </div>
+                  {history.length > 0 && tab !== 'history' && (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span className="text-2xs text-muted-foreground">{t('editor.recentCommands')}</span>
+                      <div className="flex flex-wrap justify-center gap-1.5">
+                        {history.slice(0, 3).map((h) => (
+                          <Button
+                            key={`${h.ts}:${h.cmd}`}
+                            size="sm"
+                            variant="ghost"
+                            className="max-w-full font-pixel text-xs"
+                            title={h.cmd}
+                            onClick={() => loadText(h.cmd)}
+                          >
+                            <span className="truncate">{h.cmd}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </EmptyContent>
+              </Empty>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <ResultPanel
+                  entries={results}
+                  running={running}
+                  itemsById={dataset.itemsById}
+                  prefixesById={dataset.prefixesById}
+                  atlas={dataset.atlas}
+                  onRemove={removeResult}
+                  isFavorite={isFavorite}
+                  onToggleFavorite={toggleFavoriteCommand}
+                  onToggleCollapse={toggleResultCollapse}
+                />
+              </div>
+            )}
+          </CardBody>
+          <Separator />
+          <div className="shrink-0 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-3">
+            {composer}
+          </div>
+        </div>
+
+        {/* 桌面右侧工具列。手机端改为 Sheet，避免挤压输入区。 */}
+        <div
+          id="command-tools"
+          className={cn('hidden min-w-0 scroll-mt-14 xl:block', panelOpen && 'xl:min-h-0')}
+        >
+          <Card className={cn('flex min-h-0 flex-col', panelOpen && 'h-full')}>
+            <Collapsible
+              open={panelOpen}
+              onOpenChange={setPanelOpen}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <CardHeader className="shrink-0">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="group/title flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+                  >
+                    <ShoppingBasket className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate text-sm font-semibold tracking-wide text-foreground">
+                      {t('editor.panel')}
+                    </span>
+                    <CollapseChevron open={panelOpen} className="ml-auto" />
+                  </button>
+                </CollapsibleTrigger>
+              </CardHeader>
+              <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
+                <CardBody className="min-h-0 flex-1 pt-0">{toolsContent}</CardBody>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        </div>
+
+        <Sheet open={mobileToolsOpen} onOpenChange={setMobileToolsOpen}>
+          <SheetContent side="right" className="flex w-full flex-col gap-3 p-4 sm:max-w-md">
+            <SheetHeader className="pr-8">
+              <SheetTitle>{t('editor.panel')}</SheetTitle>
+            </SheetHeader>
+            <div className="min-h-0 flex-1">{toolsContent}</div>
+          </SheetContent>
+        </Sheet>
+      </div>
     </ItemFavoritesProvider>
   )
 }

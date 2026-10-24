@@ -35,6 +35,8 @@ export interface CommandCardProps {
   unavailableText?: ReactNode
   /** 无结果时的文案。 */
   emptyText?: ReactNode
+  /** 无结果时压成一行（默认开），避免首页出现多张高空白卡。 */
+  compactEmpty?: boolean
   /** 底部命令右侧的弱化备注。 */
   footerNote?: ReactNode
   /** 右上角按钮语义：`refresh`（默认）显示刷新图标；`run` 表示手动执行，显示播放图标。 */
@@ -62,6 +64,7 @@ export function CommandCard({
   unavailable,
   unavailableText,
   emptyText,
+  compactEmpty = true,
   footerNote,
   action = 'refresh',
   onRefresh,
@@ -75,8 +78,54 @@ export function CommandCard({
   // 展开 / 折叠状态按卡片记忆（切换模块回来仍保持）。
   const [open, setOpen] = useCollapsed(collapseKey)
   const lastRun = result?.ts ? new Date(result.ts) : null
+  const refreshButton = (compact: boolean) =>
+    onRefresh ? (
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size={compact ? 'icon-sm' : 'sm'}
+              variant="ghost"
+              aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
+              disabled={unavailable || loading}
+              onClick={onRefresh}
+            >
+              {loading ? (
+                <Spinner aria-hidden data-icon="inline-start" />
+              ) : action === 'run' ? (
+                <Play data-icon="inline-start" />
+              ) : (
+                <RefreshCw data-icon="inline-start" />
+              )}
+              {!compact && (action === 'run' ? t('home.run') : t('home.refresh'))}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {lastRun ? t('home.lastRun', { time: lastRun.toLocaleTimeString() }) : t('home.neverRun')}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ) : null
+
+  if (compactEmpty && !result && !loading && !unavailable && onRefresh) {
+    return (
+      <Card className={cn('overflow-hidden', className)} data-command={command ?? undefined}>
+        <CardBody className="flex flex-wrap items-center gap-2 py-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {icon}
+            <span className="min-w-0 truncate text-sm font-semibold text-foreground">{title}</span>
+          </div>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {emptyText ?? t('home.notRun')}
+          </span>
+          {refreshButton(false)}
+        </CardBody>
+      </Card>
+    )
+  }
+
   return (
-    <Card className={cn('flex flex-col overflow-hidden', className)}>
+    <Card className={cn('flex flex-col overflow-hidden', className)} data-command={command ?? undefined}>
       <Collapsible
         open={open}
         onOpenChange={setOpen}
@@ -104,43 +153,18 @@ export function CommandCard({
               {title}
             </span>
             {/* 操作按钮：默认隐藏，hover 表头才显示；折叠时不显示；点击不触发折叠。 */}
-            <div
-              className={cn(
-                'flex shrink-0 items-center gap-1',
-                open ? 'opacity-0 transition-opacity group-hover/header:opacity-100' : 'hidden',
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {onRefresh && (
-                <TooltipProvider delayDuration={150}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
-                        disabled={unavailable || loading}
-                        onClick={onRefresh}
-                      >
-                        {loading ? (
-                          <Spinner aria-hidden data-icon="inline-start" />
-                        ) : action === 'run' ? (
-                          <Play data-icon="inline-start" />
-                        ) : (
-                          <RefreshCw data-icon="inline-start" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {lastRun
-                        ? t('home.lastRun', { time: lastRun.toLocaleTimeString() })
-                        : t('home.neverRun')}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-            <CollapseChevron open={open} reveal="group-hover/header:opacity-100" />
+            {open && (result || loading) && (
+              <div
+                className="flex shrink-0 touch-visible items-center gap-1 opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {refreshButton(true)}
+              </div>
+            )}
+            <CollapseChevron
+              open={open}
+              reveal="group-hover/header:opacity-100 group-focus-within/header:opacity-100"
+            />
           </CardHeader>
         </CollapsibleTrigger>
         <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
@@ -151,32 +175,25 @@ export function CommandCard({
                   {unavailableText ?? t('home.needLogin')}
                 </p>
               ) : result ? (
-                <div className="flex flex-col gap-1.5">
-                  {/* 无权限：卡片保留，给出本地化提示（TShock 的原文可能不是当前语言）。 */}
-                  {result.status === 'no_permission' && (
-                    <p className="text-xs text-warning">{t('home.permissionDenied')}</p>
-                  )}
+                <div className="max-h-40 overflow-y-auto">
                   <CommandOutput
-                    result={
-                      result.status === 'no_permission'
-                        ? { ...result, message: undefined }
-                        : result
-                    }
+                    result={result}
+                    showStatus={result.status !== 'ok'}
                     itemsById={itemsById}
                     prefixesById={prefixesById}
                     atlas={atlas}
                   />
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  {loading ? t('home.refreshing') : (emptyText ?? t('home.empty'))}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {loading ? t('home.refreshing') : (emptyText ?? t('home.notRun'))}
+                  </p>
+                  {!loading && refreshButton(false)}
+                </div>
               )}
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
-              <code className="font-pixel text-2xs text-muted-foreground">{command ?? '—'}</code>
-              {footerNote}
-            </div>
+            {footerNote && <div className="shrink-0 text-2xs text-muted-foreground">{footerNote}</div>}
           </CardBody>
         </CollapsibleContent>
       </Collapsible>

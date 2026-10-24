@@ -30,6 +30,8 @@ export const STATUS_TONE: Record<
   'success' | 'danger' | 'warn' | 'neutral'
 > = {
   ok: 'success',
+  // 指令不存在多为「插件未安装」，不是玩家的输入错误，与 command_error 区分色调。
+  command_not_found: 'warn',
   command_error: 'danger',
   no_permission: 'danger',
   token_invalid: 'warn',
@@ -78,10 +80,15 @@ function OutputBlock({
   }
   return (
     <div className="group/rich relative">
-      <div className="flex flex-col gap-1 rounded-xl bg-accent/60 p-3 pr-9 font-pixel text-sm leading-6 break-words whitespace-pre-wrap text-foreground">
+      {/* 富文本正文 text-xs（12px 字号 / 20px 行高）：只缩字号，行内物品图标仍是 24px（游戏聊天占位框） */}
+      <div className="flex flex-col gap-1 rounded-xl bg-accent/60 p-3 pr-9 font-pixel text-xs leading-5 break-words whitespace-pre-wrap text-foreground">
         {output.map((line, index) => (
-          <p key={index} className="min-h-6">
-            {!line ? '\u00a0' : <RichText text={line} itemsById={itemsById} prefixesById={prefixesById} atlas={atlas} />}
+          <p key={index} className="min-h-5">
+            {!line ? (
+              '\u00a0'
+            ) : (
+              <RichText text={line} itemsById={itemsById} prefixesById={prefixesById} atlas={atlas} />
+            )}
           </p>
         ))}
       </div>
@@ -89,7 +96,7 @@ function OutputBlock({
       <Button
         size="icon-sm"
         variant="ghost"
-        className="absolute top-1.5 right-1.5 rounded-full opacity-0 transition-opacity group-hover/rich:opacity-100 focus-visible:opacity-100"
+        className="touch-visible absolute top-1.5 right-1.5 rounded-full opacity-0 transition-opacity group-hover/rich:opacity-100 focus-visible:opacity-100"
         aria-label={t('action.copy')}
         title={copied ? t('action.copied') : t('action.copy')}
         onClick={(e) => {
@@ -162,7 +169,7 @@ function ResultItem({
   const favorited = isFavorite?.(command) ?? false
   const toggleLabel = collapsed ? t('result.expand') : t('result.collapse')
   return (
-    <div className="group/result rounded-xl border border-border/60 bg-card/40 p-3">
+    <div className="group/result rounded-xl bg-card/40 p-3">
       <Collapsible open={!collapsed} onOpenChange={(o) => setCollapsed(!o)}>
         {/* 表头整块可点击折叠：指令文本可鼠标选中复制（选中时不折叠）。 */}
         <CollapsibleTrigger asChild>
@@ -192,7 +199,7 @@ function ResultItem({
             </span>
             {/* 收藏 / 删除：hover 卡片才出现；点击不触发展开 / 折叠。 */}
             <div
-              className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/result:opacity-100 focus-within:opacity-100"
+              className="touch-visible flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/result:opacity-100 focus-within:opacity-100"
               onClick={(e) => e.stopPropagation()}
             >
               {onToggleFavorite && result.status === 'ok' && (
@@ -221,7 +228,10 @@ function ResultItem({
                 </Button>
               )}
             </div>
-            <CollapseChevron open={!collapsed} reveal="group-hover/result:opacity-100" />
+            <CollapseChevron
+              open={!collapsed}
+              reveal="group-hover/result:opacity-100 group-focus-within/result:opacity-100"
+            />
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>

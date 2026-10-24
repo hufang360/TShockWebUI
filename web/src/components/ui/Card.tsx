@@ -5,8 +5,8 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       data-slot="card"
-      // 默认不加边框：靠 `shadow-sm` 的轻微投影在纯白画布上区分；需要边框的地方由调用方单独加。
-      className={cn('rounded-2xl bg-card text-card-foreground shadow-sm', className)}
+      // shadcn 标准卡片表面：圆角 + 语义色边框 + 背景色，不使用投影。
+      className={cn('rounded-xl border bg-card text-card-foreground', className)}
       {...props}
     />
   )

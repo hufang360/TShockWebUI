@@ -9,7 +9,9 @@ gen-atlas.py — 把所有物品图标（含动画取第一帧）拼成一张 sp
 流程：
   1. 读 data/items.json，得到每个物品的贴图 id (icon)、帧数 (frames)、贴图尺寸 (sprite)
   2. 每个贴图只处理一次，裁剪第一帧：宽 × (高 / frames)
-  3. 按「高降序、宽升序」排序，逐行摆放，超过 limitWidth 换行（与参考项目一致）
+  3. 按「高降序、宽升序」排序，逐行摆放，超过 limitWidth 换行（与参考项目一致）；
+     **每格之间留 1px 透明缝**（--padding 1）：前端缩小图标时会开插值，紧贴时双线性采样
+     会读到相邻精灵的纹素，图标边缘出现 1px 亮/暗线（见 docs/功能-富文本解析.md §6.2）
   4. 输出：
        data/items-atlas.png    图集（随仓库提交）
        data/items-atlas.json   裁切信息 { regions: { 贴图id: [x, y, w, h] } }
@@ -21,7 +23,7 @@ gen-atlas.py — 把所有物品图标（含动画取第一帧）拼成一张 sp
 
 用法：
     python3 tools/gen-atlas.py
-    python3 tools/gen-atlas.py --limit-width 1024 --padding 0
+    python3 tools/gen-atlas.py --limit-width 1024 --padding 1
     python3 tools/gen-atlas.py --items data/items.json --sprite-dir /path/to/Images
 """
 
@@ -71,7 +73,7 @@ def main():
     ap.add_argument("--out-json", default=DEFAULT_OUT_JSON)
     ap.add_argument("--out-png", default=DEFAULT_OUT_PNG)
     ap.add_argument("--limit-width", type=int, default=1024, help="图集最大宽度，默认 1024")
-    ap.add_argument("--padding", type=int, default=0, help="每格四周留白像素，默认 0")
+    ap.add_argument("--padding", type=int, default=1, help="每格之间的留白像素，默认 1（防缩放插值采到邻居）")
     ap.add_argument("--max-height", type=int, default=8192, help="超过此高度只告警，不自动切图")
     args = ap.parse_args()
 

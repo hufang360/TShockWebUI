@@ -99,12 +99,67 @@ describe('CommandPage 未登录', () => {
     )
 
     const { rerender } = render(page(false))
-    // 未登录：只有登录提示，没有量高后的 --cmd-fill。
-    expect(document.querySelector('[style*="--cmd-fill"]')).toBeNull()
+    // 未登录：只有登录提示，没有量高后的工作区。
+    expect(screen.queryByTestId('command-workspace')).toBeNull()
 
     rerender(page(true))
-    // 登录后 rootRef 才挂载，需重新量高把卡片撑满。
-    expect(document.querySelector('[style*="--cmd-fill"]')).not.toBeNull()
+    // 登录后 rootRef 才挂载，需重新量高把工作区撑满。
+    expect(screen.getByTestId('command-workspace').style.height).not.toBe('')
+  })
+})
+
+describe('CommandPage 输入模式', () => {
+  it('工具 tabs 使用标准胶囊样式且不换行，空态虚线铺满结果区', () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    const tabs = screen.getByRole('tab', { name: '物品' }).closest('[data-slot="tabs-list"]')
+    expect(tabs?.className).toContain('bg-accent')
+    expect(tabs?.className).toContain('flex-nowrap')
+    expect(tabs?.className).not.toContain('border-b')
+
+    const dashed = screen.getByText('开始一条指令').closest('.border-dashed')
+    expect(dashed?.className).toContain('w-full')
+    expect(dashed?.className).not.toContain('max-w-2xl')
+  })
+
+  it('底部输入框可切换为聊天模式，并保留指令草稿', async () => {
+    const sendChat = vi.fn(async (text: string) => ({
+      name: 'Alice',
+      text,
+      line: `[WebUI] Alice: ${text}`,
+    }))
+    const transport = { ...fakeTransport(vi.fn()), sendChat }
+    renderEditor(transport, vi.fn().mockResolvedValue(true))
+
+    const commandInput = screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
+    fireEvent.change(commandInput, { target: { value: '/time' } })
+
+    const commandModeToggle = screen.getByRole('button', { name: '切换到聊天输入' })
+    expect(
+      commandModeToggle.compareDocumentPosition(screen.getByRole('button', { name: '执行' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    fireEvent.click(commandModeToggle)
+    const chatInput = screen.getByPlaceholderText('发消息给游戏内的玩家（会显示你是谁）')
+    const chatModeToggle = screen.getByRole('button', { name: '切换到指令输入' })
+    const chatSend = screen.getByRole('button', { name: '发送发言' })
+    expect(
+      chatModeToggle.compareDocumentPosition(chatSend) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    // 模式切换保持弱化；聊天发送与指令发送一致，使用主色飞机按钮。
+    expect(chatModeToggle.className).toContain('hover:bg-accent')
+    expect(chatModeToggle.className).not.toContain('bg-secondary')
+    expect(chatSend.className).toContain('bg-primary')
+    expect(chatSend.className).not.toContain('bg-transparent')
+    expect(chatSend.querySelector('.lucide-send')).toBeTruthy()
+    expect(chatSend.querySelector('.lucide-message-circle')).toBeNull()
+    fireEvent.change(chatInput, { target: { value: '大家好啊' } })
+    fireEvent.click(chatSend)
+
+    await waitFor(() => expect(sendChat).toHaveBeenCalledWith('大家好啊'))
+    expect(await screen.findByText(/已发送/)).toBeTruthy()
+
+    fireEvent.click(chatModeToggle)
+    expect((screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement).value).toBe('/time')
   })
 })
 
@@ -153,6 +208,15 @@ describe('CommandPage token 失效处理', () => {
 })
 
 describe('CommandPage 收藏', () => {
+  it('指令行的注释保留完整行高', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
+    const help = await screen.findByText('Shows command help.')
+    const row = help.closest('button')
+    expect(row?.className).toContain('min-h-16')
+    expect(help.className).toContain('leading-5')
+  })
+
   it('「指令」tab 不再显示收藏星标（收藏独立成 tab）', async () => {
     localStorage.setItem('tswui:draft', JSON.stringify('/time 12:00'))
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
@@ -219,7 +283,7 @@ describe('CommandPage 服务器动态', () => {
 })
 
 describe('CommandPage 物品面板', () => {
-  it('选中物品后「前往物品图鉴」回传物品 id', async () => {
+  it('选中物品后「前往物品ID」回传物品 id', async () => {
     const onOpenInDex = vi.fn()
     render(
       <I18nProvider lang="zh">
@@ -240,7 +304,7 @@ describe('CommandPage 物品面板', () => {
     const input = await screen.findByPlaceholderText('搜索物品（ID / 名称）')
     fireEvent.change(input, { target: { value: '生命' } })
     fireEvent.click(await screen.findByRole('button', { name: /生命水晶/ }))
-    fireEvent.click(screen.getByRole('button', { name: /前往 物品图鉴/ }))
+    fireEvent.click(screen.getByRole('button', { name: /前往 物品ID/ }))
     expect(onOpenInDex).toHaveBeenCalledWith(29)
   })
 

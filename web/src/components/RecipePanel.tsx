@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowRight, Check, Copy, Hammer } from 'lucide-react'
+import { ArrowRight, Check, Copy } from 'lucide-react'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { ItemIcon } from '@/components/ItemIcon'
-import { Badge, Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Separator } from '@/components/ui'
+import { Badge, Button, Collapsible, CollapsibleContent, CollapsibleTrigger} from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 import { formatItemTag } from '@/lib/items'
 import { locText } from '@/lib/loc'
@@ -39,8 +39,12 @@ const FLAG_ICON: Record<string, number> = {
   corruption: 5532, // DemonAltar（恶魔祭坛）
 }
 
-/** 合成条目 → 描述性文本；`tags` 为 true 时用 `[i:ID]` 标签代替名称。 */
-function recipeToText(recipe: Recipe, dataset: Dataset, t: T, tags: boolean): string {
+/** 合成条目 → 描述性文本；`tags` 为 true 时用 `[i:ID]` 标签代替名称。
+ *
+ * 格式与界面一致：`材料1 + 材料2 @ 制作站[ 条件] → 产物`（制作站在箭头前面）；
+ * **徒手制作不写制作站**（有条件时只写条件，如「(水中)」）。
+ */
+export function recipeToText(recipe: Recipe, dataset: Dataset, t: T, tags: boolean): string {
   const label = (id: number) =>
     tags ? formatItemTag(id) : (dataset.itemsById.get(id)?.name ?? `#${id}`)
   const withStack = (s: string, n: number) => (n > 1 ? `${s} x${n}` : s)
@@ -55,18 +59,40 @@ function recipeToText(recipe: Recipe, dataset: Dataset, t: T, tags: boolean): st
   const result = withStack(label(recipe.result.id), recipe.result.stack)
   const stationId = recipe.stationItems[0]
   const station =
-    recipe.station < 0
-      ? t('recipe.hand')
-      : stationId != null
-        ? label(stationId)
-        : t('recipe.station', { id: recipe.station })
+    stationId != null ? label(stationId) : t('recipe.station', { id: recipe.station })
   const conds = [...(recipe.env ?? []), ...(recipe.flags ?? [])]
     .filter((c) => c !== 'notDecraftable')
     .map((c) =>
       ENV_LABEL[c] ? t(ENV_LABEL[c]) : FLAG_LABEL[c] ? t(FLAG_LABEL[c]) : c,
     )
     .join(' ')
-  return `${ingredients} → ${result} @ ${station}${conds ? ` (${conds})` : ''}`
+  const head = [recipe.station < 0 ? null : `@ ${station}`, conds ? `(${conds})` : null]
+    .filter((s): s is string => !!s)
+    .join(' ')
+  return `${ingredients}${head ? ` ${head}` : ''} → ${result}`
+}
+
+/** 反向记录（可微光分解）的复制文本：`产物 @ 制作站 → 原材料的反向组合`。 */
+export function reverseRecipeToText(
+  recipe: Recipe,
+  itemId: number,
+  dataset: Dataset,
+  t: T,
+  tags: boolean,
+): string {
+  const label = (id: number) =>
+    tags ? formatItemTag(id) : (dataset.itemsById.get(id)?.name ?? `#${id}`)
+  const withStack = (s: string, n: number) => (n > 1 ? `${s} x${n}` : s)
+  const outputs = recipe.ingredients
+    .map((i) => {
+      const group = i.group ? dataset.recipes.groups[i.group] : undefined
+      const groupName = group ? locText(dataset.loc, group.key) ?? group.key : undefined
+      const base = group ? t('recipe.groupAny', { name: groupName ?? group.key }) : label(i.id)
+      return withStack(base, i.stack)
+    })
+    .join(' + ')
+  // 第二条是微光分解：制作站固定写作「微光」，不再沿用原配方的制作站 / 条件。
+  return `${label(itemId)} @ ${t('recipe.shimmerName')} → ${outputs}`
 }
 
 /**
@@ -79,23 +105,28 @@ function ItemChip({
   iconOnly,
   stack,
   label,
+  tooltip = true,
   className,
 }: {
   id: number
   dataset: Dataset
   iconOnly: boolean
   stack?: number
-  /** 覆盖名称（如配方组的「任何XX」）。 */
+  /** 覆盖名称（如配方组的「任何XX」）；`iconOnly` 时不显示文字，但仍用它做兜底名称。 */
   label?: string
+  /** 是否显示物品提示（默认开；微光等「仅作标记」的图标传 false）。 */
+  tooltip?: boolean
   className?: string
 }) {
   const item = dataset.itemsById.get(id)
   const name = label ?? item?.name ?? `#${id}`
+  // **小图标本身不可点**（避免误触弹抽屉）：要看详情就悬停出提示，点提示底部的「合成表」。
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-1.5', className)}>
-      <ItemIcon item={item} atlas={dataset.atlas} size={24} stack={stack} />
-      {/* 配方组（「任何XX」）即使开启仅图标也要显示文字 */}
-      {(!iconOnly || !!label) && <span className="truncate text-sm text-foreground/90">{name}</span>}
+      <ItemIcon item={item} atlas={dataset.atlas} size={24} stack={stack} tooltip={tooltip} />
+      {/* 仅图标模式下一律不显示名称，**包括配方组的「任何XX」**（用图标的代表物品识别类型）；
+          名称仍保留在复制文本里。 */}
+      {!iconOnly && <span className="truncate text-sm text-foreground/90">{name}</span>}
     </span>
   )
 }
@@ -150,29 +181,8 @@ function Station({
   )
 }
 
-/** 「可丢微光分解」行内标记：5362 图标（无 tips）+ 文字；多件一组时注明「每 N 个分解一次」。 */
-function DecraftTag({ dataset, stack }: { dataset: Dataset; stack: number }) {
-  const { t } = useI18n()
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      <ItemIcon
-        item={dataset.itemsById.get(5362)}
-        atlas={dataset.atlas}
-        size={22}
-        tooltip={false}
-      />
-      <span className="text-xs text-muted-foreground">{t('dex.canDecraft')}</span>
-      {stack > 1 && (
-        <span className="text-xs text-muted-foreground">
-          {t('dex.canDecraftStack', { n: stack })}
-        </span>
-      )}
-    </span>
-  )
-}
-
 /** 环境 / 阵营条件：紧跟在制作站后面；能用物品图标的都用图标，其余用文字标签。 */
-function Conditions({ recipe, dataset }: { recipe: Recipe; dataset: Dataset }) {
+export function Conditions({ recipe, dataset }: { recipe: Recipe; dataset: Dataset }) {
   const { t } = useI18n()
   const env = recipe.env ?? []
   // `notDecraftable` 改为物品级的「可微分」徽章（见 ItemsPage 详情），不在配方行里重复。
@@ -218,22 +228,25 @@ function Conditions({ recipe, dataset }: { recipe: Recipe; dataset: Dataset }) {
   )
 }
 
-function RecipeRow({
+export function RecipeRow({
   recipe,
   dataset,
   iconOnly,
   copyTags,
-  decraft,
 }: {
   recipe: Recipe
   dataset: Dataset
   iconOnly: boolean
   copyTags: boolean
-  /** 非空时在行尾追加「可丢微光分解」标记（只给「合成表」区的行）。 */
-  decraft?: { stack: number } | null
 }) {
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
+  /** 环境 / 阵营条件（`notDecraftable` 不算条件，已改成物品级的「可微分」）。 */
+  const hasConditions =
+    (recipe.env ?? []).length > 0 ||
+    (recipe.flags ?? []).some((f) => f !== 'notDecraftable')
+  /** 徒手（`station < 0`）不显示制作站；只有条件时（如「水中」）仍显示条件。 */
+  const showStation = recipe.station >= 0
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(recipeToText(recipe, dataset, t, copyTags))
@@ -244,12 +257,27 @@ function RecipeRow({
     }
   }
   return (
-    <div className="group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg bg-accent/40 px-2.5 py-2">
+    <div
+      data-testid="recipe-row"
+      className="group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-border/60 px-2.5 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
+    >
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
         {recipe.ingredients.map((ing, i) => (
           <IngredientChip key={i} ingredient={ing} dataset={dataset} iconOnly={iconOnly} />
         ))}
       </span>
+      {/* 制作站在箭头**前面**：`材料 @ 制作站(+条件) → 产物`；徒手制作不写制作站 */}
+      {(showStation || hasConditions) && (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          {showStation && (
+            <>
+              <span className="shrink-0 font-pixel text-sm text-muted-foreground">@</span>
+              <Station recipe={recipe} dataset={dataset} iconOnly={iconOnly} />
+            </>
+          )}
+          <Conditions recipe={recipe} dataset={dataset} />
+        </span>
+      )}
       <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
       <ItemChip
         id={recipe.result.id}
@@ -258,24 +286,80 @@ function RecipeRow({
         stack={recipe.result.stack}
         className="text-foreground"
       />
-      {/* 制作站左边加一条分割线 */}
-      <Separator orientation="vertical" className="h-5 shrink-0" />
-      <span className="inline-flex flex-wrap items-center gap-1.5">
-        <Hammer className="size-3.5 shrink-0 text-muted-foreground" />
-        <Station recipe={recipe} dataset={dataset} iconOnly={iconOnly} />
-        <Conditions recipe={recipe} dataset={dataset} />
-        {decraft && (
-          <>
-            <Separator orientation="vertical" className="h-5 shrink-0" />
-            <DecraftTag dataset={dataset} stack={decraft.stack} />
-          </>
-        )}
-      </span>
       {/* hover 时右上角出现复制按钮（绝对定位、不占位，避免把内容挤到第二行）。 */}
       <Button
         size="icon-sm"
         variant="ghost"
-        className="absolute top-0.5 right-0.5 shrink-0 opacity-0 transition-opacity group-hover/recipe:opacity-100 focus-visible:opacity-100"
+        className="touch-visible absolute top-0.5 right-0.5 shrink-0 opacity-0 transition-opacity group-hover/recipe:opacity-100 focus-visible:opacity-100"
+        aria-label={t('action.copy')}
+        title={copied ? t('action.copied') : t('action.copy')}
+        onClick={(e) => {
+          e.stopPropagation()
+          void copy()
+        }}
+      >
+        {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * 可微光分解时的**反向记录**：`产物 @ 制作站 → 原材料`。
+ * 与正向行同一套排版，只是材料 / 产物对调；可分解的物品才会有这一行。
+ */
+function ReverseRecipeRow({
+  recipe,
+  itemId,
+  dataset,
+  iconOnly,
+  copyTags,
+}: {
+  recipe: Recipe
+  itemId: number
+  dataset: Dataset
+  iconOnly: boolean
+  copyTags: boolean
+}) {
+  const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(reverseRecipeToText(recipe, itemId, dataset, t, copyTags))
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return (
+    <div
+      data-testid="reverse-recipe-row"
+      className="group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-dashed border-border/60 px-2.5 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
+    >
+      <ItemChip id={itemId} dataset={dataset} iconOnly={iconOnly} className="text-foreground" />
+      {/* 微光分解：`产物 @ 微光 → 原材料` */}
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <span className="shrink-0 font-pixel text-sm text-muted-foreground">@</span>
+        {/* 5362 只是微光的标记图标：文字固定「微光」，也不挂物品提示 */}
+        <ItemChip
+          id={5362}
+          dataset={dataset}
+          iconOnly={iconOnly}
+          label={t('recipe.shimmerName')}
+          tooltip={false}
+        />
+      </span>
+      <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+        {recipe.ingredients.map((ing, i) => (
+          <IngredientChip key={i} ingredient={ing} dataset={dataset} iconOnly={iconOnly} />
+        ))}
+      </span>
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        className="touch-visible absolute top-0.5 right-0.5 shrink-0 opacity-0 transition-opacity group-hover/recipe:opacity-100 focus-visible:opacity-100"
         aria-label={t('action.copy')}
         title={copied ? t('action.copied') : t('action.copy')}
         onClick={(e) => {
@@ -290,7 +374,7 @@ function RecipeRow({
 }
 
 /** 微光转换行：`[源] → [目标]`。 */
-function ShimmerRow({
+export function ShimmerRow({
   fromId,
   toId,
   dataset,
@@ -302,7 +386,10 @@ function ShimmerRow({
   iconOnly: boolean
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg bg-accent/40 px-2.5 py-2">
+    <div
+      data-testid="shimmer-row"
+      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-border/60 px-2.5 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
+    >
       <ItemChip id={fromId} dataset={dataset} iconOnly={iconOnly} />
       <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
       <ItemChip id={toId} dataset={dataset} iconOnly={iconOnly} />
@@ -316,7 +403,7 @@ function RecipeSection({
   tone,
   iconId,
   dataset,
-  singleColumn,
+  twoColumn,
   children,
 }: {
   title: string
@@ -324,8 +411,8 @@ function RecipeSection({
   /** 固定图标（按用户指定）；不传则标题前无图标。 */
   iconId?: number
   dataset: Dataset
-  /** 单列显示（默认多列自适应）。 */
-  singleColumn?: boolean
+  /** 两列视图（默认单列）。 */
+  twoColumn?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(true)
@@ -347,7 +434,8 @@ function RecipeSection({
         <div
           className={cn(
             'grid gap-1',
-            singleColumn ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]',
+            // 小屏（<sm）两列太挤：即使勾选了「两列视图」也只排一列（对应开关在小屏隐藏）。
+            twoColumn ? 'grid-cols-2 max-sm:grid-cols-1' : 'grid-cols-1',
           )}
         >
           {children}
@@ -362,12 +450,14 @@ const MAX_ROWS = 60
 /** 配方行列表：超过 MAX_ROWS 时显示「N 条未显示」，点击再加载一批。 */
 function RecipeRows({
   rows,
+  itemId,
   dataset,
   iconOnly,
   copyTags,
   decraft,
 }: {
   rows: Recipe[]
+  itemId: number
   dataset: Dataset
   iconOnly: boolean
   copyTags: boolean
@@ -382,14 +472,24 @@ function RecipeRows({
   return (
     <>
       {rows.slice(0, limit).map((r, i) => (
-        <RecipeRow
-          key={i}
-          recipe={r}
-          dataset={dataset}
-          iconOnly={iconOnly}
-          copyTags={copyTags}
-          decraft={decraft}
-        />
+        // 正向 / 反向记录放在同一个网格单元里，换列时不会被拆开。
+        <div key={i} className="flex min-w-0 flex-col gap-1">
+          <RecipeRow
+            recipe={r}
+            dataset={dataset}
+            iconOnly={iconOnly}
+            copyTags={copyTags}
+          />
+          {decraft && (
+            <ReverseRecipeRow
+              recipe={r}
+              itemId={itemId}
+              dataset={dataset}
+              iconOnly={iconOnly}
+              copyTags={copyTags}
+            />
+          )}
+        </div>
       ))}
       {hidden > 0 && (
         <Button
@@ -414,16 +514,16 @@ export function RecipePanel({
   itemId,
   dataset,
   iconOnly = false,
-  copyTags = true,
-  singleColumn = false,
+  copyTags = false,
+  twoColumn = false,
 }: {
   itemId: number
   dataset: Dataset
   iconOnly?: boolean
-  /** 复制的合成文本是否含 `[i:ID]` 标签。 */
+  /** 兼容旧调用；界面已取消复制标签功能，默认按名称复制。 */
   copyTags?: boolean
-  /** 单列显示合成记录（默认多列自适应）。 */
-  singleColumn?: boolean
+  /** 两列视图（默认单列）。 */
+  twoColumn?: boolean
 }) {
   const { t } = useI18n()
   const make = useMemo(
@@ -456,10 +556,11 @@ export function RecipePanel({
           tone="text-success"
           iconId={531}
           dataset={dataset}
-          singleColumn={singleColumn}
+          twoColumn={twoColumn}
         >
           <RecipeRows
             rows={make}
+            itemId={itemId}
             dataset={dataset}
             iconOnly={iconOnly}
             copyTags={copyTags}
@@ -473,9 +574,15 @@ export function RecipePanel({
           tone="text-warning"
           iconId={36}
           dataset={dataset}
-          singleColumn={singleColumn}
+          twoColumn={twoColumn}
         >
-          <RecipeRows rows={use} dataset={dataset} iconOnly={iconOnly} copyTags={copyTags} />
+          <RecipeRows
+            rows={use}
+            itemId={itemId}
+            dataset={dataset}
+            iconOnly={iconOnly}
+            copyTags={copyTags}
+          />
         </RecipeSection>
       )}
       {shimmerCount > 0 && (
@@ -484,7 +591,7 @@ export function RecipePanel({
           tone="text-info"
           iconId={5362}
           dataset={dataset}
-          singleColumn={singleColumn}
+          twoColumn={twoColumn}
         >
           {shimmerInto != null && (
             <ShimmerRow fromId={itemId} toId={shimmerInto} dataset={dataset} iconOnly={iconOnly} />

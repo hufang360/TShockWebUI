@@ -55,6 +55,7 @@ async function loginAsAlice() {
 afterEach(() => {
   vi.unstubAllGlobals()
   localStorage.clear()
+  window.history.replaceState(null, '', '/')
 })
 
 it('应用可启动并加载真实数据（Mock 传输标识存在）', async () => {
@@ -84,13 +85,34 @@ it('未登录时首页 / 指令 / 设置只显示登录提示与登录按钮', a
 
   // 设置页：隐藏设置内容，同样只显示登录提示。
   fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
-  expect(await screen.findByText('请先登录！')).toBeTruthy()
+  // 设置页是懒加载路由，等页面标题出现后再断言，避免命中上一页尚未卸载的登录提示。
+  expect(await screen.findByRole('heading', { name: '设置' })).toBeTruthy()
   expect(screen.queryByRole('switch', { name: '紧凑视图' })).toBeNull()
 
   // 提示里的登录按钮能打开登录框（侧栏还有一条登录按钮，这里限定正文）。
   fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: '登录' }))
   expect(await screen.findByRole('dialog')).toBeTruthy()
   fireEvent.keyDown(document.body, { key: 'Escape' })
+})
+
+it('页签同步到 URL hash，并可从 hash 直接打开', async () => {
+  mockFetch()
+  window.history.replaceState(null, '', '#/settings')
+  render(<App transport={new MockTransport()} />)
+
+  expect(await screen.findByRole('heading', { name: '设置' })).toBeTruthy()
+  fireEvent.click(screen.getAllByRole('button', { name: '物品ID' })[0])
+  expect(await screen.findByLabelText('物品ID')).toBeTruthy()
+  expect(window.location.hash).toBe('#/items')
+})
+
+it('指令页使用 #/cmd，并兼容旧 #/editor', async () => {
+  mockFetch()
+  window.history.replaceState(null, '', '#/editor')
+  render(<App transport={new MockTransport()} />)
+
+  expect(await screen.findByRole('heading', { name: '指令' })).toBeTruthy()
+  await waitFor(() => expect(window.location.hash).toBe('#/cmd'))
 })
 
 it('未登录时侧栏账号上方有一条登录按钮，点击直接打开登录框', async () => {
@@ -154,14 +176,14 @@ it('用户手动关过「统一执行」后，重登不会被自动覆盖', asyn
   expect(localStorage.getItem('tswui:homeBatch')).toBe('false')
 })
 
-it('检测到玩家管理 / 鱼店插件后自动激活侧边栏入口（用户未手动设置过）', async () => {
+it('检测到角色档案 / 鱼店插件后自动激活侧边栏入口（用户未手动设置过）', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
 
   await loginAsAlice()
 
-  // MockTransport 的玩家管理 / 鱼店探测都返回 plugin + permission → App 自动写入已激活模块。
+  // MockTransport 的角色档案 / 鱼店探测都返回 plugin + permission → App 自动写入已激活模块。
   await waitFor(() => {
     const prefs = JSON.parse(localStorage.getItem('tswui:modules') ?? '{}')
     expect(prefs.byServer?.default ?? []).toEqual(expect.arrayContaining(['players', 'store']))
@@ -171,6 +193,20 @@ it('检测到玩家管理 / 鱼店插件后自动激活侧边栏入口（用户�
   // 侧边栏出现对应入口。
   expect(screen.getAllByRole('button', { name: '玩家管理' }).length).toBeGreaterThan(0)
   expect(screen.getAllByRole('button', { name: '鱼店' }).length).toBeGreaterThan(0)
+})
+
+it('关闭模块后侧边栏入口隐藏，直达 URL 回到首页', async () => {
+  mockFetch()
+  localStorage.setItem('tswui:modules', JSON.stringify({ byServer: { default: ['store'] } }))
+  localStorage.setItem('tswui:modulesSet', JSON.stringify({ byServer: { default: ['players', 'store'] } }))
+  window.location.hash = '#/players'
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  const sidebar = screen.getByTestId('sidebar')
+  expect(within(sidebar).queryByRole('button', { name: '玩家管理' })).toBeNull()
+  expect(within(sidebar).getByRole('button', { name: '鱼店' })).toBeTruthy()
+  await waitFor(() => expect(window.location.hash).toBe('#/home'))
 })
 
 it('用户手动关过的模块，重登不会被自动激活覆盖', async () => {
@@ -263,9 +299,10 @@ it('设置入口固定在侧栏导航末尾（模块在其上方）', async () =
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
 
-  const menu = screen.getByTestId('sidebar').querySelector('[data-slot="sidebar-menu"]')
-  expect(menu).toBeTruthy()
-  const labels = Array.from(menu!.querySelectorAll('button')).map((b) => b.textContent?.trim())
+  const sidebar = screen.getByTestId('sidebar')
+  const labels = Array.from(sidebar.querySelectorAll('[data-slot="sidebar-menu"] button')).map((b) =>
+    b.textContent?.trim(),
+  )
   expect(labels).toContain('世界管理')
   expect(labels[labels.length - 1]).toBe('设置')
 })

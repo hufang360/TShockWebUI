@@ -13,6 +13,11 @@ describe('computeVirtualGrid', () => {
     expect(computeVirtualGrid({ ...base, viewportWidth: 30 }).cols).toBe(1)
   })
 
+  it('maxCols 可把超宽容器限制到固定列数', () => {
+    const r = computeVirtualGrid({ ...base, cell: 132, viewportWidth: 2400, maxCols: 10 })
+    expect(r.cols).toBe(10)
+  })
+
   it('总高度 = 行数 × 行高 − 末尾间距', () => {
     const r = computeVirtualGrid(base) // 1000 / 16 = 63 行
     expect(r.rows).toBe(63)

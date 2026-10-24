@@ -443,8 +443,8 @@ func TestCommandUnknownSentToTShock(t *testing.T) {
 	}
 	var res tshock.Result
 	_ = json.Unmarshal(rec.Body.Bytes(), &res)
-	if res.Status != tshock.StatusCommandError {
-		t.Fatalf("res = %+v，期望 command_error（由 TShock 判定）", res)
+	if res.Status != tshock.StatusCommandNotFound {
+		t.Fatalf("res = %+v，期望 command_not_found（由 TShock 判定）", res)
 	}
 	if f.count("/v3/server/rawcmd") != 1 {
 		t.Fatalf("未知指令应发往 TShock 一次，实际 %d", f.count("/v3/server/rawcmd"))
@@ -592,6 +592,242 @@ func TestCommandNoPermissionKeepsSession(t *testing.T) {
 	}
 	if store.Len() != 1 {
 		t.Fatalf("权限不足不应清会话，剩余 %d", store.Len())
+	}
+}
+
+// TestStatusForwardsSessionToken：/v2/server/status 虽然允许匿名，但只要有会话就
+// 必须带上该会话的 token —— 让 TShock（含插件）能识别这次调用属于哪个玩家。
+func TestStatusForwardsSessionToken(t *testing.T) {
+	f := newFake(okLoginRoutes())
+	var mu sync.Mutex
+	var seenToken string
+	f.routes["/v2/server/status"] = func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		seenToken = r.URL.Query().Get("token")
+		mu.Unlock()
+		writeJSON(w, 200, map[string]any{
+			"name": "w", "serverversion": "1.4.5.8", "tshockversion": "6.2.1.0",
+			"port": 7777, "playercount": 0, "maxplayers": 8, "world": "w",
+		})
+	}
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	rec := do(h, http.MethodGet, "/api/status", nil, cookie, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d，期望 200", rec.Code)
+	}
+	mu.Lock()
+	got := seenToken
+	mu.Unlock()
+	if got != "tok-1" {
+		t.Fatalf("上游收到的 token = %q，期望会话里的 tok-1", got)
+	}
+
+	// /api/status 会随登录态变化（有无 token 拿到的字段不同）→ 禁止缓存，
+	// 否则浏览器可能把登录前的匿名响应复用给已登录页面。
+	if got := rec.Header().Get("Cache-Control"); !strings.Contains(got, "no-store") {
+		t.Fatalf("Cache-Control = %q，期望含 no-store", got)
+	}
+
+	// 未登录（无 Cookie）：匿名请求照常可用，不带 token。
+	rec = do(h, http.MethodGet, "/api/status", nil, nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("匿名 HTTP %d，期望 200", rec.Code)
+	}
+	mu.Lock()
+	got = seenToken
+	mu.Unlock()
+	if got != "" {
+		t.Fatalf("未登录时不应带 token，实际 %q", got)
+	}
+}
+
+// doTarget 发一个带 X-TSWUI-Target 的请求（多服务器切换）。
+func doTarget(h http.Handler, method, path, target string, payload any, cookie *http.Cookie, csrf bool) *httptest.ResponseRecorder {
+	var body io.Reader
+	if payload != nil {
+		b, _ := json.Marshal(payload)
+		body = bytes.NewReader(b)
+	}
+	req := httptest.NewRequest(method, path, body)
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if csrf {
+		req.Header.Set("X-Requested-With", "tswui")
+	}
+	req.Header.Set("X-TSWUI-Target", target)
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// TestSessionIsolatedPerUpstream：会话按上游隔离。
+//   - A 服（默认上游）登录后，探测 B 服不会把 A 的 token 发过去；
+//   - 探测 B 服也不会把 A 的会话 / Cookie 清掉（此前切换服务器会误登出）；
+//   - 在 B 服登录得到另一条会话，两者互不影响。
+func TestSessionIsolatedPerUpstream(t *testing.T) {
+	var mu sync.Mutex
+	var tokenA, tokenB string
+	statusRoute := func(dst *string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			*dst = r.URL.Query().Get("token")
+			mu.Unlock()
+			writeJSON(w, 200, map[string]any{"name": "w", "serverversion": "1.4.5.8"})
+		}
+	}
+	fakeA := newFake(okLoginRoutes())
+	fakeA.routes["/v2/server/status"] = statusRoute(&tokenA)
+	tsA := httptest.NewServer(fakeA)
+	defer tsA.Close()
+	fakeB := newFake(okLoginRoutes())
+	fakeB.routes["/v2/server/status"] = statusRoute(&tokenB)
+	tsB := httptest.NewServer(fakeB)
+	defer tsB.Close()
+
+	srv, store := newServer(t, tsA.URL, func(c *config.Config) { c.TShockAllowCustomTargets = true })
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw") // 默认上游 = A
+
+	// 1) 探测 B：不得带 A 的 token，也不得清掉 A 的会话。
+	rec := doTarget(h, http.MethodGet, "/api/status", tsB.URL, nil, cookie, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d", rec.Code)
+	}
+	mu.Lock()
+	gotB, gotA := tokenB, tokenA
+	mu.Unlock()
+	if gotB != "" {
+		t.Fatalf("B 服不应收到 A 服的 token，实际 %q", gotB)
+	}
+	if store.Len() != 1 {
+		t.Fatalf("探测 B 服不应清掉 A 的会话，剩余 %d", store.Len())
+	}
+
+	// 2) B 服视角：未登录（A 的 Cookie 名与 B 不同，且会话绑定上游）。
+	rec = doTarget(h, http.MethodGet, "/api/session", tsB.URL, nil, cookie, false)
+	if !strings.Contains(rec.Body.String(), `"authenticated":false`) {
+		t.Fatalf("B 服应视为未登录：%s", rec.Body.String())
+	}
+	// 3) 回到 A：仍然登录着，并且 status 带 A 的 token。
+	rec = doTarget(h, http.MethodGet, "/api/session", "", nil, cookie, false)
+	if !strings.Contains(rec.Body.String(), `"authenticated":true`) {
+		t.Fatalf("A 服的会话应保留：%s", rec.Body.String())
+	}
+	doTarget(h, http.MethodGet, "/api/status", "", nil, cookie, false)
+	mu.Lock()
+	gotA = tokenA
+	mu.Unlock()
+	if gotA != "tok-1" {
+		t.Fatalf("A 服应收到 A 的 token，实际 %q", gotA)
+	}
+
+	// 4) 在 B 服登录：得到另一条会话与另一个 Cookie。
+	var cookieB *http.Cookie
+	recLogin := doTarget(h, http.MethodPost, "/api/login", tsB.URL,
+		map[string]string{"username": "alice", "password": "pw"}, nil, true)
+	if recLogin.Code != http.StatusOK {
+		t.Fatalf("B 服登录失败：HTTP %d body=%s", recLogin.Code, recLogin.Body.String())
+	}
+	for _, c := range recLogin.Result().Cookies() {
+		if strings.HasPrefix(c.Name, "tswui_session") {
+			cookieB = c
+		}
+	}
+	if cookieB == nil || cookieB.Name == cookie.Name {
+		t.Fatalf("B 服应下发另一条会话 Cookie：A=%q B=%+v", cookie.Name, cookieB)
+	}
+	if store.Len() != 2 {
+		t.Fatalf("两服应各有一条会话，实际 %d", store.Len())
+	}
+	// A 的 Cookie 对 B 无效，B 的 Cookie 对 A 也无效。
+	rec = doTarget(h, http.MethodGet, "/api/session", "", nil, cookieB, false)
+	if !strings.Contains(rec.Body.String(), `"authenticated":false`) {
+		t.Fatalf("B 的 Cookie 不应在 A 服登录：%s", rec.Body.String())
+	}
+
+	// 5) 退出 B：只清 B 的会话，A 不受影响。
+	doTarget(h, http.MethodPost, "/api/logout", tsB.URL, nil, cookieB, true)
+	if store.Len() != 1 {
+		t.Fatalf("退出 B 后应只剩 A 的会话，实际 %d", store.Len())
+	}
+	rec = doTarget(h, http.MethodGet, "/api/session", "", nil, cookie, false)
+	if !strings.Contains(rec.Body.String(), `"authenticated":true`) {
+		t.Fatalf("退出 B 不应影响 A：%s", rec.Body.String())
+	}
+}
+
+// TestCapabilitiesAggregated：一次请求返回整台服务器的可选能力（并行探测）。
+func TestCapabilitiesAggregated(t *testing.T) {
+	f := newFake(okLoginRoutes())
+	f.routes["/webui/meta"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"name": "WebUI", "version": "0.1.0", "protocol": 1, "minProtocol": 1,
+			"capabilities": []string{"batch", "commands", "me", "data", "serverinfo", "events", "sessions", "chat", "requests", "requests_review"},
+		})
+	}
+	f.routes["/webui/batch"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]any{"results": []any{}}) }
+	f.routes["/webui/requests"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]any{"requests": []any{}}) }
+	f.routes["/webui/requests/all"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]any{"requests": []any{}}) }
+	f.routes["/pm/look"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 name 参数"}) }
+	f.routes["/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 serial 参数"}) }
+	f.routes["/webui/auth/request"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 200, map[string]any{"status": "200", "code": "player_offline", "message": "该玩家不在线"})
+	}
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+
+	// 需要登录。
+	rec := do(h, http.MethodGet, "/api/capabilities", nil, nil, false)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("未登录 HTTP %d，期望 401", rec.Code)
+	}
+
+	cookie := loginCookie(t, h, "alice", "pw")
+	rec = do(h, http.MethodGet, "/api/capabilities", nil, cookie, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Reachable bool `json:"reachable"`
+		Messenger struct {
+			Installed bool   `json:"installed"`
+			Version   string `json:"version"`
+		} `json:"messenger"`
+		Batch    struct{ Plugin, Ingame bool } `json:"batch"`
+		Player   struct{ Plugin, Permission bool } `json:"player"`
+		Fish     struct{ Plugin, Rest, Permission bool } `json:"fish"`
+		Requests struct{ Plugin, Submit, Review bool } `json:"requests"`
+		WebAuth  struct{ Plugin bool } `json:"webauth"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("解析失败：%v", err)
+	}
+	if !out.Reachable || !out.Messenger.Installed || !out.Batch.Plugin || !out.Player.Plugin || !out.Player.Permission ||
+		!out.Fish.Plugin || !out.Fish.Rest || !out.Fish.Permission ||
+		!out.Requests.Plugin || !out.Requests.Submit || !out.Requests.Review || !out.WebAuth.Plugin {
+		t.Fatalf("聚合结果不完整：%s", rec.Body.String())
+	}
+
+	// 3 秒微缓存：第二次不再打上游；?fresh=1 强制重探。
+	before := f.count("/webui/meta")
+	do(h, http.MethodGet, "/api/capabilities", nil, cookie, false)
+	if got := f.count("/webui/meta"); got != before {
+		t.Fatalf("命中缓存时不应再探测上游：%d → %d", before, got)
+	}
+	do(h, http.MethodGet, "/api/capabilities?fresh=1", nil, cookie, false)
+	if got := f.count("/webui/meta"); got <= before {
+		t.Fatalf("?fresh=1 应重新探测：%d → %d", before, got)
 	}
 }
 
@@ -971,11 +1207,15 @@ func TestPlayerLookPluginMissing(t *testing.T) {
 	}
 }
 
-func TestPlayerImportRequiresAuth(t *testing.T) {
+// TestPlayerImportNoAuthNeeded：「查看存档」是公开工具，未登录也能上传 .plr（不再要求会话）。
+func TestPlayerImportNoAuthNeeded(t *testing.T) {
 	srv, _ := newServer(t, "http://127.0.0.1:1", nil)
-	rec := do(srv.Handler(), http.MethodPost, "/api/player/import", nil, nil, true)
-	if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), "not_authenticated") {
-		t.Fatalf("HTTP %d body=%s，期望 401 not_authenticated", rec.Code, rec.Body.String())
+	rec := do(srv.Handler(), http.MethodPost, "/api/player/import", strings.NewReader("not-a-player-file"), nil, true)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "bad_request") {
+		t.Fatalf("HTTP %d body=%s，期望 400 bad_request（未登录也应走到解析）", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "not_authenticated") {
+		t.Fatalf("body=%s，不应再要求登录", rec.Body.String())
 	}
 }
 
@@ -1075,7 +1315,8 @@ func TestUnknownAPIPathReturnsJSON404(t *testing.T) {
 // ---------- 鱼店（第三方插件 FishShop） ----------
 
 func TestFishCapabilitiesPluginMissing(t *testing.T) {
-	f := newFake(okLoginRoutes()) // 未注册 /v3/fishshop/ask → fake 回 404
+	// 未注册 /fishshop/ask 与 /v3/fishshop/ask → fake 回 404；rawcmd 也 404 → 判「未安装」。
+	f := newFake(okLoginRoutes())
 	ts := httptest.NewServer(f)
 	defer ts.Close()
 	srv, _ := newServer(t, ts.URL, nil)
@@ -1088,14 +1329,38 @@ func TestFishCapabilitiesPluginMissing(t *testing.T) {
 	}
 	var out tshock.FishCapability
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
-	if out.Plugin || out.Permission {
-		t.Fatalf("插件缺失时应 {plugin:false,permission:false}，实际 %+v", out)
+	if out.Plugin || out.REST || out.Permission {
+		t.Fatalf("插件缺失时应全部 false，实际 %+v", out)
+	}
+}
+
+// 老版本插件（v1.6.2 之前）只有游戏内指令：REST 全 404 但 /fish 能跑 → plugin:true, rest:false。
+func TestFishCapabilitiesOldPluginHasNoREST(t *testing.T) {
+	routes := okLoginRoutes()
+	routes["/v3/server/rawcmd"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 200, map[string]any{"status": 200, "response": []string{"/fish list，查看货架"}})
+	}
+	f := newFake(routes)
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	rec := do(h, http.MethodGet, "/api/fish/capabilities", nil, cookie, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out tshock.FishCapability
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	if !out.Plugin || out.REST || out.Permission {
+		t.Fatalf("老版本插件应为 {plugin:true, rest:false, permission:false}，实际 %+v", out)
 	}
 }
 
 func TestFishCapabilitiesNoPermission(t *testing.T) {
 	routes := okLoginRoutes()
-	routes["/v3/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) {
+	routes["/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 403, map[string]any{"error": "未授权。用户没有权限使用指定的 API 终结点。"})
 	}
 	f := newFake(routes)
@@ -1111,14 +1376,14 @@ func TestFishCapabilitiesNoPermission(t *testing.T) {
 	}
 	var out tshock.FishCapability
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
-	if !out.Plugin || out.Permission {
-		t.Fatalf("应为 {plugin:true,permission:false}，实际 %+v", out)
+	if !out.Plugin || !out.REST || out.Permission {
+		t.Fatalf("应为 {plugin:true, rest:true, permission:false}，实际 %+v", out)
 	}
 }
 
 func TestFishListSuccess(t *testing.T) {
 	routes := okLoginRoutes()
-	routes["/v3/fishshop/list"] = func(w http.ResponseWriter, _ *http.Request) {
+	routes["/fishshop/list"] = func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]any{
 			"status": 200,
 			"response": map[string]any{
@@ -1148,7 +1413,7 @@ func TestFishListSuccess(t *testing.T) {
 // 业务失败（钱不够）必须保留上游文案，返回 400 fishshop_error。
 func TestFishBuyBusinessErrorKeepsMessage(t *testing.T) {
 	routes := okLoginRoutes()
-	routes["/v3/fishshop/buy"] = func(w http.ResponseWriter, _ *http.Request) {
+	routes["/fishshop/buy"] = func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 400, map[string]any{"status": 400, "error": "钱不够"})
 	}
 	f := newFake(routes)

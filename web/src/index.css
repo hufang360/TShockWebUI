@@ -5,26 +5,27 @@
 /* ── shadcn 默认主题（new-york / baseColor: slate）───────────────── */
 :root {
   --radius: 0.625rem;
-  /* 备选：亮色画布用极浅蓝灰，卡片保持纯白 → 不用边框也有层次（见 docs/UI组件.md）。 */
-  --background: oklch(0.955 0.006 247.9);
+  /* 亮色主题：右侧主画布纯白，侧栏用轻微灰阶拉开层次。 */
+  --background: #fcfcfc;
   --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
+  /* 亮色模式使用中性深灰主色；绿色只保留给 success 等语义状态。 */
+  --primary: oklch(0.22 0.015 264);
   --primary-foreground: oklch(0.984 0.003 247.858);
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
   --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.945 0.008 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  --accent: oklch(0.965 0.004 247.9);
+  --accent-foreground: oklch(0.22 0.015 264);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
   --border: oklch(0.929 0.013 255.508);
   --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --ring: oklch(0.55 0.02 257);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -39,14 +40,14 @@
   --info-foreground: oklch(0.984 0.003 247.858);
   /* 紫色（配方标记：无微光分解等） */
   --purple: oklch(0.55 0.22 300);
-  --sidebar: oklch(0.985 0.003 247.858);
+  --sidebar: #fafafa;
   --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary: oklch(0.22 0.015 264);
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.955 0.008 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-accent: oklch(0.955 0.005 247.9);
+  --sidebar-accent-foreground: oklch(0.22 0.015 264);
   --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --sidebar-ring: oklch(0.55 0.02 257);
 }
 
 .dark {
@@ -188,6 +189,13 @@
   border-radius: 9999px;
 }
 
+/* 触屏没有 hover：折叠箭头和卡片操作不能只靠悬停出现。 */
+@media (hover: none), (pointer: coarse) {
+  .touch-visible {
+    opacity: 1 !important;
+  }
+}
+
 /* 编辑器等宽 */
 textarea.editor {
   font-family: var(--font-pixel);
@@ -221,4 +229,22 @@ textarea.editor {
 }
 .tswui-attention {
   animation: tswui-attention 0.9s ease-out 2;
+}
+
+
+/* 尊重系统减少动态效果偏好：保留状态变化，但不再播放闪烁 / 脉冲 / 位移动画。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .tswui-flash,
+  .tswui-attention {
+    animation: none !important;
+  }
 }

@@ -10,7 +10,7 @@
     <Version>0.1.0-rc.4</Version>
     <AssemblyTitle>WebUI</AssemblyTitle>
     <Product>WebUI</Product>
-    <Description>TShockWebUI 的信使插件：在线授权登录 + 批量执行 / 只读信息 / 事件流 / 会话管理 / 网页发言。</Description>
+    <Description>TShockWebUI 的信使插件：在线授权登录 + 批量执行 / 只读信息 / 事件流 / 会话管理 / 网页发言 / 物资申请。</Description>
     <NoWarn>1701;1702;1591</NoWarn>
     <DebugType>none</DebugType>
   </PropertyGroup>

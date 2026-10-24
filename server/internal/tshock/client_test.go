@@ -166,8 +166,15 @@ func TestRawCmdOutputClassification(t *testing.T) {
 	}{
 		{"权限不足", []string{"You do not have access to this command."}, StatusNoPermission},
 		{"权限不足-中文", []string{"你没有权限使用该指令。"}, StatusNoPermission},
-		{"无效指令", []string{"Invalid command entered. Type /help for a list of valid commands."}, StatusCommandError},
-		{"无效指令-中文", []string{"输入的命令无效。使用/help 获取可用的指令列表。"}, StatusCommandError},
+		{"指令不存在", []string{"Invalid command entered. Type /help for a list of valid commands."}, StatusCommandNotFound},
+		// TShock 原文带引号 + 换行 / 多空格，归一化后仍要命中。
+		{"指令不存在-带引号", []string{`Invalid   command entered. If you need help, type "/help".`}, StatusCommandNotFound},
+		{"指令不存在-多行", []string{"", "  Invalid Command Entered.  ", "Type /help."}, StatusCommandNotFound},
+		{"指令不存在-中文", []string{"输入的命令无效。使用/help 获取可用的指令列表。"}, StatusCommandNotFound},
+		{"指令不存在-中文多行", []string{"输入的命令无效。", "使用/help 获取可用的指令列表。"}, StatusCommandNotFound},
+		// 插件自己打印的「无效指令」不是「指令不存在」，不能据此判定插件未安装。
+		{"插件无效指令", []string{"无效指令：/foo"}, StatusOK},
+		{"插件参数错误", []string{"语法错误，输入 /fish help 查询用法"}, StatusOK},
 		{"仅限游戏内", []string{"You must use this command in-game."}, StatusCommandError},
 		{"仅限游戏内-中文", []string{"你必须在游戏内使用该指令。"}, StatusCommandError},
 		{"正常输出", []string{"Time set to 12:00."}, StatusOK},

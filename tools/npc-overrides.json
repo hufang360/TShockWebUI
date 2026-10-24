@@ -10,5 +10,9 @@
     "668": { "file": "668.png", "crop": [0, 0, 200, 220] },
     "696": { "file": "696.png", "frameWidth": 100, "frameIndex": 0 }
   },
-  "636": { "file": "636.png" }
+  "636": { "file": "636.png" },
+  "50": { "file": "King Slime.png" },
+  "551": { "file": "Betsy.png" },
+  "657": { "file": "Queen Slime.png" },
+  "668": { "file": "Deerclops.png" }
 }

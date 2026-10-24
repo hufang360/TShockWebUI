@@ -2,7 +2,7 @@
 
 TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达给在线玩家与服务器，再把游戏内的真实结果带回网页。
 
-> 版本 **0.1.0**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
+> 版本 **0.1.0-rc.4**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
 > 配置 `<TShock SavePath>/WebUI/config.json`。
 
 核心能力：
@@ -14,7 +14,10 @@ TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达�
    由插件按调用者 token 的权限逐条执行并统一返回结果。
 3. **只读信息与会话管理**：运行时指令目录（含插件指令，用于补全）、区域 / 传送点 / NPC / buff 补全数据、
    服务器状态与事件流（`/webui/{commands,me,data,serverinfo,events}`），以及网页会话的自助查看 / 吊销。
-4. **Tier B（可选，默认关）**：`AllowInGameOnlyCommands=true` 时，以**真实在线玩家**身份执行
+4. **物资申请**：玩家提交物品申请（物品 / 数量 / 用途）→ 服主在游戏内 `/web req ...` 或网页「待审核」
+   审核 → 在线立即发放 / 离线下次登录发放；权限 `webui.request.use` / `webui.request.review`，
+   发放用 TShock 的 `GiveItemCheck`（尊重 item ban）。
+5. **Tier B（可选，默认关）**：`AllowInGameOnlyCommands=true` 时，以**真实在线玩家**身份执行
    `AllowServer=false` 的指令（权限仍是 token 用户组，不提权）。
 
 > 授权请求 1 分钟内没有任何操作则自动失效；玩家不在线直接提示「该玩家不在线」。
@@ -48,7 +51,7 @@ scripts/build-plugin.sh      # 打印 DLL 路径
 2. **重启 TShock**（插件不支持热重载）。
 3. 启动日志应出现：
    ```
-   [WebUI] REST 端点已注册：/webui/auth/*、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}
+   [WebUI] REST 端点已注册：/webui/auth/*、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}、/webui/requests*
    [Server API] Info Plugin WebUI v0.1.0.0 (by TShockWebUI) initiated.
    ```
 
@@ -106,6 +109,17 @@ docker restart tshock
 | `AllowWebChat` | 是否允许网页端（`/webui/chat`）把文本发到游戏内聊天（带 `[WebUI]` 前缀，默认开）。 |
 | `MaxWebChatPerMinute` | 同一账号每分钟最多经网页发送的聊天条数（默认 20；0 = 不限）。 |
 | `ChatPrefix` | 网页发言在游戏内/事件流里的前缀（默认 `[WebUI]`）。 |
+| `RequestsEnabled` | 是否启用物资申请（默认开）。 |
+| `RequestMaxItems` | 一次最多几种物品（默认 10）。 |
+| `RequestMaxStacksPerLine` | 每种最多几组（默认 10，按物品 `maxStack`）。 |
+| `RequestMaxTotalStacks` | 单条申请总组数上限（默认 30）。 |
+| `RequestMaxPendingPerPlayer` | 每人待审上限（默认 3；0 = 不限）。 |
+| `RequestMaxPerDayPerPlayer` | 每人每天提交上限（默认 10；0 = 不限）。 |
+| `RequestMinIntervalSeconds` | 两次提交最小间隔（默认 10 秒）。 |
+| `RequestMaxPendingTotal` | 全服待审上限（默认 200）。 |
+| `RequestHistoryDays` | 已结束申请保留天数（默认 30）。 |
+| `RequestAutoDeliver` | 审核通过后自动发放（默认开；关掉后用 `/web req give` 补发）。 |
+| `RequestNotifyReviewers` | 新申请时给在线审核人发游戏内提示（默认开）。 |
 
 后端环境变量：
 
@@ -138,6 +152,12 @@ docker restart tshock
 | `/webui/events` | `since`、`limit`、`tail`、`token` | `{events:[{seq,type,text,time,source?}],lastSeq,firstSeq?}`；`type ∈ join\|leave\|boss\|announce\|npc\|chat`；`announce` = 世界公告（Boss 苏醒 / 事件开始 / 入侵），`npc` = 旅商到达（其它城镇 NPC 与 NPC 死亡不记）；聊天的 `source ∈ game\|webui`；`tail=N` 取最新 N 条（磁盘历史，需能力 `events_history`） |
 | `/webui/chat` | `text`、`token` | `{name,text,line,id,time,source}`：以配置前缀（默认 `[WebUI]`）广播到游戏内聊天（不伪造身份；在线禁言 → 403；超限流 → 429），并记入事件流 `type=chat, source=webui` |
 | `/webui/auth/sessions` | `token` | `{sessions:[{id,created,expires,current}]}` |
+| `/webui/requests` | `status`、`token` | 我的物资申请（需 `webui.request.use`） |
+| `/webui/requests/create` | `items`（JSON）、`reason`、`note`、`token` | 提交物资申请 |
+| `/webui/requests/cancel` | `id`、`token` | 撤回自己的待审申请 |
+| `/webui/requests/all` | `status`、`token` | 审核列表（需 `webui.request.review`） |
+| `/webui/requests/review` | `id`、`decision=approve\|deny`、`reason`、`token` | 通过 / 拒绝 |
+| `/webui/requests/deliver` | `id`、`token` | 补发已批准未发放的申请 |
 | `/webui/auth/revoke` | `id` 或 `all=true`、`token` | `{revoked:n}` |
 
 未安装插件的服务器对以上路径返回 404，后端据此提示「未安装插件」。

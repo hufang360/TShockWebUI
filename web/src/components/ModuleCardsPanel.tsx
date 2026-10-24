@@ -35,6 +35,7 @@ interface ModuleCardsPanelProps {
   /** 结果 key 前缀（如 `world:` / `m:<id>:`）。 */
   keyPrefix: string
   title: string
+  desc?: string
   cards: PanelCard[]
   /** 允许「管理卡片」时提供。 */
   onAddCard?: (name: string, command: string) => void
@@ -55,6 +56,7 @@ export function ModuleCardsPanel({
   onTokenInvalid,
   keyPrefix,
   title,
+  desc,
   cards,
   onAddCard,
   onUpdateCard,
@@ -204,7 +206,10 @@ export function ModuleCardsPanel({
   return (
     <div className="flex min-h-0 flex-col gap-4">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
+        </div>
         <div className="flex items-center gap-2">
           {lastRefreshAt && (
             <span

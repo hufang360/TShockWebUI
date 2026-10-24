@@ -75,9 +75,10 @@ Write-Host "==> 目标平台 $GOOS/$GOARCH（宿主 $hostGoos/$hostGoarch），�
 # ── 1. 生成数据自检 ─────────────────────────────────────────────
 # 生成数据随仓库提交；若被删或未生成，这里提前失败并给出生成命令。
 $required = @(
-  'data\items.json', 'data\prefixes.json', 'data\commands.json', 'data\meta.json',
+  'data\items.json', 'data\prefixes.json', 'data\buffs.json', 'data\commands.json', 'data\meta.json',
   'data\items-atlas.json', 'data\items-atlas.png',
   'data\player-atlas.json', 'data\player-atlas.png',
+  'data\buff-atlas.json', 'data\buff-atlas.png',
   'data\recipes.json', 'data\item-stats.json',
   'data\item-tips.zh-Hans.json', 'data\item-tips.en-US.json',
   'data\loc.zh-Hans.json', 'data\loc.en-US.json'
@@ -87,7 +88,7 @@ if ($missing.Count -gt 0) {
   Write-Host '错误：缺少生成数据：' -ForegroundColor Red
   $missing | ForEach-Object { Write-Host "  $_" }
   Write-Host '  请先执行（部分需要 dotnet 9 / python3-Pillow）：'
-  Write-Host '    node tools/gen-data.mjs && python3 tools/gen-atlas.py && python3 tools/gen-player-atlas.py'
+  Write-Host '    node tools/gen-data.mjs && python3 tools/gen-atlas.py && python3 tools/gen-player-atlas.py && python3 tools/gen-buff-atlas.py'
   Write-Host '    bash tools/gen-game-data.sh'
   exit 1
 }

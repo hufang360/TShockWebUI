@@ -34,7 +34,7 @@ namespace WebUI
     {
         public override string Name => "WebUI";
         public override string Author => "TShockWebUI";
-        public override string Description => "TShockWebUI 的信使插件：在线授权登录 + 批量执行 / 只读信息 / 事件流 / 会话管理 / 网页发言。";
+        public override string Description => "TShockWebUI 的信使插件：在线授权登录 + 批量执行 / 只读信息 / 事件流 / 会话管理 / 网页发言 / 物资申请。";
         public override Version Version => Assembly.GetExecutingAssembly().GetName().Version;
 
         internal static WebAuthConfig Config;
@@ -57,18 +57,21 @@ namespace WebUI
             Sessions = new SessionRegistry();
             // 服务器动态历史：建目录、恢复磁盘尾部、启动后台写线程。
             EventLog.Init(Config);
+            // 物资申请：加载 tshock/WebUI/requests.json。
+            RequisitionStore.Init(Config);
 
             // 统一入口：/webui（简写 /web），功能指令为二级子命令。
-            // 权限（TShock 为 OR 语义，这里列两个，具体子命令在 handler 内再细分）：
-            //   webui.use   玩家：/web auth、/web deny
-            //   webui.admin 管理：/web limit（另需 tshock.rest.cfg）
+            // 权限（TShock 为 OR 语义，这里列三个，具体子命令在 handler 内再细分）：
+            //   webui.use            玩家：/web auth、/web deny
+            //   webui.admin          管理：/web limit（另需 tshock.rest.cfg）
+            //   webui.request.review 审核：/web req（物资申请审核 / 补发）
             Commands.ChatCommands.Add(new Command(
-                new List<string> { WebUiPermissions.Use, WebUiPermissions.Admin },
+                new List<string> { WebUiPermissions.Use, WebUiPermissions.Admin, WebUiPermissions.RequestReview },
                 WebCommand, "webui", "web")
             {
                 // 控制台可跑 /web limit；auth / deny 在 handler 内要求游戏内本人。
                 AllowServer = true,
-                HelpText = "网页端信使插件：/web auth <验证码> | /web deny <验证码> | /web limit <上限|unlimited|default>",
+                HelpText = "网页端信使插件：/web auth <验证码> | /web deny <验证码> | /web limit <上限|unlimited|default> | /web req <list|show|ok|no|give>",
             });
 
             ServerApi.Hooks.GameUpdate.Register(this, OnGameUpdate);
@@ -87,6 +90,8 @@ namespace WebUI
             ServerApi.Hooks.ServerChat.Register(this, OnServerChat);
             // 服务器动态：记录玩家聊天（走 TShock 的 PlayerChat，仅真实聊天、不含指令）。
             PlayerHooks.PlayerChat += OnPlayerChat;
+            // 物资申请：玩家登录后补发离线期间批准的申请，并补发结果提醒。
+            PlayerHooks.PlayerPostLogin += OnPlayerPostLogin;
 
             if (TShock.RestApi != null)
             {
@@ -109,7 +114,14 @@ namespace WebUI
                 TShock.RestApi.Register(new SecureRestCommand("/webui/chat", WebAuthRest.Chat));
                 TShock.RestApi.Register(new SecureRestCommand("/webui/auth/sessions", WebAuthRest.Sessions));
                 TShock.RestApi.Register(new SecureRestCommand("/webui/auth/revoke", WebAuthRest.Revoke));
-                TShock.Log.ConsoleInfo("[WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}");
+                // 物资申请：玩家提交 / 查看 / 撤回（webui.request.use）；服主审核 / 补发（webui.request.review）。
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests", RequestRest.ListMine, WebUiPermissions.RequestUse));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/create", RequestRest.Create, WebUiPermissions.RequestUse));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/cancel", RequestRest.Cancel, WebUiPermissions.RequestUse));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/all", RequestRest.ListAll, WebUiPermissions.RequestReview));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/review", RequestRest.Review, WebUiPermissions.RequestReview));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/deliver", RequestRest.Deliver, WebUiPermissions.RequestReview));
+                TShock.Log.ConsoleInfo("[WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}、/webui/requests*");
             }
             else
             {
@@ -125,6 +137,12 @@ namespace WebUI
 
             if (!AnyGroupHasPermission(WebUiPermissions.Admin))
                 TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有 {WebUiPermissions.Admin}，/web limit 仅 superadmin 可用。");
+
+            if (!AnyGroupHasPermission(WebUiPermissions.RequestUse))
+                TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有 {WebUiPermissions.RequestUse}，玩家将无法提交物资申请；请例如：/group addperm default {WebUiPermissions.RequestUse}");
+
+            if (!AnyGroupHasPermission(WebUiPermissions.RequestReview))
+                TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有 {WebUiPermissions.RequestReview}，物资申请只能由 superadmin 审核；请例如：/group addperm <管理组> {WebUiPermissions.RequestReview}");
         }
 
         private static bool AnyGroupHasPermission(string permission)
@@ -154,8 +172,11 @@ namespace WebUI
                 ServerApi.Hooks.WorldStartHardMode.Deregister(this, OnStartHardMode);
                 ServerApi.Hooks.ServerChat.Deregister(this, OnServerChat);
                 PlayerHooks.PlayerChat -= OnPlayerChat;
+                PlayerHooks.PlayerPostLogin -= OnPlayerPostLogin;
                 // 停止事件写盘线程并 flush。
                 EventLog.Shutdown();
+                // 物资申请：最后一次变更落盘。
+                RequisitionStore.Shutdown();
             }
             base.Dispose(disposing);
         }
@@ -202,6 +223,13 @@ namespace WebUI
             if (string.IsNullOrWhiteSpace(name)) name = Main.player[e.Who]?.name;
             if (string.IsNullOrWhiteSpace(name)) return;
             EventLog.Add("leave", $"{name} 离开了服务器");
+        }
+
+        /// <summary>物资申请：玩家登录后补发离线期间批准的申请，并补发结果提醒。</summary>
+        private void OnPlayerPostLogin(PlayerPostLoginEventArgs e)
+        {
+            try { RequisitionStore.OnPlayerPostLogin(e.Player); }
+            catch (Exception ex) { TShock.Log.ConsoleError("[WebUI] 登录补发物资申请异常：" + ex); }
         }
 
         private void OnNpcKilled(NpcKilledEventArgs e)
@@ -485,6 +513,12 @@ namespace WebUI
                     WebLimit(args, args.Parameters.Skip(1).ToList());
                     return;
 
+                case "req":
+                case "request":
+                case "申请":
+                    WebReq(args, args.Parameters.Skip(1).ToList());
+                    return;
+
                 default:
                     WebHelp(args);
                     return;
@@ -497,6 +531,101 @@ namespace WebUI
             args.Player?.SendInfoMessage("  /web auth <验证码>  同意网页登录（需 webui.use）");
             args.Player?.SendInfoMessage("  /web deny <验证码>  拒绝网页登录");
             args.Player?.SendInfoMessage("  /web limit <上限|unlimited|default>  放宽 REST 建令牌限流（需 webui.admin + tshock.rest.cfg）");
+            args.Player?.SendInfoMessage("  /web req list|show|ok|no|give  物资申请审核（需 webui.request.review）");
+        }
+
+        /// <summary>
+        /// /web req：物资申请审核（服主 / 管理组）。
+        ///   /web req list [pending|approved|all]
+        ///   /web req show <id>
+        ///   /web req ok <id>
+        ///   /web req no <id> [原因]
+        ///   /web req give <id>
+        /// </summary>
+        private static void WebReq(CommandArgs args, List<string> rest)
+        {
+            if (!HasAll(args.Player, WebUiPermissions.RequestReview))
+            {
+                args.Player?.SendErrorMessage($"需要 {WebUiPermissions.RequestReview} 权限。");
+                return;
+            }
+
+            if (rest.Count == 0 || rest[0].Equals("help", StringComparison.OrdinalIgnoreCase))
+            {
+                args.Player?.SendInfoMessage("物资申请审核：");
+                args.Player?.SendInfoMessage("  /web req list [pending|approved|all]  列表（默认 pending）");
+                args.Player?.SendInfoMessage("  /web req show <id>  详情");
+                args.Player?.SendInfoMessage("  /web req ok <id>  通过并发放（在线立即给 / 离线下次登录）");
+                args.Player?.SendInfoMessage("  /web req no <id> [原因]  拒绝");
+                args.Player?.SendInfoMessage("  /web req give <id>  补发已批准未发放的申请");
+                return;
+            }
+
+            var action = (rest[0] ?? "").ToLowerInvariant();
+            var idArg = rest.Count > 1 ? rest[1] : "";
+            if (action != "list" && !int.TryParse(idArg, out _))
+            {
+                args.Player?.SendErrorMessage("用法：/web req <list|show|ok|no|give> [id]");
+                return;
+            }
+
+            switch (action)
+            {
+                case "list":
+                    SendLines(args.Player, RequisitionStore.CommandList(idArg));
+                    return;
+
+                case "show":
+                    SendLines(args.Player, RequisitionStore.CommandShow(int.Parse(idArg)));
+                    return;
+
+                case "ok":
+                case "approve":
+                {
+                    var result = RequisitionStore.ReviewFromCommand(args.Player, int.Parse(idArg), "approve", "") as RestObject;
+                    Report(args.Player, result, int.Parse(idArg));
+                    return;
+                }
+
+                case "no":
+                case "deny":
+                {
+                    var reason = rest.Count > 2 ? string.Join(" ", rest.Skip(2)) : "";
+                    var result = RequisitionStore.ReviewFromCommand(args.Player, int.Parse(idArg), "deny", reason) as RestObject;
+                    Report(args.Player, result, int.Parse(idArg));
+                    return;
+                }
+
+                case "give":
+                case "deliver":
+                {
+                    var result = RequisitionStore.DeliverFromCommand(args.Player, int.Parse(idArg)) as RestObject;
+                    Report(args.Player, result, int.Parse(idArg));
+                    return;
+                }
+
+                default:
+                    args.Player?.SendErrorMessage("未知子命令；用 /web req help 查看用法。");
+                    return;
+            }
+        }
+
+        private static void Report(TSPlayer player, RestObject result, int id)
+        {
+            if (result == null) return;
+            if (result.ContainsKey("error"))
+            {
+                player?.SendErrorMessage((result["error"] ?? "").ToString());
+                return;
+            }
+            SendLines(player, RequisitionStore.CommandShow(id));
+        }
+
+        private static void SendLines(TSPlayer player, string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            foreach (var line in text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                player?.SendInfoMessage(line);
         }
 
         /// <summary>权限判断：玩家需同时具备全部权限；控制台 / 服务端玩家按 TShock 权限（superadmin）通过。</summary>
@@ -574,5 +703,9 @@ namespace WebUI
     {
         public const string Use = "webui.use";
         public const string Admin = "webui.admin";
+        /// <summary>提交 / 查看 / 撤回自己的物资申请。</summary>
+        public const string RequestUse = "webui.request.use";
+        /// <summary>审核 / 补发物资申请（游戏内 /web req 与网页审核）。</summary>
+        public const string RequestReview = "webui.request.review";
     }
 }

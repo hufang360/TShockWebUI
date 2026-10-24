@@ -170,12 +170,74 @@ export interface PlayerCapabilities {
   permission: boolean
 }
 
+/** `GET /api/requests/capabilities`：物资申请模块的可用性。 */
+export interface RequestCapabilities {
+  /** 服务器插件是否支持物资申请（声明了 requests 能力）。 */
+  plugin: boolean
+  /** 当前用户能否提交 / 查看 / 撤回自己的申请（需要 webui.request.use）。 */
+  submit: boolean
+  /** 当前用户能否审核 / 补发（需要 webui.request.review）。 */
+  review: boolean
+  /** 不可用原因（空 = 可用）：not_installed / protocol_mismatch / missing_capabilities。 */
+  reason?: string
+}
+
+export type RequisitionStatus = 'pending' | 'approved' | 'delivered' | 'denied' | 'cancelled'
+
+/** 物资申请里的一行：物品 id + 总数量。 */
+export interface RequisitionItem {
+  id: number
+  stack: number
+}
+
+/** `GET /api/requests`：一条物资申请。 */
+export interface Requisition {
+  id: number
+  account: string
+  player: string
+  items: RequisitionItem[]
+  reason: string
+  note: string
+  status: RequisitionStatus
+  createdAt: string
+  updatedAt: string
+  reviewedBy: string
+  reviewedAt: string
+  denyReason: string
+  deliveredAt: string
+  deliveryError: string
+  world: string
+}
+
 /** `GET /api/fish/capabilities`：第三方插件 FishShop 的可用性。 */
 export interface FishCapabilities {
-  /** 服务器是否已安装 FishShop（/v3/fishshop/* 存在）。 */
+  /** 服务器在跑 FishShop（含「版本过旧、没有 REST 接口」）。 */
   plugin: boolean
-  /** 当前用户所在组是否有 fishshop.rest.use 权限。 */
+  /** 插件注册了 REST 端点（v1.6.2+）；false = 老版本只有游戏内指令。 */
+  rest: boolean
+  /**
+   * 当前用户能否访问鱼店。新版插件不需要任何额外权限（恒为 true）；
+   * 只有老版本（v1.6.2 ~ v1.6.6）缺 `fishshop.rest.use` 时才是 false。
+   */
   permission: boolean
+}
+
+/**
+ * `GET /api/capabilities`：一次拿到这台服务器上所有可选能力的可用性。
+ *
+ * 收敛前的做法是分别打 batch/player/fish/requests/webauth 五个探测端点，
+ * 启动时 + 首页 + 设置页各打一轮；现在统一读这一份。
+ * `reachable === false` 表示上游 TShock 不可达/超时 → 其余字段不可信，别据此隐藏模块。
+ */
+export interface ServerCapabilities {
+  reachable: boolean
+  /** 信使插件握手（与 pluginStatus() 同结构）。 */
+  messenger: PluginStatus
+  batch: BatchCapabilities
+  player: PlayerCapabilities
+  fish: FishCapabilities
+  requests: RequestCapabilities
+  webauth: WebAuthCapabilities
 }
 
 /** 鱼店货架上的一条商品。 */
@@ -381,6 +443,11 @@ export interface BackendTransport {
   sessions(): Promise<SessionInfo[]>
   /** 信使插件握手结果（版本 / 协议 / 能力 / 兼容性）；用于「设置 → 信使插件」诊断。 */
   pluginStatus(): Promise<PluginStatus>
+  /**
+   * 统一能力矩阵：一次请求返回插件 / 批量 / 玩家管理 / 鱼店 / 物资申请 / 在线授权的可用性。
+   * `fresh` 为 true 时绕过后端 3 秒微缓存（「重新检测」按钮用）。
+   */
+  capabilities(fresh?: boolean): Promise<ServerCapabilities>
   /** 吊销指定的 / 全部（保留当前）web 会话，返回吊销数量。 */
   revokeSessions(id?: string, all?: boolean): Promise<number>
 
@@ -398,12 +465,27 @@ export interface BackendTransport {
 
   /** 实时探测第三方插件 FishShop：是否安装 / 是否有权限。 */
   fishCapabilities(): Promise<FishCapabilities>
-  /** 查看鱼店货架（需要 fishshop.rest.use 权限）。 */
+  /** 查看鱼店货架（新版插件不需要额外权限；老版本需要 fishshop.rest.use）。 */
   fishList(): Promise<FishShop>
   /** 询价单条商品。 */
   fishAsk(serial: number): Promise<FishGood>
   /** 为自己购买；amount 默认 1，args 替换指令类商品的 {args} 占位符。 */
   fishBuy(serial: number, amount: number, args?: string): Promise<FishBuyResult>
+
+  /** 实时探测物资申请模块（插件能力 + 当前用户权限）。 */
+  requestCapabilities(): Promise<RequestCapabilities>
+  /** 我的物资申请。 */
+  requestList(status?: RequisitionStatus | 'all'): Promise<Requisition[]>
+  /** 提交物资申请。 */
+  requestCreate(items: RequisitionItem[], reason: string, note?: string): Promise<Requisition>
+  /** 撤回自己的待审申请。 */
+  requestCancel(id: number): Promise<Requisition>
+  /** 审核列表（需要 webui.request.review）。 */
+  requestListAll(status?: RequisitionStatus | 'all'): Promise<Requisition[]>
+  /** 通过 / 拒绝申请（需要 webui.request.review）。 */
+  requestReview(id: number, decision: 'approve' | 'deny', reason?: string): Promise<Requisition>
+  /** 补发已批准但未发放的申请（需要 webui.request.review）。 */
+  requestDeliver(id: number): Promise<Requisition>
 }
 
 /**

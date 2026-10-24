@@ -358,7 +358,7 @@ func (s *Server) writeChatError(w http.ResponseWriter, sess *session.Session, er
 	switch e.Kind {
 	case tshock.KindTokenInvalid:
 		s.sessions.Delete(sess.ID)
-		s.clearSessionCookie(w)
+		s.clearSessionCookie(w, *sess)
 		writeError(w, http.StatusUnauthorized, codeTokenInvalid, "登录状态已失效，请重新登录")
 	case tshock.KindNotFound:
 		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 WebUI 信使插件")
@@ -497,7 +497,7 @@ func (s *Server) writePluginError(ctx context.Context, w http.ResponseWriter, se
 	switch e.Kind {
 	case tshock.KindTokenInvalid:
 		s.sessions.Delete(sess.ID)
-		s.clearSessionCookie(w)
+		s.clearSessionCookie(w, *sess)
 		writeError(w, http.StatusUnauthorized, codeTokenInvalid, "登录状态已失效，请重新登录")
 	case tshock.KindNoPermission, tshock.KindNoAPIPermission:
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")

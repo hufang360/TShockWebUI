@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type ComponentProps, type FocusEvent, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import { History, X } from 'lucide-react'
 import { Button, InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -14,6 +22,8 @@ type SearchInputProps = Omit<ComponentProps<'input'>, 'onChange' | 'value'> & {
   history?: readonly string[]
   /** 点击「最近搜索」时的回调；缺省时回落到 `onValueChange`。 */
   onHistorySelect?: (value: string) => void
+  /** 删除单条最近搜索记录。 */
+  onHistoryRemove?: (value: string) => void
   /** 下拉框顶部的小标题（默认「最近搜索」）。 */
   historyHeader?: string
   /**
@@ -26,6 +36,12 @@ type SearchInputProps = Omit<ComponentProps<'input'>, 'onChange' | 'value'> & {
   historyOnFocus?: boolean
   /** 是否在输入框内显示「最近搜索」按钮（有历史时才出现），默认 `true`。 */
   historyToggle?: boolean
+  /** 打字时是否自动展开「最近搜索」下拉，默认 `true`；物品图鉴改为 `false`（只点按钮展开）。 */
+  historyOnInput?: boolean
+  /** 输入框左侧的前置图标（如放大镜），走 `InputGroup` 的 inline-start addon。 */
+  leadingIcon?: ReactNode
+  /** 输入框最右侧的操作图标（如搜索放大镜）。 */
+  trailingIcon?: ReactNode
 }
 
 /**
@@ -42,9 +58,13 @@ export function SearchInput({
   inputClassName,
   history,
   onHistorySelect,
+  onHistoryRemove,
   historyHeader,
   historyOnFocus = false,
   historyToggle = true,
+  historyOnInput = true,
+  leadingIcon,
+  trailingIcon,
   onFocus,
   onBlur,
   onKeyDown,
@@ -103,18 +123,28 @@ export function SearchInput({
       e.stopPropagation()
       setOpen(false)
     }
+    // 回车 = 结束输入：收起历史下拉并失焦（搜索本身实时生效）。
+    if (e.key === 'Enter') {
+      setOpen(false)
+      e.currentTarget.blur()
+    }
     onKeyDown?.(e)
   }
 
   return (
     <div ref={rootRef} className="relative w-full">
       <InputGroup className={cn('h-8 w-full', className)}>
+        {leadingIcon && (
+          <InputGroupAddon align="inline-start" className="pr-0">
+            {leadingIcon}
+          </InputGroupAddon>
+        )}
         <InputGroupInput
           value={value}
           onChange={(e) => {
             onValueChange(e.target.value)
-            // 输入时打开历史下拉（像补全一样边输边筛）；聚焦时是否弹由 historyOnFocus 决定。
-            setOpen(true)
+            // 输入时是否自动打开历史下拉由 historyOnInput 决定（物品图鉴只点按钮展开）。
+            if (historyOnInput) setOpen(true)
           }}
           onFocus={handleFocus}
           onBlur={handleBlur}
@@ -122,7 +152,7 @@ export function SearchInput({
           className={cn('px-2.5 text-xs', inputClassName)}
           {...props}
         />
-        {((historyToggle && items.length > 0) || value.length > 0) && (
+        {((historyToggle && items.length > 0) || value.length > 0 || trailingIcon) && (
           <InputGroupAddon align="inline-end">
             {historyToggle && items.length > 0 && (
               <Button
@@ -157,6 +187,7 @@ export function SearchInput({
                 <X data-icon="inline-start" />
               </Button>
             )}
+            {trailingIcon}
           </InputGroupAddon>
         )}
       </InputGroup>
@@ -170,7 +201,7 @@ export function SearchInput({
             {historyHeader ?? t('search.recent')}
           </li>
           {shown.map((h) => (
-            <li key={h}>
+            <li key={h} className="flex items-center gap-1 pr-1">
               <button
                 type="button"
                 role="option"
@@ -183,11 +214,25 @@ export function SearchInput({
                   else onValueChange(h)
                   setOpen(false)
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               >
                 <History className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{h}</span>
               </button>
+              {onHistoryRemove && (
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={t('search.remove')}
+                  title={t('search.remove')}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onHistoryRemove(h)}
+                  className="size-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  <X />
+                </Button>
+              )}
             </li>
           ))}
         </ul>

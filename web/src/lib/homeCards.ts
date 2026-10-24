@@ -11,7 +11,7 @@
  */
 
 // 默认顺序即「服务器状态 → 服务器动态 → 快捷入口 → 在线玩家 → …」。
-// 「服务器动态」固定在第 2 位、「快捷入口」固定在第 3 位（见 docs/功能-服务器动态.md）。
+// 快捷入口默认隐藏：它与侧栏导航重复，仍可在「管理卡片」中重新显示。
 export const BUILTIN_CARD_IDS = [
   'server',
   'events',
@@ -85,7 +85,7 @@ export interface CustomHomeCard {
  * 老的本机布局（`tswui:homeCards` 无 `layoutVersion` 或版本更旧）会自动升级，
  * 只把「服务器动态」「快捷入口」挪到第 2 / 第 3 位，其余卡片与隐藏态、自定义卡片都保留。
  */
-export const HOME_CARDS_LAYOUT_VERSION = 2
+export const HOME_CARDS_LAYOUT_VERSION = 3
 
 /** 「服务器动态」「快捷入口」的默认落位（0 基索引，见 docs/功能-服务器动态.md）。 */
 const PINNED_CARD_POSITIONS: { id: BuiltinCardId; index: number }[] = [
@@ -106,7 +106,7 @@ export interface HomeCardsPrefs {
 
 export const DEFAULT_HOME_CARDS: HomeCardsPrefs = {
   order: [...BUILTIN_CARD_IDS],
-  hidden: {},
+  hidden: { quick: true },
   custom: [],
   layoutVersion: HOME_CARDS_LAYOUT_VERSION,
 }
@@ -204,7 +204,13 @@ export function upgradeHomeCardsLayout(prefs: HomeCardsPrefs): HomeCardsPrefs {
   for (const { id, index } of PINNED_CARD_POSITIONS) {
     order.splice(Math.min(index, order.length), 0, id)
   }
-  return { ...prefs, order, layoutVersion: HOME_CARDS_LAYOUT_VERSION }
+  // v3：快捷入口与侧栏重复，升级时默认隐藏；用户仍可在卡片管理中重新打开。
+  return {
+    ...prefs,
+    order,
+    hidden: { ...prefs.hidden, quick: true },
+    layoutVersion: HOME_CARDS_LAYOUT_VERSION,
+  }
 }
 
 /** 把 fromId 移动到 toId 所在位置（拖拽排序）。 */

@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react'
 import { useMemo } from 'react'
-import { Star } from 'lucide-react'
+import { Hammer, Star } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { cn } from '@/lib/cn'
 import { useI18n, type I18n } from '@/lib/i18n'
+import { useItemDetail } from '@/lib/itemDetailContext'
 import { useItemFavorites } from '@/lib/itemFavoritesContext'
 import { rarityColor } from '@/lib/items'
 import { prefixDeltaLines } from '@/lib/prefixes'
@@ -93,6 +94,11 @@ interface ItemTooltipContentProps {
   /** 额外类名（如抽屉/详情里改为通栏：`w-full max-w-none`）。 */
   className?: string
   style?: CSSProperties
+  /**
+   * 不显示底部「合成表」入口。**物品详情抽屉里的那份 tips 要传 true**——
+   * 它本来就指向自己，点了再开一层没有意义。
+   */
+  hideRecipeLink?: boolean
 }
 
 export function ItemTooltipContent({
@@ -107,6 +113,7 @@ export function ItemTooltipContent({
   hideHeader = false,
   className,
   style,
+  hideRecipeLink = false,
 }: ItemTooltipContentProps) {
   const { t } = useI18n()
   const favorites = useItemFavorites()
@@ -162,7 +169,7 @@ export function ItemTooltipContent({
         {showBaseNote && (
           <p className="text-xs text-muted-foreground">{t('tooltip.baseStatsNote')}</p>
         )}
-        <IdKeyFooter item={item} className="text-muted-foreground" />
+        <IdKeyFooter item={item} className="text-muted-foreground" showLink={!hideRecipeLink} />
       </div>
     )
   }
@@ -229,16 +236,50 @@ export function ItemTooltipContent({
       {showBaseNote && (
         <p className="mt-1 text-xs text-zinc-400/90">{t('tooltip.baseStatsNote')}</p>
       )}
-      <IdKeyFooter item={item} className="text-zinc-400/90" />
+      <IdKeyFooter item={item} className="text-zinc-400/90" showLink={!hideRecipeLink} />
     </div>
   )
 }
 
-/** 所有物品提示的左下角都显示「ID · key」（如 `2665 · GreenDungeonCandelabra`）。 */
-function IdKeyFooter({ item, className }: { item: Item; className?: string }) {
+/** 所有物品提示的左下角都显示「ID · key」，后面跟一个「合成表」入口（有 Provider 时）。 */
+function IdKeyFooter({
+  item,
+  className,
+  showLink = true,
+}: {
+  item: Item
+  className?: string
+  /** 为 false 时不渲染「合成表」入口（详情抽屉里那份 tips 指向自己）。 */
+  showLink?: boolean
+}) {
+  const { t } = useI18n()
+  const detail = useItemDetail()
   return (
-    <p className={cn('mt-1 font-pixel text-xs tracking-wide break-all', className)}>
-      {item.id} · {item.key}
+    <p
+      className={cn(
+        'mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-pixel text-xs tracking-wide',
+        className,
+      )}
+    >
+      <span className="break-all">
+        {item.id} · {item.key}
+      </span>
+      {detail && showLink && (
+        <button
+          type="button"
+          onClick={(e) => {
+            // 提示可能挂在可点击的格子上：别把点击冒泡成「选中格子」。
+            e.stopPropagation()
+            detail.open(item.id)
+          }}
+          aria-label={t('tooltip.recipes')}
+          title={t('tooltip.recipes')}
+          className="inline-flex cursor-pointer items-center gap-0.5 rounded underline decoration-dotted underline-offset-2 transition-colors hover:no-underline focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+        >
+          <Hammer className="size-3" aria-hidden />
+          {t('tooltip.recipes')}
+        </button>
+      )}
     </p>
   )
 }

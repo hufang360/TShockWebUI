@@ -12,7 +12,7 @@ React + TypeScript + Vite + Tailwind，最终产物由 **Go 后端内嵌**在单
 ## 现状
 
 阶段 0–4 已交付：编辑器 / 补全 / 物品搜索 / `[i:...]` 标签 / 图集图标 / 历史草稿 / 物品图鉴 /
-合成表 / 富文本结果 / 首页卡片 / 多服务器切换 / 插件模块（玩家管理、鱼店、世界管理）。
+合成表 / 富文本结果 / 首页卡片 / 多服务器切换 / 插件模块（玩家管理、鱼店、物资申请、世界管理）。
 
 - 参数补全：`data/commands.json` 的 `paramSets` 来自 TShock 源码用法串，`lib/completion.ts` 据此逐位判定参数类型；
   真实数据回归见 `src/lib/completion.realdata.test.ts`。

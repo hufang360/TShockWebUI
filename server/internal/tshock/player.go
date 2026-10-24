@@ -61,10 +61,10 @@ type PlayerLook struct {
 	EyeColor        *int `json:"eyeColor"`
 
 	// 其它只读信息（成就 / 永久增强 / 重生点）
-	ExtraSlot            bool `json:"extraSlot"`            // 恶魔之心：额外配饰槽
-	SpawnX               int  `json:"spawnX"`               // 重生点 X（-1 = 未设置）
-	SpawnY               int  `json:"spawnY"`               // 重生点 Y
-	QuestsCompleted      int  `json:"questsCompleted"`      // 渔夫任务完成次数
+	ExtraSlot            bool `json:"extraSlot"`       // 恶魔之心：额外配饰槽
+	SpawnX               int  `json:"spawnX"`          // 重生点 X（-1 = 未设置）
+	SpawnY               int  `json:"spawnY"`          // 重生点 Y
+	QuestsCompleted      int  `json:"questsCompleted"` // 渔夫任务完成次数
 	UsingBiomeTorches    bool `json:"usingBiomeTorches"`
 	HappyFunTorchTime    bool `json:"happyFunTorchTime"`
 	UnlockedBiomeTorches bool `json:"unlockedBiomeTorches"` // 火把神徽章

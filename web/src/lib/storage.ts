@@ -31,20 +31,26 @@ export const StorageKeys = {
   collapsedCards: 'collapsedCards',
   /** 物品图鉴里收藏的物品 id（在「指令」模块的收藏 tab 展示）。 */
   itemFavorites: 'itemFavorites',
-  /** 物品图鉴每页数量（跨刷新记忆；见 lib/dexState.ts）。 */
-  dexPageSize: 'dex:pageSize',
-  /** 物品图鉴合成表「仅图标」开关（跨刷新记忆）。 */
-  dexRecipeIconOnly: 'dex:recipeIconOnly',
-  /** 物品图鉴合成表单列显示（默认多列）。 */
-  dexRecipeSingleColumn: 'dex:recipeSingleColumn',
-  /** 物品图鉴合成表复制文本是否含 [i:..] 标签。 */
-  dexRecipeCopyTag: 'dex:recipeCopyTag',
+  /** 物品图鉴是否隐藏格子中的 ID 与名称（默认关闭，即默认显示）。 */
+  dexHideItemMeta: 'dex:hideItemMeta',
+  /** 物品图鉴表格视图开关。 */
+  dexTableView: 'dex:tableView',
+  /** 物品图鉴两列表格开关。 */
+  dexTableTwoCols: 'dex:tableTwoCols',
+  /** 物品图鉴合成表「显示物品名称」开关（默认不勾选 = 仅图标；跨刷新记忆）。 */
+  dexRecipeShowNames: 'dex:recipeShowNames',
+  /** 物品图鉴合成表「两列视图」开关（默认不勾选 = 自适应多列）。 */
+  dexRecipeTwoColumn: 'dex:recipeTwoColumn',
   /** 物品图鉴「最近搜索」（统一规则：最多 10 条，见 lib/searchHistory.ts）。 */
   dexSearchHistory: 'dex:searchHistory',
+  /** 物品图鉴「最近使用的分组 / 制作页签」（最多 3 条）。 */
+  dexGroupRecent: 'dex:groupRecent',
   /** NPC 图鉴「最近搜索」（统一规则：最多 10 条）。 */
   npcsSearchHistory: 'npcs:searchHistory',
   /** 数据 ID（图格 / 墙）速查表「最近搜索」（统一规则：最多 10 条）。 */
   tilesSearchHistory: 'tiles:searchHistory',
+  /** 数据 ID 的 Buff 速查表「最近搜索」（统一规则：最多 10 条）。 */
+  buffsSearchHistory: 'buffs:searchHistory',
   itemsRecent: 'items:recent',
   settings: 'settings',
   ui: 'ui',

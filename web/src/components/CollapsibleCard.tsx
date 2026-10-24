@@ -53,8 +53,10 @@ export function CollapsibleCard({
           {headerExtra && (
             <div
               className={cn(
-                'flex shrink-0 items-center gap-1',
-                open ? 'opacity-0 transition-opacity group-hover/header:opacity-100' : 'hidden',
+                'flex shrink-0 items-center gap-1 touch-visible',
+                open
+                  ? 'opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100'
+                  : 'hidden',
               )}
             >
               {headerExtra}
@@ -66,7 +68,10 @@ export function CollapsibleCard({
               className="shrink-0 cursor-pointer"
               aria-label={typeof title === 'string' ? title : undefined}
             >
-              <CollapseChevron open={open} reveal="group-hover/header:opacity-100" />
+              <CollapseChevron
+                open={open}
+                reveal="group-hover/header:opacity-100 group-focus-within/header:opacity-100"
+              />
             </button>
           </CollapsibleTrigger>
         </CardHeader>

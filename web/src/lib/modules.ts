@@ -8,7 +8,7 @@
  * 出现在 B 服的侧边栏。开关状态存 localStorage `tswui:modules`，结构为
  * `{ byServer: { [serverId]: ModuleId[] } }`。
  *
- * - 内置模块：玩家管理（PlayerManager）、鱼店（FishShop）、世界管理（WorldModify）。
+ * - 内置模块：玩家管理（PlayerManager）、鱼店（FishShop）、物资申请（WebUI 插件）、世界管理（WorldModify）。
  * - 自定义模块：用户自己「填名称 + 指令」创建的模块，id 以 `m:` 开头，
  *   定义存 `tswui:customModules`（见 `lib/customModules.ts`）。
  * - 模块内的「额外指令卡片」存 `tswui:moduleCards`（见 `lib/moduleCards.ts`）。
@@ -50,6 +50,12 @@ export const MODULE_DEFS: ModuleDef[] = [
     requiresKey: 'modules.requires.fishShop',
   },
   {
+    id: 'requisition',
+    titleKey: 'nav.requisition',
+    hintKey: 'nav.requisitionHint',
+    requiresKey: 'modules.requires.requests',
+  },
+  {
     id: 'world',
     titleKey: 'nav.world',
     hintKey: 'nav.worldHint',
@@ -86,10 +92,12 @@ export interface ModuleDetection {
   players: boolean
   /** FishShop 已安装且当前用户组有权限。 */
   store: boolean
+  /** 信使插件已安装且当前用户可提交物资申请。 */
+  requisition: boolean
 }
 
 /** 能通过插件探测确认可用、可自动激活的内置模块（世界管理无法探测，保持手动）。 */
-const AUTO_ACTIVATABLE: readonly (keyof ModuleDetection)[] = ['players', 'store']
+const AUTO_ACTIVATABLE: readonly (keyof ModuleDetection)[] = ['players', 'store', 'requisition']
 
 /**
  * 自动激活：把「探测到插件且可用」的内置模块写进已激活列表（侧边栏入口随之出现）。

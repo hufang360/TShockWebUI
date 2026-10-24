@@ -7,7 +7,8 @@ node tools/gen-data.mjs           # 1) 物品/词缀/NPC/buff/指令 + 图格/�
 python3 tools/gen-atlas.py         # 2) 物品图标图集（需 Pillow）
 python3 tools/gen-player-atlas.py  # 3) 玩家角色图集（需 Pillow）
 python3 tools/gen-npc-atlas.py     # 4) NPC 贴图图集（需 Pillow）
-bash tools/gen-game-data.sh        # 5) 合成表 + 属性 stats + item-tips + item-groups + shimmer + prefix + 图格/墙表（需 dotnet 9）
+python3 tools/gen-buff-atlas.py    # 5) Buff 图标图集（需 Pillow）
+bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + item-groups + shimmer + prefix + 图格/墙表（需 dotnet 9）
 ```
 
 数据对应 **Terraria 1.4.5.8**。版本不匹配时必须重新生成，否则物品 ID / 名称 / 图标可能错位。
@@ -18,7 +19,7 @@ bash tools/gen-game-data.sh        # 5) 合成表 + 属性 stats + item-tips + i
 目的是让**没有游戏源码 / 解包资源**的机器也能直接构建前端与单文件二进制。代价是仓库体积与生成数据的 diff 噪音。
 
 - 图集 PNG 版权属 **Re-Logic**，随仓库提交，仅随本项目使用（见 `LICENSE`）。
-- 三个图集（items / player / npc）的 `*-atlas.json` 里都有 `meta.hash`（PNG 的内容哈希）：前端用 `?v=<hash>` 拉 PNG，图集一变 URL 就变，避免「新坐标 + 旧 PNG」的图标错位。
+- 四个图集（items / player / npc / buff）的 `*-atlas.json` 里都有 `meta.hash`（PNG 的内容哈希）：前端用 `?v=<hash>` 拉 PNG，图集一变 URL 就变，避免「新坐标 + 旧 PNG」的图标错位。
 - 升级游戏版本后必须按上文重新生成，并核对 `meta.json` 的 `gameVersion`。
 - 若后续想瘦身：可把生成物移出仓库、改由 CI / Docker 构建时生成（代价：构建机需备齐游戏资源）。
 
@@ -62,6 +63,8 @@ bash tools/gen-game-data.sh        # 5) 合成表 + 属性 stats + item-tips + i
 | `player-atlas.png` | 玩家角色图集（已入库；灰度遮罩，绘制时用玩家颜色相乘着色） | — |
 | `npc-atlas.json` | NPC 贴图图集裁切信息 `{regions:{npcId:[x,y,w,h]}}`（第一帧） | 694 |
 | `npc-atlas.png` | NPC 贴图图集（已入库；版权 Re-Logic） | — |
+| `buff-atlas.json` | Buff 图标图集裁切信息 `{regions:{buffId:[x,y,w,h]}}` | 400 |
+| `buff-atlas.png` | Buff 图标图集（已入库；版权 Re-Logic，1022×428） | — |
 
 ### commands.json 结构
 
@@ -265,7 +268,9 @@ bash tools/gen-game-data.sh        # 5) 合成表 + 属性 stats + item-tips + i
     { "id": 0, "key": "Dirt",  "item": 2 },               // item = 放置该图格的代表物品 id
     { "id": 14, "key": "Tables", "item": 1413, "size": [3, 2] }, // size = 摆放尺寸 [宽, 高]（格）
     { "id": 5, "key": "Trees", "item": null, "frameImportant": true }, // 无固定尺寸（树 / 陷阱等）
-    { "id": 7, "key": "Copper", "item": 12 }              // 简单方块：无 size（1×1）
+    { "id": 7, "key": "Copper", "item": 12 },             // 简单方块：无 size（1×1）
+    { "id": 21, "key": "Containers", "item": 48, "size": [2, 2], // 多样式图格带 styles
+      "styles": [{ "subId": 0, "item": 48 }, { "subId": 1, "item": 306 }] }
   ]
 }
 ```
@@ -273,6 +278,9 @@ bash tools/gen-game-data.sh        # 5) 合成表 + 属性 stats + item-tips + i
 - 内部名来自 `Terraria.ID/TileID.cs` / `WallID.cs` 的常量名；`item` 来自 GameDump 的 `itemTile` / `itemWall`（同一图格有多个放置物时取 id 最小的）。
 - `size`（仅图格）：GameDump 的 `tileDims`，来自游戏运行期 `Terraria.ObjectData.TileObjectData` 的 `Width × Height`（style 0 作代表）；简单方块（`1×1`）省略该字段，墙没有尺寸概念。
 - `frameImportant`（仅图格）：GameDump 的 `tileFrameImportant` 里「frame-important 但无 `TileObjectData`」的图格（树 / 陷阱 / 铁轨……）；有 `size` 的条目不重复标。
+- `styles`（仅图格）：同一 TileID 下的子 ID（游戏 `Item.placeStyle` / 样式），只有多样式图格才有；
+  `subId` 是样式下标，`item` 是该样式对应的代表物品（用于显示名称与图标）。数据由
+  `GameDump --tile-styles` 生成，`tools/gen-tile-wall.mjs` 通过 `STYLES_RAW` 合并。
 - 显示名在运行期由代表物品的官方本地化名解析（等价于游戏 `Lang.GetMapObjectName` 的常见情形）；没有代表物品时回退到内部名。
 - 由 `tools/gen-tile-wall.mjs` 整理（`tools/gen-game-data.sh` 调用，复用同一次 GameDump 的 `recipes-raw.json`）。
 
@@ -344,7 +352,10 @@ $SPRITE_DIR/Item_<icon>.png
 所有图标合成 **一张** `items-atlas.png`，前端按 `items-atlas.json` 裁切第一帧。
 参考本机 `FishShopConfig` 的 `items.png` / `itemsPngInfo` 方案，但全自动且覆盖全部物品 ID。
 
-- 尺寸：**1024 × 4584**（唯一贴图 6133 张，约 2.0 MB）。
+- 尺寸：**1024 × 4906**（唯一贴图 6133 张，约 2.0 MB）。
+- **每格之间留 1px 透明缝**（`--padding 1`，items / npc / player 三张图集一致）：
+  前端缩小图标会开插值，密排时双线性采样会读到邻居精灵的像素，图标边缘出现 1px 亮/暗线。
+  重新生成时不要传 `--padding 0`（会退回密排）。
 - 裁切信息 key 是**贴图 id**，前端用 `items.json` 里的 `item.icon` 取：
   ```js
   const [x, y, w, h] = regions[item.icon];

@@ -9,6 +9,7 @@ class FakeImage {
   naturalHeight = 0
   private _src = ''
   static requests: string[] = []
+  static decodes = 0
   static sizeFor: (url: string) => [number, number] = () => [0, 0]
 
   set src(url: string) {
@@ -25,6 +26,10 @@ class FakeImage {
   get src() {
     return this._src
   }
+
+  async decode() {
+    FakeImage.decodes += 1
+  }
 }
 
 /** 每个用例用不同哈希：lib/atlas 的图集缓存是模块级单例，跨用例不能共用 URL。 */
@@ -33,6 +38,7 @@ const atlasWith = (hash: string) => ({ meta: { sheet: 'npc-atlas.png', hash, wid
 describe('lib/atlas', () => {
   afterEach(() => {
     FakeImage.requests = []
+    FakeImage.decodes = 0
     vi.unstubAllGlobals()
   })
 
@@ -48,6 +54,7 @@ describe('lib/atlas', () => {
     const img = await loadVerifiedAtlasImage(atlasWith('h1'))
     expect(img.naturalWidth).toBe(1162)
     expect(FakeImage.requests).toEqual(['/data/npc-atlas.png?v=h1'])
+    expect(FakeImage.decodes).toBe(1)
   })
 
   it('尺寸不一致时带时间戳重取一次；重取对了就用它', async () => {

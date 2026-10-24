@@ -74,8 +74,8 @@ func TestIntegrationCommandThroughHandler(t *testing.T) {
 	// 3) 未知指令 → 交由 TShock 判定（不前置拒绝）。
 	rec = do(h, http.MethodPost, "/api/command", map[string]string{"cmd": "/definitely-not-real"}, cookie, true)
 	_ = json.Unmarshal(rec.Body.Bytes(), &res)
-	if res.Status != tshock.StatusCommandError {
-		t.Fatalf("期望 command_error（由 TShock 判定）：%+v", res)
+	if res.Status != tshock.StatusCommandNotFound {
+		t.Fatalf("期望 command_not_found（由 TShock 判定）：%+v", res)
 	}
 
 	// 4) 插件指令 /fish（不在内置白名单）→ 发往 TShock，返回真实输出。

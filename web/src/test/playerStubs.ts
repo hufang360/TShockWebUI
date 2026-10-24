@@ -11,7 +11,11 @@ import type {
   PlayerCapabilities,
   PlayerLook,
   PluginStatus,
+  Requisition,
+  RequisitionItem,
+  RequestCapabilities,
   RuntimeCommand,
+  ServerCapabilities,
   ServerInfoExtra,
   SessionInfo,
   WebAuthCapabilities,
@@ -78,6 +82,26 @@ export const playerStubs = {
     reason: 'ok',
   }),
   revokeSessions: async (): Promise<number> => 0,
+  // 统一能力矩阵：默认「什么插件都装了」；需要模拟缺插件的用例覆盖对应字段即可。
+  capabilities: async (): Promise<ServerCapabilities> => ({
+    reachable: true,
+    messenger: {
+      installed: true,
+      legacy: false,
+      version: 'test',
+      protocol: 1,
+      minProtocol: 1,
+      capabilities: ['batch', 'chat', 'commands', 'data', 'events', 'me', 'serverinfo', 'sessions'],
+      backendProtocol: 1,
+      compatible: true,
+      reason: 'ok',
+    },
+    batch: { plugin: true },
+    player: { plugin: true, permission: true },
+    fish: { plugin: true, rest: true, permission: true },
+    requests: { plugin: true, submit: true, review: true },
+    webauth: { plugin: true },
+  }),
   playerCapabilities: async (): Promise<PlayerCapabilities> => ({ plugin: true, permission: true }),
   playerLook: async (name: string): Promise<PlayerLook> => emptyPlayerLook(name),
   playerExport: async (name: string): Promise<{ filename: string; blob: Blob }> => ({
@@ -85,7 +109,7 @@ export const playerStubs = {
     blob: new Blob([]),
   }),
   importPlayer: async (): Promise<PlayerLook> => emptyPlayerLook('imported', false),
-  fishCapabilities: async (): Promise<FishCapabilities> => ({ plugin: true, permission: true }),
+  fishCapabilities: async (): Promise<FishCapabilities> => ({ plugin: true, rest: true, permission: true }),
   fishList: async (): Promise<FishShop> => ({ name: 'test', total: 0, goods: [] }),
   fishAsk: async (serial: number): Promise<FishGood> => ({
     serial,
@@ -106,4 +130,43 @@ export const playerStubs = {
     amount,
     cost: '',
   }),
+  requestCapabilities: async (): Promise<RequestCapabilities> => ({
+    plugin: true,
+    submit: true,
+    review: true,
+  }),
+  requestList: async (): Promise<Requisition[]> => [],
+  requestCreate: async (items: RequisitionItem[], reason: string, note?: string): Promise<Requisition> =>
+    makeRequisition({ items, reason, note: note ?? '' }),
+  requestCancel: async (id: number): Promise<Requisition> => makeRequisition({ id, status: 'cancelled' }),
+  requestListAll: async (): Promise<Requisition[]> => [],
+  requestReview: async (id: number, decision: 'approve' | 'deny', reason?: string): Promise<Requisition> =>
+    makeRequisition({
+      id,
+      status: decision === 'approve' ? 'delivered' : 'denied',
+      denyReason: decision === 'deny' ? reason ?? '未说明原因' : '',
+    }),
+  requestDeliver: async (id: number): Promise<Requisition> => makeRequisition({ id, status: 'delivered' }),
+}
+
+/** 测试用的物资申请默认值（各字段都有，避免用例重复拼）。 */
+export function makeRequisition(patch: Partial<Requisition> = {}): Requisition {
+  return {
+    id: 1,
+    account: 'test',
+    player: 'test',
+    items: [{ id: 9, stack: 1 }],
+    reason: 'test reason',
+    note: '',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    reviewedBy: '',
+    reviewedAt: '',
+    denyReason: '',
+    deliveredAt: '',
+    deliveryError: '',
+    world: 'test',
+    ...patch,
+  }
 }

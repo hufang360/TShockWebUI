@@ -25,6 +25,8 @@ export interface VirtualGridInput {
   overscanRows?: number
   /** 宽度未测量时的列数兜底（仅用于无布局环境） */
   fallbackCols?: number
+  /** 最大列数（例如图鉴固定一行最多 10 个） */
+  maxCols?: number
   /** 高度未测量时的视口高度兜底（仅用于无布局环境） */
   fallbackHeight?: number
 }
@@ -60,10 +62,12 @@ export function computeVirtualGrid({
   scrollTop,
   overscanRows = 2,
   fallbackCols = 10,
+  maxCols,
   fallbackHeight = 560,
 }: VirtualGridInput): VirtualGridLayout {
-  const cols =
+  const naturalCols =
     viewportWidth > 0 ? Math.max(1, Math.floor((viewportWidth + gap) / (cell + gap))) : fallbackCols
+  const cols = maxCols == null ? naturalCols : Math.min(naturalCols, Math.max(1, maxCols))
   const rowHeight = (cellHeight ?? cell) + gap
   const rows = Math.ceil(Math.max(0, count) / cols)
   const totalHeight = rows > 0 ? rows * rowHeight - gap : 0

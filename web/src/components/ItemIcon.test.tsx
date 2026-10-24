@@ -8,9 +8,9 @@ const atlas: Atlas = {
   meta: {
     gameVersion: '1.4.5.8',
     width: 1024,
-    height: 4584,
+    height: 4906,
     limitWidth: 1024,
-    padding: 0,
+    padding: 1,
     textures: 3,
     items: 3,
     sheet: 'items-atlas.png',
@@ -46,22 +46,18 @@ describe('ItemIcon 数量徽标', () => {
     expect(screen.queryByText('1')).toBeNull()
   })
 
-  it('可悬停看提示时给手形指针；关掉 tooltip 或无物品时不给', () => {
+  it('图标本身不给手形指针（只有悬停提示，点了没反应）；可点场合由外层给', () => {
     const { container, rerender } = render(<ItemIcon item={COIN} atlas={atlas} />)
     const wrap = () => container.firstElementChild as HTMLElement
-    expect(wrap().className).toContain('cursor-pointer')
+    // 有提示也不给 cursor-pointer：避免暗示「可点」
+    expect(wrap().className).not.toContain('cursor-pointer')
 
     rerender(<ItemIcon item={COIN} atlas={atlas} tooltip={false} />)
     expect(wrap().className).not.toContain('cursor-pointer')
 
-    // 未知物品（item 缺失）不弹提示 → 不给手形
-    rerender(<ItemIcon item={undefined} atlas={atlas} />)
-    expect(wrap().className).not.toContain('cursor-pointer')
-
-    // 调用方可用 className 覆盖
-    rerender(<ItemIcon item={COIN} atlas={atlas} className="cursor-default" />)
-    expect(wrap().className).toContain('cursor-default')
-    expect(wrap().className).not.toContain('cursor-pointer')
+    // 调用方仍可用 className 自己指定（如放进可点区域时）
+    rerender(<ItemIcon item={COIN} atlas={atlas} className="cursor-pointer" />)
+    expect(wrap().className).toContain('cursor-pointer')
   })
 
   it('堆叠数量贴在方框右下角（不盖住居中的小图标）', () => {

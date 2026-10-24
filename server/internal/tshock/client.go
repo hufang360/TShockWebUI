@@ -100,14 +100,17 @@ func (e *APIError) Error() string {
 
 // 指令执行结果状态（与 API_SPEC §6 一致）。
 const (
-	StatusOK           = "ok"
-	StatusCommandError = "command_error"
-	StatusNoPermission = "no_permission"
-	StatusTokenInvalid = "token_invalid"
-	StatusUnavailable  = "unavailable"
-	StatusTimeout      = "timeout"
-	StatusBadResponse  = "bad_response"
-	StatusRejected     = "rejected"
+	StatusOK = "ok"
+	// StatusCommandNotFound：TShock 明确说「这条指令不存在」（多为提供该指令的插件未安装）。
+	// 与 StatusCommandError（参数/用法错误）分开，前端据此隐藏依赖插件的内置卡片。
+	StatusCommandNotFound = "command_not_found"
+	StatusCommandError    = "command_error"
+	StatusNoPermission    = "no_permission"
+	StatusTokenInvalid    = "token_invalid"
+	StatusUnavailable     = "unavailable"
+	StatusTimeout         = "timeout"
+	StatusBadResponse     = "bad_response"
+	StatusRejected        = "rejected"
 )
 
 // Result 是指令执行结果（API_SPEC §6）。
@@ -439,19 +442,47 @@ func (c *Client) classifyForbidden(ctx context.Context, token string, body []byt
 	return &APIError{Kind: KindTokenInvalid, Status: http.StatusForbidden, Message: messageFromBody(body)}
 }
 
+// 命令输出判定的文案标记（TShock 原文 + zh_CN 译文，出处见 docs/TECHNICAL_RESEARCH.md §8.2）。
+//
+// 判定前先 `normalizeOutput`（转小写、空白合并），所以这里的标记只写「连续单词」，
+// 不受上游换行 / 多空格 / 引号影响。
+//
+// 「指令不存在」**只认 TShock 的完整句式**（英文带 `entered`、中文是「输入的命令无效」），
+// 故意不写成宽泛的 `invalid command`：插件自己也会打印「无效指令：xxx」这类文本，
+// 那属于 command_error，绝不能据此判定「插件未安装」（否则首页卡片会被误隐藏）。
+var (
+	markersNoPermission = []string{"you do not have access to this command", "你没有权限使用该指令"}
+	markersInGameOnly   = []string{"you must use this command in-game", "你必须在游戏内使用该指令"}
+	// markersCommandNotFound：TShock Commands.cs 的 unknown command 文案。
+	//   en: `Invalid command entered. If you need help, type "/help".`
+	//   zh: `输入的命令无效。使用/help 获取可用的指令列表。`
+	markersCommandNotFound = []string{"invalid command entered", "输入的命令无效"}
+	// markersCommandError：其余「无效指令」类文案（用法/参数写错）。
+	markersCommandError = []string{"invalid command"}
+)
+
+// normalizeOutput 把上游输出归一成「小写 + 单空格分隔」，便于跨换行 / 多空格匹配。
+func normalizeOutput(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
 // classifyOutput 依据 TShock 的命令输出文本判定执行结果。
 //
 // TShock 的 rawcmd 对「权限不足 / 无效指令 / 仅限游戏内」都返回 HTTP 200，
 // 把提示写进 output（Commands.HandleCommand 源码已核实），故必须解析文本。
 // 标记同时覆盖英文原文与中文（本机目标服 lang=7），见 TShock i18n/zh_CN。
 func classifyOutput(lines []string) Result {
-	joined := strings.Join(lines, "\n")
+	text := normalizeOutput(strings.Join(lines, "\n"))
 	switch {
-	case containsAny(joined, "you do not have access to this command", "你没有权限使用该指令"):
+	case containsAny(text, markersNoPermission...):
 		return Result{Status: StatusNoPermission, Output: lines, Message: "权限不足，无法执行该指令"}
-	case containsAny(joined, "you must use this command in-game", "你必须在游戏内使用该指令"):
+	case containsAny(text, markersInGameOnly...):
 		return Result{Status: StatusCommandError, Output: lines, Message: "该指令只能在游戏内执行"}
-	case containsAny(joined, "invalid command", "输入的命令无效"):
+	// 「指令不存在」优先于「参数错误」：前者说明指令本身没注册（插件未安装），
+	// 后者是指令在、用法不对。
+	case containsAny(text, markersCommandNotFound...):
+		return Result{Status: StatusCommandNotFound, Output: lines, Message: "指令不存在（提供该指令的插件可能未安装）"}
+	case containsAny(text, markersCommandError...):
 		return Result{Status: StatusCommandError, Output: lines, Message: "无效指令或参数错误"}
 	}
 	return Result{Status: StatusOK, Output: lines}

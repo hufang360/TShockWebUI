@@ -46,10 +46,9 @@ export function RichText({
           return (
             <span key={index} className="mx-0.5 inline-flex items-center align-middle">
               {/* 24px 方框 = 游戏聊天里 [i:..] 的占位尺寸（32 × 0.75，ItemTagHandler.cs:52），
-                  配 text-sm/leading-6（14px/24px）与游戏聊天行高比例一致；
-                  数量字号上限 11px（默认公式在 24px 方框下会算到 13px，在正文行里偏大，
-                  金币等小图标仍会得到更小的 9px）。
-                  悬停提示用 `lg`：图标 28px、正文 14px（默认 md 是 18px / 12px，在结果面板里偏小）。 */}
+                  **不随正文字号变**（字号调小后图标保持原大小）。
+                  数量字号上限 11px（24px 方框下的默认公式会算到 13px，在正文行里偏大，
+                  金币等小图标仍会得到更小的 9px）。悬停提示全项目统一一套尺寸（`useItemTooltip`）。 */}
               <ItemIcon
                 item={item}
                 atlas={atlas}

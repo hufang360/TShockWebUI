@@ -1,6 +1,7 @@
 // GameDump —— 从 Terraria(TShock OTAPI) 运行时导出「合成表 + 物品属性」原始数据。
 //
-// 用法：GameDump <TR_SRC> <RECIPES_OUT.json> <ITEMS_OUT.json>
+// 用法：GameDump <TR_SRC> <RECIPES_OUT.json> <ITEMS_OUT.json> [...]
+//       GameDump --tile-styles <TILE_STYLES_OUT.json>   // 只导出图格样式（子 ID）
 //
 // 原理：初始化最小静态环境后直接调用游戏自身的 Terraria.Recipe.SetupRecipes()
 //       与 Item.SetDefaults()，避免手工解析 C# 源码带来的偏差。
@@ -20,6 +21,15 @@ internal static class Program
 {
     private static void Main(string[] args)
     {
+        // 轻量模式：只导出「图格样式（子 ID）」。
+        //   dotnet GameDump.dll --tile-styles /tmp/tile-styles.json
+        if (args.Length > 0 && args[0] == "--tile-styles")
+        {
+            Bootstrap();
+            DumpTileStyles(args.Length > 1 ? args[1] : "/tmp/tile-styles.json");
+            return;
+        }
+
         var trSrc = args.Length > 0 ? args[0] : Environment.GetEnvironmentVariable("TR_SRC") ?? "";
         var recipesOut = args.Length > 1 ? args[1] : "/tmp/recipes-raw.json";
         var itemsOut = args.Length > 2 ? args[2] : "/tmp/items-raw.json";
@@ -270,6 +280,60 @@ internal static class Program
         }
         Console.WriteLine($"[recipes] 图格尺寸 {dims.Count} 条，frameImportant {frameImportant.Count} 条");
         return dims;
+    }
+
+    // ── 图格样式（子 ID）─────────────────────────────────────
+    // 家具 / 宝箱 / 平台等同一 TileID 下有多个 style（游戏里用 placeStyle / frame 区分）。
+    // style → 物品：Item.placeStyle（放置时的样式下标）→ 代表物品，用于显示名称；
+    // 有多个 placeStyle 的 tile 才会输出 styles（单样式无需子 ID）。
+    private static void DumpTileStyles(string outPath)
+    {
+        TryInitTileData();
+        try
+        {
+            Terraria.ObjectData.TileObjectData.Initialize();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"[tile-styles] 警告：TileObjectData 初始化失败：{e.InnerException?.Message ?? e.Message}");
+        }
+
+        // (tileId, style) -> 代表性物品 id（同 style 取第一个物品）
+        var styleItems = new Dictionary<int, Dictionary<int, int>>();
+        for (int i = 1; i < ItemID.Count; i++)
+        {
+            var it = new Item();
+            try { it.SetDefaults(i); } catch { }
+            if (it.createTile < 0) continue;
+            int style = it.placeStyle >= 0 ? it.placeStyle : 0;
+            if (!styleItems.TryGetValue(it.createTile, out var map))
+                styleItems[it.createTile] = map = new Dictionary<int, int>();
+            if (!map.ContainsKey(style)) map[style] = i;
+        }
+
+        var tiles = new Dictionary<int, object>();
+        for (int t = 0; t < TileID.Count; t++)
+        {
+            // 宝箱 / 平台 / 火把等 tile 的样式由物品的 placeStyle 给出；
+            // 一个 placeStyle 对应一个可放置的样式（也是玩家通常说的「子 ID」）。
+            if (!styleItems.TryGetValue(t, out var items) || items.Count <= 1) continue;
+            var styles = items
+                .OrderBy(kv => kv.Key)
+                .Select(kv => new { subId = kv.Key, item = kv.Value })
+                .ToArray();
+            tiles[t] = new { styles };
+        }
+
+        var payload = new
+        {
+            gameVersion = AssemblyVersion(),
+            tileCount = tiles.Count,
+            source = "TileObjectData.SubTiles + Item.placeStyle @ OTAPI " + AssemblyVersion(),
+            generatedBy = "tools/gamedump/Program.cs --tile-styles",
+            tiles,
+        };
+        File.WriteAllText(outPath, JsonSerializer.Serialize(payload));
+        Console.WriteLine($"[tile-styles] {tiles.Count} tiles -> {outPath}");
     }
 
     // ── 物品属性 ─────────────────────────────────────────────

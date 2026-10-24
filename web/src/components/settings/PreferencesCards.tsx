@@ -103,7 +103,7 @@ export function PreferencesCards({
         </SettingRow>
       </CollapsibleCard>
 
-      <CollapsibleCard title={t('settings.dataRefresh')} bodyClassName="flex flex-col gap-0 pt-0">
+      <CollapsibleCard title={t('settings.execution')} bodyClassName="flex flex-col gap-0 pt-0">
         <SettingRow label={t('settings.commandInterval')}>
           <NativeSelect
             size="sm"
@@ -124,6 +124,30 @@ export function PreferencesCards({
           </NativeSelect>
         </SettingRow>
         <Separator />
+        <Field
+          orientation="horizontal"
+          className="flex-nowrap items-center justify-between gap-3 py-2"
+        >
+          <div className="flex flex-col gap-0.5">
+            <FieldTitle>{t('home.batch')}</FieldTitle>
+            <p className="text-xs leading-4 text-muted-foreground">
+              {batchPlugin === true ? t('home.batchHint') : t('home.batchUnavailable')}
+            </p>
+          </div>
+          {batchPlugin === null ? (
+            <Spinner className="text-muted-foreground" />
+          ) : (
+            <Switch
+              checked={batchPlugin === true && batchMode}
+              disabled={batchPlugin !== true}
+              onCheckedChange={onBatchModeChange}
+              aria-label={t('home.batch')}
+            />
+          )}
+        </Field>
+      </CollapsibleCard>
+
+      <CollapsibleCard title={t('settings.dataRefresh')} bodyClassName="flex flex-col gap-0 pt-0">
         <div className="flex flex-col gap-1 py-2">
           <Field orientation="horizontal" className="flex-nowrap justify-between gap-3">
             <FieldTitle>{t('settings.eventsInterval')}</FieldTitle>
@@ -148,7 +172,7 @@ export function PreferencesCards({
             </NativeSelect>
           </Field>
           {!canFastEvents && (
-            <p className="text-2xs leading-4 text-muted-foreground">
+            <p className="text-xs leading-5 text-muted-foreground">
               {t('settings.eventsIntervalFastHint')}
             </p>
           )}
@@ -176,28 +200,6 @@ export function PreferencesCards({
             </NativeSelectOption>
           </NativeSelect>
         </SettingRow>
-        <Separator />
-        <Field
-          orientation="horizontal"
-          className="flex-nowrap items-center justify-between gap-3 py-2"
-        >
-          <div className="flex flex-col gap-0.5">
-            <FieldTitle>{t('home.batch')}</FieldTitle>
-            <p className="text-2xs leading-4 text-muted-foreground">
-              {batchPlugin === true ? t('home.batchHint') : t('home.batchUnavailable')}
-            </p>
-          </div>
-          {batchPlugin === null ? (
-            <Spinner className="text-muted-foreground" />
-          ) : (
-            <Switch
-              checked={batchPlugin === true && batchMode}
-              disabled={batchPlugin !== true}
-              onCheckedChange={onBatchModeChange}
-              aria-label={t('home.batch')}
-            />
-          )}
-        </Field>
       </CollapsibleCard>
     </>
   )

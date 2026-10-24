@@ -57,7 +57,7 @@ function fakeTransport(overrides: Partial<BackendTransport> = {}): BackendTransp
 }
 
 function renderPage(transport: BackendTransport) {
-  render(
+  return render(
     <I18nProvider lang="zh">
       <DatasetProvider value={makeDataset()}>
         <ExecutionQueueProvider interval={0}>
@@ -96,7 +96,16 @@ describe('FishShopPage', () => {
     expect(screen.getByText('#1')).toBeTruthy()
   })
 
-  it('非原生物品（指令类，desc 无 [i:..]）悬停不显示物品提示', async () => {
+  it('REST 货架可用时游戏内指令默认收起，可按需展开', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+
+    await screen.findAllByText('生命水晶')
+    expect(screen.queryByText('钓鱼信息')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '游戏内指令' }))
+    expect(await screen.findByText('钓鱼信息')).toBeTruthy()
+  })
+
+  it('非原生物品（指令类，desc 无 [i:..]）悬停不显示物品提示，图标不压透明度', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([ARG_GOOD]) }))
 
     const cell = await screen.findByRole('button', { name: '地图上找' })
@@ -104,6 +113,8 @@ describe('FishShopPage', () => {
     // 给提示一点渲染时间，确认不会弹出。
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(screen.queryByRole('tooltip')).toBeNull()
+    // 借来的识别图按正常透明度显示（与真物品一致）。
+    expect(within(cell).getByRole('img').parentElement?.className ?? '').not.toContain('opacity-80')
   })
 
   it('件数在头部文字行；刷新图标 tooltip 显示上次刷新时间', async () => {
@@ -154,10 +165,64 @@ describe('FishShopPage', () => {
   it('未安装插件时提示并隐藏货架', async () => {
     renderPage(
       fakeTransport({
-        fishCapabilities: async () => ({ plugin: false, permission: false }),
+        fishCapabilities: async () => ({ plugin: false, rest: false, permission: false }),
       }),
     )
-    expect(await screen.findByText('服务器未安装 FishShop 插件，无法使用鱼店。')).toBeTruthy()
+    expect(await screen.findByText('需安装 鱼店 插件，无法获取货架数据。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '生命水晶' })).toBeNull()
+  })
+
+  it('提示区有「重新检测」：装上插件后不用切页面（REST 延迟注册的兜底）', async () => {
+    // 第一次探到「没装」，第二次（点重新检测）探到可用。
+    const fishCapabilities = vi
+      .fn()
+      .mockResolvedValueOnce({ plugin: false, rest: false, permission: false })
+      .mockResolvedValue({ plugin: true, rest: true, permission: true })
+    const fishList = vi.fn(async () => shopOf([GOOD]))
+    renderPage(fakeTransport({ fishCapabilities, fishList }))
+
+    expect(await screen.findByText('需安装 鱼店 插件，无法获取货架数据。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /重新检测/ }))
+
+    await waitFor(() => expect(fishCapabilities).toHaveBeenCalledTimes(2))
+    // 检测通过后自动拉货架
+    expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
+  })
+
+  it('插件可用但无权限时提示权限，并保留游戏内指令作为兼容入口', async () => {
+    renderPage(
+      fakeTransport({
+        fishCapabilities: async () => ({ plugin: true, rest: true, permission: false }),
+      }),
+    )
+    expect(await screen.findByText('老版本鱼店插件需要 fishshop.rest.use 权限，你的用户组没有。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '生命水晶' })).toBeNull()
+    expect(await screen.findByText('钓鱼信息')).toBeTruthy()
+  })
+
+  it('老版本插件（没有 REST 接口）时提示版本过旧，且右侧指令卡片仍可用', async () => {
+    const fishList = vi.fn(async () => shopOf([]))
+    renderPage(
+      fakeTransport({
+        fishCapabilities: async () => ({ plugin: true, rest: false, permission: false }),
+        fishList,
+      }),
+    )
+    expect(await screen.findByText('鱼店插件版本过旧')).toBeTruthy()
+    // 没有 REST 就不该再拉货架。
+    expect(fishList).not.toHaveBeenCalled()
+    // 右侧指令卡片只走 rawcmd，照常渲染。
+    expect(await screen.findByText('货架')).toBeTruthy()
+    expect(screen.getByText('钓鱼信息')).toBeTruthy()
+  })
+
+  it('离开后再进入页面会重新拉货架（不受刷新间隔闸门影响）', async () => {
+    const fishList = vi.fn(async () => shopOf([GOOD]))
+    const first = renderPage(fakeTransport({ fishList }))
+    await screen.findAllByText('生命水晶')
+    first.unmount()
+    renderPage(fakeTransport({ fishList }))
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
   })
 
   it('服务类商品用 icon 字段配置的图标（desc 无 [i:..] 也能显示）', async () => {
@@ -324,7 +389,7 @@ describe('FishShopPage', () => {
 })
 
 describe('FishShopPage 右侧指令卡片', () => {
-  it('鱼店 REST API 不可用（探测报错）时仍渲染 4 张指令卡片', async () => {
+  it('鱼店 REST API 不可用（探测报错）时仍渲染 5 张指令卡片', async () => {
     renderPage(
       fakeTransport({
         fishCapabilities: async () => {
@@ -332,7 +397,8 @@ describe('FishShopPage 右侧指令卡片', () => {
         },
       }),
     )
-    expect(await screen.findByText('钓鱼信息')).toBeTruthy()
+    expect(await screen.findByText('货架')).toBeTruthy()
+    expect(screen.getByText('钓鱼信息')).toBeTruthy()
     expect(screen.getByText('鱼罐')).toBeTruthy()
     expect(screen.getByText('消费榜')).toBeTruthy()
     expect(screen.getByText('鱼篓榜')).toBeTruthy()
@@ -342,11 +408,12 @@ describe('FishShopPage 右侧指令卡片', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: ['已钓到 3 条鱼'] })
     renderPage(fakeTransport({ fishList: async () => shopOf([]), runCommand }))
 
+    fireEvent.click(await screen.findByRole('button', { name: '游戏内指令' }))
     const card = (await screen.findByText('钓鱼信息')).closest('[data-slot="card"]') as HTMLElement
     fireEvent.click(within(card).getByRole('button', { name: '刷新' }))
 
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/fish info'))
-    expect(await screen.findByText('已钓到 3 条鱼')).toBeTruthy()
+    expect((await screen.findAllByText('已钓到 3 条鱼')).length).toBeGreaterThan(0)
   })
 
   it('统一执行：一次批量请求执行全部卡片', async () => {
@@ -359,9 +426,16 @@ describe('FishShopPage 右侧指令卡片', () => {
       )
     renderPage(fakeTransport({ fishList: async () => shopOf([]), runCommand, runBatch }))
 
+    fireEvent.click(await screen.findByRole('button', { name: '游戏内指令' }))
     fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
     await waitFor(() => expect(runBatch).toHaveBeenCalled())
-    expect(runBatch.mock.calls[0][0]).toEqual(['/fish info', '/fish jar', '/fish rank', '/fish basket'])
+    expect(runBatch.mock.calls[0][0]).toEqual([
+      '/fish list',
+      '/fish info',
+      '/fish jar',
+      '/fish rank',
+      '/fish basket',
+    ])
     expect(runCommand).not.toHaveBeenCalled()
   })
 })

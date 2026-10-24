@@ -1,4 +1,5 @@
 import { CardManagerSheet, type ManagerCard } from '@/components/CardManagerSheet'
+import { Badge } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 
 export interface ManageableCard {
@@ -47,6 +48,7 @@ export function ModuleCardManagerDialog({
     name: card.name,
     command: card.command,
     custom: card.custom,
+    badges: card.custom ? undefined : <Badge>{t('home.manageBuiltin')}</Badge>,
   }))
 
   return (

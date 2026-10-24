@@ -14,8 +14,11 @@ import (
 
 // Session 是一条登录会话。TShockToken 为敏感字段，不得序列化输出。
 type Session struct {
-	ID          string
-	Username    string
+	ID       string
+	Username string
+	// Upstream 是该会话所属的 TShock 上游 base URL（如 http://1.2.3.4:7878）。
+	// 多服务器切换时按上游隔离：A 服的 token 绝不会被发往 B 服。
+	Upstream    string
 	TShockToken string
 	CreatedAt   time.Time
 	LastSeen    time.Time
@@ -44,7 +47,8 @@ func New(ttl time.Duration, max int) *Store {
 }
 
 // Create 生成随机会话 ID 并保存。已满时先清理过期条目，仍满则返回错误。
-func (s *Store) Create(username, token string) (Session, error) {
+// upstream 为该会话所属的 TShock 上游 base URL（空串表示后端默认上游）。
+func (s *Store) Create(username, token, upstream string) (Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -61,6 +65,7 @@ func (s *Store) Create(username, token string) (Session, error) {
 	sess := Session{
 		ID:          id,
 		Username:    username,
+		Upstream:    upstream,
 		TShockToken: token,
 		CreatedAt:   now,
 		LastSeen:    now,

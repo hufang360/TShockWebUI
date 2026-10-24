@@ -23,6 +23,7 @@ Terraria **TShock** 服务器的**玩家 Web 指令伴侣**：在浏览器里舒
 | 物品图鉴 | 49 个物品集合、分页浏览、随机「换一批」；悬停图标弹出**游戏同款属性提示**（伤害/暴击/击退/防御…） |
 | 合成表 | 本地合成表（`recipes.json`）展示「怎么合成 / 可用它合成什么」，不依赖服端指令与登录 |
 | 富文本结果 | 解析 Terraria `[c/RRGGBB:text]` 颜色与 `[i:ID]` 图标标签，与 1.4.5.8 `ChatManager` 规则一致 |
+| 物资申请 | 玩家搜索物品、填数量与用途提交给服主；服主在游戏内 `/web req` 或网页「待审核」审核，在线立即发放 / 离线下次登录发放（需信使插件 + `webui.request.use` / `review`） |
 | 历史 / 草稿 / 收藏 | 全部存本机 `localStorage`（`tswui:*`），上限 100，不自动执行 |
 | 会话 | 后端内存会话 + TTL；TShock 重启后刷新页面即回登录；执行遇 `token_invalid` 会弹登录框并**自动重试一次** |
 | 多服务器切换 | 可选（默认关）。开启后可在界面维护多个 TShock 上游并用 `X-TSWUI-Target` 快速切换 |
@@ -263,8 +264,8 @@ cd server && go test ./...
 
 - **所有非 GET 请求**必须带 `X-Requested-With: tswui`，否则 `403 csrf`。
 - 请求级失败用统一错误信封 `{ "error": { "code": "...", "message": "..." } }`。
-- **指令执行结果一律 HTTP 200 + `status`**：`ok` / `command_error` / `no_permission` / `token_invalid` /
-  `unavailable` / `timeout` / `bad_response` / `rejected`。
+- **指令执行结果一律 HTTP 200 + `status`**：`ok` / `command_not_found` / `command_error` / `no_permission` /
+  `token_invalid` / `unavailable` / `timeout` / `bad_response` / `rejected`。
 
 ### 关于 `allowServer=false` 的指令
 
@@ -341,6 +342,7 @@ TSWUI_TOKEN=... server/scripts/smoke.sh
 | [`docs/插件-鱼店.md`](docs/插件-鱼店.md) | FishShop 鱼店模块（依赖 / REST / 字段） |
 | [`docs/插件-世界管理.md`](docs/插件-世界管理.md) | WorldModify 世界管理模块（依赖 / 指令 / 无权限处理） |
 | [`docs/插件-信使.md`](docs/插件-信使.md) | 自研信使插件 WebUI：REST / 指令 / 配置 / 权限 |
+| [`docs/插件-物资申请.md`](docs/插件-物资申请.md) | 物资申请：端点 / 权限 / 配置 / 发放规则 |
 | [`plugin/WebUI/README.md`](plugin/WebUI/README.md) | 信使插件构建 / 部署 / 完整端点表 |
 | [`docs/TODO.md`](docs/TODO.md) | 唯一的「还没做」清单 |
 | [`docs/页面-物品图鉴.md`](docs/页面-物品图鉴.md) | 物品集合、分页与标签复制 |

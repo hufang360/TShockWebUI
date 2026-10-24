@@ -25,7 +25,7 @@ export function CollapseChevron({
       <ChevronDown
         className={cn(
           'size-4 transition-transform duration-200',
-          open ? cn('opacity-0', reveal) : '-rotate-90',
+          open ? cn('touch-visible opacity-0', reveal) : '-rotate-90',
         )}
       />
     </span>

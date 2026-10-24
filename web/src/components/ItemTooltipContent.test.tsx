@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { ItemDetailProvider } from '@/lib/itemDetailContext'
 import { ItemFavoritesProvider } from '@/lib/itemFavoritesContext'
 import { rarityColor } from '@/lib/items'
 import { ItemTooltipContent } from './ItemTooltipContent'
@@ -152,6 +153,41 @@ describe('ItemTooltipContent', () => {
     expect(screen.getByText('9%暴击率')).toBeTruthy()
     expect(screen.getByText('快速度')).toBeTruthy() // 30 × 0.8 = 24 → 快速度
     expect(screen.getByText('普通击退力')).toBeTruthy() // 3.2 × 1.5 = 4.8 → 普通击退力
+  })
+  it('物品提示底部「ID · key」一行带「合成表」入口：有 Provider 时点击打开详情', () => {
+    const open = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <ItemDetailProvider api={{ open }}>
+          <ItemTooltipContent item={item} stat={{ tip: ['190近战伤害'] }} />
+        </ItemDetailProvider>
+      </I18nProvider>,
+    )
+    const button = screen.getByRole('button', { name: '合成表' })
+    fireEvent.click(button)
+    expect(open).toHaveBeenCalledWith(4956)
+  })
+
+  it('没有 ItemDetailProvider 时不渲染「合成表」入口', () => {
+    render(
+      <I18nProvider lang="zh">
+        <ItemTooltipContent item={item} stat={{ tip: ['190近战伤害'] }} />
+      </I18nProvider>,
+    )
+    expect(screen.queryByRole('button', { name: '合成表' })).toBeNull()
+  })
+
+  it('详情面板（variant=panel）也带「合成表」入口', () => {
+    const open = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <ItemDetailProvider api={{ open }}>
+          <ItemTooltipContent item={item} variant="panel" />
+        </ItemDetailProvider>
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '合成表' }))
+    expect(open).toHaveBeenCalledWith(4956)
   })
 })
 

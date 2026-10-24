@@ -9,7 +9,14 @@ function Harness({ initial = DEFAULT_HOME_CARDS }: { initial?: HomeCardsPrefs })
   const [prefs, setPrefs] = useState(initial)
   return (
     <I18nProvider lang="zh">
-      <HomeCardManager open onOpenChange={() => {}} prefs={prefs} onChange={setPrefs} />
+      <HomeCardManager
+        open
+        onOpenChange={() => {}}
+        prefs={prefs}
+        onChange={setPrefs}
+        isManual={() => false}
+        onToggleManual={() => {}}
+      />
     </I18nProvider>
   )
 }
@@ -18,8 +25,9 @@ function seedFavorites(cmds: string[]) {
   localStorage.setItem('tswui:favorites', JSON.stringify(cmds.map((cmd, i) => ({ cmd, ts: i }))))
 }
 
-/** 用底部表单添加一张自定义卡片。 */
+/** 点「添加卡片」后，用按需展开的表单添加一张自定义卡片。 */
 function addCard(name: string, command: string) {
+  fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
   fireEvent.change(screen.getByLabelText('卡片名称'), { target: { value: name } })
   fireEvent.change(screen.getByLabelText('指令'), { target: { value: command } })
   fireEvent.click(screen.getByRole('button', { name: '添加' }))
@@ -30,19 +38,42 @@ afterEach(() => {
 })
 
 describe('HomeCardManager', () => {
-  it('底部表单可添加自定义卡片', () => {
+  it('添加表单默认收起，自动执行使用 Checkbox', () => {
+    render(<Harness />)
+    expect(screen.queryByLabelText('卡片名称')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
+    expect(screen.getByLabelText('卡片名称')).toBeTruthy()
+
+    const autoExec = screen.getByRole('checkbox', { name: '游戏时间 自动执行' })
+    expect(autoExec.getAttribute('data-state')).toBe('checked')
+  })
+
+  it('添加按钮在名称和指令都有效前保持禁用', () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
+    const add = screen.getByRole('button', { name: '添加' })
+    expect(add.hasAttribute('disabled')).toBe(true)
+    fireEvent.change(screen.getByLabelText('卡片名称'), { target: { value: '我的卡片' } })
+    expect(add.hasAttribute('disabled')).toBe(true)
+    fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'time' } })
+    expect(add.hasAttribute('disabled')).toBe(false)
+  })
+
+  it('按需展开的表单可添加自定义卡片', () => {
     render(<Harness />)
     addCard('我的卡片', 'time')
-    const nameInputs = screen.getAllByPlaceholderText('卡片名称') as HTMLInputElement[]
-    expect(nameInputs.some((el) => el.value === '我的卡片')).toBe(true)
-    const cmdInputs = screen.getAllByPlaceholderText('/指令') as HTMLInputElement[]
-    expect(cmdInputs.some((el) => el.value === '/time')).toBe(true)
+    const row = screen.getByRole('listitem', { name: '我的卡片' })
+    expect(within(row).getByText('我的卡片')).toBeTruthy()
+    expect(within(row).getByText('/time')).toBeTruthy()
   })
 
   it('自定义卡片指令输入框关联收藏指令的下拉候选', () => {
     seedFavorites(['/time 12:00', '/who'])
     render(<Harness />)
     addCard('卡片', 'time')
+    const row = screen.getByRole('listitem', { name: '卡片' })
+    fireEvent.click(within(row).getByRole('button', { name: '编辑' }))
 
     const cmdInput = screen.getAllByPlaceholderText('/指令').find((el) => el.getAttribute('list'))
     expect(cmdInput).toBeTruthy()
@@ -58,6 +89,8 @@ describe('HomeCardManager', () => {
   it('无收藏时指令输入框不关联下拉候选（不报错）', () => {
     render(<Harness />)
     addCard('卡片', 'time')
+    const row = screen.getByRole('listitem', { name: '卡片' })
+    fireEvent.click(within(row).getByRole('button', { name: '编辑' }))
     const cmdInput = screen.getAllByPlaceholderText('/指令').find((el) => el.getAttribute('list'))
     expect(cmdInput).toBeUndefined()
   })

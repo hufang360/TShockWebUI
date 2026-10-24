@@ -27,7 +27,8 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TR_SRC = process.env.TR_SRC || join(HERE, '..', '..', 'tr-code-1458');
-const RAW = process.env.RAW || '/tmp/recipes-raw.json';
+const RAW = process.env.RAW || '/tmp/recipes-raw.json'
+const STYLES_RAW = process.env.STYLES_RAW || '';
 const OUT_TILE = process.env.OUT || join(HERE, '..', 'data', 'tiles.json');
 const OUT_WALL = process.env.OUT_WALL || join(HERE, '..', 'data', 'walls.json');
 
@@ -65,8 +66,12 @@ const tileItem = invert(raw.itemTile);
 const wallItem = invert(raw.itemWall);
 const tileDims = raw.tileDims ?? {};
 const tileFrameImportant = new Set(raw.tileFrameImportant ?? []);
+// 图格子 ID（样式）：GameDump 的 `--tile-styles` 输出；没有时跳过。
+const tileStyles = STYLES_RAW
+  ? (JSON.parse(read(STYLES_RAW)).tiles ?? {})
+  : {};
 
-const build = (keys, items, dims, fi) =>
+const build = (keys, items, dims, fi, styles) =>
   [...keys.keys()]
     .sort((a, b) => a - b)
     .map((id) => {
@@ -74,11 +79,13 @@ const build = (keys, items, dims, fi) =>
       const d = dims?.[String(id)];
       if (Array.isArray(d) && d.length === 2) entry.size = d;
       else if (fi?.has(id)) entry.frameImportant = true;
+      const st = styles?.[String(id)]?.styles;
+      if (Array.isArray(st) && st.length > 0) entry.styles = st;
       return entry;
     });
 
-const tiles = build(tileKey, tileItem, tileDims, tileFrameImportant);
-const walls = build(wallKey, wallItem, null, null);
+const tiles = build(tileKey, tileItem, tileDims, tileFrameImportant, tileStyles);
+const walls = build(wallKey, wallItem, null, null, null);
 
 const write = (out, meta, entries, kind) => {
   writeFileSync(
@@ -97,7 +104,7 @@ const write = (out, meta, entries, kind) => {
           note:
             'item = 放置该图格/墙的代表物品 id（运行期用它解析本地化名）；null = 无对应物品，显示 key。' +
             (kind === 'TileID'
-              ? 'size = 图格摆放尺寸 [宽, 高]（游戏 TileObjectData；简单方块 1×1 省略）；frameImportant = 多格/动态但无固定尺寸（如树、陷阱）。'
+              ? 'size = 图格摆放尺寸 [宽, 高]（游戏 TileObjectData；简单方块 1×1 省略）；frameImportant = 多格/动态但无固定尺寸（如树、陷阱）；styles = 同一 TileID 下的子 ID（Item.placeStyle），item 为对应代表物品。'
               : ''),
         },
         entries,

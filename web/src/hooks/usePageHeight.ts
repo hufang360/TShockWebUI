@@ -8,7 +8,10 @@ import { useLayoutEffect, useState, type RefObject } from 'react'
  * 与物品图鉴（`ItemsPage`）同一套测量口径：不能用「视口 − rect.top」，
  * 要减掉 `<main>` 容器的滚动偏移与内容包裹层的底部 padding。
  */
-export function usePageHeight(ref: RefObject<HTMLElement | null>): number | undefined {
+export function usePageHeight(
+  ref: RefObject<HTMLElement | null>,
+  revision?: unknown,
+): number | undefined {
   const [height, setHeight] = useState<number | undefined>(undefined)
 
   useLayoutEffect(() => {
@@ -35,19 +38,17 @@ export function usePageHeight(ref: RefObject<HTMLElement | null>): number | unde
     // 本页刚好占满一屏，切过来时先把容器的历史滚动复位
     if (scroller instanceof HTMLElement && scroller.scrollTop > 0) scroller.scrollTop = 0
     measure()
+    // 只观察尺寸变化：不要用 MutationObserver 监听子节点（列表滚动时每挂/卸一行都会触发，
+    // 每次 measure 都要读一次布局 → 滚动明显掉帧）。
     const observed: Element = scroller ?? el.parentElement ?? el
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined
     ro?.observe(observed)
-    const mo =
-      typeof MutationObserver !== 'undefined' ? new MutationObserver(measure) : undefined
-    mo?.observe(observed, { childList: true })
     window.addEventListener('resize', measure)
     return () => {
       ro?.disconnect()
-      mo?.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [ref])
+  }, [ref, revision])
 
   return height
 }

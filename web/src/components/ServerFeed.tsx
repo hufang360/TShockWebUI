@@ -2,7 +2,6 @@ import { Fragment, useMemo, useState } from 'react'
 import { ArrowDown, RefreshCw } from 'lucide-react'
 import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
-import { WebChatInput } from '@/components/WebChatInput'
 import { Badge, Button, Empty, EmptyDescription } from '@/components/ui'
 import { useBottomList } from '@/hooks/useBottomList'
 import { useNow } from '@/hooks/useNow'
@@ -16,12 +15,11 @@ import type { Atlas, Item, Prefix } from '@/types'
 const FEED_WINDOW = 30
 
 /** 「动态」tab 的事件类型筛选。 */
-const FEED_FILTERS = ['all', 'join', 'leave', 'boss', 'announce', 'npc', 'chat'] as const
+const FEED_FILTERS = ['all', 'presence', 'boss', 'announce', 'npc', 'chat'] as const
 type FeedFilter = (typeof FEED_FILTERS)[number]
 const FEED_FILTER_LABEL: Record<FeedFilter, string> = {
   all: 'feed.filterAll',
-  join: 'feed.filterJoin',
-  leave: 'feed.filterLeave',
+  presence: 'feed.filterPresence',
   boss: 'feed.filterBoss',
   announce: 'feed.filterAnnounce',
   npc: 'feed.filterNpc',
@@ -31,6 +29,7 @@ const FEED_FILTER_LABEL: Record<FeedFilter, string> = {
 /** 事件是否属于某个筛选（旧插件的 `webui` 类型算进「聊天」）。 */
 function matchesFilter(e: ServerEvent, filter: FeedFilter): boolean {
   if (filter === 'all') return true
+  if (filter === 'presence') return e.type === 'join' || e.type === 'leave'
   if (filter === 'chat') return e.type === 'chat' || e.type === 'webui'
   return e.type === filter
 }
@@ -255,7 +254,7 @@ export function ServerFeedList({
             <button
               type="button"
               onClick={scrollToBottom}
-              className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-2xs text-primary-foreground shadow-md hover:bg-primary/90"
+              className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-2xs text-primary-foreground shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ArrowDown className="size-3" />
               {t('feed.jumpLatest')}
@@ -278,6 +277,7 @@ export function ServerFeedTab({
   authenticated,
   serverId,
   refreshInterval,
+  refreshToken,
   itemsById,
   prefixesById,
   atlas,
@@ -287,6 +287,8 @@ export function ServerFeedTab({
   serverId: string
   /** 服务器动态刷新间隔（毫秒）。 */
   refreshInterval: number
+  /** 外部刷新令牌（例如底部聊天输入框发送成功后刷新）。 */
+  refreshToken?: number
   itemsById?: Map<number, Item>
   prefixesById?: Map<number, Prefix>
   atlas?: Atlas
@@ -299,14 +301,12 @@ export function ServerFeedTab({
     serverId,
     maxEvents: 500,
     refreshInterval,
+    refreshToken,
   })
   const filtered = useMemo(
     () => (filter === 'all' ? events : events.filter((e) => matchesFilter(e, filter))),
     [events, filter],
   )
-
-  // 插件缺失 / 未登录时禁用输入；发送成功后由 WebChatInput 回调刷新一次事件流。
-  const disabled = available === false || !authenticated
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
@@ -343,13 +343,6 @@ export function ServerFeedTab({
         itemsById={itemsById}
         prefixesById={prefixesById}
         atlas={atlas}
-      />
-      <WebChatInput
-        transport={transport}
-        disabled={disabled}
-        pluginInstalled={available === true}
-        onSent={refresh}
-        className="shrink-0"
       />
     </div>
   )

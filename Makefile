@@ -34,6 +34,7 @@ data:
 	python3 tools/gen-atlas.py
 	python3 tools/gen-player-atlas.py
 	python3 tools/gen-npc-atlas.py
+	python3 tools/gen-buff-atlas.py
 	python3 tools/gen-brand-assets.py
 	bash tools/gen-game-data.sh
 

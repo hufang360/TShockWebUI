@@ -196,7 +196,7 @@ export function ServerSwitcherDialog({
           <li className={rowClass(activeId === BUILTIN_ID)}>
             <button
               type="button"
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs"
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-l-lg px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               onClick={() => {
                 onSelect(BUILTIN_ID)
                 handleOpenChange(false)
@@ -218,7 +218,7 @@ export function ServerSwitcherDialog({
             <li key={s.id} className={rowClass(activeId === s.id)}>
               <button
                 type="button"
-                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-3 py-2 text-left text-xs"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-l-lg px-3 py-2 text-left text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 onClick={() => {
                   onSelect(s.id)
                   handleOpenChange(false)

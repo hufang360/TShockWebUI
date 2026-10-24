@@ -75,7 +75,7 @@ describe('HomePage 未登录', () => {
 
     expect(screen.getByText('请先登录！')).toBeTruthy()
     expect(screen.queryByText('服务器状态')).toBeNull()
-    expect(screen.queryByRole('button', { name: '管理卡片' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '首页布局' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '登录' }))
     expect(onLogin).toHaveBeenCalledTimes(1)
@@ -83,6 +83,12 @@ describe('HomePage 未登录', () => {
 })
 
 describe('HomePage 卡片管理', () => {
+  it('首页不再展示重复的「打开指令」入口卡', async () => {
+    renderPage(fakeTransport(vi.fn().mockResolvedValue({ status: 'ok', output: [] })))
+    expect(screen.queryByTestId('command-launcher')).toBeNull()
+    expect(screen.queryByRole('button', { name: '打开指令' })).toBeNull()
+  })
+
   it('默认渲染内置卡片，并可打开管理弹框列出所有卡片', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
@@ -90,7 +96,7 @@ describe('HomePage 卡片管理', () => {
     expect(screen.getByText('服务器状态')).toBeTruthy()
     expect(screen.getByText('在线玩家')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
     const dialog = screen.getByRole('dialog')
     // 内置卡片行：有「内置」徽标与指令，且不可编辑。
     const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
@@ -104,7 +110,7 @@ describe('HomePage 卡片管理', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
     const dialog = screen.getByRole('dialog')
     const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
     fireEvent.click(within(timeRow).getByRole('switch', { name: '隐藏' }))
@@ -125,15 +131,16 @@ describe('HomePage 卡片管理', () => {
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/fish 鲈鱼'))
 
     const cardEl = screen.getByText('钓鲈鱼').closest('[data-slot="card"]') as HTMLElement
-    expect(within(cardEl).getByText('/fish 鲈鱼')).toBeTruthy()
+    expect(cardEl.getAttribute('data-command')).toBe('/fish 鲈鱼')
   })
 
   it('可添加自定义卡片并持久化到 localStorage', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
     const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '添加卡片' }))
     fireEvent.change(within(dialog).getByLabelText('卡片名称'), { target: { value: '全服 公告' } })
     fireEvent.change(within(dialog).getByLabelText('指令'), { target: { value: 'say hello' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '添加' }))
@@ -152,7 +159,7 @@ describe('HomePage 卡片管理', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
     const dialog = screen.getByRole('dialog')
     const row = within(dialog).getByRole('listitem', { name: '钓鲈鱼' })
     fireEvent.click(within(row).getByRole('button', { name: '删除卡片' }))
@@ -295,12 +302,109 @@ describe('HomePage 卡片管理', () => {
 
     const left = await screen.findByTestId('home-left')
     const right = screen.getByTestId('home-right')
-    // 右栏：服务器状态 / 服务器动态 / 快捷入口 / 最近执行
-    for (const title of ['服务器状态', '服务器动态', '快捷入口', '最近执行']) {
+    expect(right.contains(screen.getByText('服务器状态'))).toBe(true)
+    expect(left.contains(screen.getByText('在线玩家'))).toBe(true)
+    // 右栏：服务器状态 / 服务器动态 / 最近执行；快捷入口默认隐藏，避免与侧栏重复。
+    for (const title of ['服务器状态', '服务器动态', '最近执行']) {
       expect(within(right).getByText(title)).toBeTruthy()
     }
+    expect(within(right).queryByText('快捷入口')).toBeNull()
     // 左栏：指令卡
     expect(within(left).getByText('在线玩家')).toBeTruthy()
+  })
+
+  it('插件指令不存在（command_not_found）→ 卡片隐藏且只探测一次；装上插件后「刷新全部」恢复', async () => {
+    // 第一次 /bossinfo 判为「指令不存在」（插件没装），之后模拟装上了插件。
+    let planned = true
+    const runCommand = vi.fn().mockImplementation((cmd: string): Promise<CommandResult> => {
+      if (cmd === '/bossinfo') {
+        if (planned) {
+          return Promise.resolve({
+            status: 'command_not_found',
+            output: ['输入的命令无效。使用/help 获取可用的指令列表。'],
+            message: '指令不存在（提供该指令的插件可能未安装）',
+          })
+        }
+        return Promise.resolve({ status: 'ok', output: ['Boss 进度：已击败 3 个'] })
+      }
+      return Promise.resolve({ status: 'ok', output: [] })
+    })
+    renderPage(fakeTransport(runCommand))
+
+    // 首次刷新执行到 /bossinfo，判定插件未安装 → 首页不再渲染该卡片。
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
+    await waitFor(() => expect(screen.queryByText('Boss 进度')).toBeNull())
+    // 其它卡片不受影响。
+    expect(screen.getByText('Boss 战伤害')).toBeTruthy()
+
+    // 管理弹框里仍能看到它，并标记「缺少插件」。
+    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
+    const dialog = screen.getByRole('dialog')
+    const row = within(dialog).getByRole('listitem', { name: 'Boss 进度' })
+    expect(within(row).getByText('缺少插件')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // 装上插件后点「刷新全部」→ 重新探测（缺插件标记清掉），卡片带着结果回来。
+    planned = false
+    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    await waitFor(() => expect(screen.getByText('Boss 进度：已击败 3 个')).toBeTruthy())
+    expect(screen.getByText('Boss 进度')).toBeTruthy()
+  })
+
+  it('统一执行：批量结果里的 command_not_found 同样隐藏卡片', async () => {
+    localStorage.setItem('tswui:homeBatch', 'true')
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    const runBatch = vi
+      .fn()
+      .mockImplementation((cmds: string[]): Promise<CommandResult[]> =>
+        Promise.resolve(
+          cmds.map((cmd) =>
+            cmd === '/bossinfo'
+              ? { status: 'command_not_found', output: [], message: '' }
+              : { status: 'ok', output: [] },
+          ),
+        ),
+      )
+    renderPage({ ...fakeTransport(runCommand), runBatch })
+
+    await waitFor(() => expect(screen.queryByText('Boss 进度')).toBeNull())
+    expect(screen.getByText('Boss 战伤害')).toBeTruthy()
+  })
+
+  it('无权限（no_permission）不隐藏卡片，只在卡片内提示', async () => {
+    const runCommand = vi.fn().mockImplementation((cmd: string): Promise<CommandResult> => {
+      if (cmd === '/bossinfo') {
+        return Promise.resolve({
+          status: 'no_permission',
+          output: ['你没有权限使用该指令。'],
+          message: '权限不足，无法执行该指令',
+        })
+      }
+      return Promise.resolve({ status: 'ok', output: [] })
+    })
+    renderPage(fakeTransport(runCommand))
+
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
+    await waitFor(() => expect(screen.getByText('权限不足，无法执行该指令')).toBeTruthy())
+    expect(screen.getByText('Boss 进度')).toBeTruthy()
+  })
+
+  it('/lookbag 依赖的 PlayerManager 未安装 → 卡片隐藏', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    const base = fakeTransport(runCommand)
+    renderPage({
+      ...base,
+      // 统一能力矩阵：PlayerManager 未安装（其余插件都在）。
+      capabilities: async () => ({
+        ...(await base.capabilities()),
+        player: { plugin: false, permission: false },
+      }),
+    })
+
+    await waitFor(() => expect(screen.queryByText('我的背包')).toBeNull())
+    // 依赖 PlayerManager 的卡片不参与自动刷新。
+    expect(runCommand.mock.calls.map((c) => c[0])).not.toContain('/lookbag Alice')
   })
 
   it('统一执行：勾选后「刷新全部」用一次批量请求执行全部卡片', async () => {

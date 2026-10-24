@@ -128,7 +128,7 @@ export function CommandPickerPanel({
       {view === 'favorites' ? (
         <>
           <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {batch.active
                 ? t('batch.hint')
                 : t('favorites.commands', { n: filteredFavorites.length })}
@@ -196,9 +196,9 @@ export function CommandPickerPanel({
           </div>
         </>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
           <section className="flex flex-col gap-1.5">
-            <h3 className="text-2xs text-muted-foreground">
+            <h3 className="text-xs text-muted-foreground">
               {t('cmd.all', { n: commands.length })}
             </h3>
             <ul>
@@ -214,15 +214,15 @@ export function CommandPickerPanel({
                       onKeyDown={(e) => onRowKeyDown(e, index)}
                       title={cmd.helpZh ?? cmd.help}
                       className={cn(
-                        'h-auto w-full cursor-pointer flex-col items-start gap-0.5 px-2 py-1.5 font-normal',
+                        'h-auto min-h-16 w-full cursor-pointer flex-col items-start gap-1 whitespace-normal px-2 py-2.5 font-normal',
                         roving.activeIndex === index && 'bg-accent',
                       )}
                     >
                       <span className="flex items-center gap-2">
-                        <span className="font-pixel text-xs text-foreground">/{cmd.name}</span>
+                        <span className="font-pixel text-xs leading-5 text-foreground">/{cmd.name}</span>
                         {inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
                       </span>
-                      <span className="block w-full truncate text-left text-2xs text-muted-foreground">
+                      <span className="block w-full text-left text-xs leading-5 text-muted-foreground">
                         {cmd.helpZh ?? cmd.help}
                       </span>
                     </Button>
@@ -230,7 +230,7 @@ export function CommandPickerPanel({
                 )
               })}
               {commands.length === 0 && (
-                <li className="px-2 py-2 text-2xs text-muted-foreground">{t('cmd.noMatch')}</li>
+                <li className="px-2 py-2 text-xs text-muted-foreground">{t('cmd.noMatch')}</li>
               )}
             </ul>
           </section>

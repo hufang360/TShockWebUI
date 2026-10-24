@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Fish, Globe2, House, LayoutGrid, Plug, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
+import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Plug, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
 import { AppShell, type NavItem } from '@/components/AppShell'
-import { AppRoutes } from '@/components/AppRoutes'
+import { AppRoutes, preloadRoute } from '@/components/AppRoutes'
 import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
 import { LoginDialog } from '@/components/LoginDialog'
 import { QuickPreferences } from '@/components/QuickPreferences'
@@ -21,12 +21,14 @@ import {
   Spinner,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
+import { preloadAtlasImage } from '@/lib/atlas'
 import { loadLoginMemory, saveLoginMemory } from '@/lib/credentials'
 import { loadDataset, reconcileDataVersion, withRuntimeCommands } from '@/lib/dataset'
 import { CommandResultsProvider } from '@/lib/commandResults'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { I18nProvider, translate } from '@/lib/i18n'
+import { ItemDetailProvider, type ItemDetailApi } from '@/lib/itemDetailContext'
 import {
   DEFAULT_MODULES,
   MODULE_DEFS,
@@ -88,6 +90,25 @@ const DEFAULT_SERVER_INFO: ServerInfo = { allowCustom: false, default: null }
  * 而 data/meta.json 为 "1.4.5.8"。规范化后再比较，避免误报版本不一致。
  */
 const normalizeVersion = (version: string) => version.trim().replace(/^v/i, '')
+
+/** 页签与 URL hash 双向同步；不引入路由库，也不改变后端接口。 */
+function readTabFromHash(): TabId | null {
+  if (typeof window === 'undefined') return null
+  const raw = window.location.hash.replace(/^#\/?/, '')
+  if (!raw) return null
+  try {
+    const decoded = decodeURIComponent(raw)
+    // `#/cmd` 是规范地址；`#/editor` 作为旧链接兼容，会在同步 effect 中替换。
+    if (decoded === 'cmd' || decoded === 'editor') return 'editor'
+    return decoded as TabId
+  } catch {
+    return null
+  }
+}
+
+function tabHash(tab: TabId): string {
+  return `#/${encodeURIComponent(tab === 'editor' ? 'cmd' : tab)}`
+}
 
 interface AppProps {
   /** 测试或嵌入时可注入；默认按 VITE_TRANSPORT 选择。 */
@@ -174,9 +195,41 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   }, [isDark])
 
   const [ui, setUi] = useLocalState(StorageKeys.ui, DEFAULT_UI)
+  const preloadItems = useCallback(() => {
+    preloadRoute('items')
+    preloadAtlasImage(dataset?.atlas)
+  }, [dataset?.atlas])
+  const [hashTab, setHashTab] = useState<TabId | null>(readTabFromHash)
+  const navigate = useCallback(
+    (tab: TabId) => {
+      setUi((prev) => ({ ...prev, activeTab: tab }))
+      setHashTab(tab)
+      const nextHash = tabHash(tab)
+      if (window.location.hash !== nextHash) window.location.hash = nextHash
+    },
+    [setUi],
+  )
+  useEffect(() => {
+    const onHashChange = () => setHashTab(readTabFromHash())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
   // 「指令 → 物品」里点「前往物品图鉴」时带上要展示的物品 id；物品图鉴消费后清空。
   const [dexFocus, setDexFocus] = useState<number | null>(null)
   const consumeDexFocus = useCallback(() => setDexFocus(null), [])
+  /**
+   * 物品提示里的「合成表」入口（`ItemDetailProvider`）：跳到「物品图鉴」并打开该物品详情。
+   * 图鉴页会用自己的 Provider 覆盖它（就地打开抽屉，不切页、不丢当前筛选）。
+   */
+  const itemDetailApi = useMemo<ItemDetailApi>(
+    () => ({
+      open: (itemId) => {
+        setDexFocus(itemId)
+        navigate('items')
+      },
+    }),
+    [navigate],
+  )
   // 已激活模块（侧边栏入口）；「设置」里探测到插件并打开开关后写入。
   const [rawModules, setModules] = useLocalState<ModulesPrefs>(StorageKeys.modules, DEFAULT_MODULES)
   const modules = useMemo(() => sanitizeModules(rawModules), [rawModules])
@@ -210,19 +263,59 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const [servers, setServers] = useState<ServerTarget[]>(() => loadServerTargets())
   const [activeServerId, setActiveServerId] = useState<string>(() => readActiveTargetId())
 
+  // 兼容旧版持久化的 activeTab='history' / 'favorites' / 'npcs' / 'tiles' / 'codex'。
+  // URL hash 优先于本机持久化；已停用模块的入口回退到首页。
+  const activeTab: TabId = (() => {
+    const raw = (hashTab ?? ui.activeTab) as string
+    if (raw === 'history' || raw === 'favorites') return 'editor'
+    if (raw === 'npcs' || raw === 'tiles' || raw === 'codex') return 'dataid'
+    // 所有模块（含玩家管理）都严格跟随侧边栏开关；关闭后直达 URL 也回到首页。
+    if (
+      (raw === 'players' ||
+        raw === 'store' ||
+        raw === 'requisition' ||
+        raw === 'world' ||
+        isCustomModuleId(raw)) &&
+      !isModuleEnabled(modules, activeServerId, raw)
+    ) {
+      return 'home'
+    }
+    return raw
+  })()
+
+  useEffect(() => {
+    const nextHash = tabHash(activeTab)
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, '', nextHash)
+    }
+  }, [activeTab])
+
   // 侧边栏导航：固定项 + 已激活模块入口（玩家管理 / 鱼店）。
   // 注意：必须在任何 early return 之前声明（Hooks 顺序稳定）；模块按服务器区分。
   const nav = useMemo(() => {
     const items: NavItem[] = [
-      { id: 'home', label: t('nav.home'), icon: House },
-      { id: 'editor', label: t('nav.editor'), icon: Terminal },
-      { id: 'items', label: t('nav.items'), icon: BookOpen },
-      { id: 'codex', label: t('nav.codex'), icon: LayoutGrid },
+      { id: 'home', label: t('nav.home'), icon: House, group: 'primary' },
+      { id: 'editor', label: t('nav.editor'), icon: Terminal, group: 'primary' },
+      { id: 'items', label: t('nav.items'), icon: BookOpen, group: 'library', onPrefetch: preloadItems },
+      { id: 'dataid', label: t('nav.dataId'), icon: LayoutGrid, group: 'library', onPrefetch: () => preloadRoute('dataid') },
     ]
-    const icons: Record<string, typeof House> = { players: Users, store: Fish, world: Globe2 }
+    const icons: Record<string, typeof House> = { players: Users, store: Fish, requisition: ClipboardList, world: Globe2 }
+    const groups: Record<string, NavItem['group']> = {
+      players: 'players',
+      world: 'world',
+      store: 'store',
+      requisition: 'services',
+    }
     for (const def of MODULE_DEFS) {
+      // 内置模块同样只由开关控制侧边栏显隐，不因插件未安装而锁定。
       if (!isModuleEnabled(modules, activeServerId, def.id)) continue
-      items.push({ id: def.id, label: t(def.titleKey), icon: icons[def.id] ?? House })
+      items.push({
+        id: def.id,
+        label: t(def.titleKey),
+        icon: icons[def.id] ?? House,
+        group: groups[def.id] ?? 'services',
+        onPrefetch: () => preloadRoute(def.id),
+      })
     }
     for (const mod of customModules) {
       if (!isModuleEnabled(modules, activeServerId, mod.id)) continue
@@ -231,12 +324,20 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         label: mod.name || t('modules.custom.untitled'),
         // 与「设置 → 激活模块」卡片同图标（lucide Plug）。
         icon: Plug,
+        group: 'custom',
+        onPrefetch: () => preloadRoute('world'),
       })
     }
     // 「设置」始终排在最后：新增模块（内置 / 自定义）都插在它前面。
-    items.push({ id: 'settings', label: t('settings.title'), icon: SettingsIcon })
+    items.push({
+      id: 'settings',
+      label: t('settings.title'),
+      icon: SettingsIcon,
+      group: 'system',
+      onPrefetch: () => preloadRoute('settings'),
+    })
     return items
-  }, [modules, activeServerId, t, customModules])
+  }, [modules, activeServerId, t, customModules, preloadItems])
 
   const [serverInfo, setServerInfo] = useState<ServerInfo>(DEFAULT_SERVER_INFO)
   // 渲染缓存（不含 token）；真实登录态以 /api/session 为准。
@@ -304,6 +405,22 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // 物品图鉴是高频入口。首次打开时同时等待路由 chunk 与约 1.9 MB 图集解码，
+  // 会在点击后形成明显长任务；在空闲时先预热，点击时就只剩页面渲染。
+  useEffect(() => {
+    if (!dataset) return
+    const win = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+    if (win.requestIdleCallback) {
+      const id = win.requestIdleCallback(preloadItems, { timeout: 1500 })
+      return () => win.cancelIdleCallback?.(id)
+    }
+    const id = window.setTimeout(preloadItems, 1200)
+    return () => window.clearTimeout(id)
+  }, [dataset, preloadItems])
 
   // 多服务器能力探测（是否允许自定义上游 + 后端默认地址）。
   useEffect(() => {
@@ -383,33 +500,30 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       } catch {
         if (!cancelled) setRuntimeCommands([])
       }
+      // 统一能力矩阵：一次请求拿到批量执行 / 玩家管理 / 鱼店 / 物资申请等的可用性
+      //（此前是分别打 4 个探测端点；首页与设置页读同一份，不再各自重复探测）。
       try {
-        const cap = await transport.batchCapabilities()
+        const caps = await transport.capabilities()
         if (!cancelled) {
-          setIngameAllowed(cap.ingame === true)
+          setIngameAllowed(caps.batch.ingame === true)
           // 「统一执行」：检测到信使插件后自动开启（用户手动关过则保持其选择）。
           const { mode, userSet } = batchPrefsRef.current
-          if (cap.plugin === true && !userSet && !mode) setBatchMode(true)
+          if (caps.batch.plugin === true && !userSet && !mode) setBatchMode(true)
+          // 检测到插件（玩家管理 / 鱼店 / 物资申请）→ 自动激活对应侧边栏入口；用户手动改过开关的不覆盖。
+          // TShock 不可达时 caps.reachable=false，此时不据此改动模块开关。
+          if (caps.reachable) {
+            const { prefs, userSet: modUserSet } = modulesRef.current
+            const next = autoActivateModules(prefs, modUserSet, activeServerId, {
+              players: caps.player.plugin === true && caps.player.permission === true,
+              store: caps.fish.plugin === true && caps.fish.permission === true,
+              requisition:
+                caps.requests.plugin === true && (caps.requests.submit === true || caps.requests.review === true),
+            })
+            if (next !== prefs) setModules(next)
+          }
         }
       } catch {
         if (!cancelled) setIngameAllowed(false)
-      }
-      // 检测到插件（玩家管理 / 鱼店）→ 自动激活对应侧边栏入口；用户手动改过开关的不覆盖。
-      try {
-        const [playersCap, storeCap] = await Promise.all([
-          transport.playerCapabilities().catch(() => null),
-          transport.fishCapabilities().catch(() => null),
-        ])
-        if (!cancelled) {
-          const { prefs, userSet } = modulesRef.current
-          const next = autoActivateModules(prefs, userSet, activeServerId, {
-            players: playersCap?.plugin === true && playersCap.permission === true,
-            store: storeCap?.plugin === true && storeCap.permission === true,
-          })
-          if (next !== prefs) setModules(next)
-        }
-      } catch {
-        /* 探测失败就不自动激活，不影响其它能力 */
       }
       // 区域 / 传送点（插件缺失或权限不足时为空，不影响其它补全）。
       try {
@@ -464,24 +578,34 @@ export default function App({ transport: transportProp }: AppProps = {}) {
 
   // ---- 多服务器切换 ----
 
-  /** 选中某个上游：旧 token 只对旧服务器有效，先尽力销毁并清会话，再要求重新登录。 */
+  /**
+   * 选中某个上游。各服的会话在后端彼此独立（按上游分开的 Cookie），
+   * 所以切换后**按新上游重新探测登录态**：这台服之前登录过就直接进去，
+   * 没登录过才弹登录框；既不会串用别的服的 token，也不会把别的服踢下线。
+   */
   const selectServer = useCallback(
     async (id: string) => {
       if (id === activeServerId) return
       writeActiveTargetId(id)
       setActiveServerId(id)
-      try {
-        // 此时请求头已指向新上游：销毁旧 token 会失败，但后端仍会删除本地会话。
-        await transport.logout()
-      } catch {
-        /* 忽略：本地会话仍会被清 */
-      }
       clearLocalUser()
-      setLoginReason('servers.switched')
       setNotice(translate(settings.language, 'servers.switched'))
+      let next: Session = ANON
+      try {
+        next = await transport.session()
+      } catch {
+        /* 探测失败按未登录处理 */
+      }
+      if (next.authenticated && next.username) {
+        authedRef.current = true
+        setSession(next)
+        setMe({ username: next.username, savedAt: Date.now() })
+        return
+      }
+      setLoginReason('servers.switched')
       setLoginOpen(true)
     },
-    [activeServerId, transport, clearLocalUser, settings.language],
+    [activeServerId, transport, clearLocalUser, settings.language, setMe],
   )
 
   // 新增上游只写入列表，**不自动切换**（由玩家在列表里点选）。
@@ -558,9 +682,14 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     <div className="flex flex-col">
       {transport.mock && (
         <Alert variant="info" className="rounded-none px-4 py-1.5">
-          <AlertDescription className="flex flex-wrap items-center gap-2 text-2xs text-foreground">
+          <AlertDescription className="flex min-w-0 items-center gap-2 text-xs text-foreground">
             <Badge tone="mock">Mock</Badge>
-            <span>{t('app.mockBanner', { label: transport.label })}</span>
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={t('app.mockBanner', { label: transport.label })}
+            >
+              {t('app.mockCompact')}
+            </span>
           </AlertDescription>
         </Alert>
       )}
@@ -587,22 +716,6 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     </div>
   )
 
-  // 兼容旧版持久化的 activeTab='history'（早期曾用该 id 表示收藏页）/ 'favorites'（收藏已并入编辑器）/
-  // 'npcs' / 'tiles'（NPC 图鉴与数据 ID 已合并为「数据图鉴」）；
-  // 已停用模块的入口即使留存也不展示，回退到首页。
-  const activeTab: TabId = (() => {
-    const raw = ui.activeTab as string
-    if (raw === 'history' || raw === 'favorites') return 'editor'
-    if (raw === 'npcs' || raw === 'tiles') return 'codex'
-    if (
-      (raw === 'players' || raw === 'store' || raw === 'world' || isCustomModuleId(raw)) &&
-      !isModuleEnabled(modules, activeServerId, raw)
-    ) {
-      return 'home'
-    }
-    return ui.activeTab
-  })()
-
   // 侧栏账号卡片上的服务器地址（遮挡展示；内置项不再显示「服务器默认」）。
   const accountServerLabel =
     activeServerId === BUILTIN_ID
@@ -617,9 +730,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         <ExecutionQueueProvider interval={settings.commandInterval}>
         <CommandResultsProvider serverId={activeServerId}>
         <div className="h-full">
+        <ItemDetailProvider api={itemDetailApi}>
         <AppShell
           activeTab={activeTab}
-          onTabChange={(activeTab) => setUi({ ...ui, activeTab })}
+          onTabChange={navigate}
           nav={nav}
           headerExtra={
             <QuickPreferences
@@ -673,7 +787,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             runtimeValues={runtimeParams}
             customModules={customModules}
             dexFocus={dexFocus}
-            onNavigate={(activeTab) => setUi({ ...ui, activeTab })}
+            onNavigate={navigate}
             onLogin={() => {
               setLoginReason(null)
               setLoginOpen(true)
@@ -682,7 +796,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             onFocusConsumed={consumeDexFocus}
             onOpenInDex={(itemId) => {
               setDexFocus(itemId)
-              setUi({ ...ui, activeTab: 'items' })
+              navigate('items')
             }}
             onModulesChange={setModules}
             onModuleUserSet={(id) =>
@@ -692,6 +806,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             onSettingsChange={(patch) => setSettings({ ...settings, ...patch })}
           />
         </AppShell>
+        </ItemDetailProvider>
 
         <Dialog open={confirmLogoutOpen} onOpenChange={setConfirmLogoutOpen}>
           <DialogContent className="max-w-sm">

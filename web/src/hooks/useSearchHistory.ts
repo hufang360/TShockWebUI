@@ -11,6 +11,7 @@ type StorageKey = Parameters<typeof useLocalState>[0]
 export function useSearchHistory(key: StorageKey): {
   history: string[]
   remember: (query: string) => void
+  remove: (query: string) => void
   clear: () => void
 } {
   const [raw, setRaw] = useLocalState<string[]>(key, [])
@@ -26,7 +27,16 @@ export function useSearchHistory(key: StorageKey): {
     [history, setRaw],
   )
 
+  const remove = useCallback(
+    (query: string) => {
+      const key = query.trim().toLowerCase()
+      if (!key) return
+      setRaw(history.filter((item) => item.toLowerCase() !== key))
+    },
+    [history, setRaw],
+  )
+
   const clear = useCallback(() => setRaw([]), [setRaw])
 
-  return { history, remember, clear }
+  return { history, remember, remove, clear }
 }

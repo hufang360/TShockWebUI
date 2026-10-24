@@ -41,12 +41,25 @@ const (
 	CapEventsHistory = "events_history"
 	CapSessions      = "sessions"
 	CapChat          = "chat"
+	// CapRequests：物资申请（/webui/requests、/create、/cancel）。
+	CapRequests = "requests"
+	// CapRequestsReview：物资申请审核 / 补发（/webui/requests/all、/review、/deliver）。
+	CapRequestsReview = "requests_review"
 )
 
 // RequiredCapabilities 是后端会用到、期望插件声明具备的能力。
 var RequiredCapabilities = []string{
 	CapCommands, CapMe, CapData, CapServerInfo, CapEvents, CapSessions, CapBatch, CapChat,
 }
+
+// 握手不兼容的原因（PluginStatus.Reason 与 RequestCapabilities.Reason 共用）。
+const (
+	ReasonOK                  = "ok"
+	ReasonNotInstalled        = "not_installed"
+	ReasonLegacy              = "legacy"
+	ReasonProtocolMismatch    = "protocol_mismatch"
+	ReasonMissingCapabilities = "missing_capabilities"
+)
 
 // PluginMeta 是 /webui/meta 的结果。
 type PluginMeta struct {
@@ -138,7 +151,7 @@ func (c *Client) PluginStatus(ctx context.Context, secret string) (*PluginStatus
 	st := &PluginStatus{
 		BackendProtocol: BackendProtocol,
 		Capabilities:    []string{},
-		Reason:          "not_installed",
+		Reason:          ReasonNotInstalled,
 	}
 	meta, err := c.FetchMeta(ctx, secret)
 	if err != nil {
@@ -157,7 +170,7 @@ func (c *Client) PluginStatus(ctx context.Context, secret string) (*PluginStatus
 			// 旧版插件：没有 meta，按「尽力兼容」处理，但明确标记 legacy。
 			st.Legacy = true
 			st.Compatible = true
-			st.Reason = "legacy"
+			st.Reason = ReasonLegacy
 		}
 		return st, nil
 	}
@@ -174,12 +187,12 @@ func (c *Client) PluginStatus(ctx context.Context, secret string) (*PluginStatus
 
 	switch {
 	case !meta.ProtocolCompatible():
-		st.Reason = "protocol_mismatch"
+		st.Reason = ReasonProtocolMismatch
 	case len(st.Missing) > 0:
-		st.Reason = "missing_capabilities"
+		st.Reason = ReasonMissingCapabilities
 	default:
 		st.Compatible = true
-		st.Reason = "ok"
+		st.Reason = ReasonOK
 	}
 	return st, nil
 }

@@ -1,16 +1,76 @@
-import { CommandModulePage } from '@/pages/CommandModulePage'
-import { CodexPage } from '@/pages/CodexPage'
+import { lazy, Suspense } from 'react'
 import { CommandPage } from '@/pages/CommandPage'
-import { FishShopPage } from '@/pages/FishShopPage'
 import { HomePage } from '@/pages/HomePage'
-import { ItemsPage } from '@/pages/ItemsPage'
-import { PlayerManagerPage } from '@/pages/PlayerManagerPage'
-import { SettingsPage } from '@/pages/SettingsPage'
+import { Skeleton } from '@/components/ui'
+import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import type { CustomModule } from '@/lib/customModules'
 import { useI18n } from '@/lib/i18n'
-import { MODULE_BY_ID, type ModuleId, type ModulesPrefs } from '@/lib/modules'
+import { MODULE_BY_ID, isModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
 import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset, Settings, TabId } from '@/types'
+
+// 首屏只保留首页与指令页；重数据页 / 插件页按导航需求加载。
+const loadCommandModulePage = () => import('@/pages/CommandModulePage')
+const loadDataIdPage = () => import('@/pages/DataIdPage')
+const loadFishShopPage = () => import('@/pages/FishShopPage')
+const loadItemsPage = () => import('@/pages/ItemsPage')
+const loadPlayerManagerPage = () => import('@/pages/PlayerManagerPage')
+const loadRequisitionPage = () => import('@/pages/RequisitionPage')
+const loadSettingsPage = () => import('@/pages/SettingsPage')
+
+const CommandModulePage = lazy(() =>
+  loadCommandModulePage().then((m) => ({ default: m.CommandModulePage })),
+)
+const DataIdPage = lazy(() => loadDataIdPage().then((m) => ({ default: m.DataIdPage })))
+const FishShopPage = lazy(() => loadFishShopPage().then((m) => ({ default: m.FishShopPage })))
+const ItemsPage = lazy(() => loadItemsPage().then((m) => ({ default: m.ItemsPage })))
+const PlayerManagerPage = lazy(() =>
+  loadPlayerManagerPage().then((m) => ({ default: m.PlayerManagerPage })),
+)
+const RequisitionPage = lazy(() =>
+  loadRequisitionPage().then((m) => ({ default: m.RequisitionPage })),
+)
+const SettingsPage = lazy(() => loadSettingsPage().then((m) => ({ default: m.SettingsPage })))
+
+const routeLoaders: Partial<Record<TabId, () => Promise<unknown>>> = {
+  items: loadItemsPage,
+  dataid: loadDataIdPage,
+  players: loadPlayerManagerPage,
+  store: loadFishShopPage,
+  requisition: loadRequisitionPage,
+  world: loadCommandModulePage,
+  settings: loadSettingsPage,
+}
+
+/** 导航悬停 / 聚焦时预取页面 chunk；失败不提示，真正导航时仍由 ErrorBoundary 兜底。 */
+export function preloadRoute(tab: TabId) {
+  const load = routeLoaders[tab] ?? (tab.startsWith('m:') ? loadCommandModulePage : undefined)
+  void load?.().catch(() => {})
+}
+
+function RouteLoadingSkeleton() {
+  const { t } = useI18n()
+  return (
+    <div className="flex flex-col gap-4" role="status" aria-busy="true" aria-live="polite">
+      <span className="sr-only">{t('app.pageLoading')}</span>
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-6 w-28" />
+        <Skeleton className="h-9 w-24 md:h-7" />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+        </div>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export interface AppRoutesProps {
   activeTab: TabId
@@ -71,6 +131,8 @@ export function AppRoutes({
   const openLogin = onLogin
 
   return (
+    <RouteErrorBoundary key={activeTab}>
+      <Suspense fallback={<RouteLoadingSkeleton />}>
     <>
       {activeTab === 'home' && (
         <HomePage
@@ -105,7 +167,7 @@ export function AppRoutes({
       {activeTab === 'items' && (
         <ItemsPage dataset={dataset} focusItemId={dexFocus} onFocusConsumed={onFocusConsumed} />
       )}
-      {activeTab === 'codex' && <CodexPage />}
+      {activeTab === 'dataid' && <DataIdPage />}
       {activeTab === 'players' && (
         <PlayerManagerPage
           key={serverId}
@@ -114,12 +176,23 @@ export function AppRoutes({
           authenticated={authenticated}
           username={username}
           players={players}
+          moduleEnabled={isModuleEnabled(modules, serverId, 'players')}
           onTokenInvalid={onTokenInvalid}
           onLogin={openLogin}
         />
       )}
       {activeTab === 'store' && (
         <FishShopPage
+          serverId={serverId}
+          transport={transport}
+          authenticated={authenticated}
+          refreshInterval={settings.refreshInterval}
+          onTokenInvalid={onTokenInvalid}
+          onLogin={openLogin}
+        />
+      )}
+      {activeTab === 'requisition' && (
+        <RequisitionPage
           serverId={serverId}
           transport={transport}
           authenticated={authenticated}
@@ -179,5 +252,7 @@ export function AppRoutes({
         />
       )}
     </>
+      </Suspense>
+    </RouteErrorBoundary>
   )
 }

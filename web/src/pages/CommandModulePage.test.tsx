@@ -94,6 +94,7 @@ describe('CommandModulePage', () => {
 
     // 管理卡片弹框里添加一张卡片
     fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
+    fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
     fireEvent.change(screen.getByLabelText('卡片名称'), { target: { value: '时间' } })
     fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'time' } })
     fireEvent.click(screen.getByRole('button', { name: '添加' }))

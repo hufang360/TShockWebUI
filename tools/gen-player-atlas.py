@@ -180,7 +180,7 @@ def main():
     ap.add_argument("--out-json", default=DEFAULT_OUT_JSON)
     ap.add_argument("--out-png", default=DEFAULT_OUT_PNG)
     ap.add_argument("--limit-width", type=int, default=1024, help="图集最大宽度，默认 1024")
-    ap.add_argument("--padding", type=int, default=0, help="每格留白像素，默认 0")
+    ap.add_argument("--padding", type=int, default=1, help="每格之间的留白像素，默认 1（防缩放插值采到邻居）")
     ap.add_argument("--max-height", type=int, default=8192, help="超过此高度只告警")
     args = ap.parse_args()
 

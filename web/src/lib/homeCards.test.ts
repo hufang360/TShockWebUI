@@ -111,7 +111,7 @@ describe('customCardCommand', () => {
 describe('默认配置', () => {
   it('顺序与内置卡片一致', () => {
     expect(DEFAULT_HOME_CARDS.order).toEqual([...BUILTIN_CARD_IDS])
-    expect(DEFAULT_HOME_CARDS.hidden).toEqual({})
+    expect(DEFAULT_HOME_CARDS.hidden).toEqual({ quick: true })
     expect(DEFAULT_HOME_CARDS.custom).toEqual([])
   })
 
@@ -129,7 +129,7 @@ describe('upgradeHomeCardsLayout', () => {
     })
     const upgraded = upgradeHomeCardsLayout(prefs)
     expect(upgraded.order.slice(0, 4)).toEqual(['server', 'events', 'quick', 'online'])
-    expect(upgraded.hidden).toEqual({ alldeath: true })
+    expect(upgraded.hidden).toEqual({ alldeath: true, quick: true })
     expect(upgraded.order).toHaveLength(BUILTIN_CARD_IDS.length)
   })
 

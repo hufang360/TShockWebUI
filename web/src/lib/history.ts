@@ -5,6 +5,7 @@ export const HISTORY_LIMIT = 100
 
 const STATUSES: readonly CommandStatus[] = [
   'ok',
+  'command_not_found',
   'command_error',
   'no_permission',
   'token_invalid',

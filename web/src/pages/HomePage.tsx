@@ -97,10 +97,14 @@ export function HomePage({
   /** 服务器状态上次刷新时间（卡片底部展示）。 */
   const [lastStatusAt, setLastStatusAt] = useState<number | null>(null)
   const [manageOpen, setManageOpen] = useState(false)
-  // 信使插件可用性：null = 未知（不隐藏卡片），false = 未安装。
-  // lookbag 依赖 PlayerManager（/pm），bossinfo 依赖 WorldModify（/wm）。
+  // 卡片依赖的插件可用性：null = 未知（不隐藏卡片），false = 未安装。
+  //   - lookbag 依赖 PlayerManager，有 REST 探测端点（登录后主动探一次）；
+  //   - 其它插件指令（/worldinfo、/bossinfo 依赖 WorldModify；/bossdamage、/alldeath 等同理）
+  //     没有探测端点：首次执行若返回「指令不存在」（command_not_found）即判定插件未安装。
   const [playerPlugin, setPlayerPlugin] = useState<boolean | null>(null)
-  const [worldPlugin, setWorldPlugin] = useState<boolean | null>(null)
+  const [missingCards, setMissingCards] = useState<Record<string, boolean>>({})
+  // bump 一次 = 重新探测 PlayerManager（手动「刷新全部」时用）。
+  const [pluginProbeToken, setPluginProbeToken] = useState(0)
   // 批量执行（「统一执行」）依赖的信使插件；null = 未知。
   const [batchPlugin, setBatchPlugin] = useState<boolean | null>(null)
   // 「页面数据刷新间隔」触发时用来连带刷新服务器动态。
@@ -151,6 +155,22 @@ export function HomePage({
     batchRef.current = { mode: batchMode, plugin: batchPlugin }
   }, [batchMode, batchPlugin])
 
+  /** 卡片依赖的插件未安装时返回 true：首页不渲染，管理弹框里置灰标记。 */
+  const pluginMissing = useCallback(
+    (id: string): boolean => {
+      if (id === 'lookbag') return playerPlugin === false || missingCards[id] === true
+      if (id === 'events') return eventsPlugin === false
+      return missingCards[id] === true
+    },
+    [playerPlugin, missingCards, eventsPlugin],
+  )
+  // 自动 /「刷新全部」/「统一执行」收集指令时跳过缺插件的卡片，
+  // 否则卡片虽已隐藏，每次刷新仍会白跑一条必然失败的指令。
+  const pluginMissingRef = useRef(pluginMissing)
+  useEffect(() => {
+    pluginMissingRef.current = pluginMissing
+  }, [pluginMissing])
+
   // 全局执行队列：批量刷新串行执行并展示在侧栏；结果存全局，切页后仍可保留。
   const { enqueue, busy, busyPrefix } = useExecutionQueue()
   const { results: commandResults, setResult } = useCommandResults()
@@ -169,7 +189,6 @@ export function HomePage({
     }
     return unique
   }, [])
-
   const withAuth = useCallback(
     async (cmd: string): Promise<CommandResult> => {
       try {
@@ -197,14 +216,31 @@ export function HomePage({
     }
   }, [transport])
 
+  /**
+   * 按执行结果更新「该卡片依赖的插件是否已安装」：
+   * 内置指令卡片返回 `command_not_found`（指令不存在）→ 判定插件未安装，
+   * 与 `/lookbag` 一致：首页隐藏卡片、管理弹框里置灰标记；之后再执行成功则恢复。
+   * 只对内置指令卡片生效（自定义卡片是玩家自己填的指令，交结果区展示即可）。
+   */
+  const markCardAvailability = useCallback((id: string, res: CommandResult) => {
+    if (!COMMAND_CARD_BY_ID.has(id as CommandCardId)) return
+    const missing = res.status === 'command_not_found'
+    setMissingCards((prev) => {
+      if (missing) return prev[id] ? prev : { ...prev, [id]: true }
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }, [])
+
   const loadCommand = useCallback(
     async (id: string, cmd: string) => {
       const res = await withAuth(cmd)
       setResult(id, res)
-      // /bossinfo 由 WorldModify 提供：无效指令 → 判定插件未安装，隐藏对应卡片。
-      if (id === 'bossinfo') setWorldPlugin(!looksLikeMissingCommand(res))
+      markCardAvailability(id, res)
     },
-    [withAuth, setResult],
+    [withAuth, setResult, markCardAvailability],
   )
 
   const queueCommand = useCallback(
@@ -227,12 +263,16 @@ export function HomePage({
     [enqueue, loadCommand],
   )
 
-  const enqueueVisibleCommands = useCallback(() => {
+  /**
+   * 严格按首页实际卡片顺序入队（跳过隐藏、手动执行与无指令的卡片）。
+   * `skipMissing=false` 用于手动「刷新全部」：缺插件的卡片也重跑一次，装上插件后能立即恢复。
+   */
+  const enqueueVisibleCommands = useCallback((skipMissing = true) => {
     const { order, hidden, custom } = prefsRef.current
     const customById = new Map(custom.map((c) => [c.id, c]))
-    // 严格按首页实际卡片顺序入队（跳过隐藏、手动执行与无指令的卡片）。
     for (const id of order) {
       if (hidden[id]) continue
+      if (skipMissing && pluginMissingRef.current(id)) continue
       if (isManual(autoExec, `home:${id}`)) continue
       if (isBuiltinCardId(id)) {
         const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
@@ -251,12 +291,13 @@ export function HomePage({
   }, [username, queueCommand, queueCustomCommand, autoExec])
 
   /** 按首页顺序收集所有会执行的指令（key 为结果存储键，与卡片 id 一致）。 */
-  const collectBatchEntries = useCallback((): { key: string; cmd: string }[] => {
+  const collectBatchEntries = useCallback((skipMissing = true): { key: string; cmd: string }[] => {
     const { order, hidden, custom } = prefsRef.current
     const customById = new Map(custom.map((c) => [c.id, c]))
     const entries: { key: string; cmd: string }[] = []
     for (const id of order) {
       if (hidden[id]) continue
+      if (skipMissing && pluginMissingRef.current(id)) continue
       if (isManual(autoExec, `home:${id}`)) continue
       if (isBuiltinCardId(id)) {
         const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
@@ -292,28 +333,33 @@ export function HomePage({
         const results = await run()
         entries.forEach((entry, i) => {
           const res = results[i]
-          if (res) setResult(entry.key, res)
-          else setResult(entry.key, { status: 'bad_response', output: [], message: '' })
+          if (res) {
+            setResult(entry.key, res)
+            markCardAvailability(entry.key, res)
+          } else setResult(entry.key, { status: 'bad_response', output: [], message: '' })
         })
       } catch (err) {
         const res = resultFromError(err)
         entries.forEach((entry) => setResult(entry.key, res))
       }
     },
-    [transport, onTokenInvalid, setResult],
+    [transport, onTokenInvalid, setResult, markCardAvailability],
   )
 
-  const enqueueBatch = useCallback(() => {
-    const entries = collectBatchEntries()
-    if (entries.length === 0) return
-    enqueue({
-      key: 'home:__batch__',
-      labelKey: 'home.batch',
-      label: 'home.batch',
-      command: entries.map((e) => e.cmd).join('  '),
-      run: () => runBatchEntries(entries),
-    })
-  }, [collectBatchEntries, enqueue, runBatchEntries])
+  const enqueueBatch = useCallback(
+    (skipMissing = true) => {
+      const entries = collectBatchEntries(skipMissing)
+      if (entries.length === 0) return
+      enqueue({
+        key: 'home:__batch__',
+        labelKey: 'home.batch',
+        label: 'home.batch',
+        command: entries.map((e) => e.cmd).join('  '),
+        run: () => runBatchEntries(entries),
+      })
+    },
+    [collectBatchEntries, enqueue, runBatchEntries],
+  )
 
   // 卡片数据的「上次刷新全部」时间；自动进入时若 2 分钟内刷过则跳过。
   const homeScope = refreshScope(serverId, 'home')
@@ -333,13 +379,19 @@ export function HomePage({
       // 自动刷新受「页面数据刷新间隔」门控；手动「刷新全部」始终执行。
       const scope = refreshScope(serverId, 'home')
       if (!force && !isRefreshDue(scope, refreshInterval)) return
+      if (force) {
+        // 手动「刷新全部」= 重新探测一遍依赖插件的卡片：缺插件的卡片也重跑（下面 skipMissing=false），
+        // 并重探 PlayerManager。装上插件后不用刷新整个页面，点一下「刷新全部」卡片就回来；
+        // 仍然缺插件的卡片保持原标记（不隐藏再出现，避免闪一下）。
+        setPluginProbeToken((n) => n + 1)
+      }
       await loadStatus()
       setLastRefreshAt(markRefreshed(scope))
       // 页面数据刷新同时连带刷新服务器动态。
       setFeedToken((n) => n + 1)
       const { mode, plugin } = batchRef.current
-      if (mode && plugin === true) enqueueBatch()
-      else enqueueVisibleCommands()
+      if (mode && plugin === true) enqueueBatch(!force)
+      else enqueueVisibleCommands(!force)
     },
     [authenticated, serverId, refreshInterval, loadStatus, enqueueVisibleCommands, enqueueBatch],
   )
@@ -357,56 +409,43 @@ export function HomePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh, batchReady])
 
-  // 探测 PlayerManager（/lookbag 依赖它）。失败时不隐藏（保持未知）。
+  // 切换服务器 / 重新登录后，「指令是否存在」要重新探测（各服装的插件不同）。
+  useEffect(() => {
+    setMissingCards({})
+  }, [authenticated, transport, serverId])
+
+  // 统一能力矩阵：一次请求同时拿到 PlayerManager（/lookbag 依赖）与批量执行（「统一执行」依赖）。
+  // 失败 / 上游不可达时保持「未知」、不隐藏卡片；手动「刷新全部」会 bump pluginProbeToken 重探一次
+  //（插件可能是刚装上的）。
   useEffect(() => {
     if (!authenticated) {
       setPlayerPlugin(null)
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      try {
-        const cap = await transport.playerCapabilities()
-        if (!cancelled) setPlayerPlugin(cap.plugin)
-      } catch {
-        if (!cancelled) setPlayerPlugin(null)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [authenticated, transport, serverId])
-
-  // 探测批量执行信使插件（首页「统一执行」依赖）。切换服务器必须重新探测。
-  useEffect(() => {
-    if (!authenticated) {
       setBatchPlugin(null)
       return
     }
     let cancelled = false
     void (async () => {
       try {
-        const cap = await transport.batchCapabilities()
-        if (!cancelled) setBatchPlugin(cap.plugin)
+        const caps = await transport.capabilities()
+        if (cancelled) return
+        if (!caps.reachable) {
+          // TShock 不可达：保持未知，别把卡片当「插件没装」隐藏掉。
+          setPlayerPlugin(null)
+          setBatchPlugin(null)
+          return
+        }
+        setPlayerPlugin(caps.player.plugin)
+        setBatchPlugin(caps.batch.plugin)
       } catch {
-        if (!cancelled) setBatchPlugin(false)
+        if (cancelled) return
+        setPlayerPlugin(null)
+        setBatchPlugin(null)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [authenticated, transport, serverId])
-
-  /** 卡片依赖的插件未安装时，首页不渲染、管理弹框里置灰标记。 */
-  const pluginMissing = useCallback(
-    (id: string): boolean => {
-      if (id === 'lookbag') return playerPlugin === false
-      if (id === 'bossinfo') return worldPlugin === false
-      if (id === 'events') return eventsPlugin === false
-      return false
-    },
-    [playerPlugin, worldPlugin, eventsPlugin],
-  )
+  }, [authenticated, transport, serverId, pluginProbeToken])
 
   const openInEditor = useCallback(
     (cmd: string) => {
@@ -505,7 +544,6 @@ export function HomePage({
       unavailable: !authenticated,
       emptyText: t('home.customClickRefresh'),
       onRefresh: () => queueCustomCommand(id, title, cmd),
-      footerNote: <span className="text-2xs leading-4 text-muted-foreground">{t('home.customNoAuto')}</span>,
     })
   }
 
@@ -581,7 +619,7 @@ export function HomePage({
               {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
             </span>
           )}
-          <Button size="sm" variant="secondary" onClick={() => setManageOpen(true)}>
+          <Button size="sm" variant="ghost" onClick={() => setManageOpen(true)}>
             <SlidersHorizontal data-icon="inline-start" />
             {t('home.manage')}
           </Button>
@@ -627,14 +665,4 @@ export function HomePage({
       />
     </div>
   )
-}
-
-
-/**
- * 判断一次执行结果是否说明「指令不存在」（插件未安装）。
- * TShock 对无效指令返回 command_error，文案中英不同；保守地同时匹配两者。
- */function looksLikeMissingCommand(res: CommandResult): boolean {
-  if (res.status !== 'command_error') return false
-  const text = [res.message ?? '', ...res.output].join('\n').toLowerCase()
-  return text.includes('invalid command') || text.includes('无效指令') || text.includes('无效的命令')
 }

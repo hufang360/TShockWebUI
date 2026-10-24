@@ -31,8 +31,21 @@ export function loadAtlasImage(url: string): Promise<HTMLImageElement> {
   if (existing) return existing
   const promise = new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`图集加载失败：${url}`))
+    img.onload = () => {
+      // `onload` 只代表字节加载完成；第一次 drawImage 时仍可能同步解码整张巨图，
+      // 在图鉴首屏同时绘制几十个 canvas 时会形成数百毫秒长任务。先异步解码，
+      // 让实际画格子时只做裁切拷贝。
+      const decoded = typeof img.decode === 'function' ? img.decode() : Promise.resolve()
+      void decoded
+        .catch(() => {
+          /* 不支持 decode 或图片已损坏时仍交给 drawImage 处理 */
+        })
+        .then(() => resolve(img))
+    }
+    img.onerror = () => {
+      cache.delete(url)
+      reject(new Error(`图集加载失败：${url}`))
+    }
     img.src = url
   })
   cache.set(url, promise)
@@ -65,4 +78,10 @@ export async function loadVerifiedAtlasImage(atlas: AtlasLike): Promise<HTMLImag
   throw new Error(
     `图集尺寸不匹配：${atlas.meta.sheet} ${retried.naturalWidth}×${retried.naturalHeight} ≠ 裁切表 ${atlas.meta.width}×${atlas.meta.height}`,
   )
+}
+
+/** 空闲时预热图集（加载 + 解码）；失败保持静默，真正使用时仍会重试。 */
+export function preloadAtlasImage(atlas: AtlasLike | null | undefined): void {
+  if (!atlas) return
+  void loadVerifiedAtlasImage(atlas).catch(() => {})
 }

@@ -13,15 +13,12 @@ const maxImportBody = 4 << 20
 
 // handlePlayerImport 解析浏览器上传的 .plr 并返回规范化后的 PlayerLook（**仅展示**，不落库、不改服）。
 //
-// 与 /api/player/look 的区别：数据来自本地文件而非 TShock；因此只需登录（不要求 playermanager）。
-// 前端只在已安装 PlayerManager 且当前用户有权限时才显示入口。
+// 与 /api/player/look 的区别：数据来自本地上传的文件而非 TShock，**因此不需要登录**
+// （「查看存档」是公开工具：谁都能上传自己的 .plr 看人物 / 属性 / 背包），也不要求 playermanager 权限。
+// 只按客户端 IP 限流防滥用；文件解析完立即丢弃，不写磁盘。
 func (s *Server) handlePlayerImport(w http.ResponseWriter, r *http.Request) {
-	sess, ok := s.currentSession(r)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, codeNotAuthenticated, "请先登录")
-		return
-	}
-	if !s.commandLimiter.Allow(sess.ID) {
+	// 非 GET 请求仍由 csrf 中间件要求 `X-Requested-With: tswui`（只允许同源 fetch）。
+	if !s.commandLimiter.Allow(s.clientIP(r)) {
 		writeError(w, http.StatusTooManyRequests, codeRateLimited, "操作过于频繁，请稍后再试")
 		return
 	}

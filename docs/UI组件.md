@@ -12,10 +12,12 @@
 
 | 组件 | 文件 | 依赖 | 备注 |
 | --- | --- | --- | --- |
-| Button | `ui/Button.tsx` | radix slot + cva | 变体 `primary/secondary/outline/ghost/danger`；尺寸 `sm/md/lg/icon/icon-sm`；无 `isPending`，loading 用 `Spinner`；基础类含 `cursor-pointer`（Tailwind v4 的 button 默认是 `cursor: default`，这里改回手型） |
-| Card | `ui/Card.tsx` | — | `Card/Header/Title/Body`（项目自有命名，非 shadcn 的 Content/Footer）；`CardTitle` 自动兜底图标尺寸；**默认不加边框**，靠「极浅灰画布 + 白色卡片」的对比区分 |
+| Button | `ui/Button.tsx` | radix slot + cva | 变体 `primary/secondary/outline/ghost/danger`；尺寸 `sm/md/lg/icon/icon-sm`；移动端触控尺寸更大（`sm` 36px、`icon-sm` 40px），`md` 断点恢复桌面紧凑尺寸；无 `isPending`，loading 用 `Spinner`；基础类含 `cursor-pointer`（Tailwind v4 的 button 默认是 `cursor: default`，这里改回手型） |
+| Card | `ui/Card.tsx` | — | `Card/Header/Title/Body`（项目自有命名，非 shadcn 的 Content/Footer）；`CardTitle` 自动兜底图标尺寸；`rounded-xl + border + bg-card`，不使用投影 |
 | Badge | `ui/Badge.tsx` | cva | `tone` 变体：`neutral/accent/gold/danger/success/warn/mock/purple`（语义色） |
 | Input / Kbd | `ui/Input.tsx` | — | |
+| SearchInput | `components/SearchInput.tsx` | InputGroup + Button | 搜索与最近搜索；支持右侧搜索图标、胶囊外观、逐条删除历史。 |
+| Textarea | `ui/Textarea.tsx` | — | 多行文本（物资申请的用途 / 拒绝原因） |
 | InputGroup | `ui/InputGroup.tsx` | — | 输入框内的图标 / 按钮（`InputGroupInput` + `InputGroupAddon`），替代绝对定位按钮 |
 | Label | `ui/Label.tsx` | radix label | 一般通过 `FieldLabel` 使用 |
 | Field | `ui/Field.tsx` | — | `FieldGroup/Field/FieldLabel/FieldDescription/FieldTitle/FieldSet/FieldLegend`；表单一律用它 |
@@ -24,6 +26,7 @@
 | ToggleGroup | `ui/ToggleGroup.tsx` | radix toggle-group | 2–5 选的选项集（主题 / 语言 / scheme） |
 | Spinner | `ui/Spinner.tsx` | lucide | 加载指示；Button 内配 `data-icon`，独立展示配 `aria-label` |
 | Empty | `ui/Empty.tsx` | — | 空状态（`EmptyHeader/Media/Title/Description/Content`），不要手写空态 |
+| Skeleton | `ui/Skeleton.tsx` | — | 加载占位；路由懒加载与后续内容区骨架统一使用，不手写 `animate-pulse` 色块 |
 | Alert | `ui/Alert.tsx` | cva | Callout / banner / 错误提示；变体 `default/muted/destructive/warning/success/info` |
 | Native Select | `ui/NativeSelect.tsx` | lucide | 无 JS 的原生 `<select>`；`size="sm"` 用于紧凑区 |
 | Select | `ui/Select.tsx` | radix select | 需要**分组 / 分隔线 / 选中对勾**时用（如物品图鉴主筛选）；`SelectTrigger size="sm"` 用于紧凑区；表单无 JS 场景继续用 `NativeSelect` |
@@ -32,9 +35,10 @@
 | Switch | `ui/Switch.tsx` | radix switch | |
 | Dialog | `ui/Dialog.tsx` | radix dialog | 每个 Dialog 必须有 `DialogTitle`；`DialogFooter` = 底部操作区（`bg-background` + `border-t`） |
 | DropdownMenu | `ui/DropdownMenu.tsx` | radix dropdown-menu | 菜单项包在 `DropdownMenuGroup` 里；侧栏底部账号卡片（`SidebarAccountMenu`）用它 |
-| Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用） |
+| Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用 / 鱼店商品详情 / 数据ID 详情）；**不支持堆叠**，需要叠层就用 `Drawer` |
+| Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`。**每个 Drawer 必须有 `DrawerTitle`** |
 | Tooltip | `ui/Tooltip.tsx` | radix tooltip | 需要 `TooltipProvider` 祖先（`SlotTooltip` 自带一个） |
-| Popover | `ui/Popover.tsx` | radix popover | 点击 / 受控展开的浮层（`PopoverContent` 默认 `side=bottom` / `sideOffset=6`）；登录框「登录帮助」用它 |
+| Popover | `ui/Popover.tsx` | radix popover | 点击 / 受控展开的浮层（`PopoverContent` 默认 `side=bottom` / `sideOffset=6`）；登录框「登录帮助」、物品ID / 数据 ID「页面设置」用它 |
 | Separator | `ui/Separator.tsx` | radix separator | 分隔线一律用它，不要 `border-t/b` div 或 `<hr>` |
 | Collapsible | `ui/Collapsible.tsx` | radix collapsible | 可折叠区块（玩家管理的银行 / 配装分区）；`CollapsibleTrigger` 包在自定义标题按钮上 |
 | Sidebar | `ui/Sidebar.tsx` | Sheet + Tooltip + Button + Separator + `hooks/use-mobile` | 见下 |
@@ -50,19 +54,29 @@
 - **表单一律 `FieldGroup` + `Field`**（`FieldLabel` / `FieldDescription`），不要裸 `div` + `label` + `gap-*`；
   禁用态 `Field data-disabled` + 控件 `disabled`。
 - **选项集（2–7）用 `ToggleGroup`**；真正的面板切换才用 `Tabs`。
+- **页面级 `Tabs`（数据 ID 的 NPC / 图格 / 墙 / Buff、玩家管理的 查看存档 / 玩家背包）独占一整行**：
+  数据 ID 的主 Tabs 不包在 Card 内；玩家管理不重复渲染页面标题，简约视图只在有角色数据时进入正文工具行。
+  工具面板内的 物品 / 指令 / 收藏 / 历史 / 动态 使用标准胶囊 Tabs，单行横向滚动。
 - **输入框内图标 / 按钮用 `InputGroup` + `InputGroupAddon`**，不要 `relative` + 绝对定位。
 - **空状态用 `Empty`**；**提示 / Callout / banner 用 `Alert`**（不要手写彩色 div）。
+- **加载占位用 `Skeleton`**；懒加载路由、鱼店货架和角色背包首次加载统一使用。
 - **分隔线用 `Separator`**。
 - **弹框底部操作区用 `DialogFooter`**：底色 `bg-background` + `border-t`；用负外边距抵消 `DialogContent` 的 `p-5` 做成通栏；物品详情 / 商品详情 的操作按钮都放在这里。
   （亮色下 `--background` 已改为与卡片同为白，靠顶部 `border-t` 区分；暗色下仍比卡片深。）
 - **图标进组件用 `data-icon`**（`Button` / `TabsTrigger` / `ToggleGroupItem` / `CardTitle` 已统一兜底尺寸）。
-- **详情优先用右侧抽屉 `Sheet`**（物品详情、鱼店商品详情、数据图鉴的 NPC / 图格 / 墙详情）：标题栏固定、
-  中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框。
+- **详情优先用右侧抽屉**（鱼店商品详情、数据ID的 NPC / 图格 / 墙 / Buff 详情用 `Sheet`；物品详情用可堆叠的 `Drawer`）：
+  标题栏固定、中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框。
+- **抽屉里可以再开抽屉时用 `Drawer`（Base UI）**：像物品详情那样「点配方材料 → 看材料详情 → 返回」的钻取，
+  `Sheet`（radix dialog）做不到——它只会并排弹出、不会把父层缩小留在后面。叠层写法：把子 `<Drawer>`
+  **渲染在父 `DrawerContent` 里**（Base UI 靠 React 树判定嵌套），`open` 受控、关掉就出栈。
+  root 的 `onOpenChange(false)` 只表示「这一层要关」，收起动画结束后再出栈（父层的 `--nested-drawers` 才会减）。
 - **带「最近搜索」的搜索框用 `SearchInput`**：历史下拉**默认聚焦时不弹、打字时弹**，另有输入框内的
   历史按钮可手动展开（`historyOnFocus` / `historyToggle`，见 `docs/功能-搜索记录.md`）。
 - **勾选项（Checkbox + 文字）用 `Field orientation="horizontal"` + `FieldLabel htmlFor`**：
   `Field` 加 `w-auto` 才不会被 `w-full` 撑满整行，工具栏里可横向排列；`FieldLabel` 默认带 `text-foreground`，
   放进 `text-muted-foreground` 容器时需显式覆盖颜色。**不要**裸 `<label>` 包 `Checkbox` 再重复写 `aria-label`。
+- **页面级分类导航用 `Tabs variant="line"`**：放在页面标题下方的第一行，主分类靠左；右侧可放同类工具（如页面设置 / 全屏按钮）；NPC 子分类使用胶囊 Tabs，视图类 Checkbox 收进页面设置 Popover。移动端保持单行横向滚动，不为控件另起多行。
+- **卡片管理里的“自动执行”用 `Checkbox`**，与“显示/隐藏”的 `Switch` 语义分开；新增卡片和编辑自定义卡片都按需展开，不常驻表单。
 
 ## 已核实的例外（不要当违规重复报）
 
@@ -75,25 +89,43 @@
 | `components/ItemTooltip.tsx` | `className="... z-[100]"` | 自研提示（非 shadcn `Tooltip`），会从 `Sheet` / `Dialog`（`z-50`）内部触发，portal 到 `body` 后必须盖在它们上面；没有可复用的组件堆叠机制 |
 | `components/ui/*` 内建 `aria-label`（`Close` / `Loading` / `pagination` …） | 英文硬编码 | 这些是 shadcn 原样组件，不依赖 `lib/i18n`（避免 ui 层耦合业务 i18n）。**业务侧调用时用 `aria-label` / `title` 覆盖**（如 `AppShell` 给 `SidebarRail` / `SidebarTrigger` 传 `nav.toggleSidebar` / `nav.openMenu`） |
 | `components/ui/Card.tsx` | `Card` / `CardHeader` / `CardTitle` / `CardBody`，没有 `CardContent` / `CardFooter` | 项目自有命名（见组件清单）；布局语义一致，`CardFooter` 由 `DialogFooter` / `SheetFooter` 承担 |
+| `components/ui/Drawer.tsx` | 依赖 **Base UI**（`@base-ui/react/drawer`），项目其余组件都是 radix；类名与 CSS 变量取自 shadcn 官方 Base UI 版 | `components.json` 的 base 仍是 `radix`。选它唯一原因是**可堆叠嵌套**：radix 侧（`Sheet` / vaul）没有「父抽屉缩小留在后面」的实现，且 vaul 已停止维护。只有物品详情用它，其它浮层继续走 radix，不要混用；Drawer 的替换元素用 Base UI 的 `render`（不是 `asChild`）|
 
 ## 卡片的「主 / 次」层次
 
 - 亮色下 `--background` 用极浅蓝灰（`oklch(0.955 0.006 247.9)`）、`--card` 纯白 → **不用边框**就能区分卡片与画布；
   `Card` 只保留 `shadow-sm`。
+- 亮色模式主色使用中性深灰，右侧主画布为 `#ffffff`、侧边栏为 `#fafafa`，输入框 / 浅色控件使用中性浅灰；暗色模式使用原有中性主色，不再跟随亮色改色。绿色只用于 `success` 等语义状态。
+- 首页标题下固定一张紧凑的「指令」入口卡：有草稿时显示草稿并提供「继续编辑」，没有草稿时直接打开指令页；最近指令作为卡内快捷按钮。
+- 指令卡片无结果时压成单行（标题、指令、状态、执行按钮），只在有加载 / 错误 / 输出时才展开为完整结果卡。
 - **首页为左右两栏**（`xl:grid-cols-[minmax(0,1fr)_360px]`）：
-  - 右栏（概览）：服务器状态 / 服务器动态 / 快捷入口 / 最近执行（固定高度 `xl:h-56`、内部滚动）。
-  - 左栏（指令）：其余指令卡片 + 自定义卡片，`sm:grid-cols-2` 两列铺开。
+  - 右栏（概览）：服务器状态 / 服务器动态 / 最近执行；「快捷入口」与侧栏重复，默认隐藏但保留在管理器中。
+  - 左栏（指令）：其余指令卡片 + 自定义卡片。
+  - 移动端先渲染概览列，再渲染指令列；`xl` 起恢复左右两栏。
   - 两栏各自保持 `tswui:homeCards` 里的相对顺序（`RIGHT_COLUMN_IDS` 分栏）。
+- 指令页空态直接给出「浏览指令 / 收藏 / 最近执行」入口，不再只显示大块空白。
+  空态下编辑器位于引导卡中央并自动聚焦；产生结果后编辑器回到结果区底部并固定。
+- 指令页右侧面板改名「工具面板」；移动端点击「打开指令库」会自动滚到面板。
+- 鱼店在 REST 货架可用时默认收起「游戏内指令」；老插件或无 REST 时自动展开作为兼容入口。
 - 需要边框的特殊卡片（如鱼店头部卡片）由调用方单独加 `border`。
 
 ## 设置页（v1.4）
 
 - 每张卡片用 `components/CollapsibleCard.tsx`（Card + Collapsible）：头部标题可点击折叠，头部右侧控件（重新检测 / 刷新）不参与折叠。
-- 「激活模块」卡片内是 `Tabs`：**已适配**（玩家管理 / 鱼店 / 世界管理）/ **自定义**（自定义模块列表 + 创建）。
+- 「激活模块」卡片内是 `Tabs`：**内置模块**（玩家管理 / 鱼店 / 世界管理）/ **自定义**（自定义模块列表 + 创建）。
   登录成功后 App 会探测插件，**已安装且有权限的玩家管理 / 鱼店会自动激活**（侧边栏入口直接出现）；
   用户手动拨过开关的模块记入 `tswui:modulesSet`，不再被自动激活覆盖；世界管理无法可靠探测，保持手动。
-- 「界面偏好」只放字号 / 简约视图 / 语言 / 主题（自动 / 浅色 / 深色）/ 统一执行；「数据刷新」单独一张卡片：
-  执行队列间隔 + 服务器动态刷新间隔 + 页面数据刷新间隔。
+- **模块开关与插件状态解耦**：内置 / 自定义模块（包括玩家管理）都能自由开关，开关只控制侧边栏显隐；插件未安装、无权限、版本过旧或后来被卸载时，
+  开关仍可操作，状态徽标只用于说明页面数据是否可用。关闭模块后直达 URL 会回到首页。
+- 「界面偏好」只放字号 / 简约视图 / 语言 / 主题；“执行行为”单独放执行队列间隔与批量执行卡片；
+  “数据刷新”只放服务器动态刷新间隔与页面数据刷新间隔。
+
+## 响应式、触屏与 URL
+
+- 数据 ID 的图标网格使用容器查询（4 → 6 → 8 → 10 列），不再只看视口宽度；侧栏展开时也不会把格子挤到不可读。
+- 触屏设备（`hover: none` / `pointer: coarse`）上，折叠箭头、刷新、复制、收藏、删除等操作常显；桌面仍可 hover 渐进显示，键盘通过 `focus-within` 显示。
+- 当前页签同步为 `#/home`、`#/cmd`、`#/items` 等 URL；浏览器前进 / 后退、刷新和分享链接均可用。localStorage 中的 `tswui:ui.activeTab` 仅作为无 hash 时的兜底。
+- `Input` / `Textarea` / `InputGroupInput` / `NativeSelect` 未显式传 `id` 时自动生成稳定 id 与 name，避免表单字段缺少语义。
 
 ## 页面数据刷新间隔（设置）
 
@@ -113,7 +145,11 @@
   关闭后该卡片不随自动刷新 /「刷新全部」执行，只能点自己的按钮。首页「管理卡片」和模块「管理卡片」都有开关；
   首页默认开，世界管理的 `/relive`、`/cleartomb` 默认关（`ModuleCardDef.manual`）。
 - `status === 'no_permission'` 时卡片**保留**，下方显示本地化「没有执行该指令的权限」，并隐藏后端重复的中文 message
-  （与「未安装插件 → `command_error`」区分，见 `docs/插件-世界管理.md`）。
+  （与「指令不存在 → `command_not_found`」区分，见 `docs/插件-世界管理.md`）。
+- `status === 'command_not_found'`（指令不存在 = 提供该指令的插件没装）时，**内置指令卡片**自动隐藏、
+  在「管理卡片」里置灰并标「缺少插件」，也不再参与自动刷新 /「统一执行」；
+  手动「刷新全部」**不跳过**这些卡片（并重探一次 PlayerManager），装上插件后点一下即可恢复；
+  自定义卡片不隐藏（玩家自己填的指令，结果区展示即可）。
 
 ## 模块与指令卡片
 
@@ -121,7 +157,8 @@
   「填名称 + 主指令」创建，并自动生成一张「帮助」卡片（`/xx help`）；创建后可在列表中**直接改名称 / 主指令 / 顶部说明**（
   `desc` 留空则回退默认提示），改主指令会同步「帮助」卡片；激活后进侧边栏。
 - 模块内的「用户添加的指令卡片」统一存 `tswui:moduleCards`（`lib/moduleCards.ts`，`byServer[serverId][moduleId]`）。
-- 侧边栏顺序：首页 → 指令 → 物品图鉴 → 数据图鉴（NPC / 图格 / 墙） → 已激活内置模块 → 自定义模块 → **设置（恒在末尾）**。
+- 侧边栏使用轻量分组：**常用**（首页 / 指令）→ **查询**（物品ID / 数据 ID）→ **玩家**（玩家管理）→ **世界**（世界管理）→ **商店**（鱼店）→ **服务**（物资申请）→ **自定义**（已激活自定义模块）→ **系统**（设置，恒在末尾）；空分类不渲染。
+- 自定义模块在设置页支持拖拽排序，并提供「上移 / 下移」按钮；数组顺序直接决定侧栏顺序，仍存 `tswui:customModules`。
 - 通用页 `pages/CommandModulePage.tsx` + `components/ModuleCardsPanel.tsx`：世界管理与自定义模块共用，
   支持逐张刷新 / 刷新全部 / 添加删除卡片 / 批量执行。鱼店右侧卡片（`FishCommandCards`）也用同一份 `moduleCards`
   追加自定义卡片。
@@ -131,10 +168,11 @@
 `AppShell.tsx` 用 shadcn `Sidebar` 重写，替换了早期的自研侧栏：
 
 - `SidebarProvider` 受控于 App 的 `sidebarCollapsed`（Provider 内部切换，如 `Cmd/Ctrl+B`、rail 拖动，会经 `onOpenChange` 同步回 App）。
+- `AppShell` 在页面最前提供「跳到主内容」跳过链接，`<main id="main-content" tabIndex={-1}>` 作为目标。
 - `collapsible="offcanvas"`（**整体收起 / 展开**，与「隐藏侧栏 / 显示侧栏」文案一致）：
   收起时侧栏滑出屏幕、内容区占满，主区顶部出现「显示侧栏」按钮；不使用 `icon` 模式，因为侧栏底部是全宽的服务器/登录/设置控件，缩成 48px 会被截断。
 - 移动端由 `Sidebar` 内部自动改用 `Sheet` 抽屉（不再自绘遮罩），`SidebarNav` 点选后调用 `useSidebar().setOpenMobile(false)` 收起。
-- 导航项一律**单行**（图标 + 名称，`SidebarMenuButton` 默认 `h-8 text-sm`）；副标题不再放进按钮（两行会撑破 32px 高度）。
+- 导航项一律**单行**（图标 + 名称，`SidebarMenuButton` 移动端 `h-10`、桌面 `md:h-8`）；副标题不再放进按钮。
 - `SidebarHeader` 放品牌（`W` 方块 + **WebUI**，无副标题）、语言 / 主题快捷按钮（`headerExtra`，见下）与「隐藏侧栏」按钮；`SidebarContent` 只放导航；`SidebarFooter` 放执行队列（`sidebarExtra`）+ 账号卡片，**队列恒在账号上方**；
 - **「设置」是导航项且固定排在末尾**（`App.tsx` 的 `nav` 在遍历模块后 `push({ id: 'settings' })`）：新增内置 / 自定义模块都插在它前面。原页脚里的 `SettingsMenu` 已移除。
   `SidebarInset`（`<main>`）是滚动容器（图鉴等页面用 `closest('main')` 量高度）。
@@ -176,6 +214,8 @@
   只留页头 + `LoginGate`（`components/LoginGate.tsx`），点「登录」走 App 的登录框（`onLogin` 回调）。
 - 文案统一为 `login.required`（「请先登录！」/「Please sign in!」），不再按页区分。
 - 侧边栏入口本身仍可见（可点，点开只看到提示），不做整块隐藏。
+- **玩家管理**的「查看存档」tab 不需要 token（只上传本地 `.plr` 给后端解析），但侧边栏入口仍严格跟随模块开关；
+  未启用时入口隐藏，启用后即使没有安装 PlayerManager 也可进入并使用公开的「查看存档」。
 
 ## 登录框（`components/LoginDialog.tsx`）
 
@@ -209,6 +249,17 @@
 
 ## 变更记录
 
+- v1.48：首页首屏增加草稿 / 最近指令入口；指令页空态改为居中编辑器；触屏与键盘不再依赖 hover 操作；数据 ID 改容器查询列数；设置拆出“执行行为”；统一“数据 ID / 首页布局 / 工具面板 / 批量执行卡片”等术语；页签同步 URL hash；补齐表单字段语义；主色改为克制的苔藓绿。
+- v1.47：卡片管理弹层改为纵向操作结构并加宽，添加按钮增加有效性禁用；数据图鉴顶部改为搜索 / 信息、数据源、分类三层；补齐列表型自定义按钮的焦点环、表单提交禁用态和首页管理按钮权重。
+- v1.46：新增 `Skeleton`，懒加载路由、鱼店货架和角色背包使用页面 / 内容骨架；补 `RouteErrorBoundary`（chunk 加载失败可重新加载）；侧栏导航悬停 / 聚焦时预取页面 chunk；新增「跳到主内容」链接。
+- v1.45：路由按需加载：首页 / 指令保留在首屏主包，物品图鉴、数据图鉴、角色档案、鱼店、物资申请、模块页、设置页改为独立 chunk；主入口 JS 由约 940 kB 降到约 399 kB，构建不再出现 >500 kB 警告。自定义模块增加拖拽与上移 / 下移排序。
+- v1.44：信息架构与体验收敛。侧栏改为四组；导航统一为「物品图鉴 / 数据图鉴 / 角色档案」，角色档案页签为「查看存档 / 玩家背包」。首页移动端先展示概览、快捷入口默认隐藏；指令页新增可操作空态；鱼店「游戏内指令」在 REST 可用时默认收起。移动端按钮和侧栏导航扩大触控热区，新增 `prefers-reduced-motion` 降级，并清理物品图鉴残留的 10px 字号。
+- v1.43：数据ID 的 Buff 表格补上**图标列**：新增 `components/BuffIcon.tsx` + `lib/buffAtlas.ts`（懒加载 `data/buff-atlas.json` / `.png`，沿用图集的内容哈希 + `no-store` + 尺寸校验三层防护），表格 24×24、详情 96×96。图标来自游戏原图 `Buff_<id>.png`，由新增的 `tools/gen-buff-atlas.py` 生成（400 个 32×32，1022×428，137 KB）。
+- v1.42：数据ID 的代码命名从 **Codex** 统一为 **DataId**（对应页面中文名）：`CodexPage` → `DataIdPage`、`components/codex/CodexViews` → `components/dataid/DataIdViews`、`lib/codexState` → `lib/dataIdState`；`CodexKind` / `CodexState` 与 `read/remember/reset` 函数、i18n 键 `codex.*` / `nav.codex`、`data-testid="codex-*"` 同步改为 `DataId` / `dataId`。页面 tab id `codex` → `dataid`，`App.tsx` 保留 `codex` / `npcs` / `tiles` 旧 id 的兼容映射。行为不变。
+- v1.41：数据ID 新增 **Buff** 页签（`data/buffs.json` + `loc.BuffName`）：表格列 `BuffID / 名称 / 内部名`，与图格 / 墙共用「两列表格」开关与底部翻页器；**不设图标列**（无 Buff 图标集，不用物品图标冒充）；点行开右侧 `Sheet` 详情；最近搜索单独记在 `tswui:buffs:searchHistory`。
+- v1.40：新增 `ui/Drawer.tsx`（**Base UI** 版 shadcn Drawer，项目里唯一的非 radix 组件，原因见「已核实的例外」）：物品详情从右侧 `Sheet` 改为**可堆叠抽屉**——桌面右侧滑入 / 移动端底部滑入（带手柄），在抽屉里点配方材料 / 产物（或提示里的「合成表」）会**再叠一层**，父层缩小变暗留在后面。关闭语义：**× ＝ 关掉整个抽屉**，**「返回」＝ 只关当前这层**（`Esc` / 点遮罩 / 滑走同「返回」）。新增 `action.back`（返回）。
+- v1.39：玩家管理页改为 **tablist**（`Tabs`：查看存档 / 玩家管理，两项**独占一整行**均分宽度；「简约视图」开关在下一行右侧；页内按钮改常规尺寸 `md`，与「物资申请」一致）；「查看存档」公开（不需要登录 / 插件）：导入 `.plr`（含拖拽）+ 角色视图，两个 tab 共用 `components/player/PlayerLookPanel.tsx`；新增「导出图片」（`lib/playerShot.ts` + `lib/playerAvatarDraw.ts`，canvas 重画，不截 DOM）。侧边栏「玩家管理」入口恒在，模块开关只控制「玩家管理」tab。
+- v1.38：数据图鉴改名**数据ID**，NPC / 图格 / 墙 改用 shadcn `Tabs`（`role=tablist`，独占一整行，NPC 分类筛选在下一行）；「两列表格」开关从工具条移到**表格上面一行**。鱼店商品详情：属性标签统一改到**值框上面一行的左上角**（`Field` 竖排）。执行结果富文本字号降到 `text-xs`（12px / `leading-5`），**行内物品图标保持 24px 不变**。
 - v1.37：按 shadcn Critical Rules 做了一次全量核对（styling / forms / composition / icons），只发现零星偏差并修正：
   物品图鉴的「仅显示图标 / 单列 / 复制含标签」三项与数据图鉴的「两列表格」改为 `Field orientation="horizontal"` + `FieldLabel htmlFor`
   （不再裸 `<label>` 包 `Checkbox` 再重复写 `aria-label`）；侧栏账号菜单的 `DropdownMenuLabel` 包进 `DropdownMenuGroup`；

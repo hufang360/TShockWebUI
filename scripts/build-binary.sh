@@ -69,8 +69,8 @@ echo "==> 目标平台 ${GOOS}/${GOARCH}（宿主 ${HOST_GOOS}/${HOST_GOARCH}）
 # ── 1. 生成数据自检 ─────────────────────────────────────────────
 # 生成数据随仓库提交；若被删或未生成，这里提前失败并给出生成命令。
 missing=""
-for f in items.json prefixes.json commands.json meta.json items-atlas.json \
-  items-atlas.png player-atlas.json player-atlas.png recipes.json item-stats.json \
+for f in items.json prefixes.json buffs.json commands.json meta.json items-atlas.json \
+  items-atlas.png player-atlas.json player-atlas.png buff-atlas.json buff-atlas.png recipes.json item-stats.json \
   item-tips.zh-Hans.json item-tips.en-US.json loc.zh-Hans.json loc.en-US.json; do
   [ -f "data/$f" ] || missing="$missing data/$f"
 done
@@ -78,7 +78,7 @@ if [ -n "$missing" ]; then
   {
     echo "错误：缺少生成数据：$missing"
     echo "  请先执行（部分需要 dotnet 9 / python3-Pillow）："
-    echo "    node tools/gen-data.mjs && python3 tools/gen-atlas.py && python3 tools/gen-player-atlas.py"
+    echo "    node tools/gen-data.mjs && python3 tools/gen-atlas.py && python3 tools/gen-player-atlas.py && python3 tools/gen-buff-atlas.py"
     echo "    bash tools/gen-game-data.sh"
   } >&2
   exit 1

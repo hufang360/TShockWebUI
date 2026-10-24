@@ -21,7 +21,8 @@ ITEMS_RAW="$(mktemp -t items-raw.XXXXXX.json)"
 GROUPS_RAW="$(mktemp -t item-groups-raw.XXXXXX.json)"
 PREFIX_SETS_RAW="$(mktemp -t prefix-sets-raw.XXXXXX.json)"
 ITEM_DROPS_RAW="$(mktemp -t item-drops-raw.XXXXXX.json)"
-trap 'rm -f "$RECIPES_RAW" "$ITEMS_RAW" "$GROUPS_RAW" "$PREFIX_SETS_RAW" "$ITEM_DROPS_RAW"' EXIT
+TILE_STYLES_RAW="$(mktemp -t tile-styles-raw.XXXXXX.json)"
+trap 'rm -f "$RECIPES_RAW" "$ITEMS_RAW" "$GROUPS_RAW" "$PREFIX_SETS_RAW" "$ITEM_DROPS_RAW" "$TILE_STYLES_RAW"' EXIT
 
 echo "== GameDump (dotnet) =="
 echo "   TR_SRC=$TR_SRC"
@@ -49,8 +50,11 @@ TR_SRC="$TR_SRC" OUT="$REPO/data/prefix-mods.json" node "$HERE/gen-prefix-mods.m
 echo "== gen-prefix-sets =="
 RAW="$PREFIX_SETS_RAW" OUT="$REPO/data/prefix-sets.json" node "$HERE/gen-prefix-sets.mjs"
 
+echo "== tile styles =="
+dotnet "$HERE/gamedump/bin/Release/net9.0/GameDump.dll" --tile-styles "$TILE_STYLES_RAW"
+
 echo "== gen-tile-wall =="
-TR_SRC="$TR_SRC" RAW="$RECIPES_RAW" \
+TR_SRC="$TR_SRC" RAW="$RECIPES_RAW" STYLES_RAW="$TILE_STYLES_RAW" \
   OUT="$REPO/data/tiles.json" OUT_WALL="$REPO/data/walls.json" node "$HERE/gen-tile-wall.mjs"
 
 echo "完成。"

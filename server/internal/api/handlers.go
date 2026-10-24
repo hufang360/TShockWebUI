@@ -3,6 +3,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,6 +50,8 @@ const (
 	// codeFishError：FishShop 的业务失败（缺参数 / 商品不存在 / 钱不够 /
 	// 商店打烊），文案来自上游，直接展示给玩家。
 	codeFishError = "fishshop_error"
+	// codeRequestError：物资申请的业务失败（超出上限 / 物品被禁用 / 状态已处理等），文案来自插件。
+	codeRequestError = "request_error"
 	// 「在线授权」登录相关错误码。
 	codePlayerOffline     = "player_offline"
 	codeOnlineAuthDenied  = "online_auth_denied"
@@ -56,6 +60,19 @@ const (
 )
 
 const sessionCookieName = "tswui_session"
+
+// sessionCookieNameFor 返回该上游对应的会话 Cookie 名。
+//
+// 默认上游用 tswui_session（兼容单服务器部署）；自定义上游按 base URL 的哈希派生后缀，
+// 于是「多服务器切换」各自一条会话：切到别的服不会顶掉 / 冒用当前服的登录态，
+// 也绝不会把 A 服的 TShock token 发往 B 服。
+func sessionCookieNameFor(upstream string) string {
+	if upstream == "" {
+		return sessionCookieName
+	}
+	sum := sha256.Sum256([]byte(upstream))
+	return sessionCookieName + "_" + hex.EncodeToString(sum[:4])
+}
 
 // Deps 是 Server 的依赖集合。
 type Deps struct {
@@ -87,10 +104,19 @@ type Server struct {
 	// 插件 meta 短缓存：避免每次 tail / 状态探测都打插件。
 	metaMu    sync.Mutex
 	metaCache map[string]metaCacheEntry
+
+	// 能力矩阵微缓存（/api/capabilities，见 capabilities.go）。
+	capMu    sync.Mutex
+	capCache map[string]capCacheEntry
 }
 
 type metaCacheEntry struct {
 	meta *tshock.PluginMeta
+	at   time.Time
+}
+
+type capCacheEntry struct {
+	resp capabilitiesResponse
 	at   time.Time
 }
 
@@ -116,6 +142,7 @@ func New(d Deps) *Server {
 		commandLimiter: newRateLimiter(d.Config.CommandMaxPerMin),
 		hubs:           map[string]*eventHub{},
 		metaCache:      map[string]metaCacheEntry{},
+		capCache:       map[string]capCacheEntry{},
 	}
 }
 
@@ -128,6 +155,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/session", s.handleSession)
 	mux.HandleFunc("GET /api/webauth/capabilities", s.handleWebAuthCapabilities)
 	mux.HandleFunc("GET /api/plugin/status", s.handlePluginStatus)
+	mux.HandleFunc("GET /api/capabilities", s.handleCapabilities)
 	mux.HandleFunc("GET /api/servers", s.handleServers)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
 	mux.HandleFunc("GET /api/players", s.handlePlayers)
@@ -152,6 +180,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/chat", s.handleChat)
 	mux.HandleFunc("GET /api/sessions", s.handleSessions)
 	mux.HandleFunc("POST /api/sessions/revoke", s.handleRevokeSessions)
+	mux.HandleFunc("GET /api/requests/capabilities", s.handleRequestCapabilities)
+	mux.HandleFunc("GET /api/requests", s.handleRequests)
+	mux.HandleFunc("POST /api/requests", s.handleCreateRequest)
+	mux.HandleFunc("POST /api/requests/cancel", s.handleCancelRequest)
+	mux.HandleFunc("GET /api/requests/all", s.handleAllRequests)
+	mux.HandleFunc("POST /api/requests/review", s.handleReviewRequest)
+	mux.HandleFunc("POST /api/requests/deliver", s.handleDeliverRequest)
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	// 未知的 /api/* 一律返回 JSON 404，绝不回退到 SPA（index.html），
 	// 否则前端会把 HTML 当 JSON 解析，表现为“页面空白”。
@@ -251,13 +286,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sess, err := s.sessions.Create(username, token)
+	sess, err := s.sessions.Create(username, token, s.cookieUpstream(client))
 	if err != nil {
 		s.log.Error("创建会话失败", "error", err)
 		writeError(w, http.StatusInternalServerError, codeServerError, "服务器内部错误")
 		return
 	}
-	s.setSessionCookie(w, sess.ID)
+	s.setSessionCookie(w, sess)
 	writeJSON(w, http.StatusOK, map[string]string{"username": sess.Username})
 }
 
@@ -336,13 +371,13 @@ func (s *Server) handleLoginOnline(w http.ResponseWriter, r *http.Request) {
 				if username == "" {
 					username = req.Username
 				}
-				sess, cerr := s.sessions.Create(username, poll.Token)
+				sess, cerr := s.sessions.Create(username, poll.Token, s.cookieUpstream(client))
 				if cerr != nil {
 					s.log.Error("创建会话失败", "error", cerr)
 					writeError(w, http.StatusInternalServerError, codeServerError, "服务器内部错误")
 					return
 				}
-				s.setSessionCookie(w, sess.ID)
+				s.setSessionCookie(w, sess)
 				writeJSON(w, http.StatusOK, map[string]string{"username": sess.Username})
 				return
 			case tshock.WebAuthStateDenied:
@@ -437,20 +472,21 @@ func (s *Server) writeWebAuthBusiness(w http.ResponseWriter, e *tshock.APIError)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// 目标地址非法时仍允许本地退出（不因上游参数阻断登出）。
+	client, err := s.resolveClient(r)
+	if err != nil {
+		client = s.tshock
+	}
 	if sess, ok := s.currentSession(r); ok {
 		ctx, cancel := context.WithTimeout(r.Context(), s.cfg.TShockTimeout)
-		// 目标地址非法时仍允许本地退出（不因上游参数阻断登出）。
-		client, err := s.resolveClient(r)
-		if err != nil {
-			client = s.tshock
-		}
 		if err := client.DestroyToken(ctx, sess.TShockToken); err != nil {
 			s.log.Warn("销毁 TShock token 失败", "error", err)
 		}
 		cancel()
 		s.sessions.Delete(sess.ID)
 	}
-	s.clearSessionCookie(w)
+	// 只清「本次请求这一台上游」的 Cookie：多服务器切换时别服的登录态保留。
+	s.clearSessionCookie(w, session.Session{Upstream: s.cookieUpstream(client)})
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -475,9 +511,9 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		_, err := client.TokenTest(ctx, sess.TShockToken)
 		var e *tshock.APIError
 		if err != nil && errors.As(err, &e) && e.Kind == tshock.KindTokenInvalid {
-			// 上游明确表示 token 无效（含切换到另一台 TShock）：清会话与 Cookie，回未登录。
+			// 上游明确表示 token 无效（TShock 重启 / token 被销毁）：清会话与 Cookie，回未登录。
 			s.sessions.Delete(sess.ID)
-			s.clearSessionCookie(w)
+			s.clearSessionCookie(w, sess)
 		} else {
 			// 有效，或 TShock 不可达/超时（后者不强制登出，避免误清）。
 			name := sess.Username
@@ -591,7 +627,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 				// 需要 token 但缺失/失效：清会话，但仍视为可达，只是拿不到版本（API_SPEC §4）。
 				if hasSession {
 					s.sessions.Delete(sess.ID)
-					s.clearSessionCookie(w)
+					s.clearSessionCookie(w, sess)
 				}
 			}
 			if e.Status > 0 {
@@ -716,7 +752,7 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 		var e *tshock.APIError
 		if errors.As(err, &e) && e.Kind == tshock.KindTokenInvalid {
 			s.sessions.Delete(sess.ID)
-			s.clearSessionCookie(w)
+			s.clearSessionCookie(w, sess)
 		}
 	}
 	if res.Output == nil {
@@ -744,7 +780,7 @@ func (s *Server) runIngameCommand(w http.ResponseWriter, r *http.Request, sess *
 		if errors.As(err, &e) {
 			if e.Kind == tshock.KindTokenInvalid {
 				s.sessions.Delete(sess.ID)
-				s.clearSessionCookie(w)
+				s.clearSessionCookie(w, *sess)
 			}
 			if e.Kind == tshock.KindPluginBusiness {
 				// player_offline / disabled：以业务结果返回，界面上可读。
@@ -839,7 +875,7 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 			var e *tshock.APIError
 			if errors.As(err, &e) && e.Kind == tshock.KindTokenInvalid {
 				s.sessions.Delete(sess.ID)
-				s.clearSessionCookie(w)
+				s.clearSessionCookie(w, sess)
 			}
 			s.writeBatchError(w, s.refinePluginError(ctx, client, tshock.CapBatch, err))
 			return
@@ -869,14 +905,24 @@ func (s *Server) handleBatchCapabilities(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.TShockTimeout)
 	defer cancel()
 
-	plugin := true
-	if err := client.BatchProbe(ctx); err != nil {
+	cap, err := s.probeBatch(ctx, client)
+	if err != nil {
+		// 只有「探测本身失败」（超时 / 不可达）才报错；未安装由 probeBatch 归为 plugin=false。
 		var e *tshock.APIError
-		if errors.As(err, &e) && e.Kind == tshock.KindNotFound {
-			plugin = false
+		if errors.As(err, &e) {
+			switch e.Kind {
+			case tshock.KindTimeout:
+				writeError(w, http.StatusGatewayTimeout, codeTShockTimeout, "TShock 响应超时，请重试")
+				return
+			case tshock.KindUnavailable:
+				writeError(w, http.StatusBadGateway, codeTShockUnavail, "TShock 服务不可用")
+				return
+			}
 		}
+		writeError(w, http.StatusBadGateway, codeBadResponse, "无法探测批量执行能力")
+		return
 	}
-	writeJSON(w, http.StatusOK, tshock.BatchCapability{Plugin: plugin, Ingame: plugin && s.cfg.AllowIngameCommands})
+	writeJSON(w, http.StatusOK, cap)
 }
 
 // batchTimeout 给批量执行留出与指令数相称的整体超时（上限 60s）。
@@ -1000,18 +1046,40 @@ func setCacheHeaders(w http.ResponseWriter, name string) {
 
 // ---------- 会话 / Cookie ----------
 
+// currentSession 返回「与本次请求上游匹配」的会话。
+// 上游不同（多服务器切换）一律当作未登录：不串用另一台服的 token。
 func (s *Server) currentSession(r *http.Request) (session.Session, bool) {
-	c, err := r.Cookie(sessionCookieName)
+	client, err := s.resolveClient(r)
+	if err != nil {
+		// 上游地址非法：先按默认上游读会话，handler 随后会回 400。
+		client = s.tshock
+	}
+	c, err := r.Cookie(sessionCookieNameFor(s.cookieUpstream(client)))
 	if err != nil {
 		return session.Session{}, false
 	}
-	return s.sessions.Get(c.Value)
+	sess, ok := s.sessions.Get(c.Value)
+	if !ok {
+		return session.Session{}, false
+	}
+	if sess.Upstream != s.cookieUpstream(client) {
+		return session.Session{}, false
+	}
+	return sess, true
 }
 
-func (s *Server) setSessionCookie(w http.ResponseWriter, id string) {
+// cookieUpstream 把客户端 base URL 归一成会话里记录的 upstream 值：默认上游记空串。
+func (s *Server) cookieUpstream(client *tshock.Client) string {
+	if client == nil || client.BaseURL() == s.tshock.BaseURL() {
+		return ""
+	}
+	return client.BaseURL()
+}
+
+func (s *Server) setSessionCookie(w http.ResponseWriter, sess session.Session) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    id,
+		Name:     sessionCookieNameFor(sess.Upstream),
+		Value:    sess.ID,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   s.cfg.CookieSecure,
@@ -1020,9 +1088,10 @@ func (s *Server) setSessionCookie(w http.ResponseWriter, id string) {
 	})
 }
 
-func (s *Server) clearSessionCookie(w http.ResponseWriter) {
+// clearSessionCookie 清掉该会话所属上游的 Cookie（不影响其它服务器的登录态）。
+func (s *Server) clearSessionCookie(w http.ResponseWriter, sess session.Session) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     sessionCookieNameFor(sess.Upstream),
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
@@ -1043,7 +1112,7 @@ func (s *Server) writeTShockError(w http.ResponseWriter, sess *session.Session, 
 	switch e.Kind {
 	case tshock.KindTokenInvalid:
 		s.sessions.Delete(sess.ID)
-		s.clearSessionCookie(w)
+		s.clearSessionCookie(w, *sess)
 		writeError(w, http.StatusUnauthorized, codeTokenInvalid, "登录状态已失效，请重新登录")
 	case tshock.KindNoPermission, tshock.KindNoAPIPermission:
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")
@@ -1122,24 +1191,12 @@ func (s *Server) handlePlayerCapabilities(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.TShockTimeout)
 	defer cancel()
 
-	err := client.PlayerProbe(ctx, sess.TShockToken)
-	if err == nil {
-		writeJSON(w, http.StatusOK, tshock.PlayerCapability{Plugin: true, Permission: true})
+	cap, err := s.probePlayer(ctx, sess.TShockToken, client)
+	if err != nil {
+		s.writeTShockError(w, &sess, err)
 		return
 	}
-	var e *tshock.APIError
-	if errors.As(err, &e) {
-		switch e.Kind {
-		case tshock.KindNotFound:
-			// 插件未安装：不算错误，正常告知前端。
-			writeJSON(w, http.StatusOK, tshock.PlayerCapability{Plugin: false, Permission: false})
-			return
-		case tshock.KindNoPermission:
-			writeJSON(w, http.StatusOK, tshock.PlayerCapability{Plugin: true, Permission: false})
-			return
-		}
-	}
-	s.writeTShockError(w, &sess, err)
+	writeJSON(w, http.StatusOK, cap)
 }
 
 // playerNameParam 校验并取出 name 查询参数（Terraria 玩家名，允许中文）。
@@ -1182,7 +1239,7 @@ func (s *Server) handlePlayerLook(w http.ResponseWriter, r *http.Request) {
 		var e *tshock.APIError
 		if errors.As(err, &e) && e.Kind == tshock.KindTokenInvalid {
 			s.sessions.Delete(sess.ID)
-			s.clearSessionCookie(w)
+			s.clearSessionCookie(w, sess)
 		}
 		s.writeTShockError(w, &sess, err)
 		return
@@ -1217,7 +1274,7 @@ func (s *Server) handlePlayerExport(w http.ResponseWriter, r *http.Request) {
 		var e *tshock.APIError
 		if errors.As(err, &e) && e.Kind == tshock.KindTokenInvalid {
 			s.sessions.Delete(sess.ID)
-			s.clearSessionCookie(w)
+			s.clearSessionCookie(w, sess)
 		}
 		s.writeTShockError(w, &sess, err)
 		return
@@ -1247,23 +1304,12 @@ func (s *Server) handleFishCapabilities(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.TShockTimeout)
 	defer cancel()
 
-	err := client.FishProbe(ctx, sess.TShockToken)
-	if err == nil {
-		writeJSON(w, http.StatusOK, tshock.FishCapability{Plugin: true, Permission: true})
+	cap, err := s.probeFish(ctx, sess.TShockToken, client)
+	if err != nil {
+		s.writeTShockError(w, &sess, err)
 		return
 	}
-	var e *tshock.APIError
-	if errors.As(err, &e) {
-		switch e.Kind {
-		case tshock.KindNotFound:
-			writeJSON(w, http.StatusOK, tshock.FishCapability{Plugin: false, Permission: false})
-			return
-		case tshock.KindNoPermission:
-			writeJSON(w, http.StatusOK, tshock.FishCapability{Plugin: true, Permission: false})
-			return
-		}
-	}
-	s.writeTShockError(w, &sess, err)
+	writeJSON(w, http.StatusOK, cap)
 }
 
 func (s *Server) handleFishList(w http.ResponseWriter, r *http.Request) {
@@ -1383,12 +1429,14 @@ func (s *Server) writeFishError(w http.ResponseWriter, sess *session.Session, er
 	switch e.Kind {
 	case tshock.KindTokenInvalid:
 		s.sessions.Delete(sess.ID)
-		s.clearSessionCookie(w)
+		s.clearSessionCookie(w, *sess)
 		writeError(w, http.StatusUnauthorized, codeTokenInvalid, "登录状态已失效，请重新登录")
 	case tshock.KindNoPermission, tshock.KindNoAPIPermission:
 		writeError(w, http.StatusForbidden, codeNoPermission, "权限不足")
 	case tshock.KindNotFound:
-		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 FishShop 插件")
+		writeError(w, http.StatusNotImplemented, codePluginMissing, "服务器未安装 FishShop 插件（或版本过旧，没有 REST 接口）")
+	case tshock.KindPluginOutdated:
+		writeError(w, http.StatusNotImplemented, codePluginOutdated, "FishShop 版本过旧，没有 REST 接口，请在游戏内使用 /fish")
 	case tshock.KindTimeout:
 		writeError(w, http.StatusGatewayTimeout, codeTShockTimeout, "TShock 响应超时，请重试")
 	case tshock.KindUnavailable:
@@ -1420,6 +1468,9 @@ func attachmentHeader(filename string) string {
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// /api/* 的响应可能随登录态变化（如 /api/status 有无 token 拿到的字段不同），
+	// 一律禁止缓存：避免浏览器复用登录前的匿名响应。
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		// 响应已开始写出；仅记录不改变状态码。

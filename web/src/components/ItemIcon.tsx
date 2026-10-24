@@ -30,6 +30,8 @@ interface ItemIconProps {
   maxStackSize?: number
   /** 悬停时显示富提示（图标 + 词缀 + 名称 + 数量）。默认开启；提示内部的图标会关闭以避免递归。 */
   tooltip?: boolean
+  /** 隐藏提示底部的「合成表」入口（点击图标本身就能打开详情时用）。 */
+  hideRecipeLink?: boolean
 }
 
 /**
@@ -53,6 +55,7 @@ export function ItemIcon({
   stack,
   maxStackSize,
   tooltip = true,
+  hideRecipeLink,
 }: ItemIconProps) {
   const { t } = useI18n()
   const stat = useItemStat(item?.id)
@@ -103,6 +106,8 @@ export function ItemIcon({
         // 采样方式见 lib/iconScale.ts 的 shouldSmooth：缩小插值（同游戏 LinearClamp）、放大最近邻
         // （整数倍放大用插值会发糊，且贴图透明边缘会渗出 1px 虚边）
         ctx.imageSmoothingEnabled = shouldSmooth(w, cssW)
+        // 图集每格之间留 1px 透明缝（`--padding 1`，见 docs/功能-富文本解析.md §6.2）：
+        // 插值采样越界时读到的是透明缝，不会把相邻精灵的像素渗进图标边缘。
         ctx.drawImage(img, x, y, w, h, dx, dy, dw, dh)
       })
       .catch(() => {
@@ -135,17 +140,15 @@ export function ItemIcon({
     prefix,
     stack,
     name,
+    hideRecipeLink,
     disabled: !canTip,
   })
 
   return (
     <span
-      // 可悬停看提示的图标给手形指针，让“可交互”可被看到；className 放在最后以便调用方覆盖。
-      className={cn(
-        'relative inline-block shrink-0 align-middle',
-        canTip && 'cursor-pointer',
-        className,
-      )}
+      // **图标本身不给手形指针**：点它没有任何反应（只有悬停出提示），手型会让人误以为可点。
+      // 真正可点的场合由外层（`Button` 等）给 `cursor-pointer`，`cursor` 会被子元素继承。
+      className={cn('relative inline-block shrink-0 align-middle', className)}
       style={{ width: size, height: size }}
       ref={tooltipRef}
       {...tooltipProps}

@@ -18,6 +18,11 @@ const CLOSE_DELAY = 150
  */
 let closeActiveTooltip: (() => void) | null = null
 
+/** 立即收起当前物品提示（点图标打开详情前调用）。 */
+export function closeItemTooltip() {
+  closeActiveTooltip?.()
+}
+
 interface TipPosition {
   x: number
   y: number
@@ -33,6 +38,8 @@ export interface ItemTooltipOptions {
   stack?: number
   /** 覆盖显示名（默认 item.name）。 */
   name?: string
+  /** 不显示提示底部的「合成表」入口（格子图标点一下就能开详情时用）。 */
+  hideRecipeLink?: boolean
   /** 为 true 时不挂载提示（也没有手型指针）。 */
   disabled?: boolean
 }
@@ -48,7 +55,7 @@ export interface ItemTooltipHandlers {
  * 物品提示（全项目统一样式）的**锚点逻辑**：把鼠标/焦点事件绑到任意元素上，
  * 由本 hook 负责定位与 portal 渲染。
  *
- * 抽出来的原因：提示不只挂在图标画框上 —— 图鉴格子要求"整张卡片都能触发"，
+ * 抽出来的原因：提示不只挂在图标画框上 —— 部分列表条目把提示绑在整张卡片上，
  * 而 `ItemIcon` 只需要绑在自己的 canvas 外层。两者共用同一份定位/收起逻辑与同一个 `ItemTooltipContent`。
  */
 export function useItemTooltip<T extends HTMLElement = HTMLElement>({
@@ -58,6 +65,7 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
   prefix,
   stack,
   name,
+  hideRecipeLink,
   disabled,
 }: ItemTooltipOptions): { ref: RefObject<T | null>; props: ItemTooltipHandlers; node: ReactNode } {
   const ref = useRef<T>(null)
@@ -185,6 +193,9 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
             role="tooltip"
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
+            // React Portal 的事件仍会沿 React 树冒泡；阻断后，点提示文字不会触发下方格子的详情。
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             /* 唯一手写 z-index：提示会从 Sheet / Dialog（都是 z-50）内部触发，portal 到 body 后
                必须盖在它们上面。属于自研 Terraria 风格富文本提示（非 shadcn Tooltip），
                无法复用组件的自管堆叠。见 docs/UI组件.md「已核实的例外」。 */
@@ -202,6 +213,7 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
               prefix={prefix}
               stack={stack}
               name={name}
+              hideRecipeLink={hideRecipeLink}
             />
           </div>,
           document.body,

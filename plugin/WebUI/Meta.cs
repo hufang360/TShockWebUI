@@ -46,6 +46,8 @@ namespace WebUI
                 "events_history", // /webui/events?tail=N（磁盘历史 + 取最新 N 条）
                 "sessions",    // /webui/auth/sessions + /webui/auth/revoke
                 "chat",        // /webui/chat
+                "requests",    // /webui/requests*（物资申请：玩家提交 / 查看 / 撤回）
+                "requests_review", // /webui/requests/{all,review,deliver}（服主审核 / 补发）
             };
             caps.Sort(StringComparer.Ordinal);
             return caps.ToArray();

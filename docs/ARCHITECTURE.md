@@ -45,9 +45,10 @@
   ├─ GET  /assets/*                                 ← Go 内嵌静态资源
   ├─ POST /api/login      {username,password}       ← 密码只在 body
   ├─ POST /api/login/online {username}              ← 「在线授权」，最多阻塞 60s
-  ├─ GET  /api/webauth/capabilities                 ← 探测「在线授权」插件
+  ├─ GET  /api/capabilities                         ← 统一能力矩阵（一次拿到全部可选能力）
+  ├─ GET  /api/webauth/capabilities                 ← 探测「在线授权」插件（分端点，按需）
   ├─ POST /api/batch      {cmds:[...]}              ← 首页「统一执行」批量跑
-  ├─ GET  /api/batch/capabilities                   ← 探测「批量执行」插件
+  ├─ GET  /api/batch/capabilities                   ← 探测「批量执行」插件（分端点，按需）
   ├─ POST /api/logout
   ├─ GET  /api/session
   ├─ GET  /api/status
@@ -57,7 +58,7 @@
         ▼
 Go 后端（单进程，标准库）
   ├─ 静态资源服务（内嵌 webdist：index.html/assets/data）
-  ├─ 会话层：map[sessionID]{username, tshockToken, exp}  +  随机 Cookie
+  ├─ 会话层：map[sessionID]{username, tshockToken, upstream, exp} + 按上游命名的随机 Cookie
   ├─ TShock 客户端：/v2/token/create, /token/destroy, /tokentest,
   │                 /v2/server/status, /v2/players/list, /v3/server/rawcmd,
   │                 /webui/auth/*, /webui/restlimit, /webui/batch
@@ -69,7 +70,9 @@ TShock REST API  (env TSHOCK_URL，默认 http://127.0.0.1:7878)
        ├─ /webui/auth/{request,poll,cancel} → 玩家在游戏内 /web auth <code> 同意 → 插件铸造 REST token
        ├─ /webui/batch → 按 token 用户组逐条执行指令（与 rawcmd 同权限；`mode=player` 可跑 AllowServer=false，需显式开启）
        ├─ /webui/restlimit → TShock 建令牌限流只读快照（调用者自己 IP）；后端据此精确判 `rate_limited`
-       └─ /webui/{commands,me,data,serverinfo,events} → 只读信息；/webui/auth/{sessions,revoke} → 会话自助管理
+       ├─ /webui/{commands,me,data,serverinfo,events} → 只读信息；/webui/auth/{sessions,revoke} → 会话自助管理
+       ├─ /webui/{chat} → 网页发言（带 [WebUI] 前缀）
+       ├─ /webui/requests* → 物资申请（玩家提交 / 服主审核 / 补发；见 docs/插件-物资申请.md）
        └─ 高级指令 `/web limit [值|unlimited|default]` → 查看/放宽 RESTMaximumRequestsPerInterval（需 webui.admin + tshock.rest.cfg）
 ```
 
@@ -149,7 +152,7 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 ### 4.4 Tier A 前置校验（`internal/tshock/commands.go`）
 - 内嵌 `commands.json`（与前端同一份数据）。
 - 解析指令首 token（去前导 `/`，取别名），查表：
-  - 未知/插件指令（不在表内）→ **放行**，交由 TShock 判定（不存在 → `command_error`）。
+  - 未知/插件指令（不在表内）→ **放行**，交由 TShock 判定（不存在 → `command_not_found`）。
   - `allowServer === false` → `{status:"rejected", message:"只能在游戏内执行"}`，不调用 TShock。
   - 允许 → 调 `RawCmd`。
 - 这是纵深防御，不是权限边界；真正权限在 TShock（token 用户组的 `CanRun`）。
@@ -160,6 +163,11 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
   若由外层终止 TLS，CSP 也可在外层下发，二者取一即可（内建更省事）。
 - CSRF：所有 `POST /api/*` 必须带请求头 `X-Requested-With: tswui`，否则 `403 csrf`。
   配合 `SameSite=Strict` Cookie，足以挡住跨站表单提交。
+- 缓存：`/api/*` 的 JSON 响应统一 `Cache-Control: no-store`（响应随登录态变化，禁止浏览器复用）；
+  只有 `/assets/*`、`/data/*` 这类静态资源才走长缓存（见 §4.1）。
+- 会话按上游隔离：`session.Session.Upstream` 记录所属上游，Cookie 名按上游派生
+  （默认 `tswui_session`，自定义上游 `tswui_session_<hash>`）；上游不符一律视为未登录，
+  绝不把 A 服的 token 发往 B 服（多服务器切换见 `docs/API_SPEC.md` §10）。
 - 登录限流：按客户端 IP（`RemoteAddr`，可选 `X-Forwarded-For` 当 `TRUST_PROXY=true`）每 IP 每分钟 `LOGIN_MAX_PER_MIN` 次，超出 `429 rate_limited`。
 - 指令执行限流：按**会话**（每个已登录玩家一个桶，`COMMAND_MAX_PER_MIN`/分钟），超出 `429 rate_limited`；
   在会话校验之后判定，未登录请求仍返回 `401`。按会话而非 IP 计数，避免经反代时所有玩家共用来源 IP 而互相限流。

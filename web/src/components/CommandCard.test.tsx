@@ -27,7 +27,7 @@ describe('CommandCard 刷新按钮提示', () => {
   it('没有结果时 tooltip 显示「尚未执行」', async () => {
     renderCard()
     fireEvent.focus(screen.getByRole('button', { name: '刷新' }))
-    expect(await screen.findByText('尚未执行')).toBeTruthy()
+    expect((await screen.findByRole('tooltip')).textContent).toContain('尚未执行')
   })
 
   it('底部不再显示执行时间', () => {

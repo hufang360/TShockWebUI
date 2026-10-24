@@ -1,5 +1,7 @@
-import { Star } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Copy, Star } from 'lucide-react'
 import {
+  Button,
   Select,
   SelectContent,
   SelectGroup,
@@ -48,6 +50,19 @@ export function PrefixPicker({
   formatTag,
 }: PrefixPickerProps) {
   const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+  const tag = prefix ? formatTag(item.id, { prefixId }) : ''
+  const copyTag = async () => {
+    if (!tag) return
+    try {
+      await navigator.clipboard.writeText(tag)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    } catch {
+      setCopied(false)
+    }
+  }
+
   return (
     <div className="flex w-40 shrink-0 flex-col gap-1.5 rounded-lg bg-accent/50 p-2 text-xs text-muted-foreground">
       <span className="shrink-0">{t('prefix.label')}</span>
@@ -86,7 +101,7 @@ export function PrefixPicker({
       {bestPrefixIds.size > 0 && !accessory && (
         <button
           type="button"
-          className="shrink-0 cursor-pointer text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
+          className="shrink-0 cursor-pointer rounded-sm text-left underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title={t('prefix.bestHint')}
           onClick={() => onPrefixChange([...bestPrefixIds][0]!)}
         >
@@ -94,9 +109,21 @@ export function PrefixPicker({
         </button>
       )}
       {prefix && (
-        <code className="rounded bg-accent px-1.5 py-0.5 font-pixel text-2xs text-foreground">
-          {formatTag(item.id, { prefixId })}
-        </code>
+        <div className="flex min-w-0 items-center gap-1">
+          <code className="min-w-0 flex-1 truncate rounded bg-accent px-1.5 py-0.5 font-pixel text-2xs text-foreground">
+            {tag}
+          </code>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="size-6 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+            aria-label={t('prefix.copyTag')}
+            title={t('prefix.copyTag')}
+            onClick={() => void copyTag()}
+          >
+            {copied ? <Check className="text-success" /> : <Copy />}
+          </Button>
+        </div>
       )}
     </div>
   )

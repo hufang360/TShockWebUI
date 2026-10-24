@@ -17,10 +17,14 @@ import {
   type PlayerLook,
   type PluginDataType,
   type PluginStatus,
+  type Requisition,
+  type RequisitionItem,
+  type RequestCapabilities,
   type RuntimeCommand,
   type ServerInfo,
   type ServerInfoExtra,
   type ServerStatus,
+  type ServerCapabilities,
   type Session,
   type SessionInfo,
   type WebAuthCapabilities,
@@ -303,6 +307,20 @@ export class MockTransport implements BackendTransport {
     }
   }
 
+  async capabilities(fresh = false): Promise<ServerCapabilities> {
+    void fresh
+    await delay(60)
+    const [messenger, batch, player, fish, requests, webauth] = await Promise.all([
+      this.pluginStatus(),
+      this.batchCapabilities(),
+      this.playerCapabilities(),
+      this.fishCapabilities(),
+      this.requestCapabilities(),
+      this.webauthCapabilities(),
+    ])
+    return { reachable: true, messenger, batch, player, fish, requests, webauth }
+  }
+
   async playerCapabilities(): Promise<PlayerCapabilities> {
     await delay(80)
     return { plugin: true, permission: true }
@@ -361,7 +379,7 @@ export class MockTransport implements BackendTransport {
 
   async fishCapabilities(): Promise<FishCapabilities> {
     await delay(80)
-    return { plugin: true, permission: true }
+    return { plugin: true, rest: true, permission: true }
   }
 
   async fishList(): Promise<FishShop> {
@@ -381,6 +399,131 @@ export class MockTransport implements BackendTransport {
     const good = MOCK_GOODS.find((g) => g.serial === serial)
     if (!good) throw new TshockRequestError('validation', `没有这个商品: ${serial}`)
     return { serial, name: good.desc, amount: Math.max(1, amount), cost: good.cost }
+  }
+
+  // ---------- 物资申请（Mock） ----------
+
+  #mockRequests: Requisition[] = [
+    {
+      id: 1,
+      account: 'Alice',
+      player: 'Alice',
+      items: [
+        { id: 29, stack: 300 },
+        { id: 75, stack: 100 },
+      ],
+      reason: '[Mock] 建城堡外墙',
+      note: '出生点东侧',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      reviewedBy: '',
+      reviewedAt: '',
+      denyReason: '',
+      deliveredAt: '',
+      deliveryError: '',
+      world: 'Mock World',
+    },
+    {
+      id: 2,
+      account: this.#session.username ?? 'Alice',
+      player: this.#session.username ?? 'Alice',
+      items: [{ id: 75, stack: 20 }],
+      reason: '[Mock] 做夜空装饰',
+      note: '',
+      status: 'denied',
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 86000000).toISOString(),
+      reviewedBy: 'Mock 服主',
+      reviewedAt: new Date(Date.now() - 86000000).toISOString(),
+      denyReason: '数量太多，先给 5 个',
+      deliveredAt: '',
+      deliveryError: '',
+      world: 'Mock World',
+    },
+  ]
+
+  async requestCapabilities(): Promise<RequestCapabilities> {
+    await delay(80)
+    return { plugin: true, submit: true, review: true }
+  }
+
+  async requestList(status?: string): Promise<Requisition[]> {
+    await delay(160)
+    const me = this.#session.username ?? 'Alice'
+    return this.#mockRequests
+      .filter((r) => r.account === me)
+      .filter((r) => !status || status === 'all' || r.status === status)
+      .map((r) => structuredClone(r))
+  }
+
+  async requestCreate(items: RequisitionItem[], reason: string, note?: string): Promise<Requisition> {
+    await delay(220)
+    if (!items.length) throw new TshockRequestError('validation', '请至少选择一种物品')
+    if (!reason.trim()) throw new TshockRequestError('validation', '请填写申请用途')
+    const me = this.#session.username ?? 'Alice'
+    const record: Requisition = {
+      id: Math.max(0, ...this.#mockRequests.map((r) => r.id)) + 1,
+      account: me,
+      player: me,
+      items: structuredClone(items),
+      reason: reason.trim(),
+      note: (note ?? '').trim(),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      reviewedBy: '',
+      reviewedAt: '',
+      denyReason: '',
+      deliveredAt: '',
+      deliveryError: '',
+      world: 'Mock World',
+    }
+    this.#mockRequests = [record, ...this.#mockRequests]
+    return structuredClone(record)
+  }
+
+  async requestCancel(id: number): Promise<Requisition> {
+    await delay(140)
+    const me = this.#session.username ?? 'Alice'
+    const record = this.#mockRequests.find((r) => r.id === id)
+    if (!record || record.account !== me) throw new TshockRequestError('validation', '申请不存在')
+    if (record.status !== 'pending') throw new TshockRequestError('validation', '只有待审核的申请可以撤回')
+    record.status = 'cancelled'
+    record.updatedAt = new Date().toISOString()
+    return structuredClone(record)
+  }
+
+  async requestListAll(status?: string): Promise<Requisition[]> {
+    await delay(160)
+    return this.#mockRequests
+      .filter((r) => !status || status === 'all' || r.status === status)
+      .map((r) => structuredClone(r))
+  }
+
+  async requestReview(id: number, decision: 'approve' | 'deny', reason?: string): Promise<Requisition> {
+    await delay(200)
+    const record = this.#mockRequests.find((r) => r.id === id)
+    if (!record) throw new TshockRequestError('validation', '申请不存在')
+    if (record.status !== 'pending') throw new TshockRequestError('validation', '该申请已处理')
+    record.status = decision === 'approve' ? 'delivered' : 'denied'
+    record.reviewedBy = 'Mock 服主'
+    record.reviewedAt = new Date().toISOString()
+    record.updatedAt = record.reviewedAt
+    if (decision === 'approve') record.deliveredAt = record.reviewedAt
+    else record.denyReason = reason?.trim() || '未说明原因'
+    return structuredClone(record)
+  }
+
+  async requestDeliver(id: number): Promise<Requisition> {
+    await delay(160)
+    const record = this.#mockRequests.find((r) => r.id === id)
+    if (!record) throw new TshockRequestError('validation', '申请不存在')
+    if (record.status !== 'approved') throw new TshockRequestError('validation', '只有已批准的申请可以补发')
+    record.status = 'delivered'
+    record.deliveredAt = new Date().toISOString()
+    record.updatedAt = record.deliveredAt
+    return structuredClone(record)
   }
 }
 

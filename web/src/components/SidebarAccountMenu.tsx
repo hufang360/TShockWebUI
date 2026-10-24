@@ -91,7 +91,7 @@ export function SidebarAccountMenu({
           <button
             type="button"
             aria-label={t('account.menu')}
-            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent"
           >
             {avatar}
             <span className="flex min-w-0 flex-1 flex-col">

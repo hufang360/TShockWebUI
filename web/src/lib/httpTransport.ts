@@ -16,12 +16,16 @@ import {
   type PlayerLook,
   type PluginDataType,
   type PluginStatus,
+  type Requisition,
+  type RequisitionItem,
+  type RequestCapabilities,
   type RuntimeCommand,
   type ServerEvent,
   type ServerInfo,
   type ServerInfoExtra,
   type ServerStatus,
   type Session,
+  type ServerCapabilities,
   type SessionInfo,
   type TshockErrorKind,
   type WebAuthCapabilities,
@@ -60,6 +64,7 @@ function kindFromCode(code: string | undefined): TshockErrorKind {
     case 'online_auth_denied':
     case 'online_auth_error':
     case 'fishshop_error':
+    case 'request_error':
       return 'validation'
     case 'online_auth_timeout':
       return 'timeout'
@@ -358,6 +363,11 @@ export class HttpTransport implements BackendTransport {
     return (await res.json()) as PluginStatus
   }
 
+  async capabilities(fresh = false): Promise<ServerCapabilities> {
+    const res = await request(`/capabilities${fresh ? '?fresh=1' : ''}`)
+    return (await res.json()) as ServerCapabilities
+  }
+
   async revokeSessions(id?: string, all = false): Promise<number> {
     const res = await request('/sessions/revoke', {
       method: 'POST',
@@ -416,6 +426,61 @@ export class HttpTransport implements BackendTransport {
       body: JSON.stringify({ serial, amount, args: args ?? '' }),
     })
     return (await res.json()) as FishBuyResult
+  }
+
+  async requestCapabilities(): Promise<RequestCapabilities> {
+    const res = await request('/requests/capabilities')
+    return (await res.json()) as RequestCapabilities
+  }
+
+  async requestList(status?: string): Promise<Requisition[]> {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    const res = await request(`/requests${qs}`)
+    const body = (await res.json()) as { requests: Requisition[] }
+    return body.requests ?? []
+  }
+
+  async requestCreate(items: RequisitionItem[], reason: string, note?: string): Promise<Requisition> {
+    const res = await request('/requests', {
+      method: 'POST',
+      body: JSON.stringify({ items, reason, note: note ?? '' }),
+    })
+    const body = (await res.json()) as { request: Requisition }
+    return body.request
+  }
+
+  async requestCancel(id: number): Promise<Requisition> {
+    const res = await request('/requests/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ id }),
+    })
+    const body = (await res.json()) as { request: Requisition }
+    return body.request
+  }
+
+  async requestListAll(status?: string): Promise<Requisition[]> {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    const res = await request(`/requests/all${qs}`)
+    const body = (await res.json()) as { requests: Requisition[] }
+    return body.requests ?? []
+  }
+
+  async requestReview(id: number, decision: 'approve' | 'deny', reason?: string): Promise<Requisition> {
+    const res = await request('/requests/review', {
+      method: 'POST',
+      body: JSON.stringify({ id, decision, reason: reason ?? '' }),
+    })
+    const body = (await res.json()) as { request: Requisition }
+    return body.request
+  }
+
+  async requestDeliver(id: number): Promise<Requisition> {
+    const res = await request('/requests/deliver', {
+      method: 'POST',
+      body: JSON.stringify({ id }),
+    })
+    const body = (await res.json()) as { request: Requisition }
+    return body.request
   }
 }
 

@@ -217,6 +217,7 @@ const LABELS: Record<string, Record<string, LabelPair>> = {
     list: { zh: '浏览货架', en: 'List goods' },
     ask: { zh: '询价', en: 'Ask price' },
     buy: { zh: '购买', en: 'Buy' },
+    // 仅 v1.6.2 ~ v1.6.6 有；新版插件已删除自助退款（仍保留补全，老服可用）。
     refund: { zh: '退款', en: 'Refund' },
     info: { zh: '钓鱼信息', en: 'Fish info' },
     jar: { zh: '鱼罐（查看 / 存 / 取）', en: 'Fish jar' },

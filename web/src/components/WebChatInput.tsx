@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { MessageCircle } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Send } from 'lucide-react'
 import {
   Button,
   InputGroup,
@@ -13,6 +14,9 @@ import { TshockRequestError, type BackendTransport } from '@/lib/tshock'
 
 interface WebChatInputProps {
   transport: BackendTransport
+  /** 受控文本；不传时由组件自己保存。 */
+  value?: string
+  onValueChange?: (value: string) => void
   /** 未登录 / 插件缺失时禁用。 */
   disabled?: boolean
   /**
@@ -24,6 +28,8 @@ interface WebChatInputProps {
   onSent?: () => void
   /** 紧凑模式（更矮的输入框）。 */
   compact?: boolean
+  /** 发送按钮左侧的附加操作（如指令 / 聊天模式切换）。 */
+  beforeSend?: ReactNode
   className?: string
 }
 
@@ -31,20 +37,25 @@ interface WebChatInputProps {
  * 网页发言输入框（指令页「动态」tab 底部）。
  *
  * - 发送到游戏内聊天（插件加前缀，默认 `[WebUI]`，与真实玩家区分）；
- * - 发送按钮在输入框内部右侧，圆形气泡图标；
+ * - 发送按钮在输入框内部右侧，使用与指令发送一致的主色飞机按钮；
  * - 失败保留输入，可就地「重试」，不造假成功；
  * - 插件缺失 / 版本过旧 / 未登录时禁用或给出可定位的提示。
  */
 export function WebChatInput({
   transport,
+  value,
+  onValueChange,
   disabled = false,
   pluginInstalled,
   onSent,
   compact = false,
+  beforeSend,
   className,
 }: WebChatInputProps) {
   const { t } = useI18n()
-  const [text, setText] = useState('')
+  const [internalText, setInternalText] = useState('')
+  const text = value ?? internalText
+  const setText = onValueChange ?? setInternalText
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -84,7 +95,12 @@ export function WebChatInput({
           void send()
         }}
       >
-        <InputGroup className={cn('rounded-full', compact && 'h-8')}>
+        <InputGroup
+          className={cn(
+            'h-11 rounded-full bg-card pr-1 pl-4 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring',
+            compact && 'h-8',
+          )}
+        >
           <InputGroupInput
             value={text}
             maxLength={200}
@@ -94,17 +110,18 @@ export function WebChatInput({
             className={compact ? 'text-xs' : undefined}
             onChange={(e) => setText(e.target.value)}
           />
-          <InputGroupAddon align="inline-end">
+          <InputGroupAddon align="inline-end" className="[&_button]:size-9">
+            {beforeSend}
             <Button
               type="submit"
               size="icon-sm"
-              variant="outline"
+              variant="primary"
               className="rounded-full"
               disabled={sending || disabled || text.trim().length === 0}
               aria-label={t('feed.chatSend')}
               title={t('feed.chatSend')}
             >
-              {sending ? <Spinner aria-hidden /> : <MessageCircle />}
+              {sending ? <Spinner aria-hidden /> : <Send />}
             </Button>
           </InputGroupAddon>
         </InputGroup>
@@ -113,13 +130,13 @@ export function WebChatInput({
         <p className={cn('flex flex-wrap items-center gap-2 text-destructive', compact ? 'text-2xs' : 'text-2xs')}>
           {error}
           {canRetry && (
-            <button type="button" className="cursor-pointer underline underline-offset-2" onClick={() => void send()}>
+            <button type="button" className="cursor-pointer rounded-sm underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => void send()}>
               {t('feed.chatRetry')}
             </button>
           )}
         </p>
       ) : notice ? (
-        <p className={compact ? 'text-2xs text-muted-foreground' : 'text-2xs text-muted-foreground'}>{notice}</p>
+        <p className="text-xs text-muted-foreground">{notice}</p>
       ) : null}
     </div>
   )

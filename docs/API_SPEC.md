@@ -12,7 +12,11 @@
 
 - 基址：同源，**相对路径 `/api`**（`http://IP:8080` 或 `https://域名` 都适用）。
 - 请求/响应体：`application/json; charset=utf-8`。
+- 缓存：所有 `/api/*` 的 JSON 响应都带 `Cache-Control: no-store`（响应可能随登录态变化，
+  例如 `/api/status` 有无 token 拿到的字段不同），浏览器不得复用。
 - 认证：`HttpOnly` Cookie `tswui_session`（`SameSite=Strict`）。浏览器 JS **读不到**，也不需要读。
+  **多服务器切换时按上游分 Cookie**：默认上游用 `tswui_session`，自定义上游用
+  `tswui_session_<8位hash>` —— 各服的会话并存、互不覆盖，也绝不把 A 服的 token 发往 B 服（见 §10）。
 - **多服务器切换（可选）**：请求头 `X-TSWUI-Target: http://host:port` 指定本次请求的 TShock 上游；
   缺省/空表示使用后端 `TSHOCK_URL`。后端仅在 `TSHOCK_ALLOW_CUSTOM_TARGETS=true` 时接受，
   并只允许 `http/https` + `host:port`（无路径/查询/账号信息，端口缺省 7878），详见第 10 节。
@@ -37,14 +41,15 @@
 | `bad_credentials` | 401 | 账号或密码错误 | 提示「账号或密码错误」 |
 | `no_api_permission` | 403 | 账号所属组缺 `tshock.rest.useapi` | 提示联系管理员赋权 |
 | `no_permission` | 403 | 已有 token 但缺所需权限（如 `tshock.rest.command`、`playermanager`） | 提示权限不足 |
-| `plugin_not_installed` | 501 | 服务器未安装对应第三方 TShock 插件（PlayerManager / FishShop）或信使插件 | 提示「未安装插件」，隐藏模块 |
-| `plugin_outdated` | 501 | 信使插件在装，但版本过旧缺少该端点/能力（如新版才有的 `/webui/chat`） | 提示「插件版本过旧，请升级」（`message` 含版本/能力） |
+| `plugin_not_installed` | 501 | 服务器未安装对应第三方 TShock 插件（PlayerManager / FishShop）或信使插件（含物资申请） | 提示「未安装插件」，隐藏模块 |
+| `plugin_outdated` | 501 | 插件在装，但版本过旧缺少该端点/能力（如新版才有的 `/webui/chat`；或 v1.6.2 之前的 FishShop 没有 REST 接口） | 提示「插件版本过旧，请升级」（`message` 含版本/能力） |
 | `plugin_protocol_mismatch` | 501 | 信使插件与后端协议不兼容 | 提示升级插件或后端；设置页「信使插件诊断」可查看两侧版本 |
 | `player_offline` | 404 | 在线授权：目标玩家不在线 | 提示「该玩家不在线」 |
 | `online_auth_denied` | 403 | 在线授权：玩家在游戏内拒绝 | 提示「玩家已拒绝授权」 |
 | `online_auth_timeout` | 504 | 在线授权：等待确认超时 | 提示重新发起 |
 | `online_auth_error` | 400/502 | 在线授权：其它插件业务失败 / 密钥不匹配 | 展示后端 `message` |
 | `fishshop_error` | 400 | 鱼店业务失败（钱不够 / 商品不存在 / 商店打烊） | `message` 原样展示 |
+| `request_error` | 400 | 物资申请业务失败（超出数量/待审上限、物品被禁用、申请已处理等） | `message` 原样展示 |
 | `rate_limited` | 429 | 登录尝试或指令执行过于频繁 | 提示稍后重试，禁用按钮 |
 | `tshock_unavailable` | 502 | TShock 不可达 / 5xx | 提示服务不可用 |
 | `tshock_timeout` | 504 | 出站超时 | 提示重试，保留输入 |
@@ -207,6 +212,8 @@ The token 仍只在后端内存；插件铸造的 token 与 `/v2/token/create` �
 - 若存在会话，后端会调用 TShock `/tokentest` 校验上游 token：
   - token 明确失效（401/403）→ 删除会话、清 Cookie，返回 `authenticated:false`
     （**TShock 重启后刷新页面即会回到登录**）。
+  - 会话**与上游绑定**：本次请求的上游（`X-TSWUI-Target`）没有自己的会话时，直接返回
+    `authenticated:false`，既不会串用别的服的 token，也不会把别的服踢下线。
   - TShock 不可达 / 超时 → **不强制登出**（保留会话，避免误清）。
 
 ---
@@ -237,8 +244,11 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
   { "reachable": false }
   ```
   （前端据此显示「服务离线」，不当作请求失败。）
-- 有会话则带 token 请求；无会话或 `EnableTokenEndpointAuthentication=true` 导致 401 时，
-  也返回 `reachable: true`，但版本字段为 `null`（登录后再次调用即可拿到）。
+- **有会话就一定带该会话的 token**（`/v2/server/status` 允许匿名，但带上 token 才能让 TShock 识别调用者）；
+  无会话或 `EnableTokenEndpointAuthentication=true` 导致 401 时，也返回 `reachable: true`，
+  但版本字段为 `null`（登录后再次调用即可拿到）。
+  响应带 `Cache-Control: no-store`，避免浏览器复用登录前的匿名响应（见 §0）。
+  回归测试：`server/internal/api/handlers_test.go` 的 `TestStatusForwardsSessionToken`。
 
 ---
 
@@ -333,7 +343,10 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 ## 5.4 `POST /api/player/import`
 
 解析浏览器上传的本地角色存档（.plr），返回与 §5.2 **相同结构**的 `PlayerLook`，供前端展示。
-**仅展示**：不写入 TShock / 不落库 / 不修改服务器；**不要求 `playermanager`**，只需登录（CSRF 头照常要求）。
+**仅展示**：不写入 TShock / 不落库 / 不修改服务器（解析完即丢弃）。
+
+- **公开端点：不需要登录**（「查看存档」是给所有人的工具：谁都能上传自己的 .plr 看人物 / 属性 / 背包），
+  也不要求 `playermanager`；非 GET 仍要求 `X-Requested-With: tswui`（CSRF 中间件，只允许同源 fetch）。
 
 - 请求体：`.plr` 原始二进制（`Content-Type: application/octet-stream`），上限 4 MiB；超出按 `400 bad_request`。
 - 成功 `200`：`PlayerLook`（`online=false`，`spawnX/spawnY=-1`）。
@@ -341,7 +354,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
     猪猪 / 保险箱 / 熔炉 / 虚空袋（垃圾桶与配装不存于 .plr，展示为空）。
   - 颜色编码与 §5.2 相同（int32 小端 RGBA）。
 - 非法 / 加密不匹配 / 版本不支持 / 截断 → `400 bad_request`（`message` 含原因）。
-- 限流：与 §5.2 共用按会话的指令限流器。
+- 限流：按**客户端 IP** 走指令限流器（`CommandMaxPerMin`），避免公开端点被刷。
 - 实现：`server/internal/plr`（AES-128-CBC，key/IV = `UnicodeEncoding("h3y_gUyZ")`，字段门槛到 release 326）。
 
 ---
@@ -353,23 +366,32 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 > 插件接入细节（权限/字段/坑）见 [插件-鱼店.md](插件-鱼店.md)。
 
 实时探测第三方插件 FishShop 的可用性（需要会话）。后端用**空 `serial`** 调一次
-`POST {TSHOCK_URL}/v3/fishshop/ask`：404 = 未安装，403 = 无权限，400 = 存在
-（插件报「缺少 serial 参数」）。
+`POST {TSHOCK_URL}/fishshop/ask`（老版本 `v1.6.2 ~ v1.6.6` 的 `/v3/fishshop/ask` 由后端自动回退）：
+403 = 无权限，400 = 存在（插件报「缺少 serial 参数」）。
+
+新旧前缀都 `404` 时再跑一次只读的 rawcmd `/fish help`，用来区分：
+- 指令不存在 → 没装插件；
+- 指令能跑 → 装了老版本插件（v1.6.2 之前只有游戏内指令、没有 REST 接口）。
 
 成功 `200`：
 ```json
-{ "plugin": true, "permission": false }
+{ "plugin": true, "rest": true, "permission": false }
 ```
-- `plugin=false` → 未安装 FishShop，前端提示并在设置里禁用「鱼店」模块开关。
-- `permission=false` → 已安装但当前用户组缺 `fishshop.rest.use`。
+- `plugin=false` → 未安装 FishShop（或无法确认），前端提示并在设置里禁用「鱼店」模块开关。
+- `plugin=true, rest=false` → 装了**老版本插件**（没有 REST 接口），前端提示「版本过旧」；
+  右侧指令卡片（`/fish list` 等）不依赖接口，仍可用。
+- `permission=false` → 已安装且提供 REST，但**老版本插件**缺 `fishshop.rest.use`（新版插件不需要任何
+  自定义权限，探测走「缺 serial → 400」分支，`permission` 恒为 `true`）。
+- 插件上游状态码：`401` 没带 token；`403` 只表示 token 无效 / 用户组已变动（老版本缺权限也是 403，
+  后端用 `/tokentest` 区分后才会给 `permission=false`）。
 - 上游 token 失效 → `401 token_invalid`（后端已清会话）。
 
 ---
 
 ## 5.6 `GET /api/fish/list`
 
-查看鱼店货架（需要会话；上游需要 `fishshop.rest.use`）。后端转发到
-`POST {TSHOCK_URL}/v3/fishshop/list`。
+查看鱼店货架（需要会话）。上游**新版不需要任何自定义权限**（只要 token 有效；老版本需要 `fishshop.rest.use`）。
+后端转发到 `POST {TSHOCK_URL}/fishshop/list`（老版本回退 `/v3/fishshop/list`）。
 
 成功 `200`：
 ```json
@@ -377,7 +399,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
   "name": "鱼店", "total": 2,
   "goods": [{ "serial": 1, "name": "生命水晶", "icon": "[i:29]", "buyMax": 999, "needArgs": false,
               "map": ["物品"], "desc": "[i:29] 生命水晶 x5", "cost": "5 金币", "unlock": "",
-              "comment": "", "refund": false }]
+              "comment": "" }]
 }
 ```
 - `icon` 是插件配置的商品图标标签（`[i:ID]`，可能为空）。服务类商品（时间/天气/buff 等）
@@ -385,7 +407,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 - `buyMax` 单次最多可购买件数（1 = 不显示数量调节框）。
 - `needArgs` = 指令类商品含 `{args}`/`{0}` 占位符，购买时需填参数（此时不再调数量）。
 - `comment`（备注）也可能含 `[i:..]` 物品标签，前端同样渲染成图标。
-- 未安装插件 → `501 plugin_not_installed`；无权限 → `403 no_permission`。
+- 未安装插件 / 版本过旧 → `501 plugin_not_installed` / `501 plugin_outdated`；无权限 → `403 no_permission`。
 - 业务失败（如「商店打烊」）→ `400 fishshop_error`，`message` 为上游原文。
 
 ---
@@ -398,8 +420,9 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 
 ## 5.8 `POST /api/fish/buy`
 
-为自己购买（需要会话；上游需要 `fishshop.rest.buy`）。**会扣费，故与 `/api/command`
-共用按会话的限流器**。
+为自己购买（需要会话）。上游**新版不需要任何自定义权限**（老版本需要 `fishshop.rest.buy`）；
+只能买 token 同名的在线玩家，SSC 开启时游客会被插件拒绝（400「游客无法访问鱼店」）。
+**会扣费，故与 `/api/command` 共用按会话的限流器**。
 
 请求：
 ```json
@@ -440,6 +463,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 | status | 含义 | 触发 |
 | --- | --- | --- |
 | `ok` | 执行成功 | TShock 200 且输出非「拒绝/无效」 |
+| `command_not_found` | 指令不存在（多为提供该指令的插件未安装） | TShock 200 且输出含 `Invalid command entered` / `输入的命令无效` |
 | `command_error` | 指令语法/参数错误 | TShock 200 但输出含 `Invalid command` 等，或非 2xx 的指令级错误 |
 | `no_permission` | 权限不足 | TShock 403 且 body 不含 token |
 | `token_invalid` | token 失效 | TShock 403 且 body 含 token（后端清会话） |
@@ -452,7 +476,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 1. 解析 `cmd` 首 token（去 `/`、查别名，用内嵌 `commands.json`）。
 2. 空指令 → `{status:"rejected", message:"请输入指令"}`，**不调用 TShock**。
 3. `allowServer === false` → `{status:"rejected", message:"/<name> 只能在游戏内执行"}`，**不调用 TShock**。
-4. 未知/插件指令（不在 `commands.json`，如 `/fish`）→ **不拒绝**，交由 TShock 判定（不存在 → `command_error`）。
+4. 未知/插件指令（不在 `commands.json`，如 `/fish`）→ **不拒绝**，交由 TShock 判定（不存在 → `command_not_found`）。
 5. 否则 `POST {TSHOCK_URL}/v3/server/rawcmd?cmd=<urlenc>&token=<token>`，按上表映射。
 6. `token_invalid` 时删除会话并清 Cookie（响应里仍返回 200 + status）。
 
@@ -484,7 +508,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
   { "status": "rejected", "output": [], "message": "/i 只能在游戏内执行" }
 ] }
 ```
-- 每条结果的 `status` 语义与 `/api/command` 完全相同（`ok` / `command_error` / `no_permission` / …）。
+- 每条结果的 `status` 语义与 `/api/command` 完全相同（`ok` / `command_not_found` / `command_error` / `no_permission` / …）。
 - Tier A：已知 `allowServer=false` 的指令由后端直接标为 `rejected`，**不发往插件**；其余发往 `/webui/batch`。
 - 逐条权限仍由 TShock 按当前 token 用户组判定（与 rawcmd 一致，**不提权、不绕过 `AllowServer`**）。
 
@@ -496,7 +520,37 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 
 ---
 
-## 6.2 `GET /api/batch/capabilities`
+## 6.2 `GET /api/capabilities`（统一能力矩阵，需登录）
+
+一次请求返回这台服务器上**所有可选能力**的可用性，供前端启动 / 首页 / 设置页共用
+（收敛前要分别打 `batch` / `player` / `fish` / `requests` / `webauth` 五个探测端点）。
+
+```json
+{
+  "reachable": true,
+  "messenger": { "installed": true, "legacy": false, "version": "0.1.0", "protocol": 1,
+                 "minProtocol": 1, "capabilities": ["batch", "chat", "commands"],
+                 "backendProtocol": 1, "compatible": true, "reason": "ok" },
+  "batch":    { "plugin": true, "ingame": false },
+  "player":   { "plugin": true, "permission": true },
+  "fish":     { "plugin": true, "rest": true, "permission": true },
+  "requests": { "plugin": true, "submit": true, "review": true },
+  "webauth":  { "plugin": true }
+}
+```
+
+- 各字段与对应分端点完全同构（`messenger` = `GET /api/plugin/status` 原样返回）。
+- 各探测**并行**执行；单个探测失败只降级为「不可用」，不让整次请求失败。
+- `reachable=false`：上游 TShock 不可达 / 超时 → 其余字段不可信，前端**不得**据此隐藏模块。
+- `?fresh=1` 绕过 3 秒微缓存（设置页「重新检测」用）；上游不可达时不缓存。
+- 前端：`transport.capabilities(fresh?)`（`web/src/lib/transport.ts`）。
+  App 用它决定「统一执行」自动开启与模块自动激活；首页用它判断 `/lookbag`（PlayerManager）
+  与批量执行是否可用；设置页用它渲染模块状态。
+- 返回需要会话（401 `not_authenticated`）；各分端点仍保留（页面内「重新检测」按需单点探测）。
+
+---
+
+## 6.2.1 `GET /api/batch/capabilities`
 
 探测服务器是否安装了支持批量执行的信使插件（无需会话）：
 
@@ -570,7 +624,69 @@ invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosse
 
 ---
 
-## 6.4 `POST /api/command` 的 `ingame`（Tier B，默认关）
+## 6.4 物资申请（需登录，自研信使插件 WebUI）
+
+玩家向服主申请建筑 / 装备等物品；审核通过后由插件在游戏内发放（在线直接给，离线下次登录给）。
+权限仍由插件判定：提交需要 `webui.request.use`，审核 / 补发需要 `webui.request.review`。
+
+### `GET /api/requests/capabilities`
+```json
+{ "plugin": true, "submit": true, "review": false }
+```
+- `plugin=false`：插件未安装 / 旧版插件（无 `requests` 能力）；此时附 `reason` 说明原因
+  （`not_installed` / `protocol_mismatch` / `missing_capabilities`，与信使插件握手同一套取值）。
+- 插件声明 `requests` 但缺端点 → `501 plugin_outdated`。
+- `submit=false`：当前用户组缺 `webui.request.use`。
+- `review=false`：当前用户组缺 `webui.request.review`（或旧插件无 `requests_review` 能力）。
+
+### `GET /api/requests?status=pending|approved|delivered|denied|cancelled|all`
+我的申请（最多 50 条，最新在前）：`{ requests: Requisition[] }`。
+
+### `POST /api/requests`
+提交申请（需要 `X-Requested-With: tswui`）：
+```json
+{
+  "items": [{ "id": 9, "stack": 300 }, { "id": 30, "stack": 100 }],
+  "reason": "建城堡外墙",
+  "note": "出生点东侧 200 格"
+}
+```
+- `items` 1–10 行；`id` 必须是有效物品；`stack` 1–999999（插件再按 `maxStack × 10 组` 校验）。
+- `reason` 必填 1–200 字符；`note` ≤200；不含换行 / 控制字符。
+- 插件侧限额：每人 3 条待审、每天 10 条、两次提交至少间隔 10 秒、全服 200 条待审（均可配置）。
+- 响应：`{ request: Requisition }`；业务失败 → `400 request_error`（保留插件原文）。
+
+### `POST /api/requests/cancel`
+撤回自己的待审申请：`{ "id": 12 }` → `{ "request": Requisition }`。
+
+### `GET /api/requests/all?status=...`
+审核列表（最多 100 条，最新在前）：`{ requests: Requisition[] }`；需要 `webui.request.review`。
+
+### `POST /api/requests/review`
+审核：`{ "id": 12, "decision": "approve" | "deny", "reason": "数量太多" }` → `{ "request": Requisition }`。
+- `approve`：在线玩家立即发放（`RequestAutoDeliver=true`）；离线玩家状态变 `approved`，下次登录发放。
+- `deny`：状态 `denied`，`reason` 必填（前端强制，插件缺省「未说明原因」）。
+
+### `POST /api/requests/deliver`
+补发已批准未发放的申请：`{ "id": 12 }` → `{ "request": Requisition }`。
+
+`Requisition` 字段：
+```json
+{
+  "id": 12, "account": "alice", "player": "Alice",
+  "items": [{ "id": 9, "stack": 300 }],
+  "reason": "建城堡外墙", "note": "出生点东侧 200 格",
+  "status": "pending", "createdAt": "2025-10-20T10:00:00Z", "updatedAt": "2025-10-20T10:00:00Z",
+  "reviewedBy": "", "reviewedAt": "", "denyReason": "", "deliveredAt": "", "deliveryError": "",
+  "world": "world.wld"
+}
+```
+- `status ∈ pending|approved|delivered|denied|cancelled`。
+- 发放失败（如物品之后被禁用）保留 `approved` 并写 `deliveryError`，审核人可修正后补发。
+
+---
+
+## 6.5 `POST /api/command` 的 `ingame`（Tier B，默认关）
 
 `cmd` 之外可传 `ingame: true`，表示这条指令 `allowServer=false`，请以**真实在线玩家**身份执行。
 - 仅当 `TSWUI_ALLOW_INGAME_COMMANDS=true`（且插件侧开启）时生效；否则返回 `rejected`。
@@ -602,7 +718,7 @@ export interface BackendTransport {
   login(username: string, password: string): Promise<{ username: string }>
   loginOnline(username: string, signal?: AbortSignal): Promise<{ username: string }> // 见第 1.1 节
   webauthCapabilities(): Promise<WebAuthCapabilities>                              // 见第 1.2 节
-  batchCapabilities(): Promise<BatchCapabilities>                                  // 见第 6.2 节
+  batchCapabilities(): Promise<BatchCapabilities>                                  // 见第 6.2.1 节
   runBatch(cmds: string[]): Promise<CommandResult[]>                               // 见第 6.1 节
   logout(): Promise<void>
 
@@ -619,6 +735,7 @@ export interface BackendTransport {
   revokeSessions(id?: string, all?: boolean): Promise<number>        // 见第 6.3 节
   pluginStatus(): Promise<PluginStatus>                              // 见第 1.3 节
 
+  capabilities(fresh?: boolean): Promise<ServerCapabilities>           // 见第 6.2 节（统一能力矩阵）
   playerCapabilities(): Promise<PlayerCapabilities>                    // 见第 5.1 节
   playerLook(name: string): Promise<PlayerLook>                        // 见第 5.2 节
   playerExport(name: string): Promise<{ filename: string; blob: Blob }> // 见第 5.3 节
@@ -628,6 +745,14 @@ export interface BackendTransport {
   fishList(): Promise<FishShop>                                        // 见第 5.6 节
   fishAsk(serial: number): Promise<FishGood>                            // 见第 5.7 节
   fishBuy(serial: number, amount: number, args?: string): Promise<FishBuyResult> // 见第 5.8 节
+
+  requestCapabilities(): Promise<RequestCapabilities>                    // 见第 6.4 节
+  requestList(status?: string): Promise<Requisition[]>                  // 见第 6.4 节
+  requestCreate(items: RequisitionItem[], reason: string, note?: string): Promise<Requisition>
+  requestCancel(id: number): Promise<Requisition>
+  requestListAll(status?: string): Promise<Requisition[]>
+  requestReview(id: number, decision: 'approve' | 'deny', reason?: string): Promise<Requisition>
+  requestDeliver(id: number): Promise<Requisition>
 }
 ```
 
@@ -649,14 +774,15 @@ export interface BackendTransport {
 
 - [ ] 密码只在 `POST /api/login` 的 body 中；后端日志不记录 body 与 query。
 - [ ] TShock token 只存在于后端内存；不出现在任何响应体、Cookie 值以外的位置。
-- [ ] Cookie：`HttpOnly`、`SameSite=Strict`、`Path=/`；HTTPS 时 `Secure`。
+- [ ] Cookie：`HttpOnly`、`SameSite=Strict`、`Path=/`；HTTPS 时 `Secure`；
+      多服务器切换时按上游分名（`tswui_session` / `tswui_session_<hash>`），token 不跨服使用。
 - [ ] 所有非 GET 请求校验 `X-Requested-With: tswui`。
 - [ ] 响应安全头：`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`CSP`。
 - [ ] 登录按 IP 限流；`429` 时不泄露账号信息。
 - [ ] 不提供通用 URL 转发 / 代理端点。
 - [ ] 玩家管理（`/api/player/*`）复用**当前会话的 token**，不引入任何管理员身份；
       权限完全由上游 TShock / PlayerManager 判定，后端区分 `plugin_not_installed`(501) 与 `no_permission`(403)。
-- [ ] 会话 TTL 与上限生效；`token_invalid` 立即清会话。
+- [ ] 会话 TTL 与上限生效；`token_invalid` 立即清会话；会话绑定上游（上游不符按未登录处理）。
 - [ ] 启动日志脱敏。
 
 ---
@@ -680,5 +806,8 @@ export interface BackendTransport {
 - 可选请求头，适用于所有 `/api/*`，值形如 `127.0.0.1:7878` / `http://1.2.3.4:7878` / `https://host:7878`。
 - 后端规范化：只接受 `http`/`https`，不允许路径、查询、片段与账号信息；端口缺省 `7878`。
 - `allowCustom=false` 或地址非法 → `400 bad_request`，不发往任何 TShock。
-- 登录后切到另一台上游：旧 TShock token 对新上游无效，后端会在 `/api/session` 校验时清会话，
-  前端提示重新登录（token 永远只在后端内存）。
+- **每台上游各有一条会话**（Cookie 名按上游派生，见 §0）。切到另一台上游时：
+  - 该上游之前登录过 → `/api/session` 直接返回已登录，不弹登录框；
+  - 没登录过 → 返回 `authenticated:false`，前端提示登录；
+  - 当前上游的 token **不会**发往其它上游；`/api/logout` 也只清当前上游那条会话与 Cookie。
+  token 永远只在后端内存（`session.Store`，进程重启即失效）。

@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { DEFAULT_MODULES } from '@/lib/modules'
 import { playerStubs } from '@/test/playerStubs'
-import type { BackendTransport } from '@/lib/tshock'
+import type { BackendTransport, ServerCapabilities } from '@/lib/tshock'
 import type { Settings } from '@/types'
 import { APP_VERSION } from '@/lib/version'
 import { SettingsPage } from './SettingsPage'
@@ -38,6 +38,21 @@ function fakeTransport(overrides: Partial<BackendTransport> = {}): BackendTransp
   }
 }
 
+/**
+ * 只改某几项能力的传输层：SettingsPage 现在读统一能力矩阵（/api/capabilities），
+ * 不再分别调 player/fish/batch/requests 的探测端点。
+ */
+function capsTransport(
+  patch: Partial<ServerCapabilities>,
+  overrides: Partial<BackendTransport> = {},
+): BackendTransport {
+  const base = fakeTransport(overrides)
+  return {
+    ...base,
+    capabilities: async () => ({ ...(await base.capabilities()), ...patch }),
+  }
+}
+
 afterEach(() => {
   localStorage.clear()
   vi.restoreAllMocks()
@@ -65,13 +80,13 @@ describe('SettingsPage 未登录', () => {
     )
 
     expect(screen.getByText('请先登录！')).toBeTruthy()
-    expect(screen.queryByText('统一执行')).toBeNull()
+    expect(screen.queryByText('批量执行卡片')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '登录' }))
     expect(onLogin).toHaveBeenCalledTimes(1)
   })
 })
 
-describe('SettingsPage 统一执行（批量执行开关）', () => {
+describe('SettingsPage 批量执行卡片', () => {
   const renderSettings = (transport: BackendTransport) =>
     render(
       <I18nProvider lang="zh">
@@ -95,29 +110,31 @@ describe('SettingsPage 统一执行（批量执行开关）', () => {
 
   it('插件已安装时开关可用', async () => {
     renderSettings(fakeTransport())
-    const sw = await screen.findByRole('switch', { name: '统一执行' })
+    const sw = await screen.findByRole('switch', { name: '批量执行卡片' })
     await waitFor(() => expect(sw.hasAttribute('disabled')).toBe(false))
   })
 
   it('插件未安装时开关禁用并提示', async () => {
-    renderSettings(fakeTransport({ batchCapabilities: async () => ({ plugin: false }) }))
-    const sw = await screen.findByRole('switch', { name: '统一执行' })
+    renderSettings(capsTransport({ batch: { plugin: false } }))
+    const sw = await screen.findByRole('switch', { name: '批量执行卡片' })
     await waitFor(() => expect(sw.hasAttribute('disabled')).toBe(true))
     expect(screen.getByText('需服务器安装信使插件后可用')).toBeTruthy()
   })
 
-  it('统一执行位于「数据刷新」卡片内（不在界面偏好）', async () => {
-    renderSettings(fakeTransport({ batchCapabilities: async () => ({ plugin: true }) }))
-    const sw = await screen.findByRole('switch', { name: '统一执行' })
+  it('批量执行卡片位于「执行行为」卡片内', async () => {
+    renderSettings(capsTransport({ batch: { plugin: true, ingame: true } }))
+    const sw = await screen.findByRole('switch', { name: '批量执行卡片' })
     const card = sw.closest('[data-slot="card"]')
-    expect(card?.textContent).toContain('数据刷新')
+    expect(card?.textContent).toContain('执行行为')
+    expect(card?.textContent).not.toContain('数据刷新')
     expect(card?.textContent).not.toContain('界面偏好')
   })
 
-  it('两栏结构：激活模块在左列，界面偏好 / 数据刷新 / 账户在右列', async () => {
-    renderSettings(fakeTransport({ batchCapabilities: async () => ({ plugin: true }) }))
+  it('两栏结构：激活模块在左列，界面偏好 / 执行行为 / 数据刷新 / 账户在右列', async () => {
+    renderSettings(capsTransport({ batch: { plugin: true, ingame: true } }))
     const accountCard = (await screen.findByText('在线授权 / 账户')).closest('[data-slot="card"]')
     const prefCard = screen.getByText('界面偏好').closest('[data-slot="card"]')
+    const executionCard = screen.getByText('执行行为').closest('[data-slot="card"]')
     const refreshCard = screen.getByText('数据刷新').closest('[data-slot="card"]')
     const activateCard = screen.getByText('激活模块').closest('[data-slot="card"]')
 
@@ -126,9 +143,10 @@ describe('SettingsPage 统一执行（批量执行开关）', () => {
     const grid = rightCol?.parentElement
 
     expect(grid?.className).toContain('xl:grid-cols-[minmax(0,1fr)_360px]')
-    // 左列只放激活模块；右列含界面偏好 / 数据刷新 / 账户，且为 grid 的最后一列。
+    // 左列只放激活模块；右列含界面偏好 / 执行行为 / 数据刷新 / 账户，且为 grid 的最后一列。
     expect(leftCol).not.toBe(rightCol)
     expect(prefCard?.parentElement).toBe(rightCol)
+    expect(executionCard?.parentElement).toBe(rightCol)
     expect(refreshCard?.parentElement).toBe(rightCol)
     expect(grid?.lastElementChild).toBe(rightCol)
   })
@@ -143,10 +161,7 @@ describe('SettingsPage 激活模块', () => {
           settings={settings}
           onChange={vi.fn()}
           serverId="default"
-          transport={fakeTransport({
-            playerCapabilities: async () => ({ plugin: true, permission: true }),
-            fishCapabilities: async () => ({ plugin: true, permission: true }),
-          })}
+          transport={capsTransport({})}
           authenticated
           modules={DEFAULT_MODULES}
           onModulesChange={onModulesChange}
@@ -172,10 +187,7 @@ describe('SettingsPage 激活模块', () => {
           settings={settings}
           onChange={vi.fn()}
           serverId="default"
-          transport={fakeTransport({
-            playerCapabilities: async () => ({ plugin: true, permission: true }),
-            fishCapabilities: async () => ({ plugin: true, permission: true }),
-          })}
+          transport={capsTransport({})}
           authenticated
           modules={DEFAULT_MODULES}
           onModulesChange={vi.fn()}
@@ -194,23 +206,19 @@ describe('SettingsPage 激活模块', () => {
     expect(onModuleUserSet).toHaveBeenCalledWith('players')
   })
 
-  it('未安装插件的模块开关禁用并提示', async () => {
+  it('插件未安装时仍可打开模块开关', async () => {
+    const onModulesChange = vi.fn()
     render(
       <I18nProvider lang="zh">
         <SettingsPage
           settings={settings}
           onChange={vi.fn()}
           serverId="default"
-          transport={fakeTransport({
-            playerCapabilities: async () => ({ plugin: false, permission: false }),
-            fishCapabilities: async () => ({ plugin: true, permission: true }),
-          })}
+          transport={capsTransport({ player: { plugin: false, permission: false } })}
           authenticated
           modules={DEFAULT_MODULES}
-          onModulesChange={vi.fn()}
-
+          onModulesChange={onModulesChange}
           customModules={[]}
-
           onCustomModulesChange={vi.fn()}
           onTokenInvalid={vi.fn()}
           onLogin={vi.fn()}
@@ -219,16 +227,47 @@ describe('SettingsPage 激活模块', () => {
     )
 
     const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
-    await waitFor(() => expect(sw.disabled).toBe(true))
+    await waitFor(() => expect(sw.disabled).toBe(false))
     expect(screen.getByText('未安装')).toBeTruthy()
+    fireEvent.click(sw)
+    expect(onModulesChange).toHaveBeenCalledWith({ byServer: { default: ['players'] } })
   })
 
-  it('切换服务器后重新探测（不同服务器插件不同）', async () => {
+  it('插件移除后，曾经开启的模块仍可关闭', async () => {
+    const onModulesChange = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={capsTransport({ player: { plugin: false, permission: false } })}
+          authenticated
+          modules={{ byServer: { default: ['players'] } }}
+          onModulesChange={onModulesChange}
+          customModules={[]}
+          onCustomModulesChange={vi.fn()}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
+    await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'))
+    expect(sw.disabled).toBe(false)
+    fireEvent.click(sw)
+    expect(onModulesChange).toHaveBeenCalledWith({ byServer: {} })
+  })
+
+  it('切换服务器后重新探测（不同服务器插件不同），开关始终可操作', async () => {
     let server = 'online'
     const transport = fakeTransport({
-      playerCapabilities: async () =>
-        server === 'online' ? { plugin: true, permission: true } : { plugin: false, permission: false },
-      fishCapabilities: async () => ({ plugin: true, permission: true }),
+      capabilities: async () => ({
+        ...(await playerStubs.capabilities()),
+        player:
+          server === 'online' ? { plugin: true, permission: true } : { plugin: false, permission: false },
+      }),
     })
     const view = (serverId: string) => (
       <I18nProvider lang="zh">
@@ -254,10 +293,11 @@ describe('SettingsPage 激活模块', () => {
     const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
     await waitFor(() => expect(sw.disabled).toBe(false))
 
-    // 切到本地服务器：玩家管理插件不存在 → 开关变灰。
+    // 切到本地服务器：插件不存在，但开关仍可操作。
     server = 'local'
     rerender(view('local'))
-    await waitFor(() => expect(screen.getByRole('switch', { name: '玩家管理' }).hasAttribute('disabled')).toBe(true))
+    await waitFor(() => expect(screen.getByText('未安装')).toBeTruthy())
+    expect(screen.getByRole('switch', { name: '玩家管理' }).hasAttribute('disabled')).toBe(false)
   })
 
   it('服务器动态刷新间隔：默认组不能选 1 分钟', async () => {
@@ -339,9 +379,13 @@ describe('SettingsPage 激活模块', () => {
       </I18nProvider>,
     )
 
+    const create = screen.getByRole('button', { name: /创建模块/ })
+    expect(create.hasAttribute('disabled')).toBe(true)
     fireEvent.change(screen.getByLabelText('模块名称'), { target: { value: '我的模块' } })
+    expect(create.hasAttribute('disabled')).toBe(true)
     fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'time' } })
-    fireEvent.click(screen.getByRole('button', { name: /创建模块/ }))
+    expect(create.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(create)
 
     expect(onCustomModulesChange).toHaveBeenCalledTimes(1)
     const created = onCustomModulesChange.mock.calls[0][0] as { id: string; name: string }[]
@@ -378,6 +422,37 @@ describe('SettingsPage 激活模块', () => {
     const input = screen.getByDisplayValue('旧名')
     fireEvent.change(input, { target: { value: '新名' } })
     expect(onCustomModulesChange).toHaveBeenCalledWith([{ id: 'm:1', name: '新名', command: '/old', desc: '' }])
+  })
+
+  it('自定义模块可用下移按钮调整侧栏顺序', () => {
+    const onCustomModulesChange = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={fakeTransport({})}
+          authenticated
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          customModules={[
+            { id: 'm:1', name: '模块A', command: '/a', desc: '' },
+            { id: 'm:2', name: '模块B', command: '/b', desc: '' },
+          ]}
+          onCustomModulesChange={onCustomModulesChange}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    const first = screen.getByDisplayValue('模块A').closest('li') as HTMLElement
+    fireEvent.click(within(first).getByRole('button', { name: '下移' }))
+    expect(onCustomModulesChange).toHaveBeenCalledWith([
+      { id: 'm:2', name: '模块B', command: '/b', desc: '' },
+      { id: 'm:1', name: '模块A', command: '/a', desc: '' },
+    ])
   })
 
   it('修改自定义模块主指令会同步自动生成的「帮助」卡片', async () => {

@@ -9,16 +9,24 @@ export function Notice({
   icon,
   title,
   children,
+  action,
 }: {
   icon: ReactNode
   title: string
   children?: ReactNode
+  /** 提示下方的操作（如「重新检测」）。 */
+  action?: ReactNode
 }) {
   return (
     <Alert variant="warning">
       {icon}
       <AlertTitle>{title}</AlertTitle>
-      {children && <AlertDescription>{children}</AlertDescription>}
+      {(children || action) && (
+        <AlertDescription>
+          {children}
+          {action}
+        </AlertDescription>
+      )}
     </Alert>
   )
 }

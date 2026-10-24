@@ -9,6 +9,7 @@ build/
 
 # 本机 Agent 技能（不入版本管理）
 .agents/
+.pi/
 
 # 单文件构建时前端产物被拷入此处（server/main.go 用 //go:embed 内嵌），不入库
 server/internal/webdist/*

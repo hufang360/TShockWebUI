@@ -248,6 +248,29 @@ describe('HttpTransport 玩家管理（PlayerManager）', () => {
     await expect(t.playerCapabilities()).resolves.toEqual({ plugin: true, permission: false })
   })
 
+  it('capabilities 解析统一能力矩阵；fresh 追加 ?fresh=1', async () => {
+    const spy = vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse({
+        reachable: true,
+        messenger: { installed: true, protocol: 1, capabilities: [] },
+        batch: { plugin: true, ingame: false },
+        player: { plugin: true, permission: true },
+        fish: { plugin: false, rest: false, permission: false },
+        requests: { plugin: true, submit: true, review: false },
+        webauth: { plugin: true },
+      }),
+    )
+    vi.stubGlobal('fetch', spy)
+    const t = new HttpTransport()
+    const caps = await t.capabilities()
+    expect(caps.fish.plugin).toBe(false)
+    expect(caps.batch.ingame).toBe(false)
+    expect(String(spy.mock.calls[0][0])).toMatch(/\/api\/capabilities$/)
+
+    await t.capabilities(true)
+    expect(String(spy.mock.calls[1][0])).toContain('/api/capabilities?fresh=1')
+  })
+
   it('playerLook 把 name 放进 query（URL 编码）', async () => {
     const spy = vi.fn(async (_url: string, _init?: RequestInit) =>
       jsonResponse({ name: '小美', online: true, items: [] }),

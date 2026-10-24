@@ -1,55 +1,53 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Download, RefreshCw, Search, ShieldAlert, Upload } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { AlertTriangle, Download, ImageDown, RefreshCw, Rows3, Search, ShieldAlert, Upload } from 'lucide-react'
 import { LoginGate } from '@/components/LoginGate'
 import { Notice } from '@/components/Notice'
-import { PlayerAvatar } from '@/components/PlayerAvatar'
+import { PlayerLookPanel } from '@/components/player/PlayerLookPanel'
 import { SearchInput } from '@/components/SearchInput'
-import {
-  BackpackCluster,
-  EquipCluster,
-  Group,
-  LoadoutBlock,
-  PlayerInfoPanel,
-  sliceGroup,
-} from '@/components/player/PlayerLookView'
 import {
   Alert,
   AlertDescription,
-  Badge,
   Button,
   Card,
   CardBody,
-  Field,
-  FieldLabel,
-  Separator,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  Skeleton,
   Spinner,
-  Switch,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
-import { addSearchHistory } from '@/lib/searchHistory'
-import { StorageKeys } from '@/lib/storage'
-import {
-  GROUP_ICON_IDS,
-  LOADOUT_KEYS,
-  PLAYER_SLOT_GROUPS,
-} from '@/lib/playerSlots'
 import { useModuleState } from '@/hooks/useModuleState'
 import { useDataset } from '@/lib/datasetContext'
-import { setSelfAvatar } from '@/lib/selfAvatar'
 import { useI18n } from '@/lib/i18n'
+import { addSearchHistory } from '@/lib/searchHistory'
+import { setSelfAvatar } from '@/lib/selfAvatar'
+import { StorageKeys } from '@/lib/storage'
+import { EQUIP_GROUP_A, EQUIP_GROUP_B } from '@/lib/playerSlots'
+import { playerShotFilename, renderPlayerShot } from '@/lib/playerShot'
 import { TshockRequestError } from '@/lib/tshock'
 import type { BackendTransport, PlayerCapabilities, PlayerLook } from '@/lib/tshock'
 
 /**
- * 玩家管理：查看玩家背包、导出角色存档（.plr）。
+ * 玩家管理：**查看存档**（本地 .plr，不需要登录）+ **玩家管理**（TShock 在线 / 离线玩家背包与存档导出）。
  *
- * 依赖 TShock 第三方插件 PlayerManager（`/pm/look`、`/pm/export`），权限由服务器判定：
+ * 「玩家管理」tab 依赖 TShock 第三方插件 PlayerManager（`/pm/look`、`/pm/export`），权限由服务器判定：
  *   - 未安装插件 → 404 → 界面提示「未安装」
  *   - 无 playermanager 权限 → 403 → 界面提示「无权限」
+ * 「查看存档」tab 把 .plr 上传给后端解析后立即丢弃（`POST /api/player/import`，公开端点、
+ * 按 IP 限流、不落盘），谁都能上传自己的存档看人物 / 属性 / 背包。
+ *
+ * 两个 tab 都能把当前角色「导出图片」（人物全身图 + 属性 + 背包 / 装备，PNG）。
  * 浏览器不持有 token，所有请求经后端同源 `/api/*` 转发。
  */
 interface PlayerManagerPageProps {
@@ -61,9 +59,14 @@ interface PlayerManagerPageProps {
   username: string | null
   /** 在线玩家名（用于输入建议；离线玩家可手输）。 */
   players: string[]
+  /** 「玩家管理」tab 是否可用（设置 → 激活模块里的开关；「查看存档」恒可用）。 */
+  moduleEnabled?: boolean
   onTokenInvalid: () => void
   onLogin: () => void
 }
+
+/** tab：查看存档（本地 .plr）/ 玩家管理（TShock）。 */
+type PlayerTabId = 'save' | 'manage'
 
 /**
  * 按「上游 + transport」缓存探测结果与上次查看的背包（**内存**，刷新页面即清空）。
@@ -77,8 +80,8 @@ interface PlayerCache {
   /** 上次查看的玩家名（用于判断缓存是否对应输入的玩家）。 */
   name?: string
   look?: PlayerLook
-  /** 上次的 look 是否来自本地 .plr 导入。 */
-  imported?: boolean
+  /** 上次导入的本地存档（「查看存档」tab）。 */
+  saveLook?: PlayerLook
 }
 
 const playerCaches = new WeakMap<BackendTransport, Map<string, PlayerCache>>()
@@ -92,12 +95,35 @@ function cacheFor(transport: BackendTransport): Map<string, PlayerCache> {
   return cache
 }
 
+/** 触发浏览器下载（导出 .plr / 导出图片共用）。 */
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** 导出图片时需要翻译的分组标题（与 `lib/playerShot.ts` 的版面对应）。 */
+const SHOT_GROUP_KEYS = [
+  'players.group.inventory',
+  'players.group.coins',
+  'players.group.ammo',
+  'players.group.trash',
+  ...EQUIP_GROUP_B,
+  ...EQUIP_GROUP_A,
+]
+
 export function PlayerManagerPage({
   serverId,
   transport,
   authenticated,
   username,
   players,
+  moduleEnabled = true,
   onTokenInvalid,
   onLogin,
 }: PlayerManagerPageProps) {
@@ -109,6 +135,7 @@ export function PlayerManagerPage({
     name: string
     touched?: boolean
     recent?: string[]
+    tab?: PlayerTabId
   } & Record<string, unknown>>(serverId, 'players', { name: '' })
   // `touched` 用来区分「从未填过」（默认自己）与「手动清空」（就显示空）。
   const name = uiState.name || (uiState.touched ? '' : username || '')
@@ -124,6 +151,9 @@ export function PlayerManagerPage({
     },
     [recent, setUiState],
   )
+  // 「查看存档」不需要登录 / 插件，所以是默认 tab；「玩家管理」tab 恒在（模块没启用时里面给出提示）。
+  const tab: PlayerTabId = uiState.tab === 'manage' ? 'manage' : 'save'
+  const setTab = useCallback((next: PlayerTabId) => setUiState({ tab: next }), [setUiState])
   // 精简视图：开启时隐藏「银行」与「配装」（默认开）。
   const [compact, setCompact] = useLocalState(StorageKeys.playersCompact, true)
   // 各分区（银行 / 配装）的折叠状态（按 key）。
@@ -146,8 +176,9 @@ export function PlayerManagerPage({
   const [look, setLook] = useState<PlayerLook | null>(
     cached?.look && cached.name === name ? cached.look : null,
   )
-  const [imported, setImported] = useState(cached?.imported === true)
-  const [busy, setBusy] = useState<'look' | 'export' | 'import' | null>(null)
+  /** 「查看存档」tab 当前展示的本地存档（切换 tab 回来还在）。 */
+  const [saveLook, setSaveLook] = useState<PlayerLook | null>(cached?.saveLook ?? null)
+  const [busy, setBusy] = useState<'look' | 'export' | 'import' | 'shot' | null>(null)
   const [error, setError] = useState<string | null>(null)
   // 自动查一次「自己」的背包：只做一次，切换模块回来走缓存不重拉。
   const autoLoaded = useRef(false)
@@ -181,9 +212,14 @@ export function PlayerManagerPage({
     [t],
   )
 
-  // 实时探测插件可用性（登录后 / 切换服务器后重探）。
+  // 切 tab 时清掉提示，避免上一个 tab 的错误留在另一个 tab 里。
   useEffect(() => {
-    if (!authenticated) {
+    setError(null)
+  }, [tab])
+
+  // 实时探测插件可用性（已登录 + 模块已启用时探测）。「查看存档」不需要登录 / 插件，也就不探测。
+  useEffect(() => {
+    if (!authenticated || !moduleEnabled) {
       setCapability(null)
       setProbeError(null)
       setLook(null)
@@ -218,7 +254,7 @@ export function PlayerManagerPage({
     return () => {
       cancelled = true
     }
-  }, [serverId, authenticated, transport, onTokenInvalid, kindMessage])
+  }, [serverId, authenticated, moduleEnabled, transport, onTokenInvalid, kindMessage])
 
   const canUse = capability?.plugin === true && capability.permission === true
   // 最近查询的快捷按钮：不重复展示当前正在看的名字。
@@ -256,11 +292,10 @@ export function PlayerManagerPage({
       try {
         const result = await transport.playerLook(who)
         setLook(result)
-        setImported(false)
         rememberName(result.name || who)
         // 写回内存缓存：切换模块回来直接展示，不再重拉。
         const c = cacheFor(transport)
-        c.set(serverId, { ...c.get(serverId), name: who, look: result, imported: false })
+        c.set(serverId, { ...c.get(serverId), name: who, look: result })
       } catch (err) {
         if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
           onTokenInvalid()
@@ -274,31 +309,28 @@ export function PlayerManagerPage({
     [name, serverId, transport, onTokenInvalid, kindMessage, t, rememberName],
   )
 
-  // 默认查看自己的背包：首次进入且没有缓存时自动拉一次（只拉一次，不随输入变化重复拉）。
+  // 默认查看自己的背包：进入到「玩家管理」tab 且没有缓存时自动拉一次（只拉一次，不随输入变化重复拉）。
   useEffect(() => {
-    if (autoLoaded.current || !canUse || !name) return
+    if (tab !== 'manage' || !moduleEnabled || autoLoaded.current || !canUse || !name) return
     autoLoaded.current = true
     const hit = cacheFor(transport).get(serverId)
     if (hit?.look && hit.name === name) {
       setLook(hit.look)
-      setImported(hit.imported === true)
       return
     }
     void runLook()
-  }, [canUse, name, serverId, transport, runLook])
+  }, [tab, moduleEnabled, canUse, name, serverId, transport, runLook])
 
+  /** 导入本地 .plr（不需要登录）：解析结果只用于展示，后端不保存。 */
   const runImport = useCallback(
     async (file: File) => {
       setBusy('import')
       setError(null)
       try {
         const result = await transport.importPlayer(await file.arrayBuffer())
-        setLook(result)
-        setImported(true)
-        setUiState({ name: result.name, touched: true })
-        rememberName(result.name)
+        setSaveLook(result)
         const c = cacheFor(transport)
-        c.set(serverId, { ...c.get(serverId), name: result.name, look: result, imported: true })
+        c.set(serverId, { ...c.get(serverId), saveLook: result })
       } catch (err) {
         if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
           onTokenInvalid()
@@ -308,14 +340,10 @@ export function PlayerManagerPage({
         setBusy(null)
       }
     },
-    [transport, serverId, setUiState, rememberName, onTokenInvalid, kindMessage],
+    [transport, serverId, onTokenInvalid, kindMessage],
   )
 
   const runExport = useCallback(async () => {
-    if (imported) {
-      setError(t('players.importHint'))
-      return
-    }
     const target = name.trim()
     if (!target) {
       setError(t('players.err.needName'))
@@ -325,14 +353,7 @@ export function PlayerManagerPage({
     setError(null)
     try {
       const { filename, blob } = await transport.playerExport(target)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, filename)
     } catch (err) {
       if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
         onTokenInvalid()
@@ -341,257 +362,336 @@ export function PlayerManagerPage({
     } finally {
       setBusy(null)
     }
-  }, [name, imported, transport, onTokenInvalid, kindMessage, t])
+  }, [name, transport, onTokenInvalid, kindMessage, t])
 
-  const heading = (
-    <div className="flex flex-col gap-1">
-      <h2 className="text-lg font-semibold">{t('page.players.title')}</h2>
-      <p className="text-xs text-muted-foreground">{t('page.players.desc')}</p>
-    </div>
+  /**
+   * 导出图片：把当前角色（人物全身图 + 属性 + 背包 / 装备）画成 PNG。
+   * 见 `lib/playerShot.ts`（角色图与物品图标都是 canvas，不能直接截 DOM）。
+   */
+  const runShot = useCallback(
+    async (target: PlayerLook, imported: boolean) => {
+      setBusy('shot')
+      setError(null)
+      try {
+        const blob = await renderPlayerShot(
+          target,
+          {
+            status: imported
+              ? t('players.imported')
+              : target.online
+                ? t('players.online')
+                : t('players.offline'),
+            info: [
+              `${t('players.hp')} ${target.health} / ${target.maxHealth}`,
+              `${t('players.mp')} ${target.mana} / ${target.maxMana}`,
+              `${t('players.quests')} ${Number(target.questsCompleted ?? 0)} ${t('players.questsUnit')}`,
+              ...(target.spawnX >= 0 ? [`${t('players.spawn')} ${target.spawnX}, ${target.spawnY}`] : []),
+            ],
+            groups: Object.fromEntries(SHOT_GROUP_KEYS.map((key) => [key, t(key)])),
+          },
+          dataset,
+        )
+        downloadBlob(blob, playerShotFilename(target.name))
+      } catch {
+        setError(t('players.shotFailed'))
+      } finally {
+        setBusy(null)
+      }
+    },
+    [dataset, t],
   )
 
-  if (!authenticated) {
-    return (
-      <div className="flex flex-col gap-4">
-        {heading}
-        <LoginGate onLogin={onLogin} />
-      </div>
-    )
+  const shotButton = (target: PlayerLook, imported: boolean) => (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="secondary"
+            disabled={busy != null}
+            onClick={() => void runShot(target, imported)}
+          >
+            {busy === 'shot' ? (
+              <Spinner aria-hidden data-icon="inline-start" />
+            ) : (
+              <ImageDown data-icon="inline-start" />
+            )}
+            {t('players.shot')}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('players.shotHint')}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+
+  /** 选择 / 拖入 .plr 文件（隐藏的 file input 与拖拽共用）。 */
+  const pickImport = () => importRef.current?.click()
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const file = e.dataTransfer?.files?.[0]
+    if (file) void runImport(file)
   }
+
+  const fileInput = (
+    <input
+      ref={importRef}
+      id="players-plr-input"
+      name="players-plr-input"
+      type="file"
+      accept=".plr,application/octet-stream"
+      className="hidden"
+      data-testid="players-plr-input"
+      onChange={(e) => {
+        const file = e.target.files?.[0]
+        e.target.value = '' // 允许再次选择同一个文件
+        if (file) void runImport(file)
+      }}
+    />
+  )
+
+  const compactToggle = (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon-sm"
+            variant={compact ? 'secondary' : 'ghost'}
+            aria-label={t('players.compactView')}
+            aria-pressed={compact}
+            onClick={() => setCompact(!compact)}
+          >
+            <Rows3 data-icon="inline-start" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t('players.compactView')}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
 
   return (
     <div className="flex flex-col gap-4">
-      {heading}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as PlayerTabId)} className="gap-4">
+        <TabsList
+          aria-label={t('players.tabs')}
+          variant="line"
+          className="w-full justify-start"
+        >
+          <TabsTrigger value="save" variant="line" className="flex-none">
+            {t('players.tab.save')}
+          </TabsTrigger>
+          <TabsTrigger value="manage" variant="line" className="flex-none">
+            {t('players.tab.manage')}
+          </TabsTrigger>
+        </TabsList>
 
-      {checking && (
-        <Card>
-          <CardBody className="flex items-center gap-2 pt-4 text-sm text-muted-foreground">
-            <Spinner />
-            {t('players.checking')}
-          </CardBody>
-        </Card>
-      )}
-
-      {!checking && capability === null && probeError && (
-        <Notice icon={<AlertTriangle />} title={t('players.probeFailed')}>
-          {probeError}
-        </Notice>
-      )}
-
-      {!checking && capability?.plugin === false && (
-        <Notice icon={<AlertTriangle />} title={t('players.pluginMissing')}>
-          {t('players.pluginMissingHint')}
-        </Notice>
-      )}
-
-      {!checking && capability?.plugin === true && !capability.permission && (
-        <Notice icon={<ShieldAlert />} title={t('players.noPermission')}>
-          {t('players.noPermissionHint')}
-        </Notice>
-      )}
-
-      {canUse && (
-        <Card>
-          {/* 顶部多留一点边距：用户名（输入框）上方不贴卡边 */}
-          <CardBody className="flex flex-col gap-3 pt-6">
-            {/* 查询行：输入 + 带文字按钮（下载 / 刷新 / 查看）+ 分隔线 + 导入 .plr */}
-            <TooltipProvider delayDuration={150}>
-              <div className="flex flex-wrap items-center gap-2">
-                <SearchInput
-                  className="h-9 max-w-xs"
-                  inputClassName="text-sm"
-                  value={name}
-                  placeholder={t('players.namePlaceholder')}
-                  history={suggestions}
-                  historyHeader={t('players.nameSuggest')}
-                  onValueChange={(v) => {
-                    setName(v)
-                    // 输入时清掉上一次的错误，避免边打字边被“无法解析”打扰。
-                    setError(null)
-                  }}
-                  onHistorySelect={(n) => {
-                    setName(n)
-                    void runLook(n)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void runLook()
-                  }}
-                />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy != null || imported}
-                      onClick={() => void runExport()}
-                    >
-                      {busy === 'export' ? (
-                        <Spinner aria-hidden data-icon="inline-start" />
-                      ) : (
-                        <Download data-icon="inline-start" />
-                      )}
-                      {t('players.export')}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('players.export')}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy != null || imported}
-                      onClick={() => void runLook(look?.name || name)}
-                    >
-                      {busy === 'look' ? (
-                        <Spinner aria-hidden data-icon="inline-start" />
-                      ) : (
-                        <RefreshCw data-icon="inline-start" />
-                      )}
-                      {t('players.refresh')}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('players.refresh')}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="sm" variant="primary" disabled={busy != null} onClick={() => void runLook()}>
-                      {busy === 'look' ? (
-                        <Spinner aria-hidden data-icon="inline-start" />
-                      ) : (
-                        <Search data-icon="inline-start" />
-                      )}
-                      {t('players.look')}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('players.look')}</TooltipContent>
-                </Tooltip>
-                <Separator orientation="vertical" className="mx-1 h-6" />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy != null}
-                      onClick={() => importRef.current?.click()}
-                    >
-                      {busy === 'import' ? (
-                        <Spinner aria-hidden data-icon="inline-start" />
-                      ) : (
-                        <Upload data-icon="inline-start" />
-                      )}
-                      {t('players.import')}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('players.importHint')}</TooltipContent>
-                </Tooltip>
-                <input
-                  ref={importRef}
-                  type="file"
-                  accept=".plr,application/octet-stream"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = '' // 允许再次选择同一个文件
-                    if (file) void runImport(file)
-                  }}
-                />
-              </div>
-            </TooltipProvider>
-
-            {/* 简约视图 + 最近查询结果走输入框下拉（见上方 SearchInput） */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Field orientation="horizontal" className="w-auto flex-nowrap gap-1.5">
-                <Switch
-                  id="players-compact"
-                  checked={compact}
-                  onCheckedChange={setCompact}
-                  aria-label={t('players.compactView')}
-                />
-                <FieldLabel htmlFor="players-compact" className="font-normal text-muted-foreground">
-                  {t('players.compactView')}
-                </FieldLabel>
-              </Field>
-            </div>
+        {/* ── 查看存档：本地 .plr，不需要登录 / 插件 ───────────────────────── */}
+        <TabsContent value="save" className="flex flex-col gap-4">
+          {/* 整块都可以接收拖入的 .plr（选中过存档后也能换一个） */}
+          <div
+            className="flex flex-col gap-4"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+            data-testid="players-save-drop"
+          >
+            <Card>
+              <CardBody className="flex flex-wrap items-center gap-3 pt-4">
+                <Button variant="primary" disabled={busy != null} onClick={pickImport}>
+                  {busy === 'import' ? (
+                    <Spinner aria-hidden data-icon="inline-start" />
+                  ) : (
+                    <Upload data-icon="inline-start" />
+                  )}
+                  {t('players.import')}
+                </Button>
+                <p className="min-w-0 flex-1 text-2xs text-muted-foreground">{t('players.saveHint')}</p>
+                {saveLook && <div className="ml-auto">{compactToggle}</div>}
+                {fileInput}
+              </CardBody>
+            </Card>
 
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-          </CardBody>
-        </Card>
-      )}
 
-      {look && dataset && (
-        <div className="flex flex-col gap-4">
-          {/* 角色总览：**左侧全身图 + 右侧属性**作为一组，占内容区一半宽度；窄屏整行。 */}
-          <div className="flex w-full items-start gap-5 @[820px]:w-1/2">
-            {/* 角色全身图：只画皮肤 / 衣服 / 头发（不含盔甲饰品）。 */}
-            <PlayerAvatar look={look} />
-            {/* 属性区：左边留出间隔，名字加大、与属性行拉开，整体高度与人物接近。 */}
-            <div className="flex min-w-0 flex-1 flex-col gap-3 pt-2 pl-2">
-              <div className="flex items-center gap-2 text-lg font-semibold">
-                {look.name}
-                {imported ? (
-                  <Badge tone="mock">{t('players.imported')}</Badge>
-                ) : (
-                  <Badge tone={look.online ? 'success' : 'neutral'}>
-                    {look.online ? t('players.online') : t('players.offline')}
-                  </Badge>
+            {saveLook ? (
+              <PlayerLookPanel
+                look={saveLook}
+                imported
+                compact={compact}
+                collapsed={collapsed}
+                onToggleCollapse={toggleCollapsed}
+                actions={shotButton(saveLook, true)}
+              />
+            ) : (
+              <Empty className="min-h-40 border border-dashed">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Upload />
+                  </EmptyMedia>
+                  <EmptyTitle>{t('players.saveEmpty')}</EmptyTitle>
+                  <EmptyDescription>{t('players.saveEmptyHint')}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── 玩家管理：TShock 在线 / 离线玩家（需登录 + PlayerManager） ─────── */}
+        <TabsContent value="manage" className="flex flex-col gap-4">
+          {!moduleEnabled && (
+            <Notice icon={<AlertTriangle />} title={t('players.moduleOff')}>
+              {t('players.moduleOffHint')}
+            </Notice>
+          )}
+
+          {moduleEnabled && !authenticated && <LoginGate onLogin={onLogin} />}
+
+          {moduleEnabled && authenticated && checking && (
+            <Card>
+              <CardBody className="flex items-center gap-2 pt-4 text-sm text-muted-foreground">
+                <Spinner />
+                {t('players.checking')}
+              </CardBody>
+            </Card>
+          )}
+
+          {moduleEnabled && authenticated && !checking && capability === null && probeError && (
+            <Notice icon={<AlertTriangle />} title={t('players.probeFailed')}>
+              {probeError}
+            </Notice>
+          )}
+
+          {moduleEnabled && authenticated && !checking && capability?.plugin === false && (
+            <Notice icon={<AlertTriangle />} title={t('players.pluginMissing')}>
+              {t('players.pluginMissingHint')}
+            </Notice>
+          )}
+
+          {moduleEnabled &&
+            authenticated &&
+            !checking &&
+            capability?.plugin === true &&
+            !capability.permission && (
+              <Notice icon={<ShieldAlert />} title={t('players.noPermission')}>
+                {t('players.noPermissionHint')}
+              </Notice>
+            )}
+
+          {moduleEnabled && authenticated && canUse && (
+            <Card>
+              {/* 顶部多留一点边距：用户名（输入框）上方不贴卡边 */}
+              <CardBody className="flex flex-col gap-3 pt-6">
+                {/* 查询行：输入 + 带文字按钮（下载 / 刷新 / 查看） */}
+                <TooltipProvider delayDuration={150}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SearchInput
+                      className="h-9 max-w-xs"
+                      inputClassName="text-sm"
+                      value={name}
+                      placeholder={t('players.namePlaceholder')}
+                      history={suggestions}
+                      historyHeader={t('players.nameSuggest')}
+                      onValueChange={(v) => {
+                        setName(v)
+                        // 输入时清掉上一次的错误，避免边打字边被“无法解析”打扰。
+                        setError(null)
+                      }}
+                      onHistorySelect={(n) => {
+                        setName(n)
+                        void runLook(n)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void runLook()
+                      }}
+                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          disabled={busy != null}
+                          onClick={() => void runExport()}
+                        >
+                          {busy === 'export' ? (
+                            <Spinner aria-hidden data-icon="inline-start" />
+                          ) : (
+                            <Download data-icon="inline-start" />
+                          )}
+                          {t('players.export')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('players.export')}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          disabled={busy != null}
+                          onClick={() => void runLook(look?.name || name)}
+                        >
+                          {busy === 'look' ? (
+                            <Spinner aria-hidden data-icon="inline-start" />
+                          ) : (
+                            <RefreshCw data-icon="inline-start" />
+                          )}
+                          {t('players.refresh')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('players.refresh')}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="primary"
+                          disabled={busy != null}
+                          onClick={() => void runLook()}
+                        >
+                          {busy === 'look' ? (
+                            <Spinner aria-hidden data-icon="inline-start" />
+                          ) : (
+                            <Search data-icon="inline-start" />
+                          )}
+                          {t('players.look')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('players.look')}</TooltipContent>
+                    </Tooltip>
+                    {capability?.plugin === true && <div className="ml-auto">{compactToggle}</div>}
+                  </div>
+                </TooltipProvider>
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
+              </CardBody>
+            </Card>
+          )}
+
+          {moduleEnabled && authenticated && busy === 'look' && !look && (
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]" role="status" aria-busy="true">
+              <span className="sr-only">{t('app.pageLoading')}</span>
+              <Skeleton className="h-80 rounded-xl" />
+              <div className="flex flex-col gap-3">
+                <Skeleton className="h-32 rounded-xl" />
+                <Skeleton className="h-72 rounded-xl" />
               </div>
-              <PlayerInfoPanel look={look} />
             </div>
-          </div>
+          )}
 
-          <Separator />
-
-          {/* 左右两组（用容器查询，`@container` 在 AppShell 内容区，兼顾侧栏/compact）：
-              左组 = 背包（含钱币/弹药）+ 下方仓储（银行）；
-              右组 = 装备区（杂项 + 染料/时装/装备）与配装泡在同一行，**配装在右侧**。
-              内容够宽才并排；窄屏则左组在上、右组在下。 */}
-          <div className="grid items-start gap-x-8 gap-y-6 @[1150px]:grid-cols-[auto_auto]">
-            {/* 左组 */}
-            <div className="flex flex-col gap-5">
-              <BackpackCluster look={look} />
-              {/* 银行：放到背包下方（精简视图下隐藏） */}
-              {!compact && (
-                <div className="flex flex-col gap-4">
-                  {PLAYER_SLOT_GROUPS.filter((g) => g.column === 2).map((group) => (
-                    <Group
-                      key={group.key}
-                      group={group}
-                      items={sliceGroup(look, group)}
-                      titleIconId={GROUP_ICON_IDS[group.key]}
-                      open={!collapsed[group.key]}
-                      onToggle={() => toggleCollapsed(group.key)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* 右组：装备区 + 配装（配装在右，排在同一行；精简视图下隐藏配装） */}
-            <div className="flex flex-wrap items-start gap-x-4 gap-y-5">
-              <EquipCluster look={look} />
-              {!compact && (
-                <div className="flex flex-wrap items-start gap-x-2 gap-y-5">
-                  {LOADOUT_KEYS.map((key) => (
-                    <LoadoutBlock
-                      key={key}
-                      look={look}
-                      groupKey={key}
-                      open={!collapsed[key]}
-                      onToggle={() => toggleCollapsed(key)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+          {moduleEnabled && authenticated && look && dataset && (
+            <PlayerLookPanel
+              look={look}
+              imported={false}
+              compact={compact}
+              collapsed={collapsed}
+              onToggleCollapse={toggleCollapsed}
+              actions={shotButton(look, false)}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
-
