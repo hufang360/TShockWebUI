@@ -25,7 +25,7 @@ function renderPage(items: Item[] | ReturnType<typeof makeDataset>, opts: { keep
   const dataset = Array.isArray(items) ? makeDataset({ items }) : items
   const utils = render(
     <I18nProvider lang="zh">
-      <ItemsPage dataset={dataset} />
+      <ItemsPage dataset={dataset} username="Alice" />
     </I18nProvider>,
   )
   // 默认就是「全部物品」；显式点一次，顺便清掉上一次测试可能留下的筛选。
@@ -73,31 +73,31 @@ beforeEach(() => {
 describe('ItemsPage 图鉴', () => {
   it('进入页面自动聚焦搜索框', () => {
     renderPage(makeItems(5))
-    expect(document.activeElement).toBe(screen.getByLabelText('物品ID'))
+    expect(document.activeElement).toBe(screen.getByLabelText('物品 ID'))
   })
 
   it('手机进入页面不自动聚焦搜索框', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
     renderPage(makeItems(5))
-    expect(document.activeElement).not.toBe(screen.getByLabelText('物品ID'))
+    expect(document.activeElement).not.toBe(screen.getByLabelText('物品 ID'))
   })
 
-  it('手机默认显示 ID 和名称，开启隐藏设置后只显示图标', () => {
+  it('手机尺寸与桌面一致（72 宽 / 图标 64），隐藏 ID 和名称后只显示图标', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
     renderPage(makeItems(5))
     const first = cell('物品1')
-    expect(first.style.width).toBe('88px')
-    expect(first.style.height).toBe('88px')
+    expect(first.style.width).toBe('72px')
+    expect(first.style.height).toBe('106px')
     expect((within(first).getByRole('img', { name: '物品1' }) as HTMLCanvasElement).style.width).toBe(
-      '56px',
+      '64px',
     )
     expect(within(first).getByText('1')).toBeTruthy()
     expect(within(first).getByText('物品1')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
     fireEvent.click(screen.getByLabelText('隐藏 ID 和名称'))
-    expect(cell('物品1').style.width).toBe('68px')
-    expect(cell('物品1').style.height).toBe('68px')
+    expect(cell('物品1').style.width).toBe('72px')
+    expect(cell('物品1').style.height).toBe('72px')
     expect(within(cell('物品1')).queryByText('1')).toBeNull()
   })
 
@@ -128,10 +128,11 @@ describe('ItemsPage 图鉴', () => {
     expect(group).toBeTruthy()
     expect(group?.querySelector('.lucide-search')).toBeTruthy()
     expect(group?.parentElement?.parentElement?.className).toContain('max-w-sm')
-    // 手机工具条分两行：搜索行在上，筛选 / 分组 / 设置行在下。
-    const body = document.querySelector('[data-slot="card-body"]')
-    expect(body?.className).toContain('flex-col')
-    expect(body?.className).toContain('sm:flex-row')
+    // 工具条不再套卡片；手机分两行：搜索行在上，筛选 / 分组 / 设置行在下。
+    expect(document.querySelector('[data-slot="card-body"]')).toBeNull()
+    const toolbar = group?.closest('.shrink-0')
+    expect(toolbar?.className).toContain('flex-col')
+    expect(toolbar?.className).toContain('sm:flex-row')
     const count = screen.getByText('3 个结果')
     expect(count.className).not.toContain('ml-auto')
   })
@@ -139,7 +140,7 @@ describe('ItemsPage 图鉴', () => {
   it('最近搜索只在点按钮时展开，回车收起', () => {
     localStorage.setItem('tswui:dex:searchHistory', JSON.stringify(['物品1']))
     renderPage(makeItems(3))
-    const input = screen.getByLabelText('物品ID')
+    const input = screen.getByLabelText('物品 ID')
     fireEvent.change(input, { target: { value: '物品1' } })
     // 打字不自动弹出
     expect(screen.queryByTestId('search-history-list')).toBeNull()
@@ -186,7 +187,7 @@ describe('ItemsPage 图鉴', () => {
     expect(page.className).toContain('fixed')
     expect(page.className).toContain('inset-0')
     expect(page.style.height).toBe('100dvh')
-    expect(screen.queryByLabelText('物品ID')).toBeNull()
+    expect(screen.queryByLabelText('物品 ID')).toBeNull()
     expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy()
 
@@ -207,7 +208,7 @@ describe('ItemsPage 图鉴', () => {
     const list = screen.getByTestId('dex-list')
     const names = () => gridIcons().map((el) => el.getAttribute('aria-label'))
     const grid = list.querySelector<HTMLElement>('.grid')
-    expect(grid?.style.gap).toBe('4px')
+    expect(grid?.className).toContain('gap-x-4')
 
     // jsdom 无布局 → 10 列 / 560px 兜底、显示文字时行高 110+4=114 → 可视 + overscan 共 6 行
     const first = names()
@@ -229,8 +230,8 @@ describe('ItemsPage 图鉴', () => {
     const canvas = within(first).getByRole('img', { name: '物品1' }) as HTMLCanvasElement
     expect(canvas.style.width).toBe('64px')
     expect(canvas.style.height).toBe('64px')
-    expect(first.style.width).toBe('110px')
-    expect(first.style.height).toBe('110px')
+    expect(first.style.width).toBe('72px')
+    expect(first.style.height).toBe('106px')
     expect(within(first).getByText('1')).toBeTruthy()
     const name = within(first).getByText('物品1')
     expect(name.className).toContain('truncate')
@@ -238,14 +239,17 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
     fireEvent.click(screen.getByLabelText('隐藏 ID 和名称'))
     first = cell('物品1')
-    expect(first.style.width).toBe('76px')
-    expect(first.style.height).toBe('76px')
+    expect(first.style.width).toBe('72px')
+    expect(first.style.height).toBe('72px')
     expect(within(first).queryByText('1')).toBeNull()
 
     const surface = within(first).getByTestId('dex-icon-surface')
     expect(first.className).toContain('cursor-pointer')
-    expect(first.className).toContain('hover:bg-primary/10')
     expect(first.className).toContain('hover:-translate-y-0.5')
+    // 底色只在 72×72 的图标区（hover 时），格子本身不再铺色。
+    expect(first.className).not.toContain('hover:bg-primary/10')
+    expect(surface.className).toContain('size-18')
+    expect(surface.className).toContain('group-hover/cell:bg-primary/10')
     expect(surface.className).not.toContain('bg-muted/50')
     expect(surface.className).not.toContain('ring-border/50')
   })
@@ -261,6 +265,8 @@ describe('ItemsPage 图鉴', () => {
     expect(within(dialog).getByText('物品1')).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: '复制ID' })).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: '复制名称' })).toBeTruthy()
+    // 物品给予指令（`/give <物品> <玩家>`）；有词缀时才带数量与词缀。
+    expect(within(dialog).getByText('/give 1 Alice')).toBeTruthy()
     const side = within(dialog).getByTestId('dex-detail-side')
     const wiki = within(side).getByRole('link', { name: /前往 Wiki/ })
     expect(wiki.getAttribute('href')).toBe(
@@ -555,7 +561,7 @@ describe('ItemsPage 图鉴', () => {
 
   it('全部物品再点一次：清空搜索并回到顶部', () => {
     renderPage(makeItems(3))
-    const input = screen.getByLabelText('物品ID') as HTMLInputElement
+    const input = screen.getByLabelText('物品 ID') as HTMLInputElement
     fireEvent.change(input, { target: { value: '物品1' } })
     expect(input.value).toBe('物品1')
     fireEvent.click(screen.getByTestId('dex-mode-all'))
@@ -633,11 +639,11 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
     expect(names().sort()).toEqual(['物品29', '物品75'])
     // 收藏内也支持搜索，但搜索只在收藏范围内
-    fireEvent.change(screen.getByLabelText('物品ID'), { target: { value: 'Item75' } })
+    fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: 'Item75' } })
     await waitFor(() => expect(names()).toEqual(['物品75']))
 
     // 清空搜索 + 关掉收藏 → 回到全部物品
-    fireEvent.change(screen.getByLabelText('物品ID'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: '' } })
     await waitFor(() => expect(names().sort()).toEqual(['物品29', '物品75']))
     fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
     expect(names().sort()).toEqual(['物品1', '物品29', '物品4956', '物品75'])
@@ -654,7 +660,7 @@ describe('ItemsPage 图鉴', () => {
     localStorage.setItem('tswui:itemFavorites', JSON.stringify([{ id: 1, ts: 1 }]))
     renderPage(makeItems(5))
     fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
-    fireEvent.change(screen.getByLabelText('物品ID'), { target: { value: 'Item999' } })
+    fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: 'Item999' } })
     await waitFor(() => expect(screen.getByText('没有匹配的物品')).toBeTruthy())
   })
 
@@ -678,7 +684,7 @@ describe('ItemsPage 图鉴', () => {
 
     fireEvent.scroll(list)
     expect(list.scrollTop).toBe(800)
-    fireEvent.change(screen.getByLabelText('物品ID'), { target: { value: '物品1' } })
+    fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: '物品1' } })
     expect(list.scrollTop).toBe(0)
 
     list.scrollTop = 800
@@ -778,7 +784,7 @@ describe('ItemsPage 图鉴', () => {
 
   it('最近搜索：搜过的词进历史，可点回搜', async () => {
     renderPage([{ ...makeItem(1), name: '木匣' }, makeItem(2)])
-    const input = screen.getByLabelText('物品ID')
+    const input = screen.getByLabelText('物品 ID')
     fireEvent.change(input, { target: { value: '木匣' } })
     // 现在不会自动弹出：点「最近搜索」按钮再展开
     fireEvent.click(await screen.findByRole('button', { name: '最近搜索' }))

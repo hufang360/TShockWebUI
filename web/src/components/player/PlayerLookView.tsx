@@ -9,6 +9,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui'
 import { useDataset } from '@/lib/datasetContext'
+import { PERMANENT_BOOSTS } from '@/lib/playerBoosts'
 import { useI18n, type I18n } from '@/lib/i18n'
 import {
   EQUIP_GROUP_A,
@@ -329,25 +330,6 @@ export function LoadoutBlock({
   )
 }
 
-/** 永久增强消耗品（图标 id + 名称 key）。 */
-const BOOSTERS: { field: keyof PlayerLook; itemId: number; labelKey: string }[] = [
-  { field: 'ateArtisanBread', itemId: 5326, labelKey: 'players.boost.artisanBread' },
-  { field: 'usedAegisCrystal', itemId: 5337, labelKey: 'players.boost.aegisCrystal' },
-  { field: 'usedAegisFruit', itemId: 5338, labelKey: 'players.boost.aegisFruit' },
-  { field: 'usedArcaneCrystal', itemId: 5339, labelKey: 'players.boost.arcaneCrystal' },
-  { field: 'usedGalaxyPearl', itemId: 5340, labelKey: 'players.boost.galaxyPearl' },
-  { field: 'usedGummyWorm', itemId: 5341, labelKey: 'players.boost.gummyWorm' },
-  { field: 'usedAmbrosia', itemId: 5342, labelKey: 'players.boost.ambrosia' },
-]
-
-/** 一次性解锁 / 升级类标记。 */
-const UNLOCKS: { field: keyof PlayerLook; itemId: number; labelKey: string }[] = [
-  { field: 'extraSlot', itemId: 3335, labelKey: 'players.boost.demonHeart' },
-  { field: 'unlockedBiomeTorches', itemId: 5043, labelKey: 'players.boost.torchGod' },
-  { field: 'unlockedSuperCart', itemId: 5289, labelKey: 'players.boost.superCart' },
-]
-
-/** `/pm/look` 额外返回的只读信息：生命 / 魔力 / 渔夫任务 / 重生点 + 永久增强。 */
 export function PlayerInfoPanel({ look }: { look: PlayerLook }) {
   const { t } = useI18n()
   const dataset = useDataset()
@@ -400,8 +382,7 @@ export function PlayerInfoPanel({ look }: { look: PlayerLook }) {
           容器只有半宽，图标多时自动换行（`flex-wrap`）。 */}
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span className="mr-0.5 text-muted-foreground">{t('players.boost.title')}</span>
-        {UNLOCKS.map((b) => itemIcon(b.itemId, look[b.field] === true))}
-        {BOOSTERS.map((b) => itemIcon(b.itemId, look[b.field] === true))}
+        {PERMANENT_BOOSTS.map((b) => itemIcon(b.itemId, look[b.field] === true))}
       </div>
     </div>
   )

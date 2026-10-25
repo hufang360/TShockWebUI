@@ -34,6 +34,8 @@ interface PreferencesCardsProps {
   batchPlugin: boolean | null
   batchMode: boolean
   onBatchModeChange: (on: boolean) => void
+  /** 只渲染其中一组：设置页把「界面偏好」放左栏顶部，其余仍在右栏。 */
+  section?: 'interface' | 'behavior' | 'all'
 }
 
 /**
@@ -47,10 +49,14 @@ export function PreferencesCards({
   batchPlugin,
   batchMode,
   onBatchModeChange,
+  section = 'all',
 }: PreferencesCardsProps) {
   const { t } = useI18n()
+  const showInterface = section !== 'behavior'
+  const showBehavior = section !== 'interface'
   return (
     <>
+      {showInterface && (
       <CollapsibleCard title={t('settings.heading')} bodyClassName="flex flex-col gap-0 pt-0">
         <SettingRow label={t('settings.fontSize')}>
           <div className="flex items-center gap-2">
@@ -102,7 +108,10 @@ export function PreferencesCards({
           </ToggleGroup>
         </SettingRow>
       </CollapsibleCard>
+      )}
 
+      {showBehavior && (
+      <>
       <CollapsibleCard title={t('settings.execution')} bodyClassName="flex flex-col gap-0 pt-0">
         <SettingRow label={t('settings.commandInterval')}>
           <NativeSelect
@@ -201,6 +210,8 @@ export function PreferencesCards({
           </NativeSelect>
         </SettingRow>
       </CollapsibleCard>
+      </>
+      )}
     </>
   )
 }

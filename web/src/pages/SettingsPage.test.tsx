@@ -58,6 +58,11 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+/** 切到「激活模块」的某个 tab（Radix Tabs 用 mousedown 激活）。 */
+function openModuleTab(name: '内置模块' | '已适配' | '自定义') {
+  fireEvent.mouseDown(screen.getByRole('tab', { name }))
+}
+
 describe('SettingsPage 未登录', () => {
   it('隐藏设置内容，显示登录提示与登录按钮', () => {
     const onLogin = vi.fn()
@@ -130,7 +135,7 @@ describe('SettingsPage 批量执行卡片', () => {
     expect(card?.textContent).not.toContain('界面偏好')
   })
 
-  it('两栏结构：激活模块在左列，界面偏好 / 执行行为 / 数据刷新 / 账户在右列', async () => {
+  it('两栏结构：界面偏好 / 激活模块在左列，执行行为 / 数据刷新 / 账户在右列', async () => {
     renderSettings(capsTransport({ batch: { plugin: true, ingame: true } }))
     const accountCard = (await screen.findByText('在线授权 / 账户')).closest('[data-slot="card"]')
     const prefCard = screen.getByText('界面偏好').closest('[data-slot="card"]')
@@ -143,9 +148,10 @@ describe('SettingsPage 批量执行卡片', () => {
     const grid = rightCol?.parentElement
 
     expect(grid?.className).toContain('xl:grid-cols-[minmax(0,1fr)_360px]')
-    // 左列只放激活模块；右列含界面偏好 / 执行行为 / 数据刷新 / 账户，且为 grid 的最后一列。
     expect(leftCol).not.toBe(rightCol)
-    expect(prefCard?.parentElement).toBe(rightCol)
+    // 左列：界面偏好在最上，激活模块紧随其后。
+    expect(prefCard?.parentElement).toBe(leftCol)
+    expect(leftCol?.firstElementChild).toBe(prefCard)
     expect(executionCard?.parentElement).toBe(rightCol)
     expect(refreshCard?.parentElement).toBe(rightCol)
     expect(grid?.lastElementChild).toBe(rightCol)
@@ -153,6 +159,45 @@ describe('SettingsPage 批量执行卡片', () => {
 })
 
 describe('SettingsPage 激活模块', () => {
+  it('按来源分三个 tab：内置模块 / 已适配 / 自定义', async () => {
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={capsTransport({})}
+          authenticated
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          customModules={[]}
+          onCustomModulesChange={vi.fn()}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(await screen.findByRole('tab', { name: '内置模块' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '已适配' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '自定义' })).toBeTruthy()
+
+    // 内置模块：信使插件提供的物资申请。
+    expect(screen.getByRole('switch', { name: '物资申请' })).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: '玩家管理' })).toBeNull()
+
+    // 已适配：PlayerManager / FishShop / WorldModify。
+    openModuleTab('已适配')
+    expect(await screen.findByRole('switch', { name: '玩家管理' })).toBeTruthy()
+    expect(screen.getByRole('switch', { name: '鱼店' })).toBeTruthy()
+    expect(screen.getByRole('switch', { name: '世界管理' })).toBeTruthy()
+    expect(screen.getByText('依赖插件 WorldModify（/wm、/wi、/bi 等）')).toBeTruthy()
+
+    // 自定义：创建表单。
+    openModuleTab('自定义')
+    expect(await screen.findByPlaceholderText('模块名称')).toBeTruthy()
+  })
+
   it('已安装且授权的模块可打开开关', async () => {
     const onModulesChange = vi.fn()
     render(
@@ -173,6 +218,7 @@ describe('SettingsPage 激活模块', () => {
       </I18nProvider>,
     )
 
+    openModuleTab('已适配')
     const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
     await waitFor(() => expect(sw.disabled).toBe(false))
     fireEvent.click(sw)
@@ -200,6 +246,7 @@ describe('SettingsPage 激活模块', () => {
       </I18nProvider>,
     )
 
+    openModuleTab('已适配')
     const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
     await waitFor(() => expect(sw.disabled).toBe(false))
     fireEvent.click(sw)
@@ -226,6 +273,7 @@ describe('SettingsPage 激活模块', () => {
       </I18nProvider>,
     )
 
+    openModuleTab('已适配')
     const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
     await waitFor(() => expect(sw.disabled).toBe(false))
     expect(screen.getByText('未安装')).toBeTruthy()
@@ -253,6 +301,7 @@ describe('SettingsPage 激活模块', () => {
       </I18nProvider>,
     )
 
+    openModuleTab('已适配')
     const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
     await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'))
     expect(sw.disabled).toBe(false)
@@ -290,6 +339,7 @@ describe('SettingsPage 激活模块', () => {
     )
     const { rerender } = render(view('online'))
 
+    openModuleTab('已适配')
     const sw = (await screen.findByRole('switch', { name: '玩家管理' })) as HTMLButtonElement
     await waitFor(() => expect(sw.disabled).toBe(false))
 
@@ -378,6 +428,7 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
+    openModuleTab('自定义')
 
     const create = screen.getByRole('button', { name: /创建模块/ })
     expect(create.hasAttribute('disabled')).toBe(true)
@@ -418,6 +469,7 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
+    openModuleTab('自定义')
 
     const input = screen.getByDisplayValue('旧名')
     fireEvent.change(input, { target: { value: '新名' } })
@@ -446,6 +498,7 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
+    openModuleTab('自定义')
 
     const first = screen.getByDisplayValue('模块A').closest('li') as HTMLElement
     fireEvent.click(within(first).getByRole('button', { name: '下移' }))
@@ -478,6 +531,7 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
+    openModuleTab('自定义')
 
     fireEvent.change(screen.getByDisplayValue('/old'), { target: { value: '/new' } })
     expect(onCustomModulesChange).toHaveBeenCalledWith([{ id: 'm:1', name: '旧名', command: '/new', desc: '' }])
@@ -508,6 +562,7 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
+    openModuleTab('自定义')
 
     fireEvent.change(screen.getByPlaceholderText('模块顶部说明（可留空）'), {
       target: { value: '我的钓鱼模块' },

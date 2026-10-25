@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { Fish, Package, RefreshCw, Settings2, ShoppingBasket, Store, Terminal, Trophy } from 'lucide-react'
+import { Fish, RefreshCw, Settings2, Terminal } from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
+import { IconAction } from '@/components/IconAction'
 import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
-import { Button, Spinner } from '@/components/ui'
+import { TopBarActions } from '@/components/TopBar'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useModuleCards } from '@/hooks/useModuleCards'
 import { DEFAULT_AUTO_EXEC, isManual, sanitizeAutoExec, setManual } from '@/lib/autoExec'
@@ -22,14 +22,14 @@ interface FishCardDef {
   icon: ReactNode
 }
 
-/** 鱼店指令卡片：这些指令即使鱼店插件没开 REST API 也能执行（走 rawcmd）。 */
+/**
+ * 鱼店指令卡片：只保留「钓鱼信息」（`/fish info`）。
+ *
+ * 它的数据没有 REST 端点，只能靠 rawcmd 取回（且不依赖鱼店 REST，老插件也能用）。
+ * 货架 / 鱼罐 / 消费榜 / 鱼篓榜的卡片已移除：货架走 REST，其余不再作为网页入口。
+ */
 const CARDS: FishCardDef[] = [
-  // 货架：老版本插件（v1.6.2 之前）没有 REST 接口时，这是唯一能看货架的途径。
-  { id: 'list', titleKey: 'fish.card.shelf', command: '/fish list', icon: <Store /> },
   { id: 'info', titleKey: 'fish.card.info', command: '/fish info', icon: <Fish /> },
-  { id: 'jar', titleKey: 'fish.card.jar', command: '/fish jar', icon: <Package /> },
-  { id: 'rank', titleKey: 'fish.card.rank', command: '/fish rank', icon: <Trophy /> },
-  { id: 'basket', titleKey: 'fish.card.basket', command: '/fish basket', icon: <ShoppingBasket /> },
 ]
 
 interface FishCommandCardsProps {
@@ -42,12 +42,10 @@ interface FishCommandCardsProps {
   refreshInterval: number
   /** token 失效 → 弹出登录框；返回是否重登成功。 */
   onTokenInvalid: () => Promise<boolean>
-  /** 由父级提供的页头右侧插槽；提供后管理 / 刷新按钮渲染到标题同一行。 */
-  headerPortal?: HTMLElement | null
 }
 
 /**
- * 鱼店右侧「指令卡片」列：钓鱼信息 / 鱼罐 / 消费榜 / 鱼篓榜。
+ * 鱼店右侧「指令卡片」列：目前只有「钓鱼信息」（`/fish info`）。
  * 与首页卡片一致，支持「统一执行」（批量执行）；未安装批量插件时自动逐条执行。
  * 这些卡片只依赖 rawcmd，**不依赖鱼店 REST API**，因此插件未提供 REST 时仍可用。
  */
@@ -58,7 +56,6 @@ export function FishCommandCards({
   serverId,
   refreshInterval,
   onTokenInvalid,
-  headerPortal,
 }: FishCommandCardsProps) {
   const { t } = useI18n()
   const { enqueue, busy, busyPrefix } = useExecutionQueue()
@@ -224,45 +221,34 @@ export function FishCommandCards({
   }))
 
   const headerContent = (
-    <div className="flex items-center gap-2">
+    <TopBarActions>
       {lastRefreshAt && (
         <span
-          className="text-2xs text-muted-foreground"
+          className="hidden text-2xs text-muted-foreground sm:inline"
           title={new Date(lastRefreshAt).toLocaleString()}
         >
           {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
         </span>
       )}
-      <Button size="sm" variant="ghost" onClick={() => setManageOpen(true)}>
-        <Settings2 data-icon="inline-start" />
-        {t('modules.cards.manage')}
-      </Button>
-      <Button
-        size="sm"
-        variant="secondary"
+      <IconAction
+        label={refreshing ? t('home.refreshing') : t('home.refreshAll')}
+        icon={RefreshCw}
+        loading={refreshing}
+        disabled={!authenticated || entries.length === 0}
         onClick={() => refreshAll(true)}
-        disabled={!authenticated || refreshing}
-      >
-        {refreshing ? (
-          <Spinner aria-hidden data-icon="inline-start" />
-        ) : (
-          <RefreshCw data-icon="inline-start" />
-        )}
-        {refreshing ? t('home.refreshing') : t('home.refreshAll')}
-      </Button>
-    </div>
+      />
+      <IconAction
+        label={t('modules.cards.manage')}
+        icon={Settings2}
+        onClick={() => setManageOpen(true)}
+      />
+    </TopBarActions>
   )
 
   return (
-    // `xl:contents`：xl 下本组件的表头与卡片列表脱离包裹层，直接成为鱼店页两列网格的
-    // 「第 1 行右格 / 第 2 行右格」，从而与左列页头 / 内容共行对齐（见 docs/插件-鱼店.md）。
-    <div className="flex h-full min-h-0 flex-col gap-4 xl:contents">
-      {headerPortal !== undefined
-        ? headerPortal
-          ? createPortal(headerContent, headerPortal)
-          : null
-        : <div className="flex shrink-0 items-center justify-between gap-2 xl:col-start-2 xl:row-start-1">{headerContent}</div>}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pr-1 xl:col-start-2 xl:row-start-2 xl:min-h-0">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      {headerContent}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
         {entries.map((card) => (
           <div key={card.key} className="relative">
           <CommandCard

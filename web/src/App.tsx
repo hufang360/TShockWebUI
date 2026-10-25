@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Plug, Settings as SettingsIcon, Terminal, Users } from 'lucide-react'
+import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, ScrollText, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
+import { CommandTerminal } from '@/components/CommandTerminal'
+import { TerminalTopBarButton } from '@/components/TerminalTopBarButton'
 import { AppShell, type NavItem } from '@/components/AppShell'
 import { AppRoutes, preloadRoute } from '@/components/AppRoutes'
 import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
@@ -28,6 +30,7 @@ import { CommandResultsProvider } from '@/lib/commandResults'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { I18nProvider, translate } from '@/lib/i18n'
+import { TerminalProvider } from '@/lib/terminalContext'
 import { ItemDetailProvider, type ItemDetailApi } from '@/lib/itemDetailContext'
 import {
   DEFAULT_MODULES,
@@ -41,6 +44,7 @@ import {
 } from '@/lib/modules'
 import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
 import { StorageKeys, removeKey } from '@/lib/storage'
+import { readTabFromHash, tabHash } from '@/lib/routes'
 import {
   BUILTIN_ID,
   addServerTarget,
@@ -90,25 +94,6 @@ const DEFAULT_SERVER_INFO: ServerInfo = { allowCustom: false, default: null }
  * 而 data/meta.json 为 "1.4.5.8"。规范化后再比较，避免误报版本不一致。
  */
 const normalizeVersion = (version: string) => version.trim().replace(/^v/i, '')
-
-/** 页签与 URL hash 双向同步；不引入路由库，也不改变后端接口。 */
-function readTabFromHash(): TabId | null {
-  if (typeof window === 'undefined') return null
-  const raw = window.location.hash.replace(/^#\/?/, '')
-  if (!raw) return null
-  try {
-    const decoded = decodeURIComponent(raw)
-    // `#/cmd` 是规范地址；`#/editor` 作为旧链接兼容，会在同步 effect 中替换。
-    if (decoded === 'cmd' || decoded === 'editor') return 'editor'
-    return decoded as TabId
-  } catch {
-    return null
-  }
-}
-
-function tabHash(tab: TabId): string {
-  return `#/${encodeURIComponent(tab === 'editor' ? 'cmd' : tab)}`
-}
 
 interface AppProps {
   /** 测试或嵌入时可注入；默认按 VITE_TRANSPORT 选择。 */
@@ -284,11 +269,11 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   })()
 
   useEffect(() => {
-    const nextHash = tabHash(activeTab)
+    const nextHash = tabHash(activeTab, customModules)
     if (window.location.hash !== nextHash) {
       window.history.replaceState(null, '', nextHash)
     }
-  }, [activeTab])
+  }, [activeTab, customModules])
 
   // 侧边栏导航：固定项 + 已激活模块入口（玩家管理 / 鱼店）。
   // 注意：必须在任何 early return 之前声明（Hooks 顺序稳定）；模块按服务器区分。
@@ -296,8 +281,14 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     const items: NavItem[] = [
       { id: 'home', label: t('nav.home'), icon: House, group: 'primary' },
       { id: 'editor', label: t('nav.editor'), icon: Terminal, group: 'primary' },
+      { id: 'commands', label: t('nav.commands'), icon: ScrollText, group: 'primary', onPrefetch: () => preloadRoute('commands') },
       { id: 'items', label: t('nav.items'), icon: BookOpen, group: 'library', onPrefetch: preloadItems },
       { id: 'dataid', label: t('nav.dataId'), icon: LayoutGrid, group: 'library', onPrefetch: () => preloadRoute('dataid') },
+      // 查看存档是公开工具（上传本地 .plr，不读 TShock），不跟随「玩家管理」模块开关。
+      { id: 'save', label: t('nav.save'), icon: UserRound, group: 'players', onPrefetch: () => preloadRoute('save') },
+      // 查看世界同样是公开工具（上传本地 .wld，不读 TShock），排在「世界管理」模块之前。
+      { id: 'worldview', label: t('nav.worldView'), icon: MapIcon, group: 'world', onPrefetch: () => preloadRoute('worldview') },
+      // 指令小抄：世界事件 / 时间 / 召唤等指令的生成器（不依赖插件，恒在）。
     ]
     const icons: Record<string, typeof House> = { players: Users, store: Fish, requisition: ClipboardList, world: Globe2 }
     const groups: Record<string, NavItem['group']> = {
@@ -646,7 +637,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     return (
       <div className="grid min-h-screen place-items-center p-6">
         <Card className="max-w-md">
-          <CardBody className="flex flex-col gap-3 pt-4">
+          <CardBody className="flex flex-col gap-3 pt-2">
             <h1 className="text-base font-semibold text-destructive">{t('app.loadError')}</h1>
             <p className="text-sm text-foreground/80">{loadError}</p>
             <p className="text-xs text-foreground/60">{t('app.loadErrorHint')}</p>
@@ -716,6 +707,9 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     </div>
   )
 
+  // 浮动终端只在「指令」「设置」两页不出现（那两页不需要边看边执行）。
+  const terminalAllowed = activeTab !== 'editor' && activeTab !== 'settings'
+
   // 侧栏账号卡片上的服务器地址（遮挡展示；内置项不再显示「服务器默认」）。
   const accountServerLabel =
     activeServerId === BUILTIN_ID
@@ -731,6 +725,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         <CommandResultsProvider serverId={activeServerId}>
         <div className="h-full">
         <ItemDetailProvider api={itemDetailApi}>
+        <TerminalProvider>
         <AppShell
           activeTab={activeTab}
           onTabChange={navigate}
@@ -742,6 +737,11 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               onThemeChange={(theme) => setSettings({ ...settings, theme })}
               onLanguageChange={(language) => setSettings({ ...settings, language })}
             />
+          }
+          headerActions={
+            terminalAllowed && session.authenticated ? (
+              <TerminalTopBarButton visible />
+            ) : undefined
           }
           sidebarCollapsed={ui.sidebarCollapsed}
           onToggleSidebar={() => setUi({ ...ui, sidebarCollapsed: !ui.sidebarCollapsed })}
@@ -806,6 +806,24 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             onSettingsChange={(patch) => setSettings({ ...settings, ...patch })}
           />
         </AppShell>
+        <CommandTerminal
+          visible={terminalAllowed}
+          dataset={view}
+          transport={transport}
+          authenticated={session.authenticated}
+          serverId={activeServerId}
+          players={players}
+          ingameAllowed={ingameAllowed}
+          runtimeValues={runtimeParams}
+          settings={settings}
+          onTokenInvalid={handleTokenInvalid}
+          onLogin={() => {
+            setLoginReason(null)
+            setLoginOpen(true)
+          }}
+          onNavigate={navigate}
+        />
+        </TerminalProvider>
         </ItemDetailProvider>
 
         <Dialog open={confirmLogoutOpen} onOpenChange={setConfirmLogoutOpen}>

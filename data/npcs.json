@@ -2,24 +2,28 @@
  "meta": {
   "gameVersion": "1.4.5.8",
   "count": 694,
-  "source": "Terraria.ID/NPCID.cs + loc.NPCName + TShockAPI/Commands.cs SpawnBoss()"
+  "source": "Terraria.ID/NPCID.cs + loc.NPCName + loc.en-US + TShockAPI/Commands.cs SpawnBoss()"
  },
  "npcs": [
   {
    "id": 1,
-   "key": "BlueSlime"
+   "key": "BlueSlime",
+   "en": "Blue Slime"
   },
   {
    "id": 2,
-   "key": "DemonEye"
+   "key": "DemonEye",
+   "en": "Demon Eye"
   },
   {
    "id": 3,
-   "key": "Zombie"
+   "key": "Zombie",
+   "en": "Zombie"
   },
   {
    "id": 4,
    "key": "EyeofCthulhu",
+   "en": "Eye of Cthulhu",
    "sb": "eye of cthulhu",
    "sbAliases": [
     "eoc",
@@ -30,39 +34,48 @@
   },
   {
    "id": 5,
-   "key": "ServantofCthulhu"
+   "key": "ServantofCthulhu",
+   "en": "Servant of Cthulhu"
   },
   {
    "id": 6,
-   "key": "EaterofSouls"
+   "key": "EaterofSouls",
+   "en": "Eater of Souls"
   },
   {
    "id": 7,
-   "key": "DevourerHead"
+   "key": "DevourerHead",
+   "en": "Devourer"
   },
   {
    "id": 8,
-   "key": "DevourerBody"
+   "key": "DevourerBody",
+   "en": "Devourer"
   },
   {
    "id": 9,
-   "key": "DevourerTail"
+   "key": "DevourerTail",
+   "en": "Devourer"
   },
   {
    "id": 10,
-   "key": "GiantWormHead"
+   "key": "GiantWormHead",
+   "en": "Giant Worm"
   },
   {
    "id": 11,
-   "key": "GiantWormBody"
+   "key": "GiantWormBody",
+   "en": "Giant Worm"
   },
   {
    "id": 12,
-   "key": "GiantWormTail"
+   "key": "GiantWormTail",
+   "en": "Giant Worm"
   },
   {
    "id": 13,
    "key": "EaterofWorldsHead",
+   "en": "Eater of Worlds",
    "sb": "eater of worlds",
    "sbAliases": [
     "eater",
@@ -73,153 +86,190 @@
   },
   {
    "id": 14,
-   "key": "EaterofWorldsBody"
+   "key": "EaterofWorldsBody",
+   "en": "Eater of Worlds"
   },
   {
    "id": 15,
-   "key": "EaterofWorldsTail"
+   "key": "EaterofWorldsTail",
+   "en": "Eater of Worlds"
   },
   {
    "id": 16,
-   "key": "MotherSlime"
+   "key": "MotherSlime",
+   "en": "Mother Slime"
   },
   {
    "id": 17,
-   "key": "Merchant"
+   "key": "Merchant",
+   "en": "Merchant"
   },
   {
    "id": 18,
-   "key": "Nurse"
+   "key": "Nurse",
+   "en": "Nurse"
   },
   {
    "id": 19,
-   "key": "ArmsDealer"
+   "key": "ArmsDealer",
+   "en": "Arms Dealer"
   },
   {
    "id": 20,
-   "key": "Dryad"
+   "key": "Dryad",
+   "en": "Dryad"
   },
   {
    "id": 21,
-   "key": "Skeleton"
+   "key": "Skeleton",
+   "en": "Skeleton"
   },
   {
    "id": 22,
-   "key": "Guide"
+   "key": "Guide",
+   "en": "Guide"
   },
   {
    "id": 23,
-   "key": "MeteorHead"
+   "key": "MeteorHead",
+   "en": "Meteor Head"
   },
   {
    "id": 24,
-   "key": "FireImp"
+   "key": "FireImp",
+   "en": "Fire Imp"
   },
   {
    "id": 25,
-   "key": "BurningSphere"
+   "key": "BurningSphere",
+   "en": "Burning Sphere"
   },
   {
    "id": 26,
-   "key": "GoblinPeon"
+   "key": "GoblinPeon",
+   "en": "Goblin Peon"
   },
   {
    "id": 27,
-   "key": "GoblinThief"
+   "key": "GoblinThief",
+   "en": "Goblin Thief"
   },
   {
    "id": 28,
-   "key": "GoblinWarrior"
+   "key": "GoblinWarrior",
+   "en": "Goblin Warrior"
   },
   {
    "id": 29,
-   "key": "GoblinSorcerer"
+   "key": "GoblinSorcerer",
+   "en": "Goblin Sorcerer"
   },
   {
    "id": 30,
-   "key": "ChaosBall"
+   "key": "ChaosBall",
+   "en": "Chaos Ball"
   },
   {
    "id": 31,
-   "key": "AngryBones"
+   "key": "AngryBones",
+   "en": "Angry Bones"
   },
   {
    "id": 32,
-   "key": "DarkCaster"
+   "key": "DarkCaster",
+   "en": "Dark Caster"
   },
   {
    "id": 33,
-   "key": "WaterSphere"
+   "key": "WaterSphere",
+   "en": "Water Sphere"
   },
   {
    "id": 34,
-   "key": "CursedSkull"
+   "key": "CursedSkull",
+   "en": "Cursed Skull"
   },
   {
    "id": 35,
    "key": "SkeletronHead",
+   "en": "Skeletron",
    "sb": "skeletron",
    "sbAll": true
   },
   {
    "id": 36,
-   "key": "SkeletronHand"
+   "key": "SkeletronHand",
+   "en": "Skeletron"
   },
   {
    "id": 37,
-   "key": "OldMan"
+   "key": "OldMan",
+   "en": "Old Man"
   },
   {
    "id": 38,
-   "key": "Demolitionist"
+   "key": "Demolitionist",
+   "en": "Demolitionist"
   },
   {
    "id": 39,
-   "key": "BoneSerpentHead"
+   "key": "BoneSerpentHead",
+   "en": "Bone Serpent"
   },
   {
    "id": 40,
-   "key": "BoneSerpentBody"
+   "key": "BoneSerpentBody",
+   "en": "Bone Serpent"
   },
   {
    "id": 41,
-   "key": "BoneSerpentTail"
+   "key": "BoneSerpentTail",
+   "en": "Bone Serpent"
   },
   {
    "id": 42,
-   "key": "Hornet"
+   "key": "Hornet",
+   "en": "Hornet"
   },
   {
    "id": 43,
-   "key": "ManEater"
+   "key": "ManEater",
+   "en": "Man Eater"
   },
   {
    "id": 44,
-   "key": "UndeadMiner"
+   "key": "UndeadMiner",
+   "en": "Undead Miner"
   },
   {
    "id": 45,
-   "key": "Tim"
+   "key": "Tim",
+   "en": "Tim"
   },
   {
    "id": 46,
-   "key": "Bunny"
+   "key": "Bunny",
+   "en": "Bunny"
   },
   {
    "id": 47,
-   "key": "CorruptBunny"
+   "key": "CorruptBunny",
+   "en": "Corrupt Bunny"
   },
   {
    "id": 48,
-   "key": "Harpy"
+   "key": "Harpy",
+   "en": "Harpy"
   },
   {
    "id": 49,
-   "key": "CaveBat"
+   "key": "CaveBat",
+   "en": "Cave Bat"
   },
   {
    "id": 50,
    "key": "KingSlime",
+   "en": "King Slime",
    "sb": "king slime",
    "sbAliases": [
     "king",
@@ -230,251 +280,313 @@
   },
   {
    "id": 51,
-   "key": "JungleBat"
+   "key": "JungleBat",
+   "en": "Jungle Bat"
   },
   {
    "id": 52,
-   "key": "DoctorBones"
+   "key": "DoctorBones",
+   "en": "Doctor Bones"
   },
   {
    "id": 53,
-   "key": "TheGroom"
+   "key": "TheGroom",
+   "en": "The Groom"
   },
   {
    "id": 54,
-   "key": "Clothier"
+   "key": "Clothier",
+   "en": "Clothier"
   },
   {
    "id": 55,
-   "key": "Goldfish"
+   "key": "Goldfish",
+   "en": "Goldfish"
   },
   {
    "id": 56,
-   "key": "Snatcher"
+   "key": "Snatcher",
+   "en": "Snatcher"
   },
   {
    "id": 57,
-   "key": "CorruptGoldfish"
+   "key": "CorruptGoldfish",
+   "en": "Corrupt Goldfish"
   },
   {
    "id": 58,
-   "key": "Piranha"
+   "key": "Piranha",
+   "en": "Piranha"
   },
   {
    "id": 59,
-   "key": "LavaSlime"
+   "key": "LavaSlime",
+   "en": "Lava Slime"
   },
   {
    "id": 60,
-   "key": "Hellbat"
+   "key": "Hellbat",
+   "en": "Hellbat"
   },
   {
    "id": 61,
-   "key": "Vulture"
+   "key": "Vulture",
+   "en": "Vulture"
   },
   {
    "id": 62,
-   "key": "Demon"
+   "key": "Demon",
+   "en": "Demon"
   },
   {
    "id": 63,
-   "key": "BlueJellyfish"
+   "key": "BlueJellyfish",
+   "en": "Blue Jellyfish"
   },
   {
    "id": 64,
-   "key": "PinkJellyfish"
+   "key": "PinkJellyfish",
+   "en": "Pink Jellyfish"
   },
   {
    "id": 65,
-   "key": "Shark"
+   "key": "Shark",
+   "en": "Shark"
   },
   {
    "id": 66,
-   "key": "VoodooDemon"
+   "key": "VoodooDemon",
+   "en": "Voodoo Demon"
   },
   {
    "id": 67,
-   "key": "Crab"
+   "key": "Crab",
+   "en": "Crab"
   },
   {
    "id": 68,
-   "key": "DungeonGuardian"
+   "key": "DungeonGuardian",
+   "en": "Dungeon Guardian"
   },
   {
    "id": 69,
-   "key": "Antlion"
+   "key": "Antlion",
+   "en": "Antlion"
   },
   {
    "id": 70,
-   "key": "SpikeBall"
+   "key": "SpikeBall",
+   "en": "Spike Ball"
   },
   {
    "id": 71,
-   "key": "DungeonSlime"
+   "key": "DungeonSlime",
+   "en": "Dungeon Slime"
   },
   {
    "id": 72,
-   "key": "BlazingWheel"
+   "key": "BlazingWheel",
+   "en": "Blazing Wheel"
   },
   {
    "id": 73,
-   "key": "GoblinScout"
+   "key": "GoblinScout",
+   "en": "Goblin Scout"
   },
   {
    "id": 74,
-   "key": "Bird"
+   "key": "Bird",
+   "en": "Bird"
   },
   {
    "id": 75,
-   "key": "Pixie"
+   "key": "Pixie",
+   "en": "Pixie"
   },
   {
    "id": 77,
-   "key": "ArmoredSkeleton"
+   "key": "ArmoredSkeleton",
+   "en": "Armored Skeleton"
   },
   {
    "id": 78,
-   "key": "Mummy"
+   "key": "Mummy",
+   "en": "Mummy"
   },
   {
    "id": 79,
-   "key": "DarkMummy"
+   "key": "DarkMummy",
+   "en": "Dark Mummy"
   },
   {
    "id": 80,
-   "key": "LightMummy"
+   "key": "LightMummy",
+   "en": "Light Mummy"
   },
   {
    "id": 81,
-   "key": "CorruptSlime"
+   "key": "CorruptSlime",
+   "en": "Corrupt Slime"
   },
   {
    "id": 82,
-   "key": "Wraith"
+   "key": "Wraith",
+   "en": "Wraith"
   },
   {
    "id": 83,
-   "key": "CursedHammer"
+   "key": "CursedHammer",
+   "en": "Cursed Hammer"
   },
   {
    "id": 84,
-   "key": "EnchantedSword"
+   "key": "EnchantedSword",
+   "en": "Enchanted Sword"
   },
   {
    "id": 85,
-   "key": "Mimic"
+   "key": "Mimic",
+   "en": "Mimic"
   },
   {
    "id": 86,
-   "key": "Unicorn"
+   "key": "Unicorn",
+   "en": "Unicorn"
   },
   {
    "id": 87,
-   "key": "WyvernHead"
+   "key": "WyvernHead",
+   "en": "Wyvern"
   },
   {
    "id": 88,
-   "key": "WyvernLegs"
+   "key": "WyvernLegs",
+   "en": "Wyvern"
   },
   {
    "id": 89,
-   "key": "WyvernBody"
+   "key": "WyvernBody",
+   "en": "Wyvern"
   },
   {
    "id": 90,
-   "key": "WyvernBody2"
+   "key": "WyvernBody2",
+   "en": "Wyvern"
   },
   {
    "id": 91,
-   "key": "WyvernBody3"
+   "key": "WyvernBody3",
+   "en": "Wyvern"
   },
   {
    "id": 92,
-   "key": "WyvernTail"
+   "key": "WyvernTail",
+   "en": "Wyvern"
   },
   {
    "id": 93,
-   "key": "GiantBat"
+   "key": "GiantBat",
+   "en": "Giant Bat"
   },
   {
    "id": 94,
-   "key": "Corruptor"
+   "key": "Corruptor",
+   "en": "Corruptor"
   },
   {
    "id": 95,
-   "key": "DiggerHead"
+   "key": "DiggerHead",
+   "en": "Digger"
   },
   {
    "id": 96,
-   "key": "DiggerBody"
+   "key": "DiggerBody",
+   "en": "Digger"
   },
   {
    "id": 97,
-   "key": "DiggerTail"
+   "key": "DiggerTail",
+   "en": "Digger"
   },
   {
    "id": 98,
-   "key": "SeekerHead"
+   "key": "SeekerHead",
+   "en": "World Feeder"
   },
   {
    "id": 99,
-   "key": "SeekerBody"
+   "key": "SeekerBody",
+   "en": "World Feeder"
   },
   {
    "id": 100,
-   "key": "SeekerTail"
+   "key": "SeekerTail",
+   "en": "World Feeder"
   },
   {
    "id": 101,
-   "key": "Clinger"
+   "key": "Clinger",
+   "en": "Clinger"
   },
   {
    "id": 102,
-   "key": "AnglerFish"
+   "key": "AnglerFish",
+   "en": "Angler Fish"
   },
   {
    "id": 103,
-   "key": "GreenJellyfish"
+   "key": "GreenJellyfish",
+   "en": "Green Jellyfish"
   },
   {
    "id": 104,
-   "key": "Werewolf"
+   "key": "Werewolf",
+   "en": "Werewolf"
   },
   {
    "id": 105,
-   "key": "BoundGoblin"
+   "key": "BoundGoblin",
+   "en": "Bound Goblin"
   },
   {
    "id": 106,
-   "key": "BoundWizard"
+   "key": "BoundWizard",
+   "en": "Bound Wizard"
   },
   {
    "id": 107,
-   "key": "GoblinTinkerer"
+   "key": "GoblinTinkerer",
+   "en": "Goblin Tinkerer"
   },
   {
    "id": 108,
-   "key": "Wizard"
+   "key": "Wizard",
+   "en": "Wizard"
   },
   {
    "id": 109,
-   "key": "Clown"
+   "key": "Clown",
+   "en": "Clown"
   },
   {
    "id": 110,
-   "key": "SkeletonArcher"
+   "key": "SkeletonArcher",
+   "en": "Skeleton Archer"
   },
   {
    "id": 111,
-   "key": "GoblinArcher"
+   "key": "GoblinArcher",
+   "en": "Goblin Archer"
   },
   {
    "id": 112,
-   "key": "VileSpit"
+   "key": "VileSpit",
+   "en": "Vile Spit"
   },
   {
    "id": 113,
    "key": "WallofFlesh",
+   "en": "Wall of Flesh",
    "sb": "wall of flesh",
    "sbAliases": [
     "wall of flesh",
@@ -483,63 +595,77 @@
   },
   {
    "id": 114,
-   "key": "WallofFleshEye"
+   "key": "WallofFleshEye",
+   "en": "Wall of Flesh"
   },
   {
    "id": 115,
-   "key": "TheHungry"
+   "key": "TheHungry",
+   "en": "The Hungry"
   },
   {
    "id": 116,
-   "key": "TheHungryII"
+   "key": "TheHungryII",
+   "en": "The Hungry"
   },
   {
    "id": 117,
-   "key": "LeechHead"
+   "key": "LeechHead",
+   "en": "Leech"
   },
   {
    "id": 118,
-   "key": "LeechBody"
+   "key": "LeechBody",
+   "en": "Leech"
   },
   {
    "id": 119,
-   "key": "LeechTail"
+   "key": "LeechTail",
+   "en": "Leech"
   },
   {
    "id": 120,
-   "key": "ChaosElemental"
+   "key": "ChaosElemental",
+   "en": "Chaos Elemental"
   },
   {
    "id": 121,
-   "key": "Slimer"
+   "key": "Slimer",
+   "en": "Slimer"
   },
   {
    "id": 122,
-   "key": "Gastropod"
+   "key": "Gastropod",
+   "en": "Gastropod"
   },
   {
    "id": 123,
-   "key": "BoundMechanic"
+   "key": "BoundMechanic",
+   "en": "Bound Mechanic"
   },
   {
    "id": 124,
-   "key": "Mechanic"
+   "key": "Mechanic",
+   "en": "Mechanic"
   },
   {
    "id": 125,
    "key": "Retinazer",
+   "en": "Retinazer",
    "sb": "twins",
    "sbAll": true
   },
   {
    "id": 126,
    "key": "Spazmatism",
+   "en": "Spazmatism",
    "sb": "twins",
    "sbAll": true
   },
   {
    "id": 127,
    "key": "SkeletronPrime",
+   "en": "Skeletron Prime",
    "sb": "skeletron prime",
    "sbAliases": [
     "prime",
@@ -549,381 +675,475 @@
   },
   {
    "id": 128,
-   "key": "PrimeCannon"
+   "key": "PrimeCannon",
+   "en": "Prime Cannon"
   },
   {
    "id": 129,
-   "key": "PrimeSaw"
+   "key": "PrimeSaw",
+   "en": "Prime Saw"
   },
   {
    "id": 130,
-   "key": "PrimeVice"
+   "key": "PrimeVice",
+   "en": "Prime Vice"
   },
   {
    "id": 131,
-   "key": "PrimeLaser"
+   "key": "PrimeLaser",
+   "en": "Prime Laser"
   },
   {
    "id": 132,
-   "key": "BaldZombie"
+   "key": "BaldZombie",
+   "en": "Zombie"
   },
   {
    "id": 133,
-   "key": "WanderingEye"
+   "key": "WanderingEye",
+   "en": "Wandering Eye"
   },
   {
    "id": 134,
    "key": "TheDestroyer",
+   "en": "The Destroyer",
    "sb": "destroyer",
    "sbAll": true
   },
   {
    "id": 135,
-   "key": "TheDestroyerBody"
+   "key": "TheDestroyerBody",
+   "en": "The Destroyer"
   },
   {
    "id": 136,
-   "key": "TheDestroyerTail"
+   "key": "TheDestroyerTail",
+   "en": "The Destroyer"
   },
   {
    "id": 137,
-   "key": "IlluminantBat"
+   "key": "IlluminantBat",
+   "en": "Illuminant Bat"
   },
   {
    "id": 138,
-   "key": "IlluminantSlime"
+   "key": "IlluminantSlime",
+   "en": "Illuminant Slime"
   },
   {
    "id": 139,
-   "key": "Probe"
+   "key": "Probe",
+   "en": "Probe"
   },
   {
    "id": 140,
-   "key": "PossessedArmor"
+   "key": "PossessedArmor",
+   "en": "Possessed Armor"
   },
   {
    "id": 141,
-   "key": "ToxicSludge"
+   "key": "ToxicSludge",
+   "en": "Toxic Sludge"
   },
   {
    "id": 142,
-   "key": "SantaClaus"
+   "key": "SantaClaus",
+   "en": "Santa Claus"
   },
   {
    "id": 143,
-   "key": "SnowmanGangsta"
+   "key": "SnowmanGangsta",
+   "en": "Snowman Gangsta"
   },
   {
    "id": 144,
-   "key": "MisterStabby"
+   "key": "MisterStabby",
+   "en": "Mister Stabby"
   },
   {
    "id": 145,
-   "key": "SnowBalla"
+   "key": "SnowBalla",
+   "en": "Snow Balla"
   },
   {
    "id": 147,
-   "key": "IceSlime"
+   "key": "IceSlime",
+   "en": "Ice Slime"
   },
   {
    "id": 148,
-   "key": "Penguin"
+   "key": "Penguin",
+   "en": "Penguin"
   },
   {
    "id": 149,
-   "key": "PenguinBlack"
+   "key": "PenguinBlack",
+   "en": "Penguin"
   },
   {
    "id": 150,
-   "key": "IceBat"
+   "key": "IceBat",
+   "en": "Ice Bat"
   },
   {
    "id": 151,
-   "key": "Lavabat"
+   "key": "Lavabat",
+   "en": "Lava Bat"
   },
   {
    "id": 152,
-   "key": "GiantFlyingFox"
+   "key": "GiantFlyingFox",
+   "en": "Giant Flying Fox"
   },
   {
    "id": 153,
-   "key": "GiantTortoise"
+   "key": "GiantTortoise",
+   "en": "Giant Tortoise"
   },
   {
    "id": 154,
-   "key": "IceTortoise"
+   "key": "IceTortoise",
+   "en": "Ice Tortoise"
   },
   {
    "id": 155,
-   "key": "Wolf"
+   "key": "Wolf",
+   "en": "Wolf"
   },
   {
    "id": 156,
-   "key": "RedDevil"
+   "key": "RedDevil",
+   "en": "Red Devil"
   },
   {
    "id": 157,
-   "key": "Arapaima"
+   "key": "Arapaima",
+   "en": "Arapaima"
   },
   {
    "id": 158,
-   "key": "VampireBat"
+   "key": "VampireBat",
+   "en": "Vampire"
   },
   {
    "id": 159,
-   "key": "Vampire"
+   "key": "Vampire",
+   "en": "Vampire"
   },
   {
    "id": 160,
-   "key": "Truffle"
+   "key": "Truffle",
+   "en": "Truffle"
   },
   {
    "id": 161,
-   "key": "ZombieEskimo"
+   "key": "ZombieEskimo",
+   "en": "Frozen Zombie"
   },
   {
    "id": 162,
-   "key": "Frankenstein"
+   "key": "Frankenstein",
+   "en": "Frankenstein"
   },
   {
    "id": 163,
-   "key": "BlackRecluse"
+   "key": "BlackRecluse",
+   "en": "Black Recluse"
   },
   {
    "id": 164,
-   "key": "WallCreeper"
+   "key": "WallCreeper",
+   "en": "Wall Creeper"
   },
   {
    "id": 165,
-   "key": "WallCreeperWall"
+   "key": "WallCreeperWall",
+   "en": "Wall Creeper"
   },
   {
    "id": 166,
-   "key": "SwampThing"
+   "key": "SwampThing",
+   "en": "Swamp Thing"
   },
   {
    "id": 167,
-   "key": "UndeadViking"
+   "key": "UndeadViking",
+   "en": "Undead Viking"
   },
   {
    "id": 168,
-   "key": "CorruptPenguin"
+   "key": "CorruptPenguin",
+   "en": "Corrupt Penguin"
   },
   {
    "id": 169,
-   "key": "IceElemental"
+   "key": "IceElemental",
+   "en": "Ice Elemental"
   },
   {
    "id": 170,
-   "key": "PigronCorruption"
+   "key": "PigronCorruption",
+   "en": "Pigron"
   },
   {
    "id": 171,
-   "key": "PigronHallow"
+   "key": "PigronHallow",
+   "en": "Pigron"
   },
   {
    "id": 172,
-   "key": "RuneWizard"
+   "key": "RuneWizard",
+   "en": "Rune Wizard"
   },
   {
    "id": 173,
-   "key": "Crimera"
+   "key": "Crimera",
+   "en": "Crimera"
   },
   {
    "id": 174,
-   "key": "Herpling"
+   "key": "Herpling",
+   "en": "Herpling"
   },
   {
    "id": 175,
-   "key": "AngryTrapper"
+   "key": "AngryTrapper",
+   "en": "Angry Trapper"
   },
   {
    "id": 176,
-   "key": "MossHornet"
+   "key": "MossHornet",
+   "en": "Moss Hornet"
   },
   {
    "id": 177,
-   "key": "Derpling"
+   "key": "Derpling",
+   "en": "Derpling"
   },
   {
    "id": 178,
-   "key": "Steampunker"
+   "key": "Steampunker",
+   "en": "Steampunker"
   },
   {
    "id": 179,
-   "key": "CrimsonAxe"
+   "key": "CrimsonAxe",
+   "en": "Crimson Axe"
   },
   {
    "id": 180,
-   "key": "PigronCrimson"
+   "key": "PigronCrimson",
+   "en": "Pigron"
   },
   {
    "id": 181,
-   "key": "FaceMonster"
+   "key": "FaceMonster",
+   "en": "Face Monster"
   },
   {
    "id": 182,
-   "key": "FloatyGross"
+   "key": "FloatyGross",
+   "en": "Floaty Gross"
   },
   {
    "id": 183,
-   "key": "Crimslime"
+   "key": "Crimslime",
+   "en": "Crimslime"
   },
   {
    "id": 184,
-   "key": "SpikedIceSlime"
+   "key": "SpikedIceSlime",
+   "en": "Spiked Ice Slime"
   },
   {
    "id": 185,
-   "key": "SnowFlinx"
+   "key": "SnowFlinx",
+   "en": "Snow Flinx"
   },
   {
    "id": 186,
-   "key": "PincushionZombie"
+   "key": "PincushionZombie",
+   "en": "Zombie"
   },
   {
    "id": 187,
-   "key": "SlimedZombie"
+   "key": "SlimedZombie",
+   "en": "Zombie"
   },
   {
    "id": 188,
-   "key": "SwampZombie"
+   "key": "SwampZombie",
+   "en": "Zombie"
   },
   {
    "id": 189,
-   "key": "TwiggyZombie"
+   "key": "TwiggyZombie",
+   "en": "Zombie"
   },
   {
    "id": 190,
-   "key": "CataractEye"
+   "key": "CataractEye",
+   "en": "Demon Eye"
   },
   {
    "id": 191,
-   "key": "SleepyEye"
+   "key": "SleepyEye",
+   "en": "Demon Eye"
   },
   {
    "id": 192,
-   "key": "DialatedEye"
+   "key": "DialatedEye",
+   "en": "Demon Eye"
   },
   {
    "id": 193,
-   "key": "GreenEye"
+   "key": "GreenEye",
+   "en": "Demon Eye"
   },
   {
    "id": 194,
-   "key": "PurpleEye"
+   "key": "PurpleEye",
+   "en": "Demon Eye"
   },
   {
    "id": 195,
-   "key": "LostGirl"
+   "key": "LostGirl",
+   "en": "Lost Girl"
   },
   {
    "id": 196,
-   "key": "Nymph"
+   "key": "Nymph",
+   "en": "Nymph"
   },
   {
    "id": 197,
-   "key": "ArmoredViking"
+   "key": "ArmoredViking",
+   "en": "Armored Viking"
   },
   {
    "id": 198,
-   "key": "Lihzahrd"
+   "key": "Lihzahrd",
+   "en": "Lihzahrd"
   },
   {
    "id": 199,
-   "key": "LihzahrdCrawler"
+   "key": "LihzahrdCrawler",
+   "en": "Lihzahrd"
   },
   {
    "id": 200,
-   "key": "FemaleZombie"
+   "key": "FemaleZombie",
+   "en": "Zombie"
   },
   {
    "id": 201,
-   "key": "HeadacheSkeleton"
+   "key": "HeadacheSkeleton",
+   "en": "Skeleton"
   },
   {
    "id": 202,
-   "key": "MisassembledSkeleton"
+   "key": "MisassembledSkeleton",
+   "en": "Skeleton"
   },
   {
    "id": 203,
-   "key": "PantlessSkeleton"
+   "key": "PantlessSkeleton",
+   "en": "Skeleton"
   },
   {
    "id": 204,
-   "key": "SpikedJungleSlime"
+   "key": "SpikedJungleSlime",
+   "en": "Spiked Jungle Slime"
   },
   {
    "id": 205,
-   "key": "Moth"
+   "key": "Moth",
+   "en": "Moth"
   },
   {
    "id": 206,
-   "key": "IcyMerman"
+   "key": "IcyMerman",
+   "en": "Icy Merman"
   },
   {
    "id": 207,
-   "key": "DyeTrader"
+   "key": "DyeTrader",
+   "en": "Dye Trader"
   },
   {
    "id": 208,
-   "key": "PartyGirl"
+   "key": "PartyGirl",
+   "en": "Party Girl"
   },
   {
    "id": 209,
-   "key": "Cyborg"
+   "key": "Cyborg",
+   "en": "Cyborg"
   },
   {
    "id": 210,
-   "key": "Bee"
+   "key": "Bee",
+   "en": "Bee"
   },
   {
    "id": 211,
-   "key": "BeeSmall"
+   "key": "BeeSmall",
+   "en": "Bee"
   },
   {
    "id": 212,
-   "key": "PirateDeckhand"
+   "key": "PirateDeckhand",
+   "en": "Pirate Deckhand"
   },
   {
    "id": 213,
-   "key": "PirateCorsair"
+   "key": "PirateCorsair",
+   "en": "Pirate Corsair"
   },
   {
    "id": 214,
-   "key": "PirateDeadeye"
+   "key": "PirateDeadeye",
+   "en": "Pirate Deadeye"
   },
   {
    "id": 215,
-   "key": "PirateCrossbower"
+   "key": "PirateCrossbower",
+   "en": "Pirate Crossbower"
   },
   {
    "id": 216,
-   "key": "PirateCaptain"
+   "key": "PirateCaptain",
+   "en": "Pirate Captain"
   },
   {
    "id": 217,
-   "key": "CochinealBeetle"
+   "key": "CochinealBeetle",
+   "en": "Cochineal Beetle"
   },
   {
    "id": 218,
-   "key": "CyanBeetle"
+   "key": "CyanBeetle",
+   "en": "Cyan Beetle"
   },
   {
    "id": 219,
-   "key": "LacBeetle"
+   "key": "LacBeetle",
+   "en": "Lac Beetle"
   },
   {
    "id": 220,
-   "key": "SeaSnail"
+   "key": "SeaSnail",
+   "en": "Sea Snail"
   },
   {
    "id": 221,
-   "key": "Squid"
+   "key": "Squid",
+   "en": "Squid"
   },
   {
    "id": 222,
    "key": "QueenBee",
+   "en": "Queen Bee",
    "sb": "queen bee",
    "sbAliases": [
     "qb",
@@ -933,183 +1153,227 @@
   },
   {
    "id": 223,
-   "key": "ZombieRaincoat"
+   "key": "ZombieRaincoat",
+   "en": "Raincoat Zombie"
   },
   {
    "id": 224,
-   "key": "FlyingFish"
+   "key": "FlyingFish",
+   "en": "Flying Fish"
   },
   {
    "id": 225,
-   "key": "UmbrellaSlime"
+   "key": "UmbrellaSlime",
+   "en": "Umbrella Slime"
   },
   {
    "id": 226,
-   "key": "FlyingSnake"
+   "key": "FlyingSnake",
+   "en": "Flying Snake"
   },
   {
    "id": 227,
-   "key": "Painter"
+   "key": "Painter",
+   "en": "Painter"
   },
   {
    "id": 228,
-   "key": "WitchDoctor"
+   "key": "WitchDoctor",
+   "en": "Witch Doctor"
   },
   {
    "id": 229,
-   "key": "Pirate"
+   "key": "Pirate",
+   "en": "Pirate"
   },
   {
    "id": 230,
-   "key": "GoldfishWalker"
+   "key": "GoldfishWalker",
+   "en": "Goldfish"
   },
   {
    "id": 231,
-   "key": "HornetFatty"
+   "key": "HornetFatty",
+   "en": "Hornet"
   },
   {
    "id": 232,
-   "key": "HornetHoney"
+   "key": "HornetHoney",
+   "en": "Hornet"
   },
   {
    "id": 233,
-   "key": "HornetLeafy"
+   "key": "HornetLeafy",
+   "en": "Hornet"
   },
   {
    "id": 234,
-   "key": "HornetSpikey"
+   "key": "HornetSpikey",
+   "en": "Hornet"
   },
   {
    "id": 235,
-   "key": "HornetStingy"
+   "key": "HornetStingy",
+   "en": "Hornet"
   },
   {
    "id": 236,
-   "key": "JungleCreeper"
+   "key": "JungleCreeper",
+   "en": "Jungle Creeper"
   },
   {
    "id": 237,
-   "key": "JungleCreeperWall"
+   "key": "JungleCreeperWall",
+   "en": "Jungle Creeper"
   },
   {
    "id": 238,
-   "key": "BlackRecluseWall"
+   "key": "BlackRecluseWall",
+   "en": "Black Recluse"
   },
   {
    "id": 239,
-   "key": "BloodCrawler"
+   "key": "BloodCrawler",
+   "en": "Blood Crawler"
   },
   {
    "id": 240,
-   "key": "BloodCrawlerWall"
+   "key": "BloodCrawlerWall",
+   "en": "Blood Crawler"
   },
   {
    "id": 241,
-   "key": "BloodFeeder"
+   "key": "BloodFeeder",
+   "en": "Blood Feeder"
   },
   {
    "id": 242,
-   "key": "BloodJelly"
+   "key": "BloodJelly",
+   "en": "Blood Jelly"
   },
   {
    "id": 243,
-   "key": "IceGolem"
+   "key": "IceGolem",
+   "en": "Ice Golem"
   },
   {
    "id": 244,
-   "key": "RainbowSlime"
+   "key": "RainbowSlime",
+   "en": "Rainbow Slime"
   },
   {
    "id": 245,
    "key": "Golem",
+   "en": "Golem",
    "sb": "golem",
    "sbAll": true
   },
   {
    "id": 246,
-   "key": "GolemHead"
+   "key": "GolemHead",
+   "en": "Golem Head"
   },
   {
    "id": 247,
-   "key": "GolemFistLeft"
+   "key": "GolemFistLeft",
+   "en": "Golem Fist"
   },
   {
    "id": 248,
-   "key": "GolemFistRight"
+   "key": "GolemFistRight",
+   "en": "Golem Fist"
   },
   {
    "id": 249,
-   "key": "GolemHeadFree"
+   "key": "GolemHeadFree",
+   "en": "Golem Head"
   },
   {
    "id": 250,
-   "key": "AngryNimbus"
+   "key": "AngryNimbus",
+   "en": "Angry Nimbus"
   },
   {
    "id": 251,
-   "key": "Eyezor"
+   "key": "Eyezor",
+   "en": "Eyezor"
   },
   {
    "id": 252,
-   "key": "Parrot"
+   "key": "Parrot",
+   "en": "Parrot"
   },
   {
    "id": 253,
-   "key": "Reaper"
+   "key": "Reaper",
+   "en": "Reaper"
   },
   {
    "id": 254,
-   "key": "ZombieMushroom"
+   "key": "ZombieMushroom",
+   "en": "Spore Zombie"
   },
   {
    "id": 255,
-   "key": "ZombieMushroomHat"
+   "key": "ZombieMushroomHat",
+   "en": "Spore Zombie"
   },
   {
    "id": 256,
-   "key": "FungoFish"
+   "key": "FungoFish",
+   "en": "Fungo Fish"
   },
   {
    "id": 257,
-   "key": "AnomuraFungus"
+   "key": "AnomuraFungus",
+   "en": "Anomura Fungus"
   },
   {
    "id": 258,
-   "key": "MushiLadybug"
+   "key": "MushiLadybug",
+   "en": "Mushi Ladybug"
   },
   {
    "id": 259,
-   "key": "FungiBulb"
+   "key": "FungiBulb",
+   "en": "Fungi Bulb"
   },
   {
    "id": 260,
-   "key": "GiantFungiBulb"
+   "key": "GiantFungiBulb",
+   "en": "Giant Fungi Bulb"
   },
   {
    "id": 261,
-   "key": "FungiSpore"
+   "key": "FungiSpore",
+   "en": "Fungi Spore"
   },
   {
    "id": 262,
    "key": "Plantera",
+   "en": "Plantera",
    "sb": "plantera",
    "sbAll": true
   },
   {
    "id": 263,
-   "key": "PlanterasHook"
+   "key": "PlanterasHook",
+   "en": "Plantera's Hook"
   },
   {
    "id": 264,
-   "key": "PlanterasTentacle"
+   "key": "PlanterasTentacle",
+   "en": "Plantera's Tentacle"
   },
   {
    "id": 265,
-   "key": "Spore"
+   "key": "Spore",
+   "en": "Spore"
   },
   {
    "id": 266,
    "key": "BrainofCthulhu",
+   "en": "Brain of Cthulhu",
    "sb": "brain of cthulhu",
    "sbAliases": [
     "boc",
@@ -1120,327 +1384,407 @@
   },
   {
    "id": 267,
-   "key": "Creeper"
+   "key": "Creeper",
+   "en": "Creeper"
   },
   {
    "id": 268,
-   "key": "IchorSticker"
+   "key": "IchorSticker",
+   "en": "Ichor Sticker"
   },
   {
    "id": 269,
-   "key": "RustyArmoredBonesAxe"
+   "key": "RustyArmoredBonesAxe",
+   "en": "Rusty Armored Bones"
   },
   {
    "id": 270,
-   "key": "RustyArmoredBonesFlail"
+   "key": "RustyArmoredBonesFlail",
+   "en": "Rusty Armored Bones"
   },
   {
    "id": 271,
-   "key": "RustyArmoredBonesSword"
+   "key": "RustyArmoredBonesSword",
+   "en": "Rusty Armored Bones"
   },
   {
    "id": 272,
-   "key": "RustyArmoredBonesSwordNoArmor"
+   "key": "RustyArmoredBonesSwordNoArmor",
+   "en": "Rusty Armored Bones"
   },
   {
    "id": 273,
-   "key": "BlueArmoredBones"
+   "key": "BlueArmoredBones",
+   "en": "Blue Armored Bones"
   },
   {
    "id": 274,
-   "key": "BlueArmoredBonesMace"
+   "key": "BlueArmoredBonesMace",
+   "en": "Blue Armored Bones"
   },
   {
    "id": 275,
-   "key": "BlueArmoredBonesNoPants"
+   "key": "BlueArmoredBonesNoPants",
+   "en": "Blue Armored Bones"
   },
   {
    "id": 276,
-   "key": "BlueArmoredBonesSword"
+   "key": "BlueArmoredBonesSword",
+   "en": "Blue Armored Bones"
   },
   {
    "id": 277,
-   "key": "HellArmoredBones"
+   "key": "HellArmoredBones",
+   "en": "Hell Armored Bones"
   },
   {
    "id": 278,
-   "key": "HellArmoredBonesSpikeShield"
+   "key": "HellArmoredBonesSpikeShield",
+   "en": "Hell Armored Bones"
   },
   {
    "id": 279,
-   "key": "HellArmoredBonesMace"
+   "key": "HellArmoredBonesMace",
+   "en": "Hell Armored Bones"
   },
   {
    "id": 280,
-   "key": "HellArmoredBonesSword"
+   "key": "HellArmoredBonesSword",
+   "en": "Hell Armored Bones"
   },
   {
    "id": 281,
-   "key": "RaggedCaster"
+   "key": "RaggedCaster",
+   "en": "Ragged Caster"
   },
   {
    "id": 282,
-   "key": "RaggedCasterOpenCoat"
+   "key": "RaggedCasterOpenCoat",
+   "en": "Ragged Caster"
   },
   {
    "id": 283,
-   "key": "Necromancer"
+   "key": "Necromancer",
+   "en": "Necromancer"
   },
   {
    "id": 284,
-   "key": "NecromancerArmored"
+   "key": "NecromancerArmored",
+   "en": "Necromancer"
   },
   {
    "id": 285,
-   "key": "DiabolistRed"
+   "key": "DiabolistRed",
+   "en": "Diabolist"
   },
   {
    "id": 286,
-   "key": "DiabolistWhite"
+   "key": "DiabolistWhite",
+   "en": "Diabolist"
   },
   {
    "id": 287,
-   "key": "BoneLee"
+   "key": "BoneLee",
+   "en": "Bone Lee"
   },
   {
    "id": 288,
-   "key": "DungeonSpirit"
+   "key": "DungeonSpirit",
+   "en": "Dungeon Spirit"
   },
   {
    "id": 289,
-   "key": "GiantCursedSkull"
+   "key": "GiantCursedSkull",
+   "en": "Giant Cursed Skull"
   },
   {
    "id": 290,
-   "key": "Paladin"
+   "key": "Paladin",
+   "en": "Paladin"
   },
   {
    "id": 291,
-   "key": "SkeletonSniper"
+   "key": "SkeletonSniper",
+   "en": "Skeleton Sniper"
   },
   {
    "id": 292,
-   "key": "TacticalSkeleton"
+   "key": "TacticalSkeleton",
+   "en": "Tactical Skeleton"
   },
   {
    "id": 293,
-   "key": "SkeletonCommando"
+   "key": "SkeletonCommando",
+   "en": "Skeleton Commando"
   },
   {
    "id": 294,
-   "key": "AngryBonesBig"
+   "key": "AngryBonesBig",
+   "en": "Angry Bones"
   },
   {
    "id": 295,
-   "key": "AngryBonesBigMuscle"
+   "key": "AngryBonesBigMuscle",
+   "en": "Angry Bones"
   },
   {
    "id": 296,
-   "key": "AngryBonesBigHelmet"
+   "key": "AngryBonesBigHelmet",
+   "en": "Angry Bones"
   },
   {
    "id": 297,
-   "key": "BirdBlue"
+   "key": "BirdBlue",
+   "en": "Blue Jay"
   },
   {
    "id": 298,
-   "key": "BirdRed"
+   "key": "BirdRed",
+   "en": "Cardinal"
   },
   {
    "id": 299,
-   "key": "Squirrel"
+   "key": "Squirrel",
+   "en": "Squirrel"
   },
   {
    "id": 300,
-   "key": "Mouse"
+   "key": "Mouse",
+   "en": "Mouse"
   },
   {
    "id": 301,
-   "key": "Raven"
+   "key": "Raven",
+   "en": "Raven"
   },
   {
    "id": 302,
-   "key": "SlimeMasked"
+   "key": "SlimeMasked",
+   "en": "Slime"
   },
   {
    "id": 303,
-   "key": "BunnySlimed"
+   "key": "BunnySlimed",
+   "en": "Bunny"
   },
   {
    "id": 304,
-   "key": "HoppinJack"
+   "key": "HoppinJack",
+   "en": "Hoppin' Jack"
   },
   {
    "id": 305,
-   "key": "Scarecrow1"
+   "key": "Scarecrow1",
+   "en": "Scarecrow"
   },
   {
    "id": 306,
-   "key": "Scarecrow2"
+   "key": "Scarecrow2",
+   "en": "Scarecrow"
   },
   {
    "id": 307,
-   "key": "Scarecrow3"
+   "key": "Scarecrow3",
+   "en": "Scarecrow"
   },
   {
    "id": 308,
-   "key": "Scarecrow4"
+   "key": "Scarecrow4",
+   "en": "Scarecrow"
   },
   {
    "id": 309,
-   "key": "Scarecrow5"
+   "key": "Scarecrow5",
+   "en": "Scarecrow"
   },
   {
    "id": 310,
-   "key": "Scarecrow6"
+   "key": "Scarecrow6",
+   "en": "Scarecrow"
   },
   {
    "id": 311,
-   "key": "Scarecrow7"
+   "key": "Scarecrow7",
+   "en": "Scarecrow"
   },
   {
    "id": 312,
-   "key": "Scarecrow8"
+   "key": "Scarecrow8",
+   "en": "Scarecrow"
   },
   {
    "id": 313,
-   "key": "Scarecrow9"
+   "key": "Scarecrow9",
+   "en": "Scarecrow"
   },
   {
    "id": 314,
-   "key": "Scarecrow10"
+   "key": "Scarecrow10",
+   "en": "Scarecrow"
   },
   {
    "id": 315,
-   "key": "HeadlessHorseman"
+   "key": "HeadlessHorseman",
+   "en": "Headless Horseman"
   },
   {
    "id": 316,
-   "key": "Ghost"
+   "key": "Ghost",
+   "en": "Ghost"
   },
   {
    "id": 317,
-   "key": "DemonEyeOwl"
+   "key": "DemonEyeOwl",
+   "en": "Demon Eye"
   },
   {
    "id": 318,
-   "key": "DemonEyeSpaceship"
+   "key": "DemonEyeSpaceship",
+   "en": "Demon Eye"
   },
   {
    "id": 319,
-   "key": "ZombieDoctor"
+   "key": "ZombieDoctor",
+   "en": "Zombie"
   },
   {
    "id": 320,
-   "key": "ZombieSuperman"
+   "key": "ZombieSuperman",
+   "en": "Zombie"
   },
   {
    "id": 321,
-   "key": "ZombiePixie"
+   "key": "ZombiePixie",
+   "en": "Zombie"
   },
   {
    "id": 322,
-   "key": "SkeletonTopHat"
+   "key": "SkeletonTopHat",
+   "en": "Skeleton"
   },
   {
    "id": 323,
-   "key": "SkeletonAstonaut"
+   "key": "SkeletonAstonaut",
+   "en": "Skeleton"
   },
   {
    "id": 324,
-   "key": "SkeletonAlien"
+   "key": "SkeletonAlien",
+   "en": "Skeleton"
   },
   {
    "id": 325,
    "key": "MourningWood",
+   "en": "Mourning Wood",
    "sb": "mourning wood"
   },
   {
    "id": 326,
-   "key": "Splinterling"
+   "key": "Splinterling",
+   "en": "Splinterling"
   },
   {
    "id": 327,
    "key": "Pumpking",
+   "en": "Pumpking",
    "sb": "pumpking"
   },
   {
    "id": 328,
-   "key": "PumpkingBlade"
+   "key": "PumpkingBlade",
+   "en": "Pumpking"
   },
   {
    "id": 329,
-   "key": "Hellhound"
+   "key": "Hellhound",
+   "en": "Hellhound"
   },
   {
    "id": 330,
-   "key": "Poltergeist"
+   "key": "Poltergeist",
+   "en": "Poltergeist"
   },
   {
    "id": 331,
-   "key": "ZombieXmas"
+   "key": "ZombieXmas",
+   "en": "Zombie"
   },
   {
    "id": 332,
-   "key": "ZombieSweater"
+   "key": "ZombieSweater",
+   "en": "Zombie"
   },
   {
    "id": 333,
-   "key": "SlimeRibbonWhite"
+   "key": "SlimeRibbonWhite",
+   "en": "Slime"
   },
   {
    "id": 334,
-   "key": "SlimeRibbonYellow"
+   "key": "SlimeRibbonYellow",
+   "en": "Slime"
   },
   {
    "id": 335,
-   "key": "SlimeRibbonGreen"
+   "key": "SlimeRibbonGreen",
+   "en": "Slime"
   },
   {
    "id": 336,
-   "key": "SlimeRibbonRed"
+   "key": "SlimeRibbonRed",
+   "en": "Slime"
   },
   {
    "id": 337,
-   "key": "BunnyXmas"
+   "key": "BunnyXmas",
+   "en": "Bunny"
   },
   {
    "id": 338,
-   "key": "ZombieElf"
+   "key": "ZombieElf",
+   "en": "Zombie Elf"
   },
   {
    "id": 339,
-   "key": "ZombieElfBeard"
+   "key": "ZombieElfBeard",
+   "en": "Zombie Elf"
   },
   {
    "id": 340,
-   "key": "ZombieElfGirl"
+   "key": "ZombieElfGirl",
+   "en": "Zombie Elf"
   },
   {
    "id": 341,
-   "key": "PresentMimic"
+   "key": "PresentMimic",
+   "en": "Present Mimic"
   },
   {
    "id": 342,
-   "key": "GingerbreadMan"
+   "key": "GingerbreadMan",
+   "en": "Gingerbread Man"
   },
   {
    "id": 343,
-   "key": "Yeti"
+   "key": "Yeti",
+   "en": "Yeti"
   },
   {
    "id": 344,
    "key": "Everscream",
+   "en": "Everscream",
    "sb": "everscream"
   },
   {
    "id": 345,
    "key": "IceQueen",
+   "en": "Ice Queen",
    "sb": "ice queen"
   },
   {
    "id": 346,
    "key": "SantaNK1",
+   "en": "Santa-NK1",
    "sb": "santa-nk1",
    "sbAliases": [
     "santa",
@@ -1449,99 +1793,123 @@
   },
   {
    "id": 347,
-   "key": "ElfCopter"
+   "key": "ElfCopter",
+   "en": "Elf Copter"
   },
   {
    "id": 348,
-   "key": "Nutcracker"
+   "key": "Nutcracker",
+   "en": "Nutcracker"
   },
   {
    "id": 349,
-   "key": "NutcrackerSpinning"
+   "key": "NutcrackerSpinning",
+   "en": "Nutcracker"
   },
   {
    "id": 350,
-   "key": "ElfArcher"
+   "key": "ElfArcher",
+   "en": "Elf Archer"
   },
   {
    "id": 351,
-   "key": "Krampus"
+   "key": "Krampus",
+   "en": "Krampus"
   },
   {
    "id": 352,
-   "key": "Flocko"
+   "key": "Flocko",
+   "en": "Flocko"
   },
   {
    "id": 353,
-   "key": "Stylist"
+   "key": "Stylist",
+   "en": "Stylist"
   },
   {
    "id": 354,
-   "key": "WebbedStylist"
+   "key": "WebbedStylist",
+   "en": "Webbed Stylist"
   },
   {
    "id": 355,
-   "key": "Firefly"
+   "key": "Firefly",
+   "en": "Firefly"
   },
   {
    "id": 356,
-   "key": "Butterfly"
+   "key": "Butterfly",
+   "en": "Butterfly"
   },
   {
    "id": 357,
-   "key": "Worm"
+   "key": "Worm",
+   "en": "Worm"
   },
   {
    "id": 358,
-   "key": "LightningBug"
+   "key": "LightningBug",
+   "en": "Lightning Bug"
   },
   {
    "id": 359,
-   "key": "Snail"
+   "key": "Snail",
+   "en": "Snail"
   },
   {
    "id": 360,
-   "key": "GlowingSnail"
+   "key": "GlowingSnail",
+   "en": "Glowing Snail"
   },
   {
    "id": 361,
-   "key": "Frog"
+   "key": "Frog",
+   "en": "Frog"
   },
   {
    "id": 362,
-   "key": "Duck"
+   "key": "Duck",
+   "en": "Duck"
   },
   {
    "id": 363,
-   "key": "Duck2"
+   "key": "Duck2",
+   "en": "Duck"
   },
   {
    "id": 364,
-   "key": "DuckWhite"
+   "key": "DuckWhite",
+   "en": "Duck"
   },
   {
    "id": 365,
-   "key": "DuckWhite2"
+   "key": "DuckWhite2",
+   "en": "Duck"
   },
   {
    "id": 366,
-   "key": "ScorpionBlack"
+   "key": "ScorpionBlack",
+   "en": "Scorpion"
   },
   {
    "id": 367,
-   "key": "Scorpion"
+   "key": "Scorpion",
+   "en": "Scorpion"
   },
   {
    "id": 368,
-   "key": "TravellingMerchant"
+   "key": "TravellingMerchant",
+   "en": "Traveling Merchant"
   },
   {
    "id": 369,
-   "key": "Angler"
+   "key": "Angler",
+   "en": "Angler"
   },
   {
    "id": 370,
    "key": "DukeFishron",
+   "en": "Duke Fishron",
    "sb": "duke fishron",
    "sbAliases": [
     "duke",
@@ -1552,116 +1920,144 @@
   },
   {
    "id": 371,
-   "key": "DetonatingBubble"
+   "key": "DetonatingBubble",
+   "en": "Detonating Bubble"
   },
   {
    "id": 372,
-   "key": "Sharkron"
+   "key": "Sharkron",
+   "en": "Sharkron"
   },
   {
    "id": 373,
-   "key": "Sharkron2"
+   "key": "Sharkron2",
+   "en": "Sharkron"
   },
   {
    "id": 374,
-   "key": "TruffleWorm"
+   "key": "TruffleWorm",
+   "en": "Truffle Worm"
   },
   {
    "id": 375,
-   "key": "TruffleWormDigger"
+   "key": "TruffleWormDigger",
+   "en": "Truffle Worm"
   },
   {
    "id": 376,
-   "key": "SleepingAngler"
+   "key": "SleepingAngler",
+   "en": "Sleeping Angler"
   },
   {
    "id": 377,
-   "key": "Grasshopper"
+   "key": "Grasshopper",
+   "en": "Grasshopper"
   },
   {
    "id": 378,
-   "key": "ChatteringTeethBomb"
+   "key": "ChatteringTeethBomb",
+   "en": "Chattering Teeth Bomb"
   },
   {
    "id": 379,
-   "key": "CultistArcherBlue"
+   "key": "CultistArcherBlue",
+   "en": "Cultist Archer"
   },
   {
    "id": 380,
-   "key": "CultistArcherWhite"
+   "key": "CultistArcherWhite",
+   "en": "Cultist Archer"
   },
   {
    "id": 381,
-   "key": "BrainScrambler"
+   "key": "BrainScrambler",
+   "en": "Brain Scrambler"
   },
   {
    "id": 382,
-   "key": "RayGunner"
+   "key": "RayGunner",
+   "en": "Ray Gunner"
   },
   {
    "id": 383,
-   "key": "MartianOfficer"
+   "key": "MartianOfficer",
+   "en": "Martian Officer"
   },
   {
    "id": 384,
-   "key": "ForceBubble"
+   "key": "ForceBubble",
+   "en": "Bubble Shield"
   },
   {
    "id": 385,
-   "key": "GrayGrunt"
+   "key": "GrayGrunt",
+   "en": "Gray Grunt"
   },
   {
    "id": 386,
-   "key": "MartianEngineer"
+   "key": "MartianEngineer",
+   "en": "Martian Engineer"
   },
   {
    "id": 387,
-   "key": "MartianTurret"
+   "key": "MartianTurret",
+   "en": "Tesla Turret"
   },
   {
    "id": 388,
-   "key": "MartianDrone"
+   "key": "MartianDrone",
+   "en": "Martian Drone"
   },
   {
    "id": 389,
-   "key": "GigaZapper"
+   "key": "GigaZapper",
+   "en": "Gigazapper"
   },
   {
    "id": 390,
-   "key": "ScutlixRider"
+   "key": "ScutlixRider",
+   "en": "Scutlix Gunner"
   },
   {
    "id": 391,
-   "key": "Scutlix"
+   "key": "Scutlix",
+   "en": "Scutlix"
   },
   {
    "id": 392,
    "key": "MartianSaucer",
+   "en": "Martian Saucer",
    "sb": "martian saucer"
   },
   {
    "id": 393,
-   "key": "MartianSaucerTurret"
+   "key": "MartianSaucerTurret",
+   "en": "Martian Saucer Turret"
   },
   {
    "id": 394,
-   "key": "MartianSaucerCannon"
+   "key": "MartianSaucerCannon",
+   "en": "Martian Saucer Cannon"
   },
   {
    "id": 395,
-   "key": "MartianSaucerCore"
+   "key": "MartianSaucerCore",
+   "en": "Martian Saucer"
   },
   {
    "id": 396,
-   "key": "MoonLordHead"
+   "key": "MoonLordHead",
+   "en": "Moon Lord"
   },
   {
    "id": 397,
-   "key": "MoonLordHand"
+   "key": "MoonLordHand",
+   "en": "Moon Lord's Hand"
   },
   {
    "id": 398,
    "key": "MoonLordCore",
+   "en": "Moon Lord's Core",
    "sb": "moon lord",
    "sbAliases": [
     "ml",
@@ -1672,168 +2068,209 @@
   },
   {
    "id": 399,
-   "key": "MartianProbe"
+   "key": "MartianProbe",
+   "en": "Martian Probe"
   },
   {
    "id": 400,
-   "key": "MoonLordFreeEye"
+   "key": "MoonLordFreeEye",
+   "en": "True Eye of Cthulhu"
   },
   {
    "id": 401,
-   "key": "MoonLordLeechBlob"
+   "key": "MoonLordLeechBlob",
+   "en": "Moon Leech Clot"
   },
   {
    "id": 402,
-   "key": "StardustWormHead"
+   "key": "StardustWormHead",
+   "en": "Milkyway Weaver"
   },
   {
    "id": 403,
-   "key": "StardustWormBody"
+   "key": "StardustWormBody",
+   "en": "StardustWormBody"
   },
   {
    "id": 404,
-   "key": "StardustWormTail"
+   "key": "StardustWormTail",
+   "en": "StardustWormTail"
   },
   {
    "id": 405,
-   "key": "StardustCellBig"
+   "key": "StardustCellBig",
+   "en": "Star Cell"
   },
   {
    "id": 406,
-   "key": "StardustCellSmall"
+   "key": "StardustCellSmall",
+   "en": "Mini Star Cell"
   },
   {
    "id": 407,
-   "key": "StardustJellyfishBig"
+   "key": "StardustJellyfishBig",
+   "en": "Flow Invader"
   },
   {
    "id": 408,
-   "key": "StardustJellyfishSmall"
+   "key": "StardustJellyfishSmall",
+   "en": "StardustJellyfishSmall"
   },
   {
    "id": 409,
-   "key": "StardustSpiderBig"
+   "key": "StardustSpiderBig",
+   "en": "Twinkle Popper"
   },
   {
    "id": 410,
-   "key": "StardustSpiderSmall"
+   "key": "StardustSpiderSmall",
+   "en": "Twinkle"
   },
   {
    "id": 411,
-   "key": "StardustSoldier"
+   "key": "StardustSoldier",
+   "en": "Stargazer"
   },
   {
    "id": 412,
-   "key": "SolarCrawltipedeHead"
+   "key": "SolarCrawltipedeHead",
+   "en": "Crawltipede"
   },
   {
    "id": 413,
-   "key": "SolarCrawltipedeBody"
+   "key": "SolarCrawltipedeBody",
+   "en": "Crawltipede"
   },
   {
    "id": 414,
-   "key": "SolarCrawltipedeTail"
+   "key": "SolarCrawltipedeTail",
+   "en": "Crawltipede"
   },
   {
    "id": 415,
-   "key": "SolarDrakomire"
+   "key": "SolarDrakomire",
+   "en": "Drakomire"
   },
   {
    "id": 416,
-   "key": "SolarDrakomireRider"
+   "key": "SolarDrakomireRider",
+   "en": "Drakomire Rider"
   },
   {
    "id": 417,
-   "key": "SolarSroller"
+   "key": "SolarSroller",
+   "en": "Sroller"
   },
   {
    "id": 418,
-   "key": "SolarCorite"
+   "key": "SolarCorite",
+   "en": "Corite"
   },
   {
    "id": 419,
-   "key": "SolarSolenian"
+   "key": "SolarSolenian",
+   "en": "Selenian"
   },
   {
    "id": 420,
-   "key": "NebulaBrain"
+   "key": "NebulaBrain",
+   "en": "Nebula Floater"
   },
   {
    "id": 421,
-   "key": "NebulaHeadcrab"
+   "key": "NebulaHeadcrab",
+   "en": "Brain Suckler"
   },
   {
    "id": 422,
    "key": "LunarTowerVortex",
+   "en": "Vortex Pillar",
    "sb": "vortex pillar"
   },
   {
    "id": 423,
-   "key": "NebulaBeast"
+   "key": "NebulaBeast",
+   "en": "Evolution Beast"
   },
   {
    "id": 424,
-   "key": "NebulaSoldier"
+   "key": "NebulaSoldier",
+   "en": "Predictor"
   },
   {
    "id": 425,
-   "key": "VortexRifleman"
+   "key": "VortexRifleman",
+   "en": "Storm Diver"
   },
   {
    "id": 426,
-   "key": "VortexHornetQueen"
+   "key": "VortexHornetQueen",
+   "en": "Alien Queen"
   },
   {
    "id": 427,
-   "key": "VortexHornet"
+   "key": "VortexHornet",
+   "en": "Alien Hornet"
   },
   {
    "id": 428,
-   "key": "VortexLarva"
+   "key": "VortexLarva",
+   "en": "Alien Larva"
   },
   {
    "id": 429,
-   "key": "VortexSoldier"
+   "key": "VortexSoldier",
+   "en": "Vortexian"
   },
   {
    "id": 430,
-   "key": "ArmedZombie"
+   "key": "ArmedZombie",
+   "en": "Zombie"
   },
   {
    "id": 431,
-   "key": "ArmedZombieEskimo"
+   "key": "ArmedZombieEskimo",
+   "en": "Frozen Zombie"
   },
   {
    "id": 432,
-   "key": "ArmedZombiePincussion"
+   "key": "ArmedZombiePincussion",
+   "en": "Zombie"
   },
   {
    "id": 433,
-   "key": "ArmedZombieSlimed"
+   "key": "ArmedZombieSlimed",
+   "en": "Zombie"
   },
   {
    "id": 434,
-   "key": "ArmedZombieSwamp"
+   "key": "ArmedZombieSwamp",
+   "en": "Zombie"
   },
   {
    "id": 435,
-   "key": "ArmedZombieTwiggy"
+   "key": "ArmedZombieTwiggy",
+   "en": "Zombie"
   },
   {
    "id": 436,
-   "key": "ArmedZombieCenx"
+   "key": "ArmedZombieCenx",
+   "en": "Zombie"
   },
   {
    "id": 437,
-   "key": "CultistTablet"
+   "key": "CultistTablet",
+   "en": "Mysterious Tablet"
   },
   {
    "id": 438,
-   "key": "CultistDevote"
+   "key": "CultistDevote",
+   "en": "Lunatic Devotee"
   },
   {
    "id": 439,
    "key": "CultistBoss",
+   "en": "Lunatic Cultist",
    "sb": "lunatic cultist",
    "sbAliases": [
     "cultist",
@@ -1845,211 +2282,263 @@
   },
   {
    "id": 440,
-   "key": "CultistBossClone"
+   "key": "CultistBossClone",
+   "en": "Lunatic Cultist"
   },
   {
    "id": 441,
-   "key": "TaxCollector"
+   "key": "TaxCollector",
+   "en": "Tax Collector"
   },
   {
    "id": 442,
-   "key": "GoldBird"
+   "key": "GoldBird",
+   "en": "Gold Bird"
   },
   {
    "id": 443,
-   "key": "GoldBunny"
+   "key": "GoldBunny",
+   "en": "Gold Bunny"
   },
   {
    "id": 444,
-   "key": "GoldButterfly"
+   "key": "GoldButterfly",
+   "en": "Gold Butterfly"
   },
   {
    "id": 445,
-   "key": "GoldFrog"
+   "key": "GoldFrog",
+   "en": "Gold Frog"
   },
   {
    "id": 446,
-   "key": "GoldGrasshopper"
+   "key": "GoldGrasshopper",
+   "en": "Gold Grasshopper"
   },
   {
    "id": 447,
-   "key": "GoldMouse"
+   "key": "GoldMouse",
+   "en": "Gold Mouse"
   },
   {
    "id": 448,
-   "key": "GoldWorm"
+   "key": "GoldWorm",
+   "en": "Gold Worm"
   },
   {
    "id": 449,
-   "key": "BoneThrowingSkeleton"
+   "key": "BoneThrowingSkeleton",
+   "en": "Skeleton"
   },
   {
    "id": 450,
-   "key": "BoneThrowingSkeleton2"
+   "key": "BoneThrowingSkeleton2",
+   "en": "Skeleton"
   },
   {
    "id": 451,
-   "key": "BoneThrowingSkeleton3"
+   "key": "BoneThrowingSkeleton3",
+   "en": "Skeleton"
   },
   {
    "id": 452,
-   "key": "BoneThrowingSkeleton4"
+   "key": "BoneThrowingSkeleton4",
+   "en": "Skeleton"
   },
   {
    "id": 453,
-   "key": "SkeletonMerchant"
+   "key": "SkeletonMerchant",
+   "en": "Skeleton Merchant"
   },
   {
    "id": 454,
-   "key": "CultistDragonHead"
+   "key": "CultistDragonHead",
+   "en": "Phantasm Dragon"
   },
   {
    "id": 455,
-   "key": "CultistDragonBody1"
+   "key": "CultistDragonBody1",
+   "en": "Phantasm Dragon"
   },
   {
    "id": 456,
-   "key": "CultistDragonBody2"
+   "key": "CultistDragonBody2",
+   "en": "Phantasm Dragon"
   },
   {
    "id": 457,
-   "key": "CultistDragonBody3"
+   "key": "CultistDragonBody3",
+   "en": "Phantasm Dragon"
   },
   {
    "id": 458,
-   "key": "CultistDragonBody4"
+   "key": "CultistDragonBody4",
+   "en": "Phantasm Dragon"
   },
   {
    "id": 459,
-   "key": "CultistDragonTail"
+   "key": "CultistDragonTail",
+   "en": "Phantasm Dragon"
   },
   {
    "id": 460,
-   "key": "Butcher"
+   "key": "Butcher",
+   "en": "Butcher"
   },
   {
    "id": 461,
-   "key": "CreatureFromTheDeep"
+   "key": "CreatureFromTheDeep",
+   "en": "Creature from the Deep"
   },
   {
    "id": 462,
-   "key": "Fritz"
+   "key": "Fritz",
+   "en": "Fritz"
   },
   {
    "id": 463,
-   "key": "Nailhead"
+   "key": "Nailhead",
+   "en": "Nailhead"
   },
   {
    "id": 464,
-   "key": "CrimsonBunny"
+   "key": "CrimsonBunny",
+   "en": "Vicious Bunny"
   },
   {
    "id": 465,
-   "key": "CrimsonGoldfish"
+   "key": "CrimsonGoldfish",
+   "en": "Vicious Goldfish"
   },
   {
    "id": 466,
-   "key": "Psycho"
+   "key": "Psycho",
+   "en": "Psycho"
   },
   {
    "id": 467,
-   "key": "DeadlySphere"
+   "key": "DeadlySphere",
+   "en": "Deadly Sphere"
   },
   {
    "id": 468,
-   "key": "DrManFly"
+   "key": "DrManFly",
+   "en": "Dr. Man Fly"
   },
   {
    "id": 469,
-   "key": "ThePossessed"
+   "key": "ThePossessed",
+   "en": "The Possessed"
   },
   {
    "id": 470,
-   "key": "CrimsonPenguin"
+   "key": "CrimsonPenguin",
+   "en": "Vicious Penguin"
   },
   {
    "id": 471,
-   "key": "GoblinSummoner"
+   "key": "GoblinSummoner",
+   "en": "Goblin Warlock"
   },
   {
    "id": 472,
-   "key": "ShadowFlameApparition"
+   "key": "ShadowFlameApparition",
+   "en": "Shadowflame Apparition"
   },
   {
    "id": 473,
-   "key": "BigMimicCorruption"
+   "key": "BigMimicCorruption",
+   "en": "Corrupt Mimic"
   },
   {
    "id": 474,
-   "key": "BigMimicCrimson"
+   "key": "BigMimicCrimson",
+   "en": "Crimson Mimic"
   },
   {
    "id": 475,
-   "key": "BigMimicHallow"
+   "key": "BigMimicHallow",
+   "en": "Hallowed Mimic"
   },
   {
    "id": 476,
-   "key": "BigMimicJungle"
+   "key": "BigMimicJungle",
+   "en": "Jungle Mimic"
   },
   {
    "id": 477,
-   "key": "Mothron"
+   "key": "Mothron",
+   "en": "Mothron"
   },
   {
    "id": 478,
-   "key": "MothronEgg"
+   "key": "MothronEgg",
+   "en": "Mothron Egg"
   },
   {
    "id": 479,
-   "key": "MothronSpawn"
+   "key": "MothronSpawn",
+   "en": "Baby Mothron"
   },
   {
    "id": 480,
-   "key": "Medusa"
+   "key": "Medusa",
+   "en": "Medusa"
   },
   {
    "id": 481,
-   "key": "GreekSkeleton"
+   "key": "GreekSkeleton",
+   "en": "Hoplite"
   },
   {
    "id": 482,
-   "key": "GraniteGolem"
+   "key": "GraniteGolem",
+   "en": "Granite Golem"
   },
   {
    "id": 483,
-   "key": "GraniteFlyer"
+   "key": "GraniteFlyer",
+   "en": "Granite Elemental"
   },
   {
    "id": 484,
-   "key": "EnchantedNightcrawler"
+   "key": "EnchantedNightcrawler",
+   "en": "Enchanted Nightcrawler"
   },
   {
    "id": 485,
-   "key": "Grubby"
+   "key": "Grubby",
+   "en": "Grubby"
   },
   {
    "id": 486,
-   "key": "Sluggy"
+   "key": "Sluggy",
+   "en": "Sluggy"
   },
   {
    "id": 487,
-   "key": "Buggy"
+   "key": "Buggy",
+   "en": "Buggy"
   },
   {
    "id": 488,
-   "key": "TargetDummy"
+   "key": "TargetDummy",
+   "en": "Target Dummy"
   },
   {
    "id": 489,
-   "key": "BloodZombie"
+   "key": "BloodZombie",
+   "en": "Blood Zombie"
   },
   {
    "id": 490,
-   "key": "Drippler"
+   "key": "Drippler",
+   "en": "Drippler"
   },
   {
    "id": 491,
    "key": "PirateShip",
+   "en": "Flying Dutchman",
    "sb": "flying dutchman",
    "sbAliases": [
     "dutchman",
@@ -2059,587 +2548,732 @@
   },
   {
    "id": 492,
-   "key": "PirateShipCannon"
+   "key": "PirateShipCannon",
+   "en": "Dutchman Cannon"
   },
   {
    "id": 493,
    "key": "LunarTowerStardust",
+   "en": "Stardust Pillar",
    "sb": "stardust pillar"
   },
   {
    "id": 494,
-   "key": "Crawdad"
+   "key": "Crawdad",
+   "en": "Crawdad"
   },
   {
    "id": 495,
-   "key": "Crawdad2"
+   "key": "Crawdad2",
+   "en": "Crawdad"
   },
   {
    "id": 496,
-   "key": "GiantShelly"
+   "key": "GiantShelly",
+   "en": "Giant Shelly"
   },
   {
    "id": 497,
-   "key": "GiantShelly2"
+   "key": "GiantShelly2",
+   "en": "Giant Shelly"
   },
   {
    "id": 498,
-   "key": "Salamander"
+   "key": "Salamander",
+   "en": "Salamander"
   },
   {
    "id": 499,
-   "key": "Salamander2"
+   "key": "Salamander2",
+   "en": "Salamander"
   },
   {
    "id": 500,
-   "key": "Salamander3"
+   "key": "Salamander3",
+   "en": "Salamander"
   },
   {
    "id": 501,
-   "key": "Salamander4"
+   "key": "Salamander4",
+   "en": "Salamander"
   },
   {
    "id": 502,
-   "key": "Salamander5"
+   "key": "Salamander5",
+   "en": "Salamander"
   },
   {
    "id": 503,
-   "key": "Salamander6"
+   "key": "Salamander6",
+   "en": "Salamander"
   },
   {
    "id": 504,
-   "key": "Salamander7"
+   "key": "Salamander7",
+   "en": "Salamander"
   },
   {
    "id": 505,
-   "key": "Salamander8"
+   "key": "Salamander8",
+   "en": "Salamander"
   },
   {
    "id": 506,
-   "key": "Salamander9"
+   "key": "Salamander9",
+   "en": "Salamander"
   },
   {
    "id": 507,
    "key": "LunarTowerNebula",
+   "en": "Nebula Pillar",
    "sb": "nebula pillar"
   },
   {
    "id": 508,
-   "key": "GiantWalkingAntlion"
+   "key": "GiantWalkingAntlion",
+   "en": "Giant Antlion Charger"
   },
   {
    "id": 509,
-   "key": "GiantFlyingAntlion"
+   "key": "GiantFlyingAntlion",
+   "en": "Giant Antlion Swarmer"
   },
   {
    "id": 510,
-   "key": "DuneSplicerHead"
+   "key": "DuneSplicerHead",
+   "en": "Dune Splicer"
   },
   {
    "id": 511,
-   "key": "DuneSplicerBody"
+   "key": "DuneSplicerBody",
+   "en": "Dune Splicer"
   },
   {
    "id": 512,
-   "key": "DuneSplicerTail"
+   "key": "DuneSplicerTail",
+   "en": "Dune Splicer"
   },
   {
    "id": 513,
-   "key": "TombCrawlerHead"
+   "key": "TombCrawlerHead",
+   "en": "Tomb Crawler"
   },
   {
    "id": 514,
-   "key": "TombCrawlerBody"
+   "key": "TombCrawlerBody",
+   "en": "Tomb Crawler"
   },
   {
    "id": 515,
-   "key": "TombCrawlerTail"
+   "key": "TombCrawlerTail",
+   "en": "Tomb Crawler"
   },
   {
    "id": 516,
-   "key": "SolarFlare"
+   "key": "SolarFlare",
+   "en": "Solar Flare"
   },
   {
    "id": 517,
    "key": "LunarTowerSolar",
+   "en": "Solar Pillar",
    "sb": "solar pillar"
   },
   {
    "id": 518,
-   "key": "SolarSpearman"
+   "key": "SolarSpearman",
+   "en": "Drakanian"
   },
   {
    "id": 519,
-   "key": "SolarGoop"
+   "key": "SolarGoop",
+   "en": "Solar Fragment"
   },
   {
    "id": 520,
-   "key": "MartianWalker"
+   "key": "MartianWalker",
+   "en": "Martian Walker"
   },
   {
    "id": 521,
-   "key": "AncientCultistSquidhead"
+   "key": "AncientCultistSquidhead",
+   "en": "Ancient Vision"
   },
   {
    "id": 522,
-   "key": "AncientLight"
+   "key": "AncientLight",
+   "en": "Ancient Light"
   },
   {
    "id": 523,
-   "key": "AncientDoom"
+   "key": "AncientDoom",
+   "en": "Ancient Doom"
   },
   {
    "id": 524,
-   "key": "DesertGhoul"
+   "key": "DesertGhoul",
+   "en": "Ghoul"
   },
   {
    "id": 525,
-   "key": "DesertGhoulCorruption"
+   "key": "DesertGhoulCorruption",
+   "en": "Vile Ghoul"
   },
   {
    "id": 526,
-   "key": "DesertGhoulCrimson"
+   "key": "DesertGhoulCrimson",
+   "en": "Tainted Ghoul"
   },
   {
    "id": 527,
-   "key": "DesertGhoulHallow"
+   "key": "DesertGhoulHallow",
+   "en": "Dreamer Ghoul"
   },
   {
    "id": 528,
-   "key": "DesertLamiaLight"
+   "key": "DesertLamiaLight",
+   "en": "Lamia"
   },
   {
    "id": 529,
-   "key": "DesertLamiaDark"
+   "key": "DesertLamiaDark",
+   "en": "Lamia"
   },
   {
    "id": 530,
-   "key": "DesertScorpionWalk"
+   "key": "DesertScorpionWalk",
+   "en": "Sand Poacher"
   },
   {
    "id": 531,
-   "key": "DesertScorpionWall"
+   "key": "DesertScorpionWall",
+   "en": "Sand Poacher"
   },
   {
    "id": 532,
-   "key": "DesertBeast"
+   "key": "DesertBeast",
+   "en": "Basilisk"
   },
   {
    "id": 533,
-   "key": "DesertDjinn"
+   "key": "DesertDjinn",
+   "en": "Desert Spirit"
   },
   {
    "id": 534,
-   "key": "DemonTaxCollector"
+   "key": "DemonTaxCollector",
+   "en": "Tortured Soul"
   },
   {
    "id": 535,
-   "key": "SlimeSpiked"
+   "key": "SlimeSpiked",
+   "en": "Spiked Slime"
   },
   {
    "id": 536,
-   "key": "TheBride"
+   "key": "TheBride",
+   "en": "The Bride"
   },
   {
    "id": 537,
-   "key": "SandSlime"
+   "key": "SandSlime",
+   "en": "Sand Slime"
   },
   {
    "id": 538,
-   "key": "SquirrelRed"
+   "key": "SquirrelRed",
+   "en": "Red Squirrel"
   },
   {
    "id": 539,
-   "key": "SquirrelGold"
+   "key": "SquirrelGold",
+   "en": "Gold Squirrel"
   },
   {
    "id": 540,
-   "key": "PartyBunny"
+   "key": "PartyBunny",
+   "en": "Bunny"
   },
   {
    "id": 541,
-   "key": "SandElemental"
+   "key": "SandElemental",
+   "en": "Sand Elemental"
   },
   {
    "id": 542,
-   "key": "SandShark"
+   "key": "SandShark",
+   "en": "Sand Shark"
   },
   {
    "id": 543,
-   "key": "SandsharkCorrupt"
+   "key": "SandsharkCorrupt",
+   "en": "Bone Biter"
   },
   {
    "id": 544,
-   "key": "SandsharkCrimson"
+   "key": "SandsharkCrimson",
+   "en": "Flesh Reaver"
   },
   {
    "id": 545,
-   "key": "SandsharkHallow"
+   "key": "SandsharkHallow",
+   "en": "Crystal Thresher"
   },
   {
    "id": 546,
-   "key": "Tumbleweed"
+   "key": "Tumbleweed",
+   "en": "Angry Tumbler"
   },
   {
    "id": 547,
-   "key": "DD2AttackerTest"
+   "key": "DD2AttackerTest",
+   "en": "???"
   },
   {
    "id": 548,
-   "key": "DD2EterniaCrystal"
+   "key": "DD2EterniaCrystal",
+   "en": "Eternia Crystal"
   },
   {
    "id": 549,
-   "key": "DD2LanePortal"
+   "key": "DD2LanePortal",
+   "en": "Mysterious Portal"
   },
   {
    "id": 550,
-   "key": "DD2Bartender"
+   "key": "DD2Bartender",
+   "en": "Tavernkeep"
   },
   {
    "id": 551,
    "key": "DD2Betsy",
+   "en": "Betsy",
    "sb": "betsy"
   },
   {
    "id": 552,
-   "key": "DD2GoblinT1"
+   "key": "DD2GoblinT1",
+   "en": "Etherian Goblin"
   },
   {
    "id": 553,
-   "key": "DD2GoblinT2"
+   "key": "DD2GoblinT2",
+   "en": "{$NPCName.DD2GoblinT1}"
   },
   {
    "id": 554,
-   "key": "DD2GoblinT3"
+   "key": "DD2GoblinT3",
+   "en": "{$NPCName.DD2GoblinT1}"
   },
   {
    "id": 555,
-   "key": "DD2GoblinBomberT1"
+   "key": "DD2GoblinBomberT1",
+   "en": "Etherian Goblin Bomber"
   },
   {
    "id": 556,
-   "key": "DD2GoblinBomberT2"
+   "key": "DD2GoblinBomberT2",
+   "en": "{$NPCName.DD2GoblinBomberT1}"
   },
   {
    "id": 557,
-   "key": "DD2GoblinBomberT3"
+   "key": "DD2GoblinBomberT3",
+   "en": "{$NPCName.DD2GoblinBomberT1}"
   },
   {
    "id": 558,
-   "key": "DD2WyvernT1"
+   "key": "DD2WyvernT1",
+   "en": "Etherian Wyvern"
   },
   {
    "id": 559,
-   "key": "DD2WyvernT2"
+   "key": "DD2WyvernT2",
+   "en": "{$NPCName.DD2WyvernT1}"
   },
   {
    "id": 560,
-   "key": "DD2WyvernT3"
+   "key": "DD2WyvernT3",
+   "en": "{$NPCName.DD2WyvernT1}"
   },
   {
    "id": 561,
-   "key": "DD2JavelinstT1"
+   "key": "DD2JavelinstT1",
+   "en": "Etherian Javelin Thrower"
   },
   {
    "id": 562,
-   "key": "DD2JavelinstT2"
+   "key": "DD2JavelinstT2",
+   "en": "{$NPCName.DD2JavelinstT1}"
   },
   {
    "id": 563,
-   "key": "DD2JavelinstT3"
+   "key": "DD2JavelinstT3",
+   "en": "{$NPCName.DD2JavelinstT1}"
   },
   {
    "id": 564,
-   "key": "DD2DarkMageT1"
+   "key": "DD2DarkMageT1",
+   "en": "Dark Mage"
   },
   {
    "id": 565,
-   "key": "DD2DarkMageT3"
+   "key": "DD2DarkMageT3",
+   "en": "{$NPCName.DD2DarkMageT1}"
   },
   {
    "id": 566,
-   "key": "DD2SkeletonT1"
+   "key": "DD2SkeletonT1",
+   "en": "Old One's Skeleton"
   },
   {
    "id": 567,
-   "key": "DD2SkeletonT3"
+   "key": "DD2SkeletonT3",
+   "en": "{$NPCName.DD2SkeletonT1}"
   },
   {
    "id": 568,
-   "key": "DD2WitherBeastT2"
+   "key": "DD2WitherBeastT2",
+   "en": "Wither Beast"
   },
   {
    "id": 569,
-   "key": "DD2WitherBeastT3"
+   "key": "DD2WitherBeastT3",
+   "en": "{$NPCName.DD2WitherBeastT2}"
   },
   {
    "id": 570,
-   "key": "DD2DrakinT2"
+   "key": "DD2DrakinT2",
+   "en": "Drakin"
   },
   {
    "id": 571,
-   "key": "DD2DrakinT3"
+   "key": "DD2DrakinT3",
+   "en": "{$NPCName.DD2DrakinT2}"
   },
   {
    "id": 572,
-   "key": "DD2KoboldWalkerT2"
+   "key": "DD2KoboldWalkerT2",
+   "en": "Kobold"
   },
   {
    "id": 573,
-   "key": "DD2KoboldWalkerT3"
+   "key": "DD2KoboldWalkerT3",
+   "en": "{$NPCName.DD2KoboldWalkerT2}"
   },
   {
    "id": 574,
-   "key": "DD2KoboldFlyerT2"
+   "key": "DD2KoboldFlyerT2",
+   "en": "Kobold Glider"
   },
   {
    "id": 575,
-   "key": "DD2KoboldFlyerT3"
+   "key": "DD2KoboldFlyerT3",
+   "en": "{$NPCName.DD2KoboldFlyerT2}"
   },
   {
    "id": 576,
-   "key": "DD2OgreT2"
+   "key": "DD2OgreT2",
+   "en": "Ogre"
   },
   {
    "id": 577,
-   "key": "DD2OgreT3"
+   "key": "DD2OgreT3",
+   "en": "{$NPCName.DD2OgreT2}"
   },
   {
    "id": 578,
-   "key": "DD2LightningBugT3"
+   "key": "DD2LightningBugT3",
+   "en": "Etherian Lightning Bug"
   },
   {
    "id": 579,
-   "key": "BartenderUnconscious"
+   "key": "BartenderUnconscious",
+   "en": "Unconscious Man"
   },
   {
    "id": 580,
-   "key": "WalkingAntlion"
+   "key": "WalkingAntlion",
+   "en": "Antlion Charger"
   },
   {
    "id": 581,
-   "key": "FlyingAntlion"
+   "key": "FlyingAntlion",
+   "en": "Antlion Swarmer"
   },
   {
    "id": 582,
-   "key": "LarvaeAntlion"
+   "key": "LarvaeAntlion",
+   "en": "Antlion Larva"
   },
   {
    "id": 583,
-   "key": "FairyCritterPink"
+   "key": "FairyCritterPink",
+   "en": "Pink Fairy"
   },
   {
    "id": 584,
-   "key": "FairyCritterGreen"
+   "key": "FairyCritterGreen",
+   "en": "Green Fairy"
   },
   {
    "id": 585,
-   "key": "FairyCritterBlue"
+   "key": "FairyCritterBlue",
+   "en": "Blue Fairy"
   },
   {
    "id": 586,
-   "key": "ZombieMerman"
+   "key": "ZombieMerman",
+   "en": "Zombie Merman"
   },
   {
    "id": 587,
-   "key": "EyeballFlyingFish"
+   "key": "EyeballFlyingFish",
+   "en": "Wandering Eye Fish"
   },
   {
    "id": 588,
-   "key": "Golfer"
+   "key": "Golfer",
+   "en": "Golfer"
   },
   {
    "id": 589,
-   "key": "GolferRescue"
+   "key": "GolferRescue",
+   "en": "Golfer"
   },
   {
    "id": 590,
-   "key": "TorchZombie"
+   "key": "TorchZombie",
+   "en": "Zombie"
   },
   {
    "id": 591,
-   "key": "ArmedTorchZombie"
+   "key": "ArmedTorchZombie",
+   "en": "Zombie"
   },
   {
    "id": 592,
-   "key": "GoldGoldfish"
+   "key": "GoldGoldfish",
+   "en": "Gold Goldfish"
   },
   {
    "id": 593,
-   "key": "GoldGoldfishWalker"
+   "key": "GoldGoldfishWalker",
+   "en": "Gold Goldfish"
   },
   {
    "id": 594,
-   "key": "WindyBalloon"
+   "key": "WindyBalloon",
+   "en": "Windy Balloon"
   },
   {
    "id": 595,
-   "key": "BlackDragonfly"
+   "key": "BlackDragonfly",
+   "en": "Dragonfly"
   },
   {
    "id": 596,
-   "key": "BlueDragonfly"
+   "key": "BlueDragonfly",
+   "en": "Dragonfly"
   },
   {
    "id": 597,
-   "key": "GreenDragonfly"
+   "key": "GreenDragonfly",
+   "en": "Dragonfly"
   },
   {
    "id": 598,
-   "key": "OrangeDragonfly"
+   "key": "OrangeDragonfly",
+   "en": "Dragonfly"
   },
   {
    "id": 599,
-   "key": "RedDragonfly"
+   "key": "RedDragonfly",
+   "en": "Dragonfly"
   },
   {
    "id": 600,
-   "key": "YellowDragonfly"
+   "key": "YellowDragonfly",
+   "en": "Dragonfly"
   },
   {
    "id": 601,
-   "key": "GoldDragonfly"
+   "key": "GoldDragonfly",
+   "en": "Gold Dragonfly"
   },
   {
    "id": 602,
-   "key": "Seagull"
+   "key": "Seagull",
+   "en": "Seagull"
   },
   {
    "id": 603,
-   "key": "Seagull2"
+   "key": "Seagull2",
+   "en": "Seagull"
   },
   {
    "id": 604,
-   "key": "LadyBug"
+   "key": "LadyBug",
+   "en": "Ladybug"
   },
   {
    "id": 605,
-   "key": "GoldLadyBug"
+   "key": "GoldLadyBug",
+   "en": "Gold Ladybug"
   },
   {
    "id": 606,
-   "key": "Maggot"
+   "key": "Maggot",
+   "en": "Maggot"
   },
   {
    "id": 607,
-   "key": "Pupfish"
+   "key": "Pupfish",
+   "en": "Pupfish"
   },
   {
    "id": 608,
-   "key": "Grebe"
+   "key": "Grebe",
+   "en": "Grebe"
   },
   {
    "id": 609,
-   "key": "Grebe2"
+   "key": "Grebe2",
+   "en": "Grebe"
   },
   {
    "id": 610,
-   "key": "Rat"
+   "key": "Rat",
+   "en": "Rat"
   },
   {
    "id": 611,
-   "key": "Owl"
+   "key": "Owl",
+   "en": "Owl"
   },
   {
    "id": 612,
-   "key": "WaterStrider"
+   "key": "WaterStrider",
+   "en": "Water Strider"
   },
   {
    "id": 613,
-   "key": "GoldWaterStrider"
+   "key": "GoldWaterStrider",
+   "en": "Gold Water Strider"
   },
   {
    "id": 614,
-   "key": "ExplosiveBunny"
+   "key": "ExplosiveBunny",
+   "en": "Explosive Bunny"
   },
   {
    "id": 615,
-   "key": "Dolphin"
+   "key": "Dolphin",
+   "en": "Dolphin"
   },
   {
    "id": 616,
-   "key": "Turtle"
+   "key": "Turtle",
+   "en": "Turtle"
   },
   {
    "id": 617,
-   "key": "TurtleJungle"
+   "key": "TurtleJungle",
+   "en": "Jungle Turtle"
   },
   {
    "id": 618,
-   "key": "BloodNautilus"
+   "key": "BloodNautilus",
+   "en": "Dreadnautilus"
   },
   {
    "id": 619,
-   "key": "BloodSquid"
+   "key": "BloodSquid",
+   "en": "Blood Squid"
   },
   {
    "id": 620,
-   "key": "GoblinShark"
+   "key": "GoblinShark",
+   "en": "Hemogoblin Shark"
   },
   {
    "id": 621,
-   "key": "BloodEelHead"
+   "key": "BloodEelHead",
+   "en": "Blood Eel"
   },
   {
    "id": 622,
-   "key": "BloodEelBody"
+   "key": "BloodEelBody",
+   "en": "Blood Eel"
   },
   {
    "id": 623,
-   "key": "BloodEelTail"
+   "key": "BloodEelTail",
+   "en": "Blood Eel"
   },
   {
    "id": 624,
-   "key": "Gnome"
+   "key": "Gnome",
+   "en": "Gnome"
   },
   {
    "id": 625,
-   "key": "SeaTurtle"
+   "key": "SeaTurtle",
+   "en": "Sea Turtle"
   },
   {
    "id": 626,
-   "key": "Seahorse"
+   "key": "Seahorse",
+   "en": "Seahorse"
   },
   {
    "id": 627,
-   "key": "GoldSeahorse"
+   "key": "GoldSeahorse",
+   "en": "Gold Seahorse"
   },
   {
    "id": 628,
-   "key": "Dandelion"
+   "key": "Dandelion",
+   "en": "Angry Dandelion"
   },
   {
    "id": 629,
-   "key": "IceMimic"
+   "key": "IceMimic",
+   "en": "Ice Mimic"
   },
   {
    "id": 630,
-   "key": "BloodMummy"
+   "key": "BloodMummy",
+   "en": "Blood Mummy"
   },
   {
    "id": 631,
-   "key": "RockGolem"
+   "key": "RockGolem",
+   "en": "Rock Golem"
   },
   {
    "id": 632,
-   "key": "MaggotZombie"
+   "key": "MaggotZombie",
+   "en": "Maggot Zombie"
   },
   {
    "id": 633,
-   "key": "BestiaryGirl"
+   "key": "BestiaryGirl",
+   "en": "Zoologist"
   },
   {
    "id": 634,
-   "key": "SporeBat"
+   "key": "SporeBat",
+   "en": "Spore Bat"
   },
   {
    "id": 635,
-   "key": "SporeSkeleton"
+   "key": "SporeSkeleton",
+   "en": "Spore Skeleton"
   },
   {
    "id": 636,
    "key": "HallowBoss",
+   "en": "Empress of Light",
    "sb": "empress of light",
    "sbAliases": [
     "empress",
@@ -2650,87 +3284,108 @@
   },
   {
    "id": 637,
-   "key": "TownCat"
+   "key": "TownCat",
+   "en": "Cat"
   },
   {
    "id": 638,
-   "key": "TownDog"
+   "key": "TownDog",
+   "en": "Dog"
   },
   {
    "id": 639,
-   "key": "GemSquirrelAmethyst"
+   "key": "GemSquirrelAmethyst",
+   "en": "Amethyst Squirrel"
   },
   {
    "id": 640,
-   "key": "GemSquirrelTopaz"
+   "key": "GemSquirrelTopaz",
+   "en": "Topaz Squirrel"
   },
   {
    "id": 641,
-   "key": "GemSquirrelSapphire"
+   "key": "GemSquirrelSapphire",
+   "en": "Sapphire Squirrel"
   },
   {
    "id": 642,
-   "key": "GemSquirrelEmerald"
+   "key": "GemSquirrelEmerald",
+   "en": "Emerald Squirrel"
   },
   {
    "id": 643,
-   "key": "GemSquirrelRuby"
+   "key": "GemSquirrelRuby",
+   "en": "Ruby Squirrel"
   },
   {
    "id": 644,
-   "key": "GemSquirrelDiamond"
+   "key": "GemSquirrelDiamond",
+   "en": "Diamond Squirrel"
   },
   {
    "id": 645,
-   "key": "GemSquirrelAmber"
+   "key": "GemSquirrelAmber",
+   "en": "Amber Squirrel"
   },
   {
    "id": 646,
-   "key": "GemBunnyAmethyst"
+   "key": "GemBunnyAmethyst",
+   "en": "Amethyst Bunny"
   },
   {
    "id": 647,
-   "key": "GemBunnyTopaz"
+   "key": "GemBunnyTopaz",
+   "en": "Topaz Bunny"
   },
   {
    "id": 648,
-   "key": "GemBunnySapphire"
+   "key": "GemBunnySapphire",
+   "en": "Sapphire Bunny"
   },
   {
    "id": 649,
-   "key": "GemBunnyEmerald"
+   "key": "GemBunnyEmerald",
+   "en": "Emerald Bunny"
   },
   {
    "id": 650,
-   "key": "GemBunnyRuby"
+   "key": "GemBunnyRuby",
+   "en": "Ruby Bunny"
   },
   {
    "id": 651,
-   "key": "GemBunnyDiamond"
+   "key": "GemBunnyDiamond",
+   "en": "Diamond Bunny"
   },
   {
    "id": 652,
-   "key": "GemBunnyAmber"
+   "key": "GemBunnyAmber",
+   "en": "Amber Bunny"
   },
   {
    "id": 653,
-   "key": "HellButterfly"
+   "key": "HellButterfly",
+   "en": "Hell Butterfly"
   },
   {
    "id": 654,
-   "key": "Lavafly"
+   "key": "Lavafly",
+   "en": "Lavafly"
   },
   {
    "id": 655,
-   "key": "MagmaSnail"
+   "key": "MagmaSnail",
+   "en": "Magma Snail"
   },
   {
    "id": 656,
-   "key": "TownBunny"
+   "key": "TownBunny",
+   "en": "Bunny"
   },
   {
    "id": 657,
    "key": "QueenSlimeBoss",
+   "en": "Queen Slime",
    "sb": "queen slime",
    "sbAliases": [
     "qs",
@@ -2740,160 +3395,199 @@
   },
   {
    "id": 658,
-   "key": "QueenSlimeMinionBlue"
+   "key": "QueenSlimeMinionBlue",
+   "en": "Crystal Slime"
   },
   {
    "id": 659,
-   "key": "QueenSlimeMinionPink"
+   "key": "QueenSlimeMinionPink",
+   "en": "Bouncy Slime"
   },
   {
    "id": 660,
-   "key": "QueenSlimeMinionPurple"
+   "key": "QueenSlimeMinionPurple",
+   "en": "Heavenly Slime"
   },
   {
    "id": 661,
-   "key": "EmpressButterfly"
+   "key": "EmpressButterfly",
+   "en": "Prismatic Lacewing"
   },
   {
    "id": 662,
-   "key": "PirateGhost"
+   "key": "PirateGhost",
+   "en": "Pirate's Curse"
   },
   {
    "id": 663,
-   "key": "Princess"
+   "key": "Princess",
+   "en": "Princess"
   },
   {
    "id": 664,
-   "key": "TorchGod"
+   "key": "TorchGod",
+   "en": "The Torch God"
   },
   {
    "id": 665,
-   "key": "ChaosBallTim"
+   "key": "ChaosBallTim",
+   "en": "{$NPCName.ChaosBall}"
   },
   {
    "id": 666,
-   "key": "VileSpitEaterOfWorlds"
+   "key": "VileSpitEaterOfWorlds",
+   "en": "{$NPCName.VileSpit}"
   },
   {
    "id": 667,
-   "key": "GoldenSlime"
+   "key": "GoldenSlime",
+   "en": "Golden Slime"
   },
   {
    "id": 668,
    "key": "Deerclops",
+   "en": "Deerclops",
    "sb": "deerclops"
   },
   {
    "id": 669,
-   "key": "Stinkbug"
+   "key": "Stinkbug",
+   "en": "Stinkbug"
   },
   {
    "id": 670,
-   "key": "TownSlimeBlue"
+   "key": "TownSlimeBlue",
+   "en": "Nerdy Slime"
   },
   {
    "id": 671,
-   "key": "ScarletMacaw"
+   "key": "ScarletMacaw",
+   "en": "Scarlet Macaw"
   },
   {
    "id": 672,
-   "key": "BlueMacaw"
+   "key": "BlueMacaw",
+   "en": "Blue Macaw"
   },
   {
    "id": 673,
-   "key": "Toucan"
+   "key": "Toucan",
+   "en": "Toucan"
   },
   {
    "id": 674,
-   "key": "YellowCockatiel"
+   "key": "YellowCockatiel",
+   "en": "Yellow Cockatiel"
   },
   {
    "id": 675,
-   "key": "GrayCockatiel"
+   "key": "GrayCockatiel",
+   "en": "Gray Cockatiel"
   },
   {
    "id": 676,
-   "key": "ShimmerSlime"
+   "key": "ShimmerSlime",
+   "en": "Shimmer Slime"
   },
   {
    "id": 677,
-   "key": "Shimmerfly"
+   "key": "Shimmerfly",
+   "en": "Faeling"
   },
   {
    "id": 678,
-   "key": "TownSlimeGreen"
+   "key": "TownSlimeGreen",
+   "en": "Cool Slime"
   },
   {
    "id": 679,
-   "key": "TownSlimeOld"
+   "key": "TownSlimeOld",
+   "en": "Elder Slime"
   },
   {
    "id": 680,
-   "key": "TownSlimePurple"
+   "key": "TownSlimePurple",
+   "en": "Clumsy Slime"
   },
   {
    "id": 681,
-   "key": "TownSlimeRainbow"
+   "key": "TownSlimeRainbow",
+   "en": "Diva Slime"
   },
   {
    "id": 682,
-   "key": "TownSlimeRed"
+   "key": "TownSlimeRed",
+   "en": "Surly Slime"
   },
   {
    "id": 683,
-   "key": "TownSlimeYellow"
+   "key": "TownSlimeYellow",
+   "en": "Mystic Slime"
   },
   {
    "id": 684,
-   "key": "TownSlimeCopper"
+   "key": "TownSlimeCopper",
+   "en": "Squire Slime"
   },
   {
    "id": 685,
-   "key": "BoundTownSlimeOld"
+   "key": "BoundTownSlimeOld",
+   "en": "Old Shaking Chest"
   },
   {
    "id": 686,
-   "key": "BoundTownSlimePurple"
+   "key": "BoundTownSlimePurple",
+   "en": "Clumsy Balloon Slime"
   },
   {
    "id": 687,
-   "key": "BoundTownSlimeYellow"
+   "key": "BoundTownSlimeYellow",
+   "en": "Mystic Frog"
   },
   {
    "id": 688,
-   "key": "Pufferfish"
+   "key": "Pufferfish",
+   "en": "Pufferfish"
   },
   {
    "id": 689,
-   "key": "OwlMimic"
+   "key": "OwlMimic",
+   "en": "Owl"
   },
   {
    "id": 690,
-   "key": "StatueMimic"
+   "key": "StatueMimic",
+   "en": "Statue"
   },
   {
    "id": 691,
-   "key": "MossZombie"
+   "key": "MossZombie",
+   "en": "Moss Zombie"
   },
   {
    "id": 692,
-   "key": "Orca"
+   "key": "Orca",
+   "en": "Orca"
   },
   {
    "id": 693,
-   "key": "LibrarianSkeleton"
+   "key": "LibrarianSkeleton",
+   "en": "Librarian Skeleton"
   },
   {
    "id": 694,
-   "key": "WaterBoltMimic"
+   "key": "WaterBoltMimic",
+   "en": "Water Bolt Mimic"
   },
   {
    "id": 695,
-   "key": "PalworldCattivaDistressed"
+   "key": "PalworldCattivaDistressed",
+   "en": "{$ItemName.PalworldMinionCattiva}"
   },
   {
    "id": 696,
-   "key": "PalworldFoxsparksDistressed"
+   "key": "PalworldFoxsparksDistressed",
+   "en": "{$ItemName.PalworldMinionFoxsparks}"
   }
  ]
 }

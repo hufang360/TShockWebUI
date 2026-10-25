@@ -101,8 +101,8 @@ it('页签同步到 URL hash，并可从 hash 直接打开', async () => {
   render(<App transport={new MockTransport()} />)
 
   expect(await screen.findByRole('heading', { name: '设置' })).toBeTruthy()
-  fireEvent.click(screen.getAllByRole('button', { name: '物品ID' })[0])
-  expect(await screen.findByLabelText('物品ID')).toBeTruthy()
+  fireEvent.click(screen.getAllByRole('button', { name: '物品 ID' })[0])
+  expect(await screen.findByLabelText('物品 ID')).toBeTruthy()
   expect(window.location.hash).toBe('#/items')
 })
 
@@ -111,7 +111,7 @@ it('指令页使用 #/cmd，并兼容旧 #/editor', async () => {
   window.history.replaceState(null, '', '#/editor')
   render(<App transport={new MockTransport()} />)
 
-  expect(await screen.findByRole('heading', { name: '指令' })).toBeTruthy()
+  expect(await screen.findByRole('tab', { name: '指令' })).toBeTruthy()
   await waitFor(() => expect(window.location.hash).toBe('#/cmd'))
 })
 
@@ -358,7 +358,7 @@ it('可用访问令牌登录，且令牌不落 localStorage', async () => {
   expect(JSON.stringify(localStorage)).not.toContain('mock-token-xyz')
 })
 
-it('侧栏可隐藏并可重新显示', async () => {
+it('侧栏可收成图标栏并可重新展开', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
@@ -524,4 +524,116 @@ it('登录失败时提示服主赋权命令（addperm tshock.rest.useapi）', as
   expect(
     await within(dialog).findByText('/group addperm default tshock.rest.useapi tshock.rest.command'),
   ).toBeTruthy()
+})
+
+it('首页「终端」打开浮动终端，执行结果与指令页共享', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+  await loginAsAlice()
+
+  // 顶栏右侧的终端入口（未登录时不渲染）。
+  fireEvent.click(screen.getByTestId('terminal-topbar'))
+  const win = await screen.findByTestId('terminal-window')
+  const input = within(win).getByPlaceholderText(/输入指令/)
+  fireEvent.change(input, { target: { value: '/time day' } })
+  // 先收起补全下拉，再回车执行（与指令页的编辑器行为一致）。
+  fireEvent.keyDown(input, { key: 'Escape' })
+  fireEvent.keyDown(input, { key: 'Enter' })
+  expect(await within(win).findByText(/世界时间/)).toBeTruthy()
+
+  // 切到指令页：终端自动收起（该页不需要它），终端跑过的结果已经在结果列表里（共用 tswui:commandResults）。
+  fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
+  await waitFor(() => expect(screen.queryByTestId('terminal-window')).toBeNull())
+  expect(await within(screen.getByRole('main')).findByText(/世界时间/)).toBeTruthy()
+})
+
+it('顶栏「指令」入口：未登录不显示，登录后除指令 / 设置外都显示', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  // 未登录：不显示入口。
+  expect(screen.queryByTestId('terminal-topbar')).toBeNull()
+
+  await loginAsAlice()
+  expect(await screen.findByTestId('terminal-topbar')).toBeTruthy()
+
+  // 指令页：隐藏。
+  fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
+  expect(await screen.findByRole('tab', { name: '指令' })).toBeTruthy()
+  await waitFor(() => expect(screen.queryByTestId('terminal-topbar')).toBeNull())
+
+  // 物品 ID：显示。
+  fireEvent.click(screen.getAllByRole('button', { name: '物品 ID' })[0])
+  expect(await screen.findByTestId('terminal-topbar')).toBeTruthy()
+
+  // 设置页：隐藏。
+  fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
+  expect(await screen.findByRole('heading', { name: '设置' })).toBeTruthy()
+  await waitFor(() => expect(screen.queryByTestId('terminal-topbar')).toBeNull())
+})
+
+it('「查看存档」是独立侧边栏菜单：未登录也能用，不依赖玩家管理模块', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  // 侧栏「查看存档」入口（公开工具；玩家管理模块此时未启用）。
+  fireEvent.click(screen.getAllByRole('button', { name: '查看存档' })[0])
+
+  expect(await screen.findByTestId('players-save-drop')).toBeTruthy()
+  expect(window.location.hash).toBe('#/plr')
+  // 不需要登录，也不显示登录提示。
+  expect(screen.queryByText('请先登录！')).toBeNull()
+  expect(screen.getByRole('button', { name: /导入 \.plr/ })).toBeTruthy()
+})
+
+it('侧边栏「指令小抄」：NPC管理列出 Boss，点击填进浮动终端', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+  await loginAsAlice()
+
+  fireEvent.click(screen.getAllByRole('button', { name: '指令小抄' })[0])
+  expect(await screen.findByRole('tab', { name: '默认' })).toBeTruthy()
+  expect(window.location.hash).toBe('#/commands')
+
+  fireEvent.mouseDown(screen.getByRole('tab', { name: 'NPC管理' }))
+  fireEvent.click(await screen.findByRole('button', { name: /\/spawnboss "king slime"/ }))
+  const win = await screen.findByTestId('terminal-window')
+  const input = within(win).getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
+  expect(input.value).toBe('/spawnboss "king slime"')
+
+  // 传送 NPC 用英文名（真实数据里的 `en` 字段）；点新记录会覆盖输入框。
+  fireEvent.click(screen.getByRole('button', { name: /渔夫\s*#369/ }))
+  expect(input.value).toBe('/tpnpc Angler')
+})
+it('旧的「召唤NPC」地址回落到「指令小抄」', async () => {
+  mockFetch()
+  window.history.replaceState(null, '', '#/spawn')
+  render(<App transport={new MockTransport()} />)
+  expect(await screen.findByRole('tab', { name: '默认' })).toBeTruthy()
+  await waitFor(() => expect(window.location.hash).toBe('#/commands'))
+})
+
+it('「查看世界」是独立侧边栏菜单：未登录也能用，排在「世界管理」之前', async () => {
+  mockFetch()
+  localStorage.setItem('tswui:modules', JSON.stringify({ byServer: { default: ['world'] } }))
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  // 侧栏顺序：查看世界（公开工具）在世界管理（WorldModify 模块）之前。
+  const sidebar = screen.getByTestId('sidebar')
+  const labels = Array.from(sidebar.querySelectorAll('[data-slot="sidebar-menu"] button')).map((b) =>
+    b.textContent?.trim(),
+  )
+  expect(labels.indexOf('查看世界')).toBeGreaterThan(-1)
+  expect(labels.indexOf('查看世界')).toBeLessThan(labels.indexOf('世界管理'))
+
+  // 点进去：不需要登录，直接是本地导入界面。
+  fireEvent.click(screen.getAllByRole('button', { name: '查看世界' })[0])
+  expect(await screen.findByTestId('world-drop')).toBeTruthy()
+  expect(window.location.hash).toBe('#/wld')
+  expect(screen.queryByText('请先登录！')).toBeNull()
 })

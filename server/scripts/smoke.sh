@@ -23,7 +23,7 @@ check() { # name expected_substr actual
 echo "== 公共端点 ($BASE) =="
 check "healthz" '"status":"ok"' "$(curl -s "$BASE/healthz")"
 check "healthz version" '"version"' "$(curl -s "$BASE/healthz")"
-check "index"  "TShock"        "$(curl -s "$BASE/")"
+check "index"  "WebUI"        "$(curl -s "$BASE/")"
 check "meta"   '"gameVersion"'   "$(curl -s "$BASE/data/meta.json")"
 check "session(anon)" '"authenticated":false' "$(curl -s "$BASE/api/session")"
 

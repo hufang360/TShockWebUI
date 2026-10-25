@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  RefreshCw,
-  SlidersHorizontal,
-  Terminal,
-} from 'lucide-react'
+import { RefreshCw, Settings2, Terminal } from 'lucide-react'
 import { COMMAND_CARD_BY_ID, type CommandCardId } from '@/components/home/commandCards'
+import { IconAction } from '@/components/IconAction'
 import {
   EventsCard,
   QuickLinksCard,
@@ -15,16 +12,15 @@ import {
 import { HomeCardManager } from '@/components/HomeCardManager'
 import { CommandCard } from '@/components/CommandCard'
 import { LoginGate } from '@/components/LoginGate'
+import { TopBarActions } from '@/components/TopBar'
 import { DEFAULT_MODULES, type ModulesPrefs } from '@/lib/modules'
 import {
-  Badge,
-  Button,
   Card,
   CardBody,
   CardHeader,
   CardTitle,
-  Spinner,
 } from '@/components/ui'
+import { cn } from '@/lib/cn'
 import { useLocalState } from '@/hooks/useLocalState'
 import {
   DEFAULT_AUTO_EXEC,
@@ -56,6 +52,14 @@ import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
 const RIGHT_COLUMN_IDS = new Set<string>(['server', 'events', 'quick', 'recent'])
 /** 「最近执行」固定一个合适的高度，内容超出时内部滚动。 */
 const RECENT_LIMIT = 5
+
+/**
+ * 首页左栏的展示顺序：世界信息 / 我的背包 一组，在线玩家 + 游戏时间、死亡次数 + Boss 战伤害各一组，
+ * Boss 进度放最后；自定义卡片插在 Boss 进度之前。
+ */
+const LEFT_ORDER = ['world', 'lookbag', 'online', 'time', 'alldeath'] as const
+/** 这些卡片占半栏；其余（Boss 进度 / 自定义）占整行。 */
+const HALF_WIDTH_IDS = new Set<string>(LEFT_ORDER)
 
 interface HomePageProps {
   dataset: Dataset
@@ -587,65 +591,67 @@ export function HomePage({
   })
   // 两栏：左 = 指令卡片 + 自定义卡片；右 = 概览卡片（服务器状态 / 动态 / 快捷入口 / 最近执行）。
   // 各自保持 `prefs.order` 里的相对顺序。
-  const leftCards = visibleCards.filter((id) => !RIGHT_COLUMN_IDS.has(id))
+  const visibleSet = new Set(visibleCards)
+  const leftCards = [
+    ...LEFT_ORDER.filter((id) => visibleSet.has(id)),
+    ...visibleCards.filter(
+      (id) => !RIGHT_COLUMN_IDS.has(id) && !HALF_WIDTH_IDS.has(id) && id !== 'bossinfo',
+    ),
+    ...(visibleSet.has('bossinfo') ? ['bossinfo'] : []),
+  ]
   const rightCards = visibleCards.filter((id) => RIGHT_COLUMN_IDS.has(id))
+  // 半宽卡片是奇数时，最后一个独占整行，避免留下半格空白。
+  const halfCards = leftCards.filter((id) => HALF_WIDTH_IDS.has(id))
+  const loneHalf = halfCards.length % 2 === 1 ? halfCards[halfCards.length - 1] : null
 
-  // 未登录：隐藏首页所有卡片（数据都要 token 才能拉取），只留标题 + 登录提示。
+  // 未登录：隐藏首页所有卡片（数据都要 token 才能拉取），只留登录提示。
   if (!authenticated) {
-    return (
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-foreground">{t('nav.home')}</h2>
-          {transport.mock && <Badge tone="mock">Mock</Badge>}
-        </div>
-        <LoginGate onLogin={onLogin} />
-      </div>
-    )
+    return <LoginGate onLogin={onLogin} />
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-foreground">{t('nav.home')}</h2>
-          {transport.mock && <Badge tone="mock">Mock</Badge>}
-        </div>
-        <div className="flex items-center gap-2">
-          {lastRefreshAt && (
-            <span
-              className="hidden text-2xs text-muted-foreground sm:inline"
-              title={new Date(lastRefreshAt).toLocaleString()}
-            >
-              {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
-            </span>
-          )}
-          <Button size="sm" variant="ghost" onClick={() => setManageOpen(true)}>
-            <SlidersHorizontal data-icon="inline-start" />
-            {t('home.manage')}
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => void refresh(true)}
-            disabled={refreshingAll}
+    <div className="flex flex-col gap-2">
+      <TopBarActions>
+        {lastRefreshAt && (
+          <span
+            className="hidden text-2xs text-muted-foreground sm:inline"
+            title={new Date(lastRefreshAt).toLocaleString()}
           >
-            {refreshingAll ? (
-              <Spinner aria-hidden data-icon="inline-start" />
-            ) : (
-              <RefreshCw data-icon="inline-start" />
-            )}
-            {refreshingAll ? t('home.refreshing') : t('home.refreshAll')}
-          </Button>
-        </div>
-      </div>
+            {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
+          </span>
+        )}
+        <IconAction
+          label={refreshingAll ? t('home.refreshing') : t('home.refreshAll')}
+          icon={RefreshCw}
+          loading={refreshingAll}
+          onClick={() => void refresh(true)}
+        />
+        <IconAction
+          label={t('home.manage')}
+          icon={Settings2}
+          onClick={() => setManageOpen(true)}
+        />
+      </TopBarActions>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_360px]">
         {/* 左栏：指令卡片（单列，高度随内容并限 min/max） */}
-        <div data-testid="home-left" className="flex flex-col gap-4">
-          {leftCards.map((id) => renderCard(id))}
+        <div data-testid="home-left" className="grid gap-2 sm:grid-cols-2">
+          {leftCards.map((id) => (
+            <div
+              key={id}
+              className={cn(
+                'min-w-0',
+                (!HALF_WIDTH_IDS.has(id) || id === loneHalf) && 'sm:col-span-2',
+                // 同一行的半宽卡片互相等高（网格行高 = 该行最高卡片）。
+                HALF_WIDTH_IDS.has(id) && id !== loneHalf && '[&>[data-slot=card]]:h-full',
+              )}
+            >
+              {renderCard(id)}
+            </div>
+          ))}
         </div>
         {/* 右栏：概览卡片（服务器状态 / 服务器动态 / 快捷入口 / 最近执行） */}
-        <div data-testid="home-right" className="flex flex-col gap-4">
+        <div data-testid="home-right" className="flex flex-col gap-2">
           {rightCards.map((id) => renderCard(id))}
         </div>
       </div>

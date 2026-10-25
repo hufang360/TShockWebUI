@@ -97,7 +97,7 @@ TShockWebUI/
 ├── server/                       # Go 后端（标准库 only）
 │   ├── main.go                   # 启动、路由、静态服务（//go:embed webdist）
 │   ├── internal/
-│   │   ├── api/                  # /api/* handlers、middleware、playerimport
+│   │   ├── api/                  # /api/* handlers、middleware
 │   │   ├── config/               # env 解析
 │   │   ├── plr/                  # .plr 存档解析（AES-128-CBC）
 │   │   ├── session/              # 内存会话 + TTL

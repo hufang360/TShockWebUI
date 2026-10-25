@@ -4,7 +4,6 @@ import { ModuleCardsPanel, type PanelCard } from '@/components/ModuleCardsPanel'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui'
 import { useModuleCards } from '@/hooks/useModuleCards'
 import { useI18n } from '@/lib/i18n'
-import { isCustomModuleId } from '@/lib/modules'
 import { readJson, writeJson } from '@/lib/storage'
 import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset } from '@/types'
@@ -101,64 +100,34 @@ export function CommandModulePage({
     [fixedCards, cards, t, keyPrefix],
   )
 
-  const loginHeading = (
-    <div className="flex flex-col gap-1">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
-    </div>
-  )
-
-  // 未登录：隐藏卡片列表（执行指令需要 token），只留标题 + 登录提示。
+  // 未登录：隐藏卡片列表（执行指令需要 token），只留登录提示。
   if (!authenticated) {
-    return (
-      <div className="flex flex-col gap-4">
-        {loginHeading}
-        <LoginGate onLogin={onLogin} />
-      </div>
-    )
+    return <LoginGate onLogin={onLogin} />
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {isCustomModuleId(moduleId) ? (
-        // 自定义模块：左 = 指令卡片（第一张为「帮助」），右 = 记事本。
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0">
-            <ModuleCardsPanel
-              dataset={dataset}
-              transport={transport}
-              authenticated={authenticated}
-              serverId={serverId}
-              refreshInterval={refreshInterval}
-              onTokenInvalid={onTokenInvalid}
-              keyPrefix={keyPrefix}
-              title={title}
-              desc={desc}
-              cards={allCards}
-              onAddCard={add}
-              onUpdateCard={update}
-              onRemoveCard={remove}
-            />
-          </div>
-          <NotebookCard moduleId={moduleId} />
+    <div className="flex flex-col gap-2">
+      {/* 世界管理与自定义模块统一为两栏：左 = 指令卡片，右 = 记事本。 */}
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0">
+          <ModuleCardsPanel
+            dataset={dataset}
+            transport={transport}
+            authenticated={authenticated}
+            serverId={serverId}
+            refreshInterval={refreshInterval}
+            onTokenInvalid={onTokenInvalid}
+            keyPrefix={keyPrefix}
+            title={title}
+            desc={desc}
+            cards={allCards}
+            onAddCard={add}
+            onUpdateCard={update}
+            onRemoveCard={remove}
+          />
         </div>
-      ) : (
-        <ModuleCardsPanel
-          dataset={dataset}
-          transport={transport}
-          authenticated={authenticated}
-          serverId={serverId}
-          refreshInterval={refreshInterval}
-          onTokenInvalid={onTokenInvalid}
-          keyPrefix={keyPrefix}
-          title={title}
-          desc={desc}
-          cards={allCards}
-          onAddCard={add}
-          onUpdateCard={update}
-          onRemoveCard={remove}
-        />
-      )}
+        <NotebookCard moduleId={moduleId} />
+      </div>
     </div>
   )
 }

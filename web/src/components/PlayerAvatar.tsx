@@ -69,7 +69,7 @@ export function PlayerAvatar({ look, scale = 3, fill = false, className }: Playe
   return (
     <canvas
       ref={canvasRef}
-      className={cn('block', fill && 'h-full w-auto', className)}
+      className={cn('block bg-transparent', fill && 'h-full w-auto', className)}
       style={fill ? undefined : { width: PLAYER_FRAME_W * scale, height: PLAYER_FRAME_H * scale }}
       role="img"
       aria-label={look.name}

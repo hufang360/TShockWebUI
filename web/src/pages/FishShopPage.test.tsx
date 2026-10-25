@@ -96,13 +96,16 @@ describe('FishShopPage', () => {
     expect(screen.getByText('#1')).toBeTruthy()
   })
 
-  it('REST 货架可用时游戏内指令默认收起，可按需展开', async () => {
+  it('右侧只保留「钓鱼信息」卡片，且不再有「游戏内指令」开关', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
     await screen.findAllByText('生命水晶')
-    expect(screen.queryByText('钓鱼信息')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '游戏内指令' }))
     expect(await screen.findByText('钓鱼信息')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '游戏内指令' })).toBeNull()
+    // 已移除的卡片不再出现。
+    expect(screen.queryByText('鱼罐')).toBeNull()
+    expect(screen.queryByText('消费榜')).toBeNull()
+    expect(screen.queryByText('鱼篓榜')).toBeNull()
   })
 
   it('非原生物品（指令类，desc 无 [i:..]）悬停不显示物品提示，图标不压透明度', async () => {
@@ -182,14 +185,14 @@ describe('FishShopPage', () => {
     renderPage(fakeTransport({ fishCapabilities, fishList }))
 
     expect(await screen.findByText('需安装 鱼店 插件，无法获取货架数据。')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /重新检测/ }))
+    fireEvent.click(screen.getAllByRole('button', { name: /重新检测/ })[0])
 
     await waitFor(() => expect(fishCapabilities).toHaveBeenCalledTimes(2))
     // 检测通过后自动拉货架
     expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
   })
 
-  it('插件可用但无权限时提示权限，并保留游戏内指令作为兼容入口', async () => {
+  it('插件可用但无权限时提示权限，钓鱼信息卡片仍可用', async () => {
     renderPage(
       fakeTransport({
         fishCapabilities: async () => ({ plugin: true, rest: true, permission: false }),
@@ -200,7 +203,7 @@ describe('FishShopPage', () => {
     expect(await screen.findByText('钓鱼信息')).toBeTruthy()
   })
 
-  it('老版本插件（没有 REST 接口）时提示版本过旧，且右侧指令卡片仍可用', async () => {
+  it('老版本插件（没有 REST 接口）时提示版本过旧，钓鱼信息卡片仍可用', async () => {
     const fishList = vi.fn(async () => shopOf([]))
     renderPage(
       fakeTransport({
@@ -211,9 +214,9 @@ describe('FishShopPage', () => {
     expect(await screen.findByText('鱼店插件版本过旧')).toBeTruthy()
     // 没有 REST 就不该再拉货架。
     expect(fishList).not.toHaveBeenCalled()
-    // 右侧指令卡片只走 rawcmd，照常渲染。
-    expect(await screen.findByText('货架')).toBeTruthy()
-    expect(screen.getByText('钓鱼信息')).toBeTruthy()
+    // 右侧指令卡片只走 rawcmd，照常渲染（只剩「钓鱼信息」）。
+    expect(await screen.findByText('钓鱼信息')).toBeTruthy()
+    expect(screen.queryByText('货架')).toBeNull()
   })
 
   it('离开后再进入页面会重新拉货架（不受刷新间隔闸门影响）', async () => {
@@ -397,18 +400,14 @@ describe('FishShopPage 右侧指令卡片', () => {
         },
       }),
     )
-    expect(await screen.findByText('货架')).toBeTruthy()
-    expect(screen.getByText('钓鱼信息')).toBeTruthy()
-    expect(screen.getByText('鱼罐')).toBeTruthy()
-    expect(screen.getByText('消费榜')).toBeTruthy()
-    expect(screen.getByText('鱼篓榜')).toBeTruthy()
+    expect(await screen.findByText('钓鱼信息')).toBeTruthy()
+    expect(screen.queryByText('货架')).toBeNull()
   })
 
   it('点击卡片刷新会执行对应指令', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: ['已钓到 3 条鱼'] })
     renderPage(fakeTransport({ fishList: async () => shopOf([]), runCommand }))
 
-    fireEvent.click(await screen.findByRole('button', { name: '游戏内指令' }))
     const card = (await screen.findByText('钓鱼信息')).closest('[data-slot="card"]') as HTMLElement
     fireEvent.click(within(card).getByRole('button', { name: '刷新' }))
 
@@ -426,16 +425,9 @@ describe('FishShopPage 右侧指令卡片', () => {
       )
     renderPage(fakeTransport({ fishList: async () => shopOf([]), runCommand, runBatch }))
 
-    fireEvent.click(await screen.findByRole('button', { name: '游戏内指令' }))
     fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
     await waitFor(() => expect(runBatch).toHaveBeenCalled())
-    expect(runBatch.mock.calls[0][0]).toEqual([
-      '/fish list',
-      '/fish info',
-      '/fish jar',
-      '/fish rank',
-      '/fish basket',
-    ])
+    expect(runBatch.mock.calls[0][0]).toEqual(['/fish info'])
     expect(runCommand).not.toHaveBeenCalled()
   })
 })

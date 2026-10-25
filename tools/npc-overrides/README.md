@@ -5,7 +5,7 @@
 ```json
 {
   "636": { "file": "636.png" },
-  "668": { "file": "668.png", "crop": [0, 0, 200, 220] }
+  "668": { "file": "Deerclops.png", "crop": [0, 0, 200, 220] }
 }
 ```
 
@@ -13,6 +13,9 @@
 - `file`：图片文件名（相对本目录）。
 - `crop`：可选，`[x, y, w, h]`，只取图片的某一块；不写则用整张图。
 - `frameWidth` / `frameIndex`：图片是横向多帧时，按每帧宽度取第 N 帧（默认 0）。
+
+**文件名不要有空格**——空格统一写成下划线（`King Slime.png` → `King_Slime.png`），
+这样构建脚本 / 命令行 / CI 里都不用处理转义。
 
 登记完运行：
 
@@ -23,4 +26,4 @@ python3 tools/gen-npc-atlas.py
 生成脚本会优先用这里的图片替换游戏原图，打包进 `data/npc-atlas.{json,png}`。
 没有登记的 NPC 仍用游戏原图。
 
-> 图片版权请自行确认；本目录除 `README.md` 外**不入库**（见 `.gitignore`）。
+> 图片与本登记表一起**入库**（保证图集可复现）。图片版权 Re-Logic，仅用于本项目的 NPC 图标展示。

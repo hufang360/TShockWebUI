@@ -162,7 +162,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/player/capabilities", s.handlePlayerCapabilities)
 	mux.HandleFunc("GET /api/player/look", s.handlePlayerLook)
 	mux.HandleFunc("GET /api/player/export", s.handlePlayerExport)
-	mux.HandleFunc("POST /api/player/import", s.handlePlayerImport)
 	mux.HandleFunc("GET /api/fish/capabilities", s.handleFishCapabilities)
 	mux.HandleFunc("GET /api/fish/list", s.handleFishList)
 	mux.HandleFunc("GET /api/fish/ask", s.handleFishAsk)
@@ -1037,6 +1036,9 @@ func setCacheHeaders(w http.ResponseWriter, name string) {
 	case strings.HasPrefix(name, "data/") && strings.HasSuffix(name, "-atlas.json"):
 		// 图集裁切信息很小，且带着 PNG 的内容哈希：每次校验，保证哈希及时更新。
 		w.Header().Set("Cache-Control", "no-cache")
+	case strings.HasPrefix(name, "demo/"):
+		// 自带 Demo 世界（`web/public/demo/world.wld`）：固定内容，天级缓存足够。
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	case strings.HasPrefix(name, "data/") && strings.HasSuffix(name, ".json"):
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 	case name == "index.html":

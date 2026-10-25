@@ -25,14 +25,22 @@ export const StorageKeys = {
   favorites: 'favorites',
   /** 指令页最近几条结果卡片（含输出内容）。 */
   commandResults: 'commandResults',
-  /** 指令页右侧当前选中的 tab。 */
+  /** 浮动终端的窗口位置与尺寸 `{ x, y, w, h }`（桌面端；每次拖动 / 缩放后写入）。 */
+  terminal: 'terminal',
+  /** 浮动终端的输入草稿。与指令页草稿分开：终端执行后清空输入，不应抹掉页面里的草稿。 */
+  terminalDraft: 'terminal:draft',
+  /** 指令页右侧工具面板当前选中的 tab。 */
   commandTab: 'commandTab',
+  /** 指令页顶部 tab（指令 / 聊天 / 小抄）。 */
+  commandPageTab: 'commandPageTab',
   /** 可折叠卡片（指令结果 / 首页与模块卡片）的展开状态 { key: open }。 */
   collapsedCards: 'collapsedCards',
   /** 物品图鉴里收藏的物品 id（在「指令」模块的收藏 tab 展示）。 */
   itemFavorites: 'itemFavorites',
   /** 物品图鉴是否隐藏格子中的 ID 与名称（默认关闭，即默认显示）。 */
   dexHideItemMeta: 'dex:hideItemMeta',
+  /** 数据 ID 是否隐藏图标格中的 ID 与名称（默认关闭，即默认显示）。 */
+  dataIdHideMeta: 'dataId:hideMeta',
   /** 物品图鉴表格视图开关。 */
   dexTableView: 'dex:tableView',
   /** 物品图鉴两列表格开关。 */

@@ -30,6 +30,8 @@ export interface Npc {
   id: number
   key: string
   name: string
+  /** 英文名（`loc.en-US` 的 `NPCName`）。`/tpnpc` 等只认名字的指令用它，避免依赖服务器语言。 */
+  en?: string
   /** `/sb`（spawnboss）可用参数（规范写法，如 `eye of cthulhu`）；仅 TShock 支持的 Boss 有。 */
   sb?: string
   /** `/sb` 的其它别名（如 `eoc` / `eye`）。 */
@@ -597,8 +599,11 @@ export interface UiState {
 export type TabId =
   | 'home'
   | 'editor'
+  | 'commands'
   | 'items'
   | 'dataid'
+  | 'save'
+  | 'worldview'
   | 'players'
   | 'store'
   | 'requisition'

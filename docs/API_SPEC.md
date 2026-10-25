@@ -340,24 +340,17 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 
 ---
 
-## 5.4 `POST /api/player/import`
+## 5.4 本地存档解析（不在后端）
 
-解析浏览器上传的本地角色存档（.plr），返回与 §5.2 **相同结构**的 `PlayerLook`，供前端展示。
-**仅展示**：不写入 TShock / 不落库 / 不修改服务器（解析完即丢弃）。
+「查看存档」（`.plr`）与「查看世界」（`.wld`）都**完全在浏览器里解析**，后端不提供导入接口：
 
-- **公开端点：不需要登录**（「查看存档」是给所有人的工具：谁都能上传自己的 .plr 看人物 / 属性 / 背包），
-  也不要求 `playermanager`；非 GET 仍要求 `X-Requested-With: tswui`（CSRF 中间件，只允许同源 fetch）。
+| 功能 | 实现 | 说明 |
+| --- | --- | --- |
+| 查看存档 | `web/src/lib/save/plr.ts`（AES-128-CBC 解密 + 字段解析） | 文件不离开浏览器；不需要登录 / 权限，也没有上传体积与限流问题 |
+| 查看世界 | `web/src/lib/save/worldFile.ts` + `worldThumb.ts`（头部解析 + 图格 RLE + 缩略图） | 同上，缩略图在 `<canvas>` 上本地渲染，可导出 PNG |
 
-- 请求体：`.plr` 原始二进制（`Content-Type: application/octet-stream`），上限 4 MiB；超出按 `400 bad_request`。
-- 成功 `200`：`PlayerLook`（`online=false`，`spawnX/spawnY=-1`）。
-  - 解析范围：外观 / 生命魔力 / 背包 58 + 装备 20 + 染料 10 + 杂项 5+5 +
-    猪猪 / 保险箱 / 熔炉 / 虚空袋（垃圾桶与配装不存于 .plr，展示为空）。
-  - 颜色编码与 §5.2 相同（int32 小端 RGBA）。
-- 非法 / 加密不匹配 / 版本不支持 / 截断 → `400 bad_request`（`message` 含原因）。
-- 限流：按**客户端 IP** 走指令限流器（`CommandMaxPerMin`），避免公开端点被刷。
-- 实现：`server/internal/plr`（AES-128-CBC，key/IV = `UnicodeEncoding("h3y_gUyZ")`，字段门槛到 release 326）。
-
----
+> 早期版本曾有 `POST /api/player/import` 与 `POST /api/world/import`（后端解析）。现已删除：
+> 后端不再接触玩家 / 世界存档，公网部署也就不存在「公开解析接口」的滥用面。
 
 ---
 
@@ -379,7 +372,7 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 ```
 - `plugin=false` → 未安装 FishShop（或无法确认），前端提示并在设置里禁用「鱼店」模块开关。
 - `plugin=true, rest=false` → 装了**老版本插件**（没有 REST 接口），前端提示「版本过旧」；
-  右侧指令卡片（`/fish list` 等）不依赖接口，仍可用。
+  右侧「钓鱼信息」卡片（`/fish info`）不依赖接口，仍可用。
 - `permission=false` → 已安装且提供 REST，但**老版本插件**缺 `fishshop.rest.use`（新版插件不需要任何
   自定义权限，探测走「缺 serial → 400」分支，`permission` 恒为 `true`）。
 - 插件上游状态码：`401` 没带 token；`403` 只表示 token 无效 / 用户组已变动（老版本缺权限也是 403，
@@ -739,7 +732,6 @@ export interface BackendTransport {
   playerCapabilities(): Promise<PlayerCapabilities>                    // 见第 5.1 节
   playerLook(name: string): Promise<PlayerLook>                        // 见第 5.2 节
   playerExport(name: string): Promise<{ filename: string; blob: Blob }> // 见第 5.3 节
-  importPlayer(data: ArrayBuffer): Promise<PlayerLook>                 // 见第 5.4 节
 
   fishCapabilities(): Promise<FishCapabilities>                        // 见第 5.5 节
   fishList(): Promise<FishShop>                                        // 见第 5.6 节

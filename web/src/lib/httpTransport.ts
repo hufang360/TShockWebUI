@@ -396,15 +396,6 @@ export class HttpTransport implements BackendTransport {
     }
   }
 
-  async importPlayer(data: ArrayBuffer): Promise<PlayerLook> {
-    const res = await request('/player/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: data,
-    })
-    return (await res.json()) as PlayerLook
-  }
-
   async fishCapabilities(): Promise<FishCapabilities> {
     const res = await request('/fish/capabilities')
     return (await res.json()) as FishCapabilities

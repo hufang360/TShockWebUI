@@ -99,11 +99,12 @@ describe('CommandPage 未登录', () => {
     )
 
     const { rerender } = render(page(false))
-    // 未登录：只有登录提示，没有量高后的工作区。
-    expect(screen.queryByTestId('command-workspace')).toBeNull()
+    // 未登录：顶部 tab 仍在（可以看「小抄」），指令 tab 里是登录提示。
+    expect(screen.getByTestId('command-workspace')).toBeTruthy()
+    expect(screen.getByText('请先登录！')).toBeTruthy()
 
     rerender(page(true))
-    // 登录后 rootRef 才挂载，需重新量高把工作区撑满。
+    // 登录后重新量高把工作区撑满。
     expect(screen.getByTestId('command-workspace').style.height).not.toBe('')
   })
 })
@@ -207,48 +208,6 @@ describe('CommandPage token 失效处理', () => {
   })
 })
 
-describe('CommandPage 收藏', () => {
-  it('指令行的注释保留完整行高', async () => {
-    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
-    const help = await screen.findByText('Shows command help.')
-    const row = help.closest('button')
-    expect(row?.className).toContain('min-h-16')
-    expect(help.className).toContain('leading-5')
-  })
-
-  it('「指令」tab 不再显示收藏星标（收藏独立成 tab）', async () => {
-    localStorage.setItem('tswui:draft', JSON.stringify('/time 12:00'))
-    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
-
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
-    await screen.findByPlaceholderText('搜索指令（名称 / 别名 / 帮助）')
-    expect(screen.queryByRole('button', { name: '收藏' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '取消收藏' })).toBeNull()
-  })
-
-  it('搜索前导 / 仍能匹配指令', async () => {
-    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
-    fireEvent.change(await screen.findByPlaceholderText('搜索指令（名称 / 别名 / 帮助）'), {
-      target: { value: '/time' },
-    })
-    expect(screen.getByText('/time')).toBeTruthy()
-  })
-
-  it('搜索框 ↓ 进入指令列表并高亮', async () => {
-    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: '指令' }))
-    const input = await screen.findByPlaceholderText('搜索指令（名称 / 别名 / 帮助）')
-
-    fireEvent.keyDown(input, { key: 'ArrowDown' })
-    const focused = document.activeElement as HTMLElement
-    expect(focused.tagName).toBe('BUTTON')
-    expect(focused.className).toContain('bg-accent')
-    expect(focused.textContent).toContain('/help')
-  })
-})
-
 describe('CommandPage 服务器动态', () => {
   it('「动态」tab 渲染事件流（含聊天）', async () => {
     const transport: BackendTransport = {
@@ -276,14 +235,14 @@ describe('CommandPage 服务器动态', () => {
         />
       </I18nProvider>,
     )
-    fireEvent.mouseDown(await screen.findByRole('tab', { name: '动态' }))
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: '聊天' }))
     expect(await screen.findByText('Alice: 你好')).toBeTruthy()
     expect(screen.getByText('Alice 加入了服务器')).toBeTruthy()
   })
 })
 
 describe('CommandPage 物品面板', () => {
-  it('选中物品后「前往物品ID」回传物品 id', async () => {
+  it('选中物品后「前往物品 ID」回传物品 id', async () => {
     const onOpenInDex = vi.fn()
     render(
       <I18nProvider lang="zh">
@@ -304,7 +263,7 @@ describe('CommandPage 物品面板', () => {
     const input = await screen.findByPlaceholderText('搜索物品（ID / 名称）')
     fireEvent.change(input, { target: { value: '生命' } })
     fireEvent.click(await screen.findByRole('button', { name: /生命水晶/ }))
-    fireEvent.click(screen.getByRole('button', { name: /前往 物品ID/ }))
+    fireEvent.click(screen.getByRole('button', { name: /前往 物品 ID/ }))
     expect(onOpenInDex).toHaveBeenCalledWith(29)
   })
 

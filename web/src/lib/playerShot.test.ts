@@ -12,6 +12,7 @@ const labels: ShotLabels = {
   status: '本地导入',
   info: ['生命 100 / 100', '魔力 20 / 20'],
   groups: {},
+  boostTitle: '永久增强',
 }
 
 describe('buildPlayerShotLayout', () => {

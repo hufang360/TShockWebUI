@@ -108,7 +108,6 @@ export const playerStubs = {
     filename: `${name}.plr`,
     blob: new Blob([]),
   }),
-  importPlayer: async (): Promise<PlayerLook> => emptyPlayerLook('imported', false),
   fishCapabilities: async (): Promise<FishCapabilities> => ({ plugin: true, rest: true, permission: true }),
   fishList: async (): Promise<FishShop> => ({ name: 'test', total: 0, goods: [] }),
   fishAsk: async (serial: number): Promise<FishGood> => ({

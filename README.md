@@ -27,7 +27,7 @@ Terraria **TShock** 服务器的**玩家 Web 指令伴侣**：在浏览器里舒
 | 历史 / 草稿 / 收藏 | 全部存本机 `localStorage`（`tswui:*`），上限 100，不自动执行 |
 | 会话 | 后端内存会话 + TTL；TShock 重启后刷新页面即回登录；执行遇 `token_invalid` 会弹登录框并**自动重试一次** |
 | 多服务器切换 | 可选（默认关）。开启后可在界面维护多个 TShock 上游并用 `X-TSWUI-Target` 快速切换 |
-| 界面 | shadcn/ui（new-york / slate），light/dark，中/英双语，无顶栏 + 可折叠侧栏，移动端抽屉式导航 |
+| 界面 | shadcn/ui（new-york / slate），light/dark，中/英双语，可折叠侧栏 + 内容区吸顶顶栏（页面操作在顶栏右侧），移动端抽屉式导航 |
 
 界面默认主题为 dark；图标来自仓库内 `data/items-atlas.png`（生成物，版权属 Re-Logic）。
 
@@ -304,7 +304,7 @@ cd server && go vet ./... && go test -race ./...
 TSHOCK_URL=http://127.0.0.1:7878 TSHOCK_TOKEN=simpleToken \
   go test -tags integration -run Integration -v ./internal/tshock
 
-# 前端（152 个用例）
+# 前端（vitest 全量）
 cd web && npm run typecheck && npm run lint && npm run test:run
 
 # 端到端冒烟（对已运行的后端）

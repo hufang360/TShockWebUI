@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { AlertTriangle, Droplets, Fish, RefreshCw, ShieldAlert, ShoppingCart, Terminal } from 'lucide-react'
+import { AlertTriangle, Droplets, Fish, RefreshCw, ShieldAlert, ShoppingCart } from 'lucide-react'
+import { InfoPopover } from '@/components/InfoPopover'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
 import { Notice } from '@/components/Notice'
 import { CommandOutput } from '@/components/ResultPanel'
 import { FishCommandCards } from '@/components/FishCommandCards'
+import { TopBarActions } from '@/components/TopBar'
 import { CELL_ICON_SIZE, GoodCell, GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
 import { cn } from '@/lib/cn'
 import {
@@ -93,9 +95,6 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const [confirming, setConfirming] = useState(false)
   const [buying, setBuying] = useState(false)
   const [buyResult, setBuyResult] = useState<FishBuyResult | null>(null)
-  /** REST 货架可用时，游戏内指令默认收起；老插件 / 无 REST 时自动展开作为兼容入口。 */
-  const [showGameCards, setShowGameCards] = useState(false)
-  const [cardsHeaderNode, setCardsHeaderNode] = useState<HTMLDivElement | null>(null)
   // 购买成功后的冷却秒数：期间禁用购买按钮，避免连点重复购买。
   const [buyCooldown, setBuyCooldown] = useState(0)
   const argsRef = useRef<HTMLInputElement>(null)
@@ -166,7 +165,6 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const plugin = capability?.plugin === true
   const restReady = capability?.rest === true
   const canUse = plugin && restReady && capability?.permission === true
-  const showFallbackCards = (!checking && !canUse) || showGameCards
 
   const loadShop = useCallback(async () => {
     setLoading(true)
@@ -331,38 +329,19 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     </Button>
   )
 
-  const heading = (
-    <div
-      className={cn(
-        'flex flex-wrap items-start justify-between gap-3',
-        showFallbackCards && 'xl:col-span-2 xl:row-start-1',
-      )}
-    >
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{t('page.store.title')}</h2>
-        <p className="text-xs text-muted-foreground">{t('page.store.desc')}</p>
-      </div>
-      {authenticated && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-expanded={showGameCards}
-            onClick={() => setShowGameCards((open) => !open)}
-          >
-            <Terminal data-icon="inline-start" />
-            {showGameCards ? t('result.collapse') : t('fish.cards')}
-          </Button>
-          {showFallbackCards && <div ref={setCardsHeaderNode} className="flex items-center gap-2" />}
-        </div>
-      )}
-    </div>
+  const pageActions = (
+    <TopBarActions
+      info={
+        <InfoPopover label={t('home.pageInfo')} title={t('page.store.title')}>
+          {t('page.store.desc')}
+        </InfoPopover>
+      }
+    />
   )
 
   if (!authenticated) {
     return (
-      <div className="flex flex-col gap-4">
-        {heading}
+      <div className="flex flex-col gap-2">
         <LoginGate onLogin={onLogin} />
       </div>
     )
@@ -382,25 +361,17 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       </div>
       <div
         ref={rootRef}
-        // 两列共享行：row1 = 左页头 / 右表头，row2 = 左内容 / 右卡片列表。
-        // 整页锁定到可用高度，两列在 row2 各自内部滚动（货架不再溢出到视口外）。
-        className={cn(
-          'grid gap-4',
-          showFallbackCards && 'xl:h-[var(--fish-fill)] xl:grid-cols-[minmax(0,1fr)_360px] xl:grid-rows-[auto_minmax(0,1fr)]',
-        )}
-        style={
-          showFallbackCards && fillHeight
-            ? ({ '--fish-fill': `${fillHeight}px` } as CSSProperties)
-            : undefined
-        }
+        // 两列：左货架 / 右指令卡片，各自内部滚动；整页锁定到可用高度。
+        className="grid gap-2 xl:h-[var(--fish-fill)] xl:grid-cols-[minmax(0,1fr)_360px]"
+        style={fillHeight ? ({ '--fish-fill': `${fillHeight}px` } as CSSProperties) : undefined}
       >
-        {heading}
+        {pageActions}
 
-        {/* 左下：货架（REST API 不可用时只影响左侧，右侧指令卡片仍可用） */}
-        <div className="flex min-w-0 flex-col gap-4 xl:col-start-1 xl:row-start-2 xl:min-h-0">
+        {/* 左：货架（REST API 不可用时只影响左侧，右侧指令卡片仍可用） */}
+        <div className="flex min-w-0 flex-col gap-2 xl:min-h-0">
       {checking && (
         <Card>
-          <CardBody className="flex items-center gap-2 pt-4 text-sm text-muted-foreground">
+          <CardBody className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
             <Spinner />
             {t('fish.checking')}
           </CardBody>
@@ -526,19 +497,15 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       )}
         </div>
 
-        {/* 右列：指令卡片（只依赖 rawcmd，不依赖鱼店 REST API）。
-            xl 下 FishCommandCards 为 display:contents，其表头 / 列表分别落到 row1 / row2。 */}
-        {showFallbackCards && (
-          <FishCommandCards
-            dataset={dataset}
-            transport={transport}
-            authenticated={authenticated}
-            serverId={serverId}
-            refreshInterval={refreshInterval}
-            onTokenInvalid={onTokenInvalid}
-            headerPortal={cardsHeaderNode}
-          />
-        )}
+        {/* 右列：指令卡片（只依赖 rawcmd，不依赖鱼店 REST API）。 */}
+        <FishCommandCards
+          dataset={dataset}
+          transport={transport}
+          authenticated={authenticated}
+          serverId={serverId}
+          refreshInterval={refreshInterval}
+          onTokenInvalid={onTokenInvalid}
+        />
       </div>
       </div>
 

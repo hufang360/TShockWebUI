@@ -26,6 +26,12 @@ export interface ModuleCardDef {
 
 export interface ModuleDef {
   id: ModuleId
+  /**
+   * 模块来源，决定「设置 → 激活模块」里归到哪个 tab：
+   * - `webui`：随自研**信使插件**（WebUI）提供（如物资申请）；
+   * - `plugin`：已适配的**第三方**插件（PlayerManager / FishShop / WorldModify）。
+   */
+  origin: 'webui' | 'plugin'
   /** 侧边栏 / 设置里的展示名（i18n key）。 */
   titleKey: string
   /** 侧边栏副标题。 */
@@ -39,24 +45,28 @@ export interface ModuleDef {
 export const MODULE_DEFS: ModuleDef[] = [
   {
     id: 'players',
+    origin: 'plugin',
     titleKey: 'nav.players',
     hintKey: 'nav.playersHint',
     requiresKey: 'modules.requires.playerManager',
   },
   {
     id: 'store',
+    origin: 'plugin',
     titleKey: 'nav.store',
     hintKey: 'nav.storeHint',
     requiresKey: 'modules.requires.fishShop',
   },
   {
     id: 'requisition',
+    origin: 'webui',
     titleKey: 'nav.requisition',
     hintKey: 'nav.requisitionHint',
     requiresKey: 'modules.requires.requests',
   },
   {
     id: 'world',
+    origin: 'plugin',
     titleKey: 'nav.world',
     hintKey: 'nav.worldHint',
     requiresKey: 'modules.requires.worldModify',

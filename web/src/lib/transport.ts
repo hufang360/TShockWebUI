@@ -460,8 +460,6 @@ export interface BackendTransport {
    * 由调用方用 object URL 触发浏览器下载（这样能带上 X-TSWUI-Target 等请求头）。
    */
   playerExport(name: string): Promise<{ filename: string; blob: Blob }>
-  /** 解析本地 .plr 角色存档（**仅展示**，不上传保存到服务器；需要登录）。 */
-  importPlayer(data: ArrayBuffer): Promise<PlayerLook>
 
   /** 实时探测第三方插件 FishShop：是否安装 / 是否有权限。 */
   fishCapabilities(): Promise<FishCapabilities>

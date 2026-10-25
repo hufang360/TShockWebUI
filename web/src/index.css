@@ -6,7 +6,7 @@
 :root {
   --radius: 0.625rem;
   /* 亮色主题：右侧主画布纯白，侧栏用轻微灰阶拉开层次。 */
-  --background: #fcfcfc;
+  --background: #ffffff;
   --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);

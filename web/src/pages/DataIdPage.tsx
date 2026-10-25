@@ -11,11 +11,10 @@ import {
   NpcTableLayout,
   TileIconGrid,
 } from '@/components/dataid/DataIdViews'
+import { FullscreenDock } from '@/components/FullscreenDock'
 import { SearchInput } from '@/components/SearchInput'
 import {
   Button,
-  Card,
-  CardBody,
   Checkbox,
   Empty,
   EmptyHeader,
@@ -37,12 +36,15 @@ import {
   TabsTrigger,
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
+import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePageHeight } from '@/hooks/usePageHeight'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
 import { readDataIdState, rememberDataIdState, type DataIdKind } from '@/lib/dataIdState'
 import { useDataset } from '@/lib/datasetContext'
+import { useMyPermissions } from '@/hooks/useMyPermissions'
+import { TopBarActions } from '@/components/TopBar'
 import { useI18n } from '@/lib/i18n'
 import {
   NPC_COLLECTIONS,
@@ -51,6 +53,7 @@ import {
   npcCollectionName,
 } from '@/lib/npcCollections'
 import { StorageKeys } from '@/lib/storage'
+import type { BackendTransport } from '@/lib/tshock'
 import type { TileWallData, TileWallEntry } from '@/types'
 
 /** 格子里的贴图框尺寸（NPC 贴图与物品图标共用，保证两种数据源对齐；默认 64×64）。 */
@@ -72,7 +75,18 @@ const EMPTY_TILEWALL: TileWallData = {
  *
  * 只读页：不执行任何指令（`/sb` / `/sm` 都只能在游戏内执行）。
  */
-export function DataIdPage() {
+export function DataIdPage({
+  authenticated = false,
+  serverId = 'default',
+  transport,
+}: {
+  /** 是否已登录：未登录不显示需要权限的召唤 / 增益指令。 */
+  authenticated?: boolean
+  /** 当前上游 id（权限按上游缓存）。 */
+  serverId?: string
+  /** 鉴权传输层（拿当前玩家的权限节点用）。 */
+  transport?: BackendTransport
+}) {
   const { t, lang } = useI18n()
   const dataset = useDataset()
   const npcs = useMemo(() => dataset?.npcs ?? [], [dataset])
@@ -88,6 +102,7 @@ export function DataIdPage() {
   // NPC 单行筛选：'' = 全部，'boss' = Boss，其余 = 分类 id。
   const [npcFilter, setNpcFilter] = useState(initial.npcFilter)
   // 图格 / 墙 / Buff 表格是否排成左右两列（默认开）。
+  const [hideMeta, setHideMeta] = useLocalState<boolean>(StorageKeys.dataIdHideMeta, false)
   const [twoCols, setTwoCols] = useState(initial.twoCols)
   // 「两列表格」只在 xl（≥1280px）真能排成两列；小屏只有一列 → 隐藏开关，也按单列渲染。
   const twoColsAvailable = useMediaQuery('(min-width: 1280px)')
@@ -110,6 +125,11 @@ export function DataIdPage() {
     kind === 'npc' ? npcHistory.history : kind === 'buff' ? buffHistory.history : dataHistory.history
   const removeSearchHistory =
     kind === 'npc' ? npcHistory.remove : kind === 'buff' ? buffHistory.remove : dataHistory.remove
+
+  // 当前玩家的权限节点：决定详情里是否显示 `/sb`、`/sm`、`/gbuff`。
+  // 只有「已登录 + 明确知道权限 + 确实没有该节点」才隐藏；拿不到权限时宁可显示（否则看起来像功能坏了）。
+  const { username, known, has } = useMyPermissions(transport, authenticated, serverId)
+  const canSee = (permission: string) => authenticated && (!known || has(permission))
 
   const rootRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -291,8 +311,9 @@ export function DataIdPage() {
   const selectedBuff = selected?.kind === 'buff' ? dataset?.buffsById.get(selected.id) ?? null : null
   const selectedKind: DataIdKind = selected?.kind ?? 'tile'
 
-  // 所有 NPC 分类统一使用默认 64×64 图标绘制区。
-  const thumbSize = THUMB_SIZE
+  // 默认 64×64；Boss 分类放大一倍（128），格子与图标区同步放大。
+  const bossCategory = kind === 'npc' && npcFilter === 'boss'
+  const thumbSize = bossCategory ? THUMB_SIZE * 2 : THUMB_SIZE
 
   // 页面设置统一给出全部 Wiki 入口，不随当前 tab 增删。
   const wiki = (zh: string, en: string) =>
@@ -356,6 +377,9 @@ export function DataIdPage() {
           )}
         >
           <Settings2 />
+          <span data-action-label className="hidden truncate">
+            {t('dataId.settings')}
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -372,6 +396,18 @@ export function DataIdPage() {
             {t('dataId.settings.view')}
           </div>
           <FieldGroup className="gap-2">
+            <Field orientation="horizontal" className="w-auto">
+              <Checkbox
+                id="dataid-hide-meta"
+                aria-label={t('dex.hideItemMeta')}
+                checked={hideMeta}
+                onCheckedChange={(v) => setHideMeta(v === true)}
+                data-testid="dataid-hide-meta"
+              />
+              <FieldLabel htmlFor="dataid-hide-meta" className="cursor-pointer font-normal">
+                {t('dex.hideItemMeta')}
+              </FieldLabel>
+            </Field>
             <div className="flex items-center justify-between gap-2">
               <Field orientation="horizontal" className="w-auto">
                 <Checkbox
@@ -479,6 +515,9 @@ export function DataIdPage() {
       className="text-muted-foreground hover:bg-accent hover:text-foreground"
     >
       {resultsFullscreen ? <Minimize2 /> : <Maximize2 />}
+      <span data-action-label className="hidden truncate">
+        {resultsFullscreen ? t('dataId.exitFullscreen') : t('dataId.enterFullscreen')}
+      </span>
     </Button>
   )
 
@@ -488,16 +527,22 @@ export function DataIdPage() {
       data-testid="dataid-page"
       data-fullscreen={resultsFullscreen || undefined}
       className={cn(
-        'flex min-h-[360px] flex-col gap-3 overflow-hidden',
+        'flex min-h-[360px] flex-col overflow-hidden',
         resultsFullscreen && 'fixed inset-0 z-50 bg-background',
       )}
       style={{ height: resultsFullscreen ? '100dvh' : pageHeight }}
     >
-      {resultsFullscreen ? (
-        <div className="pointer-events-auto absolute top-3 right-3 z-30 flex items-center gap-1 rounded-lg border border-border bg-popover p-1 shadow-lg">
+      {!resultsFullscreen && (
+        <TopBarActions>
           {settingsControl}
           {fullscreenControl}
-        </div>
+        </TopBarActions>
+      )}
+      {resultsFullscreen ? (
+        <FullscreenDock label={t('dataId.showActions')}>
+          {settingsControl}
+          {fullscreenControl}
+        </FullscreenDock>
       ) : (
         <>
           {/* 数据源 Tab 独立置顶。 */}
@@ -522,67 +567,64 @@ export function DataIdPage() {
             </TabsList>
           </Tabs>
 
-          <Card className="shrink-0">
-            <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-4 pb-4">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <div className="w-full max-w-sm min-w-0">
-                  <SearchInput
-                    ref={searchRef}
-                    value={query}
-                    onValueChange={changeQuery}
-                    placeholder={
-                      kind === 'npc'
-                        ? t('dataId.search.npc')
-                        : kind === 'tile'
-                          ? t('dataId.search.tile')
-                          : kind === 'wall'
-                            ? t('dataId.search.wall')
-                            : t('dataId.search.buff')
-                    }
-                    aria-label={t('nav.dataId')}
-                    history={searchHistory}
-                    onHistoryRemove={removeSearchHistory}
-                    trailingIcon={<Search className="size-4 text-muted-foreground" />}
-                    className="h-9 rounded-full pl-3 pr-1"
-                    inputClassName="text-sm"
-                  />
-                </div>
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {t('dataId.resultCount', { n: total })}
-                </span>
+          {/* 工具行：不再套卡片，直接铺在页面上 */}
+          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 p-1">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <div className="w-full max-w-sm min-w-0">
+                <SearchInput
+                  ref={searchRef}
+                  value={query}
+                  onValueChange={changeQuery}
+                  placeholder={
+                    kind === 'npc'
+                      ? t('dataId.search.npc')
+                      : kind === 'tile'
+                        ? t('dataId.search.tile')
+                        : kind === 'wall'
+                          ? t('dataId.search.wall')
+                          : t('dataId.search.buff')
+                  }
+                  aria-label={t('nav.dataId')}
+                  history={searchHistory}
+                  onHistoryRemove={removeSearchHistory}
+                  trailingIcon={<Search className="size-4 text-muted-foreground" />}
+                  className="h-9 rounded-full pl-3 pr-1"
+                  inputClassName="text-sm"
+                />
               </div>
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {t('dataId.resultCount', { n: total })}
+              </span>
+            </div>
 
-              <div className="ml-auto flex min-w-0 items-center gap-1">
-                {kind === 'npc' && (
-                  <Tabs
-                    value={npcFilter || 'all'}
-                    onValueChange={(value) => setNpcFilter(value === 'all' ? '' : value)}
-                    className="w-auto max-w-full shrink-0 gap-0"
+            <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-1 sm:w-auto">
+              {kind === 'npc' && (
+                <Tabs
+                  value={npcFilter || 'all'}
+                  onValueChange={(value) => setNpcFilter(value === 'all' ? '' : value)}
+                  className="w-auto max-w-full shrink-0 gap-0"
+                >
+                  <TabsList
+                    aria-label={t('npcs.collections')}
+                    data-testid="npc-category-tabs"
+                    className="h-8 max-w-full justify-start overflow-x-auto p-0.5"
                   >
-                    <TabsList
-                      aria-label={t('npcs.collections')}
-                      data-testid="npc-category-tabs"
-                      className="h-8 max-w-full justify-start overflow-x-auto p-0.5"
-                    >
-                      <TabsTrigger value="all" className="h-7 flex-none px-2">
-                        {t('npcs.filter.all')}
+                    <TabsTrigger value="all" className="h-7 flex-none px-2">
+                      {t('npcs.filter.all')}
+                    </TabsTrigger>
+                    <TabsTrigger value="boss" className="h-7 flex-none px-2">
+                      {t('npcs.filter.boss')}
+                    </TabsTrigger>
+                    {NPC_COLLECTIONS.map((c) => (
+                      <TabsTrigger key={c.id} value={c.id} className="h-7 flex-none px-2">
+                        {npcCollectionName(c, lang)}
                       </TabsTrigger>
-                      <TabsTrigger value="boss" className="h-7 flex-none px-2">
-                        {t('npcs.filter.boss')}
-                      </TabsTrigger>
-                      {NPC_COLLECTIONS.map((c) => (
-                        <TabsTrigger key={c.id} value={c.id} className="h-7 flex-none px-2">
-                          {npcCollectionName(c, lang)}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
-                )}
-                {settingsControl}
-                {fullscreenControl}
-              </div>
-            </CardBody>
-          </Card>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
+          </div>
         </>
       )}
 
@@ -593,7 +635,7 @@ export function DataIdPage() {
         onScroll={(e) => {
           scrollTopRef.current = e.currentTarget.scrollTop
         }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-1"
       >
         {total === 0 ? (
           <Empty className="min-h-40 border border-dashed">
@@ -612,14 +654,21 @@ export function DataIdPage() {
           ) : (
             <div
               className={cn(
-                'grid gap-1.5',
-                resultsFullscreen
-                  ? 'grid-cols-[repeat(auto-fill,minmax(5rem,1fr))]'
-                  : 'grid-cols-4 @[32rem]:grid-cols-6 @[48rem]:grid-cols-8 @[72rem]:grid-cols-10',
+                'grid gap-x-2 gap-y-4 md:gap-x-4',
+                bossCategory
+                  ? 'grid-cols-[repeat(auto-fill,9rem)]'
+                  : 'grid-cols-[repeat(auto-fill,4.5rem)]',
               )}
             >
               {filteredNpcs.map((npc) => (
-                <NpcCell key={npc.id} npc={npc} size={thumbSize} onSelect={(value) => setSelected({ kind: 'npc', id: value.id })} />
+                <NpcCell
+                  key={npc.id}
+                  npc={npc}
+                  size={thumbSize}
+                  large={bossCategory}
+                  hideMeta={hideMeta}
+                  onSelect={(value) => setSelected({ kind: 'npc', id: value.id })}
+                />
               ))}
             </div>
           )
@@ -627,7 +676,7 @@ export function DataIdPage() {
           tableView ? (
             <BuffTableLayout rows={filteredBuffs} twoCols={effectiveTwoCols} onSelect={(buff) => setSelected({ kind: 'buff', id: buff.id })} />
           ) : (
-            <BuffGrid rows={filteredBuffs} fullscreen={resultsFullscreen} onSelect={(buff) => setSelected({ kind: 'buff', id: buff.id })} />
+            <BuffGrid rows={filteredBuffs} hideMeta={hideMeta} onSelect={(buff) => setSelected({ kind: 'buff', id: buff.id })} />
           )
         ) : (kind === 'tile' || kind === 'wall') && !tableView ? (
           <TileIconGrid
@@ -637,7 +686,7 @@ export function DataIdPage() {
               dataset?.itemsById.get(e.subId != null ? (e.styleItem ?? -1) : (e.item ?? -1))
             }
             atlas={dataset?.atlas}
-            fullscreen={resultsFullscreen}
+            hideMeta={hideMeta}
             onSelect={(entry) => setSelected({ kind, id: entry.id })}
           />
         ) : (
@@ -675,9 +724,18 @@ export function DataIdPage() {
               </SheetHeader>
               <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
                 {selectedNpc ? (
-                  <NpcDetail npc={selectedNpc} large />
+                  <NpcDetail
+                    npc={selectedNpc}
+                    large
+                    canSpawnBoss={canSee('tshock.npc.spawnboss')}
+                    canSpawnMob={canSee('tshock.npc.spawnmob')}
+                  />
                 ) : selectedBuff ? (
-                  <BuffDetail buff={selectedBuff} large />
+                  <BuffDetail
+                    buff={selectedBuff}
+                    large
+                    gbuffPlayer={canSee('tshock.buff.others') ? username : null}
+                  />
                 ) : selectedData ? (
                   <DataDetail
                     entry={selectedData}

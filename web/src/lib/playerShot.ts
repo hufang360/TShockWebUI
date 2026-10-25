@@ -2,6 +2,7 @@ import { loadVerifiedAtlasImage } from '@/lib/atlas'
 import { iconContentSize, shouldSmooth } from '@/lib/iconScale'
 import { PLAYER_FRAME_H, PLAYER_FRAME_W, drawPlayerAvatar } from '@/lib/playerAvatarDraw'
 import { loadPlayerAtlas, loadPlayerAtlasImage } from '@/lib/playerAtlas'
+import { PERMANENT_BOOSTS } from '@/lib/playerBoosts'
 import { EQUIP_GROUP_A, EQUIP_GROUP_B, findGroup, type SlotGroup } from '@/lib/playerSlots'
 import type { PlayerItem, PlayerLook } from '@/lib/tshock'
 import type { AtlasRegions, Dataset } from '@/types'
@@ -53,6 +54,13 @@ export interface ShotSlot {
   item: PlayerItem
 }
 
+export interface ShotBoost {
+  x: number
+  y: number
+  itemId: number
+  on: boolean
+}
+
 export interface ShotGroup {
   key: string
   label: string
@@ -68,6 +76,8 @@ export interface PlayerShotLayout {
   status: ShotText
   avatar: { x: number; y: number; scale: number }
   info: ShotText[]
+  /** 永久增强：标题 + 一排图标（未解锁 / 未使用的按 40% 透明绘制）。 */
+  boosts: { title: ShotText; items: ShotBoost[]; size: number }
   groups: ShotGroup[]
   /** 格子边长（绘制用；布局与绘制共用同一常量）。 */
   slot: number
@@ -81,6 +91,8 @@ export interface ShotLabels {
   info: string[]
   /** 分组标题：`players.group.*` → 本地化名。 */
   groups: Record<string, string>
+  /** 「永久增强」标题。 */
+  boostTitle: string
 }
 
 /**
@@ -169,7 +181,17 @@ export function buildPlayerShotLayout(look: PlayerLook, labels: ShotLabels): Pla
 
   const infoCount = Math.max(1, labels.info.length)
   const infoBottom = infoY + (infoCount - 1) * 22 + 18
-  const height = Math.max(equipBottom, infoBottom) + PAD
+  // 永久增强：标题一行、图标一行（20px，间隔 4px），与页面顺序一致。
+  const boostTitleY = infoBottom + 4
+  const boostRowY = boostTitleY + 18
+  const boostSize = 20
+  const boostItems: ShotBoost[] = PERMANENT_BOOSTS.map((boost, i) => ({
+    x: infoX + i * (boostSize + 4),
+    y: boostRowY,
+    itemId: boost.itemId,
+    on: look[boost.field] === true,
+  }))
+  const height = Math.max(equipBottom, boostRowY + boostSize) + PAD
   const width = Math.max(ammoX + SLOT, x - SLOT_GAP) + PAD
 
   return {
@@ -185,6 +207,11 @@ export function buildPlayerShotLayout(look: PlayerLook, labels: ShotLabels): Pla
       size: 13,
       tone: 'muted' as const,
     })),
+    boosts: {
+      title: { x: infoX, y: boostTitleY, text: labels.boostTitle, size: 12, tone: 'muted' },
+      items: boostItems,
+      size: boostSize,
+    },
     groups,
     slot: SLOT,
   }
@@ -269,11 +296,7 @@ export async function renderPlayerShotCanvas({
   text(layout.status, colors.muted)
   for (const line of layout.info) text(line, colors.muted)
 
-  // 人物图：浅色底框衬托（与页面一致）
-  ctx.fillStyle = colors.accent
-  ctx.globalAlpha = 0.6
-  ctx.fillRect(layout.avatar.x - 8, layout.avatar.y - 8, AVATAR_W + 16, AVATAR_H + 16)
-  ctx.globalAlpha = 1
+  // 人物图：透明背景，不加底框。
   try {
     const atlas = await loadPlayerAtlas()
     const image = await loadPlayerAtlasImage(atlas)
@@ -297,6 +320,33 @@ export async function renderPlayerShotCanvas({
       atlasImage = await loadVerifiedAtlasImage(atlas)
     } catch {
       atlasImage = null
+    }
+  }
+
+  // 永久增强：标题 + 图标（未使用的变淡）。
+  text(layout.boosts.title, colors.muted)
+  if (atlas && atlasImage) {
+    for (const boost of layout.boosts.items) {
+      const iconKey = dataset?.itemsById.get(boost.itemId)?.icon ?? boost.itemId
+      const region = atlas.regions[String(iconKey)]
+      if (!region) continue
+      const [sx, sy, w, h] = region
+      const content = iconContentSize(w, h, layout.boosts.size)
+      ctx.save()
+      ctx.globalAlpha = boost.on ? 1 : 0.4
+      ctx.imageSmoothingEnabled = shouldSmooth(w, content.width)
+      ctx.drawImage(
+        atlasImage,
+        sx,
+        sy,
+        w,
+        h,
+        boost.x + (layout.boosts.size - content.width) / 2,
+        boost.y + (layout.boosts.size - content.height) / 2,
+        content.width,
+        content.height,
+      )
+      ctx.restore()
     }
   }
 

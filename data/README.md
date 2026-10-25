@@ -40,7 +40,7 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
 | --- | --- | --- |
 | `items.json` | 物品：ID、内部名、图标、动画帧数、贴图尺寸、标签（**无名称**） | 6195 |
 | `prefixes.json` | 词缀：ID、内部名（**无名称**） | 97 |
-| `npcs.json` | NPC：ID、内部名（**无名称**，名称取 `loc.NPCName`；参数补全用）、`/sb` 参数信息 | 694 |
+| `npcs.json` | NPC：ID、内部名、**英文名 `en`**（取 `loc.en-US`；`/tpnpc` 等只认名字的指令用）、`/sb` 参数信息 | 694 |
 | `tiles.json` | 图格 ID：内部名（`TileID`）、代表物品 id、摆放尺寸 | 754 |
 | `walls.json` | 墙 ID：内部名（`WallID`）、代表物品 id | 367 |
 | `buffs.json` | Buff：ID、内部名（**无名称**，名称取 `loc.BuffName`；参数补全用） | 400 |
@@ -242,22 +242,26 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
 - `minStack` / `maxStack` 是模拟中观察到的数量范围。
 - 只做木匣（掉落与专家/大师无关）；宝藏袋（`OpenBossBag`）含专家/大师分支，未纳入。
 
-### npcs.json 结构（`/sb` 参数）
+### npcs.json 结构（`/sb` 参数 + 英文名）
 
-`npcs.json` 的每条除了 `id` / `key`，还会从 TShock `SpawnBoss()` 的 switch 解析出 Boss 信息（供「数据图鉴」的 Boss 筛选与「指令」页 `/sb` 补全使用）：
+每条是 `id` / `key`（NPCID 常量名）/ `en`（英文名，取自 `loc.en-US` 的 `NPCName`，缺失回退 `key`）。
+Boss 还会从 TShock `SpawnBoss()` 的 switch 解析出 `/sb` 信息（供「数据图鉴」的 Boss 筛选、
+「指令」页 `/sb` 补全、「召唤NPC」页使用）：
 
 ```jsonc
 {
   "id": 4,
   "key": "EyeofCthulhu",
-  "sb": "eye of cthulhu",        // /sb 的规范写法（最长别名）；仅 Boss 有
+  "en": "Eye of Cthulhu",         // 英文名；`/tpnpc` 只接受名称（不认 ID），用它跨服务器语言都能命中
+  "sb": "eye of cthulhu",         // /sb 的规范写法（最长别名）；仅 Boss 有
   "sbAliases": ["eoc", "eye", "eye of cthulhu"],  // 全部合法别名（多于一个时）
   "sbAll": true                   // 是否包含在 /sb all 里
 }
 ```
 
-- 来源：`TShockAPI/Commands.cs` 的 `SpawnBoss()`（`case` 标签 → `npc.SetDefaults(N)`；`NPC.SpawnWOF` → 113）。
-- 普通怪物没有这些字段；`/sm` 对任意 NPC 都可用（名称或数字 ID），所以图鉴总是给出 `/sm`。
+- 来源：`TShockAPI/Commands.cs` 的 `SpawnBoss()`（`case` 标签 → `npc.SetDefaults(N)`；`NPC.SpawnWOF` → 113）；
+  `en` 来自 `loc.en-US` 的 `NPCName`。
+- 普通怪物只有 `id` / `key` / `en`；`/sm` 对任意 NPC 都可用（名称或数字 ID），所以图鉴总是给出 `/sm`。
 
 ### tiles.json / walls.json 结构（数据图鉴）
 

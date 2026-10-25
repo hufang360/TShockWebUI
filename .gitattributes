@@ -5,6 +5,7 @@
 *.jpg binary
 *.ico binary
 *.plr binary
+*.wld binary
 *.dll binary
 
 # Windows 脚本保持 CRLF

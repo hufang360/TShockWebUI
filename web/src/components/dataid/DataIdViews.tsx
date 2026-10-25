@@ -1,4 +1,5 @@
 import { BuffIcon } from '@/components/BuffIcon'
+import { CommandLine } from '@/components/CommandLine'
 import { ItemIcon } from '@/components/ItemIcon'
 import { NpcSprite } from '@/components/NpcSprite'
 import { Eye } from 'lucide-react'
@@ -6,6 +7,8 @@ import { Badge, Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { DataIdKind } from '@/lib/dataIdState'
 import { useI18n } from '@/lib/i18n'
+import { gbuffCommand } from '@/lib/commandFormat'
+import { spawnBossCommand, spawnMobCommand } from '@/lib/spawnTips'
 import type { Atlas, Buff, Item, Npc, TileWallEntry } from '@/types'
 
 /**
@@ -13,20 +16,36 @@ import type { Atlas, Buff, Item, Npc, TileWallEntry } from '@/types'
  * 纯展示：不持有页面状态，数据与回调由 `DataIdPage` 注入。
  */
 
+/** 图标网格：宽度固定 72，间距固定（列 8px / 行 16px）。 */
+const ICON_GRID =
+  'grid grid-cols-[repeat(auto-fill,4.5rem)] gap-x-2 gap-y-4 md:gap-x-4'
+
+/**
+ * 格子固定 72 宽（= 图标区宽度），ID / 名称都在这个宽度内截断。
+ * hover 时**整格**（图标 + 文字）一起上浮，只有 72×72 的图标区在 hover 时才出现底色。
+ */
 const CELL_CLASS =
-  'flex cursor-pointer flex-col items-center gap-1 rounded-xl px-1 py-2 text-center transition'
+  'group/cell flex w-18 cursor-pointer flex-col items-center gap-1 rounded-xl text-center transition'
 const CELL_HOVER =
-  'hover:-translate-y-0.5 hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
-const ICON_CELL_BG = 'rounded-lg bg-muted/50 p-0.5 ring-1 ring-border/50'
+  'hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+/** 图标区：默认**无底色**、无描边，72×72；hover 时才铺 `bg-primary/10`。 */
+const ICON_CELL_BG =
+  'flex size-18 items-center justify-center rounded-lg transition-colors group-hover/cell:bg-primary/10'
 
 export function NpcCell({
   npc,
   size,
+  large = false,
+  hideMeta = false,
   onSelect,
 }: {
   npc: Npc
   /** 贴图绘制区边长（64 / Boss 128）。 */
   size: number
+  /** Boss 分类：格子 / 图标区各放大一倍（144 / 128）。 */
+  large?: boolean
+  /** 页面设置里「隐藏 ID 和名称」：只留图标。 */
+  hideMeta?: boolean
   onSelect: (npc: Npc) => void
 }) {
   return (
@@ -34,13 +53,19 @@ export function NpcCell({
       type="button"
       title={`${npc.name} #${npc.id}`}
       onClick={() => onSelect(npc)}
-      className={cn(CELL_CLASS, CELL_HOVER)}
+      className={cn(CELL_CLASS, CELL_HOVER, large ? 'w-36' : 'w-18')}
     >
-      <span className={cn('inline-flex', ICON_CELL_BG)}>
+      <span className={cn(ICON_CELL_BG, large ? 'size-36' : 'size-18')}>
         <NpcSprite id={npc.id} size={size} name={npc.name} />
       </span>
-      <span className="font-pixel text-2xs leading-none text-muted-foreground">{npc.id}</span>
-      <span className="w-full truncate text-xs leading-4 text-foreground">{npc.name}</span>
+      {!hideMeta && (
+        <>
+          <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+            {npc.id}
+          </span>
+          <span className="w-full truncate text-xs leading-4 text-foreground">{npc.name}</span>
+        </>
+      )}
     </button>
   )
 }
@@ -196,22 +221,15 @@ export function BuffTableLayout({
 /** Buff 图标网格（默认视图）：图标 + BuffID + 名称；点击开 Popover。 */
 export function BuffGrid({
   rows,
-  fullscreen = false,
+  hideMeta = false,
   onSelect,
 }: {
   rows: Buff[]
-  fullscreen?: boolean
+  hideMeta?: boolean
   onSelect: (buff: Buff) => void
 }) {
   return (
-    <div
-      className={cn(
-        'grid gap-1.5',
-        fullscreen
-          ? 'grid-cols-[repeat(auto-fill,minmax(5rem,1fr))]'
-          : 'grid-cols-4 @[32rem]:grid-cols-6 @[48rem]:grid-cols-8 @[72rem]:grid-cols-10',
-      )}
-    >
+    <div className={ICON_GRID}>
       {rows.map((buff) => (
         <button
           key={buff.id}
@@ -220,11 +238,17 @@ export function BuffGrid({
           onClick={() => onSelect(buff)}
           className={cn(CELL_CLASS, CELL_HOVER)}
         >
-          <span className={cn('inline-flex', ICON_CELL_BG)}>
-            <BuffIcon id={buff.id} size={48} name={buff.name} />
+          <span className={ICON_CELL_BG}>
+            <BuffIcon id={buff.id} size={64} name={buff.name} />
           </span>
-          <span className="font-pixel text-2xs leading-none text-muted-foreground">{buff.id}</span>
-          <span className="w-full truncate text-xs leading-4 text-foreground">{buff.name}</span>
+          {!hideMeta && (
+            <>
+              <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+                {buff.id}
+              </span>
+              <span className="w-full truncate text-xs leading-4 text-foreground">{buff.name}</span>
+            </>
+          )}
         </button>
       ))}
     </div>
@@ -303,26 +327,19 @@ export function TileIconGrid({
   nameOf,
   itemOf,
   atlas,
-  fullscreen = false,
+  hideMeta = false,
   onSelect,
 }: {
   rows: TileWallEntry[]
   nameOf: (e: TileWallEntry) => string
   itemOf: (e: TileWallEntry) => Item | undefined
   atlas: Atlas | undefined
-  fullscreen?: boolean
+  hideMeta?: boolean
   onSelect: (entry: TileWallEntry) => void
 }) {
   const { t } = useI18n()
   return (
-    <div
-      className={cn(
-        'grid gap-1.5',
-        fullscreen
-          ? 'grid-cols-[repeat(auto-fill,minmax(5rem,1fr))]'
-          : 'grid-cols-4 @[32rem]:grid-cols-6 @[48rem]:grid-cols-8 @[72rem]:grid-cols-10',
-      )}
-    >
+    <div className={ICON_GRID}>
       {rows.map((entry) => {
         const name = nameOf(entry)
         const item = itemOf(entry)
@@ -335,21 +352,25 @@ export function TileIconGrid({
             onClick={() => onSelect(entry)}
             className={cn(CELL_CLASS, CELL_HOVER)}
           >
-            <span className={cn('inline-flex', ICON_CELL_BG)}>
+            <span className={ICON_CELL_BG}>
               {item ? (
                 <ItemIcon item={item} atlas={atlas} size={64} name={name} tooltip={false} />
               ) : (
                 <span className="inline-block size-16 rounded bg-muted/60" aria-hidden />
               )}
             </span>
-            <span className="font-pixel text-2xs leading-none text-muted-foreground">
-              {displayId}
-            </span>
-            <span className="w-full truncate text-xs leading-4 text-foreground">{name}</span>
-            {entry.subId == null && (entry.styles?.length ?? 0) > 0 && (
-              <span className="rounded bg-accent/60 px-1.5 py-0.5 text-2xs text-muted-foreground">
-                {t('dataId.styles.count', { n: entry.styles!.length })}
-              </span>
+            {!hideMeta && (
+              <>
+                <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+                  {displayId}
+                </span>
+                <span className="w-full truncate text-xs leading-4 text-foreground">{name}</span>
+                {entry.subId == null && (entry.styles?.length ?? 0) > 0 && (
+                  <span className="max-w-full truncate rounded bg-accent/60 px-1.5 py-0.5 text-2xs text-muted-foreground">
+                    {t('dataId.styles.count', { n: entry.styles!.length })}
+                  </span>
+                )}
+              </>
             )}
           </button>
         )
@@ -502,7 +523,31 @@ function DetailRow({
   )
 }
 
-export function NpcDetail({ npc, large = false }: { npc: Npc; large?: boolean }) {
+/**
+ * 一条只读指令：左 = 属性 / 命令名，右 = 指令原文，末尾复制按钮。
+ * 与「内部名」那行同一套左右布局。
+ */
+/** Boss 的单字简写（优先 `sbAliases` 里不等于全名的项，其次取全名第一个词）。 */
+function bossShortAlias(npc: Npc): string | null {
+  if (!npc.sb) return null
+  const alias = npc.sbAliases?.find((a) => a && a !== npc.sb)
+  const short = alias ?? npc.sb.split(/\s+/)[0]
+  return short && short !== npc.sb ? short : null
+}
+
+export function NpcDetail({
+  npc,
+  large = false,
+  canSpawnBoss = false,
+  canSpawnMob = false,
+}: {
+  npc: Npc
+  large?: boolean
+  /** 当前玩家有 `tshock.npc.spawnboss`（未登录 / 无权限 = false，不显示）。 */
+  canSpawnBoss?: boolean
+  /** 当前玩家有 `tshock.npc.spawnmob`。 */
+  canSpawnMob?: boolean
+}) {
   const { t } = useI18n()
   return (
     <div className={cn('flex flex-col gap-2', large && 'gap-4')}>
@@ -521,6 +566,26 @@ export function NpcDetail({ npc, large = false }: { npc: Npc; large?: boolean })
         </div>
       </div>
       <DetailRow label={t('dataId.field.internal')} value={npc.key} mono />
+      {/* 召唤指令：要**对应权限**才显示；`/spawnboss` 还要求该 NPC 是 Boss（有 `sb`）。 */}
+      {(canSpawnBoss || canSpawnMob) && (
+        <div className="flex flex-col gap-1">
+          {canSpawnBoss && npc.sb && (
+            <>
+              <CommandLine label={t('dataId.cmd.spawnboss')} command={spawnBossCommand(npc.sb)} />
+              {/* 部分 Boss 有单字简写（如 king slime → /sb king）：单独一行，方便手输。 */}
+              {bossShortAlias(npc) && (
+                <CommandLine
+                  label={t('dataId.cmd.spawnbossShort')}
+                  command={`/sb ${bossShortAlias(npc)}`}
+                />
+              )}
+            </>
+          )}
+          {canSpawnMob && (
+            <CommandLine label={t('dataId.cmd.spawnmob')} command={spawnMobCommand(npc.id)} />
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -553,11 +618,11 @@ export function DataDetail({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col items-center gap-3">
-        <div className="flex size-40 items-center justify-center rounded-xl bg-accent/60">
+        <div className="flex size-40 items-center justify-center rounded-xl bg-accent">
           {item ? (
-            <ItemIcon item={item} atlas={atlas} size={96} name={name} tooltip={false} />
+            <ItemIcon item={item} atlas={atlas} size={64} name={name} tooltip={false} />
           ) : (
-            <span className="inline-block size-24 rounded bg-muted/60" aria-hidden />
+            <span className="inline-block size-16 rounded bg-muted/60" aria-hidden />
           )}
         </div>
         <div className="text-center">
@@ -649,7 +714,19 @@ export function DataDetail({
   )
 }
 
-export function BuffDetail({ buff, large = false }: { buff: Buff; large?: boolean }) {
+export function BuffDetail({
+  buff,
+  large = false,
+  gbuffPlayer = null,
+}: {
+  buff: Buff
+  large?: boolean
+  /**
+   * 有 `tshock.buff.others` 时传当前玩家名 → 显示 `/gbuff <玩家> <buffID>`；
+   * 未登录 / 无权限传 null（不显示）。
+   */
+  gbuffPlayer?: string | null
+}) {
   const { t } = useI18n()
   return (
     <div className={cn('flex flex-col gap-2', large && 'gap-4')}>
@@ -663,6 +740,9 @@ export function BuffDetail({ buff, large = false }: { buff: Buff; large?: boolea
         </div>
       </div>
       <DetailRow label={t('dataId.field.internal')} value={buff.key} mono />
+      {gbuffPlayer && (
+        <CommandLine label={t('dataId.cmd.gbuff')} command={gbuffCommand(gbuffPlayer, buff.id)} />
+      )}
     </div>
   )
 }

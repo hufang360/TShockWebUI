@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Plug, ShieldAlert } from 'lucide-react'
 import {
   Badge,
   Button,
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
   Switch,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui'
-import { CollapseChevron } from '@/components/CollapseChevron'
 import { CollapsibleCard } from '@/components/CollapsibleCard'
 import { LoginGate } from '@/components/LoginGate'
 import { useI18n } from '@/lib/i18n'
@@ -18,7 +18,14 @@ import { PluginDiagnosticsCard } from '@/components/PluginDiagnosticsCard'
 import { WebAccountSection } from '@/components/WebAccountSection'
 import { CustomModulesSection } from '@/components/settings/CustomModulesSection'
 import { PreferencesCards } from '@/components/settings/PreferencesCards'
-import { MODULE_DEFS, isModuleEnabled, setModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
+import {
+  MODULE_DEFS,
+  isModuleEnabled,
+  setModuleEnabled,
+  type ModuleDef,
+  type ModuleId,
+  type ModulesPrefs,
+} from '@/lib/modules'
 import { createCustomModule, type CustomModule } from '@/lib/customModules'
 import { normalizeCustomCommand } from '@/lib/homeCards'
 import {
@@ -91,6 +98,10 @@ export function SettingsPage({
   const [, setBatchModeSet] = useLocalState(StorageKeys.homeBatchSet, false)
   const [batchPlugin, setBatchPlugin] = useState<boolean | null>(null)
   const [, setRawModuleCards] = useLocalState(StorageKeys.moduleCards, DEFAULT_MODULE_CARDS)
+  // 「激活模块」按来源分 tab：内置（信使插件）/ 已适配（第三方插件）/ 自定义。
+  const [moduleTab, setModuleTab] = useState<'builtin' | 'plugin' | 'custom'>('builtin')
+  const webuiModules = MODULE_DEFS.filter((def) => def.origin === 'webui')
+  const pluginModules = MODULE_DEFS.filter((def) => def.origin === 'plugin')
   const [newModuleName, setNewModuleName] = useState('')
   const [newModuleCommand, setNewModuleCommand] = useState('')
   // 当前用户组：决定「服务器动态」能否选 1 分钟（仅 GM / superadmin / vip）。
@@ -310,9 +321,21 @@ export function SettingsPage({
         <p className="text-xs text-muted-foreground">{t('settings.note')}</p>
       </div>
 
-      {/* 两栏：左 = 激活模块；右 = 界面偏好 / 数据刷新 / 在线授权 / 账户 */}
+      {/* 两栏：左 = 界面偏好 / 激活模块；右 = 执行与数据刷新 / 在线授权 / 账户 */}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-4">
+      <PreferencesCards
+        section="interface"
+        settings={settings}
+        onChange={onChange}
+        canFastEvents={canFastEvents}
+        batchPlugin={batchPlugin}
+        batchMode={batchMode}
+        onBatchModeChange={(v) => {
+          setBatchMode(v)
+          setBatchModeSet(true)
+        }}
+      />
       <CollapsibleCard
         title={t('modules.activate')}
         icon={<Plug />}
@@ -323,77 +346,88 @@ export function SettingsPage({
           </Button>
         }
       >
-        <CollapsibleGroup title={t('modules.tab.builtin')}>
-          <p className="text-xs text-muted-foreground">{t('modules.activateHint')}</p>
-          <ul className="flex flex-col gap-2">
-            {MODULE_DEFS.map((def) => {
-              const cap = caps[def.id]
-              const enabled = isModuleEnabled(modules, serverId, def.id)
-              return (
-                <li
-                  key={def.id}
-                  className="flex flex-wrap items-center gap-3 rounded-xl bg-accent/40 p-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-foreground">{t(def.titleKey)}</span>
-                      <CapBadge status={cap.status} text={statusText(cap.status)} />
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{t(def.requiresKey)}</p>
-                    {cap.status === 'error' && cap.message && (
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-destructive">
-                        <AlertTriangle className="size-3" />
-                        {cap.message}
-                      </p>
-                    )}
-                    {cap.status === 'no-permission' && (
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-warning">
-                        <ShieldAlert className="size-3" />
-                        {t('modules.noPermissionHint')}
-                      </p>
-                    )}
-                    {cap.status === 'outdated' && (
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-warning">
-                        <AlertTriangle className="size-3" />
-                        {t('modules.outdatedHint')}
-                      </p>
-                    )}
-                  </div>
-                  <Switch
-                    checked={enabled}
-                    onCheckedChange={(v) => toggle(def.id, v)}
-                    aria-label={t(def.titleKey)}
-                  />
-                </li>
-              )
-            })}
-          </ul>
-          <p className="text-xs text-muted-foreground">{t('modules.note')}</p>
-        </CollapsibleGroup>
+        <Tabs
+          value={moduleTab}
+          onValueChange={(v) => setModuleTab(v as typeof moduleTab)}
+          className="w-full gap-3"
+        >
+          <TabsList
+            aria-label={t('modules.activate')}
+            variant="line"
+            className="w-full justify-start"
+          >
+            <TabsTrigger value="builtin" variant="line" className="flex-none">
+              {t('modules.tab.builtin')}
+            </TabsTrigger>
+            <TabsTrigger value="plugin" variant="line" className="flex-none">
+              {t('modules.tab.plugin')}
+            </TabsTrigger>
+            <TabsTrigger value="custom" variant="line" className="flex-none">
+              {t('modules.tab.custom')}
+            </TabsTrigger>
+          </TabsList>
 
-        <CollapsibleGroup title={t('modules.tab.custom')}>
-          <CustomModulesSection
-            customModules={customModules}
-            modules={modules}
-            serverId={serverId}
-            authenticated={authenticated}
-            onToggle={toggle}
-            onUpdate={updateCustomModule}
-            onRemove={(id) => onCustomModulesChange(customModules.filter((x) => x.id !== id))}
-            onMove={moveCustomModule}
-            newName={newModuleName}
-            newCommand={newModuleCommand}
-            onNewNameChange={setNewModuleName}
-            onNewCommandChange={setNewModuleCommand}
-            onCreate={createModule}
-          />
-        </CollapsibleGroup>
+          {/* 内置：随信使插件（WebUI）提供的模块。 */}
+          <TabsContent value="builtin" className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">{t('modules.tab.builtinHint')}</p>
+            <ul className="flex flex-col gap-2">
+              {webuiModules.map((def) => (
+                <ModuleRow
+                  key={def.id}
+                  def={def}
+                  cap={caps[def.id]}
+                  enabled={isModuleEnabled(modules, serverId, def.id)}
+                  statusText={statusText}
+                  onToggle={toggle}
+                />
+              ))}
+            </ul>
+          </TabsContent>
+
+          {/* 已适配：第三方插件（PlayerManager / FishShop / WorldModify）。 */}
+          <TabsContent value="plugin" className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">{t('modules.tab.pluginHint')}</p>
+            <ul className="flex flex-col gap-2">
+              {pluginModules.map((def) => (
+                <ModuleRow
+                  key={def.id}
+                  def={def}
+                  cap={caps[def.id]}
+                  enabled={isModuleEnabled(modules, serverId, def.id)}
+                  statusText={statusText}
+                  onToggle={toggle}
+                />
+              ))}
+            </ul>
+          </TabsContent>
+
+          {/* 自定义：用户填名称 + 主指令创建的模块。 */}
+          <TabsContent value="custom" className="flex flex-col gap-3">
+            <CustomModulesSection
+              customModules={customModules}
+              modules={modules}
+              serverId={serverId}
+              authenticated={authenticated}
+              onToggle={toggle}
+              onUpdate={updateCustomModule}
+              onRemove={(id) => onCustomModulesChange(customModules.filter((x) => x.id !== id))}
+              onMove={moveCustomModule}
+              newName={newModuleName}
+              newCommand={newModuleCommand}
+              onNewNameChange={setNewModuleName}
+              onNewCommandChange={setNewModuleCommand}
+              onCreate={createModule}
+            />
+          </TabsContent>
+        </Tabs>
+        <p className="text-xs text-muted-foreground">{t('modules.note')}</p>
       </CollapsibleCard>
         </div>
 
         {/* 右列：界面偏好 / 数据刷新 / 在线授权 / 账户 */}
         <div className="flex min-w-0 flex-col gap-4">
       <PreferencesCards
+        section="behavior"
         settings={settings}
         onChange={onChange}
         canFastEvents={canFastEvents}
@@ -428,16 +462,57 @@ function CapBadge({ status, text }: { status: CapStatus; text: string }) {
   return <Badge tone={tone}>{text}</Badge>
 }
 
-/** 激活模块里的可折叠分组（已适配 / 自定义），默认展开。 */
-function CollapsibleGroup({ title, children }: { title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(true)
+/**
+ * 「激活模块」里的一行：名称 + 能力徽标 + 依赖说明 + 开关。
+ *
+ * 开关只控制侧边栏入口，不受插件安装状态限制（装没装都能拨）；插件状态只作提示。
+ */
+function ModuleRow({
+  def,
+  cap,
+  enabled,
+  statusText,
+  onToggle,
+}: {
+  def: ModuleDef
+  cap: CapState
+  enabled: boolean
+  statusText: (status: CapStatus) => string
+  onToggle: (id: ModuleId, on: boolean) => void
+}) {
+  const { t } = useI18n()
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-3">
-      <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-left">
-        <span className="text-sm font-semibold text-foreground">{title}</span>
-        <CollapseChevron open={open} />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-3">{children}</CollapsibleContent>
-    </Collapsible>
+    <li className="flex flex-wrap items-center gap-3 rounded-xl bg-accent/40 p-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-foreground">{t(def.titleKey)}</span>
+          <CapBadge status={cap.status} text={statusText(cap.status)} />
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t(def.requiresKey)}</p>
+        {cap.status === 'error' && cap.message && (
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-destructive">
+            <AlertTriangle className="size-3" />
+            {cap.message}
+          </p>
+        )}
+        {cap.status === 'no-permission' && (
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-warning">
+            <ShieldAlert className="size-3" />
+            {t('modules.noPermissionHint')}
+          </p>
+        )}
+        {cap.status === 'outdated' && (
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-warning">
+            <AlertTriangle className="size-3" />
+            {t('modules.outdatedHint')}
+          </p>
+        )}
+      </div>
+      <Switch
+        checked={enabled}
+        onCheckedChange={(v) => onToggle(def.id, v)}
+        aria-label={t(def.titleKey)}
+      />
+    </li>
   )
 }

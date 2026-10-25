@@ -13,8 +13,12 @@ export interface VirtualGridInput {
   cell: number
   /** 格子高度（px）；缺省 = 宽度（正方形格子） */
   cellHeight?: number
-  /** 格子间距（px） */
+  /** 格子间距（px）；`gapX` / `gapY` 缺省时两者都用它 */
   gap: number
+  /** 列间距（px），默认 = gap */
+  gapX?: number
+  /** 行间距（px），默认 = gap */
+  gapY?: number
   /** 滚动容器可视宽度（px）；≤0 表示尚未测量（jsdom / 首次渲染） */
   viewportWidth: number
   /** 滚动容器可视高度（px）；≤0 同上看 fallbackHeight */
@@ -57,6 +61,8 @@ export function computeVirtualGrid({
   cell,
   cellHeight,
   gap,
+  gapX,
+  gapY,
   viewportWidth,
   viewportHeight,
   scrollTop,
@@ -65,12 +71,14 @@ export function computeVirtualGrid({
   maxCols,
   fallbackHeight = 560,
 }: VirtualGridInput): VirtualGridLayout {
+  const gx = gapX ?? gap
+  const gy = gapY ?? gap
   const naturalCols =
-    viewportWidth > 0 ? Math.max(1, Math.floor((viewportWidth + gap) / (cell + gap))) : fallbackCols
+    viewportWidth > 0 ? Math.max(1, Math.floor((viewportWidth + gx) / (cell + gx))) : fallbackCols
   const cols = maxCols == null ? naturalCols : Math.min(naturalCols, Math.max(1, maxCols))
-  const rowHeight = (cellHeight ?? cell) + gap
+  const rowHeight = (cellHeight ?? cell) + gy
   const rows = Math.ceil(Math.max(0, count) / cols)
-  const totalHeight = rows > 0 ? rows * rowHeight - gap : 0
+  const totalHeight = rows > 0 ? rows * rowHeight - gy : 0
 
   if (rows === 0) {
     return {

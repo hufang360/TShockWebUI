@@ -7,12 +7,16 @@ import { SelectIndicator } from '@/components/SelectIndicator'
 import {
   Badge,
   Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui'
+import { CollapseChevron } from '@/components/CollapseChevron'
 import { useBatchSelect } from '@/hooks/useBatchSelect'
 import { useRovingFocus } from '@/hooks/useRovingFocus'
 import { cn } from '@/lib/cn'
@@ -71,7 +75,22 @@ export function CommandPickerPanel({
     )
   }, [dataset.commands, keyword])
 
-  const roving = useRovingFocus(view === 'commands' ? commands.length : filteredFavorites.length)
+  // `allowServer=false` 的指令（只能游戏内执行）统一排到最下，收进可折叠分组。
+  const { runnable, inGame } = useMemo(() => {
+    const ok: typeof commands = []
+    const blocked: typeof commands = []
+    for (const cmd of commands) (cmd.allowServer === false ? blocked : ok).push(cmd)
+    return { runnable: ok, inGame: blocked }
+  }, [commands])
+  // 搜索时自动展开「游戏内」分组（否则搜到了也看不见）；清空搜索后回到用户手动选择的状态。
+  const [showInGame, setShowInGame] = useState(false)
+  const inGameOpen = showInGame || (keyword.length > 0 && inGame.length > 0)
+  // 键盘导航只用当前可见的行（折叠时跳过游戏内那些）。
+  const visibleCount = runnable.length + (inGameOpen ? inGame.length : 0)
+
+  const roving = useRovingFocus(
+    view === 'commands' ? visibleCount : filteredFavorites.length,
+  )
 
   const handleBatchDelete = () => {
     for (const key of batch.selected) {
@@ -101,6 +120,35 @@ export function CommandPickerPanel({
         inputRef.current?.focus()
       }
     }
+  }
+
+  /** 一行指令（可执行 / 仅游戏内共用）。 */
+  const renderRow = (cmd: Dataset['commands'][number], index: number) => {
+    const inGameOnly = cmd.allowServer === false
+    return (
+      <li key={cmd.name}>
+        <Button
+          variant="ghost"
+          ref={roving.setRef(index)}
+          onFocus={() => roving.setActive(index)}
+          onClick={() => onLoad(`/${cmd.name} `)}
+          onKeyDown={(e) => onRowKeyDown(e, index)}
+          title={cmd.helpZh ?? cmd.help}
+          className={cn(
+            'h-auto min-h-16 w-full cursor-pointer flex-col items-start gap-1 whitespace-normal px-2 py-2.5 font-normal',
+            roving.activeIndex === index && 'bg-accent',
+          )}
+        >
+          <span className="flex items-center gap-2">
+            <span className="font-pixel text-xs leading-5 text-foreground">/{cmd.name}</span>
+            {inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
+          </span>
+          <span className="block w-full text-left text-xs leading-5 text-muted-foreground">
+            {cmd.helpZh ?? cmd.help}
+          </span>
+        </Button>
+      </li>
+    )
   }
 
   /** 搜索框 ↑↓ / Enter 进入列表第一行。 */
@@ -202,38 +250,33 @@ export function CommandPickerPanel({
               {t('cmd.all', { n: commands.length })}
             </h3>
             <ul>
-              {commands.map((cmd, index) => {
-                const inGameOnly = !cmd.allowServer
-                return (
-                  <li key={cmd.name}>
-                    <Button
-                      variant="ghost"
-                      ref={roving.setRef(index)}
-                      onFocus={() => roving.setActive(index)}
-                      onClick={() => onLoad(`/${cmd.name} `)}
-                      onKeyDown={(e) => onRowKeyDown(e, index)}
-                      title={cmd.helpZh ?? cmd.help}
-                      className={cn(
-                        'h-auto min-h-16 w-full cursor-pointer flex-col items-start gap-1 whitespace-normal px-2 py-2.5 font-normal',
-                        roving.activeIndex === index && 'bg-accent',
-                      )}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className="font-pixel text-xs leading-5 text-foreground">/{cmd.name}</span>
-                        {inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
-                      </span>
-                      <span className="block w-full text-left text-xs leading-5 text-muted-foreground">
-                        {cmd.helpZh ?? cmd.help}
-                      </span>
-                    </Button>
-                  </li>
-                )
-              })}
-              {commands.length === 0 && (
+              {runnable.map((cmd, index) => renderRow(cmd, index))}
+              {runnable.length === 0 && inGame.length === 0 && (
                 <li className="px-2 py-2 text-xs text-muted-foreground">{t('cmd.noMatch')}</li>
               )}
             </ul>
           </section>
+
+          {inGame.length > 0 && (
+            <Collapsible
+              open={inGameOpen}
+              onOpenChange={(open) => {
+                setShowInGame(open)
+                roving.reset()
+              }}
+              className="mt-3 flex flex-col gap-1.5"
+            >
+              <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-left">
+                <span className="text-xs text-muted-foreground">
+                  {t('cmd.ingameGroup', { n: inGame.length })}
+                </span>
+                <CollapseChevron open={inGameOpen} />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ul>{inGame.map((cmd, index) => renderRow(cmd, runnable.length + index))}</ul>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
         </div>
       )}
     </div>

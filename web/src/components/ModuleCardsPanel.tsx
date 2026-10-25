@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Settings2 } from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
+import { IconAction } from '@/components/IconAction'
+import { InfoPopover } from '@/components/InfoPopover'
 import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
-import { Button, Empty, EmptyDescription, Spinner } from '@/components/ui'
+import { TopBarActions } from '@/components/TopBar'
+import { Empty, EmptyDescription } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { DEFAULT_AUTO_EXEC, isManual, sanitizeAutoExec, setManual } from '@/lib/autoExec'
 import { useCommandResults } from '@/lib/commandResults'
@@ -204,44 +207,41 @@ export function ModuleCardsPanel({
   }))
 
   return (
-    <div className="flex min-h-0 flex-col gap-4">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-          {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          {lastRefreshAt && (
-            <span
-              className="text-2xs text-muted-foreground"
-              title={new Date(lastRefreshAt).toLocaleString()}
-            >
-              {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
-            </span>
-          )}
-          {onAddCard && (
-            <Button size="sm" variant="ghost" onClick={() => setManageOpen(true)}>
-              <Settings2 data-icon="inline-start" />
-              {t('modules.cards.manage')}
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => refreshAll(true)}
-            disabled={!authenticated || refreshing || runnable.length === 0}
+    <div className="flex min-h-0 flex-col gap-2">
+      <TopBarActions
+        info={
+          desc ? (
+            <InfoPopover label={t('home.pageInfo')} title={title}>
+              {desc}
+            </InfoPopover>
+          ) : undefined
+        }
+      >
+        {lastRefreshAt && (
+          <span
+            className="hidden text-2xs text-muted-foreground sm:inline"
+            title={new Date(lastRefreshAt).toLocaleString()}
           >
-            {refreshing ? (
-              <Spinner aria-hidden data-icon="inline-start" />
-            ) : (
-              <RefreshCw data-icon="inline-start" />
-            )}
-            {refreshing ? t('home.refreshing') : t('home.refreshAll')}
-          </Button>
-        </div>
-      </div>
+            {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
+          </span>
+        )}
+        <IconAction
+          label={refreshing ? t('home.refreshing') : t('home.refreshAll')}
+          icon={RefreshCw}
+          loading={refreshing}
+          disabled={!authenticated || runnable.length === 0}
+          onClick={() => refreshAll(true)}
+        />
+        {onAddCard && (
+          <IconAction
+            label={t('modules.cards.manage')}
+            icon={Settings2}
+            onClick={() => setManageOpen(true)}
+          />
+        )}
+      </TopBarActions>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
         {cards.length === 0 ? (
           <Empty size="sm">
             <EmptyDescription>{t('modules.cards.empty')}</EmptyDescription>

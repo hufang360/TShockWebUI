@@ -16,7 +16,7 @@ export function LoginGate({ onLogin }: LoginGateProps) {
   const { t } = useI18n()
   return (
     <Card>
-      <CardBody className="flex flex-wrap items-center justify-between gap-3 pt-4">
+      <CardBody className="flex flex-wrap items-center justify-between gap-3 pt-2">
         <p className="text-sm text-foreground/80">{t('login.required')}</p>
         <Button variant="primary" onClick={onLogin}>
           {t('action.login')}

@@ -7,8 +7,6 @@ import { ItemTableLayout } from '@/components/items/ItemTable'
 import { SearchInput } from '@/components/SearchInput'
 import {
   Button,
-  Card,
-  CardBody,
   Checkbox,
   Empty,
   EmptyHeader,
@@ -29,6 +27,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
+import { FullscreenDock } from '@/components/FullscreenDock'
+import { TopBarActions } from '@/components/TopBar'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePageHeight } from '@/hooks/usePageHeight'
@@ -56,13 +56,12 @@ import { StorageKeys } from '@/lib/storage'
 import { computeVirtualGrid } from '@/lib/virtualGrid'
 import type { Dataset, Item, ItemFavorite } from '@/types'
 
-/** 格子是正方形；一行最多 10 个，剩余宽度留白。横纵间距统一 4px。 */
-const CELL_GAP = 4
-const TARGET_COLS = 10
-const CELL_SIZE = 76
-const CELL_META_SIZE = 110
-const COMPACT_CELL_SIZE = 68
-const COMPACT_CELL_META_SIZE = 88
+/** 尺寸与「数据 ID → NPC」一致：格宽 72、图标 64；列间距手机 8px / 桌面 16px，行距 16px。 */
+const CELL_WIDTH = 72
+const CELL_HEIGHT = 72
+const CELL_META_HEIGHT = 106
+const CELL_GAP_DESKTOP = 16
+const CELL_GAP_MOBILE = 8
 
 
 interface DexSettingFieldProps {
@@ -122,12 +121,15 @@ export function ItemsPage({
   dataset,
   focusItemId,
   onFocusConsumed,
+  username = null,
 }: {
   dataset: Dataset
   /** 从「指令 → 前往物品图鉴」带来的物品 id：挂载后选中并弹出详情。 */
   focusItemId?: number | null
   /** 消费完 focusItemId 后回调（父级清空，避免再次切回时重复弹出）。 */
   onFocusConsumed?: () => void
+  /** 当前登录玩家名（物品详情里的 `/give` 指令用）；未登录为 null。 */
+  username?: string | null
 }) {
   const { t } = useI18n()
   const [state, setState] = useState<DexState>(readDexState)
@@ -163,6 +165,8 @@ export function ItemsPage({
   const [viewport, setViewport] = useState({ w: 0, h: 0 })
   const debounced = useDebouncedValue(state.query, 180)
   const compactCells = useMediaQuery('(max-width: 639px)')
+  const mobileGrid = useMediaQuery('(max-width: 767px)')
+  const gridGap = mobileGrid ? CELL_GAP_MOBILE : CELL_GAP_DESKTOP
   const tableTwoColsAvailable = useMediaQuery('(min-width: 1280px)')
   const effectiveTableTwoCols = tableTwoCols && tableTwoColsAvailable
 
@@ -563,26 +567,19 @@ export function ItemsPage({
     setScrollReady(true)
   }, [pageHeight])
 
-  // 格子宽高保持一致：默认只显示图标；关闭隐藏设置后整体放大以容纳文字。
-  const cell = compactCells
-    ? hideItemMeta
-      ? COMPACT_CELL_SIZE
-      : COMPACT_CELL_META_SIZE
-    : hideItemMeta
-      ? CELL_SIZE
-      : CELL_META_SIZE
-  const cellHeight = cell
+  // 与 NPC 格子同尺寸：宽度固定 72；带文字时高 106，只显示图标时高 72。
+  const cellWidth = CELL_WIDTH
+  const cellHeight = hideItemMeta ? CELL_HEIGHT : CELL_META_HEIGHT
 
   const layout = computeVirtualGrid({
     count: ordered.length,
-    cell,
+    cell: cellWidth,
     cellHeight,
-    gap: CELL_GAP,
+    gap: gridGap,
     viewportWidth: viewport.w,
     viewportHeight: viewport.h,
     scrollTop,
     overscanRows: 1,
-    maxCols: resultsFullscreen ? undefined : TARGET_COLS,
   })
   const visible = ordered.slice(layout.startIndex, layout.endIndex)
 
@@ -647,21 +644,20 @@ export function ItemsPage({
         const top = scrollTopRef.current
         const next = computeVirtualGrid({
           count: ordered.length,
-          cell,
+          cell: cellWidth,
           cellHeight,
-          gap: CELL_GAP,
+          gap: gridGap,
           viewportWidth: viewport.w,
           viewportHeight: viewport.h,
           scrollTop: top,
           overscanRows: 1,
-          maxCols: resultsFullscreen ? undefined : TARGET_COLS,
         })
         const cur = layoutRef.current
         if (cur && cur.startRow === next.startRow && cur.endRow === next.endRow) return
         setScrollTop(top)
       })
     },
-    [ordered.length, cell, cellHeight, viewport.w, viewport.h],
+    [ordered.length, cellWidth, cellHeight, gridGap, viewport.w, viewport.h],
   )
 
   const groupSearch = groupQuery.trim().toLowerCase()
@@ -779,6 +775,9 @@ export function ItemsPage({
                         )}
                       >
                         <Settings2 />
+                        <span data-action-label className="hidden truncate">
+                          {t('dex.settings')}
+                        </span>
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
@@ -867,6 +866,9 @@ export function ItemsPage({
       className="text-muted-foreground hover:bg-card hover:text-foreground"
     >
       {resultsFullscreen ? <Minimize2 /> : <Maximize2 />}
+      <span data-action-label className="hidden truncate">
+        {resultsFullscreen ? t('dex.exitFullscreen') : t('dex.enterFullscreen')}
+      </span>
     </Button>
   )
 
@@ -883,117 +885,119 @@ export function ItemsPage({
           )}
           style={{ height: resultsFullscreen ? '100dvh' : pageHeight }}
         >
-          {/* 工具条：一张卡片 */}
+          {/* 页面设置 / 全屏收到顶栏右侧，工具条只留搜索与筛选。 */}
           {!resultsFullscreen && (
-          <Card className="shrink-0">
-            <CardBody className="flex flex-col gap-2 pt-4 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="flex w-full min-w-0 items-center gap-2 sm:flex-1">
-                <div className="w-full max-w-sm">
-                  <SearchInput
-                    ref={searchRef}
-                    value={state.query}
-                    onValueChange={(v) => {
-                      patch({ query: v })
-                      resetScroll()
-                    }}
-                    placeholder={t('dex.placeholder')}
-                    aria-label={t('nav.items')}
-                    history={searchHistory}
-                    onHistorySelect={selectKeyword}
-                    onHistoryRemove={removeSearchHistory}
-                    historyOnInput={false}
-                    trailingIcon={<Search className="size-4 text-muted-foreground" />}
-                    className="h-9 rounded-full pl-3 pr-1"
-                    inputClassName="text-sm"
-                  />
-                </div>
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {t('dex.resultCount', { n: ordered.length })}
-                </span>
+            <TopBarActions>
+              {itemsSettingsControl}
+              {fullscreenToggle}
+            </TopBarActions>
+          )}
+          {/* 工具条：不再套卡片，直接铺在页面上（与数据 ID 一致） */}
+          {!resultsFullscreen && (
+          <div className="flex shrink-0 flex-col gap-2 p-1 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex w-full min-w-0 items-center gap-2 sm:flex-1">
+              <div className="w-full max-w-sm">
+                <SearchInput
+                  ref={searchRef}
+                  value={state.query}
+                  onValueChange={(v) => {
+                    patch({ query: v })
+                    resetScroll()
+                  }}
+                  placeholder={t('dex.placeholder')}
+                  aria-label={t('nav.items')}
+                  history={searchHistory}
+                  onHistorySelect={selectKeyword}
+                  onHistoryRemove={removeSearchHistory}
+                  historyOnInput={false}
+                  trailingIcon={<Search className="size-4 text-muted-foreground" />}
+                  className="h-9 rounded-full pl-3 pr-1"
+                  inputClassName="text-sm"
+                />
               </div>
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {t('dex.resultCount', { n: ordered.length })}
+              </span>
+            </div>
 
-              {/* 手机上搜索独占第一行；筛选项从下一行开始。 */}
-              <div className="ml-0 flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground sm:ml-auto sm:w-auto">
-                <div className="flex min-w-0 items-center rounded-lg bg-accent p-0.5">
-                  <ToggleGroup
-                    type="single"
-                    value={activeTopMode}
-                    onValueChange={selectTopMode}
-                    aria-label={t('dex.filter')}
-                    variant="outline"
-                    size="sm"
-                    className="flex-wrap"
-                  >
-                    <ToggleGroupItem value="all" data-testid="dex-mode-all">
-                      {t('dex.collectionAll')}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="favorites" data-testid="dex-favorites-toggle">
-                      <Star
-                        className={cn(activeTopMode === 'favorites' && 'fill-current')}
-                        data-icon="inline-start"
-                      />
-                      {t('dex.favorites')}
-                      <span className="tabular-nums opacity-70">{favoriteItems.length}</span>
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  <Separator orientation="vertical" className="mx-1 h-4" />
+            {/* 手机上搜索独占第一行；筛选项从下一行开始。 */}
+            <div className="ml-0 flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground sm:ml-auto sm:w-auto">
+              <div className="flex min-w-0 items-center rounded-lg bg-accent p-0.5">
+                <ToggleGroup
+                  type="single"
+                  value={activeTopMode}
+                  onValueChange={selectTopMode}
+                  aria-label={t('dex.filter')}
+                  variant="outline"
+                  size="sm"
+                  className="flex-wrap"
+                >
+                  <ToggleGroupItem value="all" data-testid="dex-mode-all">
+                    {t('dex.collectionAll')}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="favorites" data-testid="dex-favorites-toggle">
+                    <Star
+                      className={cn(activeTopMode === 'favorites' && 'fill-current')}
+                      data-icon="inline-start"
+                    />
+                    {t('dex.favorites')}
+                    <span className="tabular-nums opacity-70">{favoriteItems.length}</span>
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <Separator orientation="vertical" className="mx-1 h-4" />
 
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t('dex.collectionGroup')}
+                  onClick={() => setGroupDrawerOpen(true)}
+                  className={cn(
+                    'max-w-64 gap-1.5 px-2.5 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground',
+                    (collection || gameMode) && 'bg-card font-semibold text-foreground shadow-sm',
+                  )}
+                >
+                  <ListFilter className="size-3.5 text-muted-foreground" />
+                  <span className="min-w-0 truncate">
+                    {collection
+                      ? t('dex.groupCurrent', {
+                          group: t(`dex.group.${collection.group}`),
+                          name:
+                            collection.group === 'range'
+                              ? rangeTabLabel(collection)
+                              : collection.name,
+                        })
+                      : gameMode
+                        ? t('dex.groupCurrent', {
+                            group: t('dex.tabs'),
+                            name: t(`dex.tab.${effectiveGroupTab}`),
+                          })
+                        : t('dex.collectionGroup')}
+                  </span>
+                  <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+                </Button>
+                {(collection || gameMode) && (
                   <Button
                     variant="ghost"
-                    size="sm"
-                    aria-label={t('dex.collectionGroup')}
-                    onClick={() => setGroupDrawerOpen(true)}
-                    className={cn(
-                      'max-w-64 gap-1.5 px-2.5 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground',
-                      (collection || gameMode) && 'bg-card font-semibold text-foreground shadow-sm',
-                    )}
+                    size="icon-sm"
+                    aria-label={t('dex.clearGroup')}
+                    title={t('dex.clearGroup')}
+                    onClick={clearGroup}
+                    className="text-muted-foreground hover:bg-card hover:text-foreground"
                   >
-                    <ListFilter className="size-3.5 text-muted-foreground" />
-                    <span className="min-w-0 truncate">
-                      {collection
-                        ? t('dex.groupCurrent', {
-                            group: t(`dex.group.${collection.group}`),
-                            name:
-                              collection.group === 'range'
-                                ? rangeTabLabel(collection)
-                                : collection.name,
-                          })
-                        : gameMode
-                          ? t('dex.groupCurrent', {
-                              group: t('dex.tabs'),
-                              name: t(`dex.tab.${effectiveGroupTab}`),
-                            })
-                          : t('dex.collectionGroup')}
-                    </span>
-                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+                    <X />
                   </Button>
-                  {(collection || gameMode) && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={t('dex.clearGroup')}
-                      title={t('dex.clearGroup')}
-                      onClick={clearGroup}
-                      className="text-muted-foreground hover:bg-card hover:text-foreground"
-                    >
-                      <X />
-                    </Button>
-                  )}
-                </div>
-
-                {itemsSettingsControl}
-
-                {fullscreenToggle}
+                )}
               </div>
-            </CardBody>
-          </Card>
+
+            </div>
+          </div>
           )}
 
           {resultsFullscreen && (
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-lg border border-border/60 bg-card/95 p-1 shadow-sm backdrop-blur">
+            <FullscreenDock label={t('dex.showActions')}>
               {itemsSettingsControl}
               {fullscreenToggle}
-            </div>
+            </FullscreenDock>
           )}
 
           <DexGroupDrawer
@@ -1023,7 +1027,7 @@ export function ItemsPage({
             data-testid="dex-list"
             onScroll={handleScroll}
             onKeyDown={handleGridKeyDown}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-1"
           >
             {favoritesEmpty || ordered.length === 0 ? (
               <Empty className="min-h-40 border border-dashed">
@@ -1039,17 +1043,20 @@ export function ItemsPage({
                 selectedId={state.selectedId}
                 twoCols={effectiveTableTwoCols}
                 onSelect={selectCell}
+                resetKey={`${state.query}|${state.mode}|${state.collectionId}|${state.groupTab}|${state.favoritesOnly}|${effectiveTableTwoCols}`}
               />
             ) : (
               <div className="relative" style={{ height: layout.totalHeight }}>
                 {/* 位置还原完成前只占高度、不挂格子（挂载发生在页面高度就绪之后） */}
                 {scrollReady && (
                 <div
-                  className="absolute right-0 left-0 grid justify-start"
+                  className={cn(
+                    'absolute right-0 left-0 grid justify-start gap-y-4',
+                    mobileGrid ? 'gap-x-2' : 'gap-x-4',
+                  )}
                   style={{
                     top: layout.offsetTop,
-                    gridTemplateColumns: `repeat(${layout.cols}, ${cell}px)`,
-                    gap: CELL_GAP,
+                    gridTemplateColumns: `repeat(${layout.cols}, ${cellWidth}px)`,
                   }}
                 >
                   {visible.map((item, index) => (
@@ -1058,10 +1065,9 @@ export function ItemsPage({
                       item={item}
                       atlas={dataset.atlas}
                       selected={state.selectedId === item.id}
-                      width={cell}
+                      width={cellWidth}
                       height={cellHeight}
                       index={layout.startIndex + index}
-                      compact={compactCells}
                       hideMeta={hideItemMeta}
                       onSelect={selectCell}
                     />
@@ -1079,6 +1085,7 @@ export function ItemsPage({
               dataset={dataset}
               stack={detail.stack}
               index={0}
+              username={username}
               rootPrefixId={state.prefixId}
               onRootPrefixChange={(prefixId) => patch({ prefixId })}
               recipe={detailRecipe}

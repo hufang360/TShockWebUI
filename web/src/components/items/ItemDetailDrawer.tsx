@@ -14,6 +14,7 @@ import {
 } from '@/components/ui'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/lib/i18n'
+import { CommandLine } from '@/components/CommandLine'
 import { formatItemTag, wikiUrl } from '@/lib/items'
 import { rankPrefixes } from '@/lib/prefixes'
 import type { Dataset, Item } from '@/types'
@@ -32,6 +33,8 @@ export interface ItemDetailDrawerProps {
   stack: number[]
   /** 当前层下标（0 = 根）。 */
   index: number
+  /** 当前登录玩家名（`/give` 指令用）；未登录为 null。 */
+  username?: string | null
   /** 根抽屉的词缀选择（存在 `DexState.prefixId`，切模块回来会还原）。 */
   rootPrefixId: number
   onRootPrefixChange: (prefixId: number) => void
@@ -60,6 +63,7 @@ export function ItemDetailDrawer({
   dataset,
   stack,
   index,
+  username = null,
   rootPrefixId,
   onRootPrefixChange,
   recipe,
@@ -101,6 +105,7 @@ export function ItemDetailDrawer({
           item={item}
           dataset={dataset}
           depth={index}
+          username={username}
           prefixId={prefixId}
           onPrefixChange={setPrefixId}
           recipe={recipe}
@@ -113,6 +118,7 @@ export function ItemDetailDrawer({
             dataset={dataset}
             stack={stack}
             index={index + 1}
+            username={username}
             rootPrefixId={rootPrefixId}
             onRootPrefixChange={onRootPrefixChange}
             recipe={recipe}
@@ -134,12 +140,14 @@ function ItemDetailPanel({
   prefixId,
   onPrefixChange,
   recipe,
+  username,
   onBack,
   onCloseAll,
 }: {
   item: Item
   dataset: Dataset
   depth: number
+  username: string | null
   prefixId: number
   onPrefixChange: (prefixId: number) => void
   recipe: ItemDetailRecipeOptions
@@ -184,6 +192,14 @@ function ItemDetailPanel({
     (dataset.recipes.byIngredient[String(item.id)]?.length ?? 0) > 0 ||
     dataset.shimmerToById.has(item.id) ||
     (dataset.shimmerFromById.get(item.id)?.length ?? 0) > 0
+
+  /** `/give <物品> <玩家> [数量] [词缀]`；有词缀时必须带数量 1。未登录不显示。 */
+  const playerArg = username && /\s/.test(username) ? `"${username}"` : username
+  const giveCommand = username
+    ? prefixId
+      ? `/give ${item.id} ${playerArg} 1 ${prefixId}`
+      : `/give ${item.id} ${playerArg}`
+    : null
 
   const copy = useCallback(async (kind: 'id' | 'name') => {
     try {
@@ -286,6 +302,8 @@ function ItemDetailPanel({
             )}
           </div>
         </div>
+
+        {giveCommand && <CommandLine label={t('dex.giveCommand')} command={giveCommand} />}
 
         {/* 物品级标签：可丢微光分解（数据见 gamedump 的 canDecraft）
             已融入到「合成表」的每条记录里（见 RecipePanel），这里不再单独占一行。 */}

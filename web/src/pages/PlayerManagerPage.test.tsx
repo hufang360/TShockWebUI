@@ -44,15 +44,13 @@ function renderPage(transport: BackendTransport, authenticated = true, username:
   )
 }
 
-/** 渲染并切到「玩家背包」tab（默认 tab 是「查看存档」）。 */
+/** 渲染「玩家管理」（「查看存档」已独立成页面，见 PlrPage.test.tsx）。 */
 function renderManage(
   transport: BackendTransport,
   authenticated = true,
   username: string | null = 'Alice',
 ) {
-  const view = renderPage(transport, authenticated, username)
-  fireEvent.mouseDown(screen.getByRole('tab', { name: '玩家背包' }))
-  return view
+  return renderPage(transport, authenticated, username)
 }
 
 beforeEach(() => {
@@ -68,15 +66,11 @@ afterEach(() => {
 })
 
 describe('PlayerManagerPage', () => {
-  it('未登录也能用「查看存档」；「玩家背包」tab 才提示先登录', () => {
+  it('未登录时提示先登录（查看存档已独立成公开页面）', () => {
     renderPage(makeTransport(), false)
-    // 默认 tab 是查看存档：不需要登录，导入入口在
-    expect(screen.getByRole('button', { name: /导入 \.plr/ })).toBeTruthy()
-    expect(screen.queryByText('请先登录！')).toBeNull()
-    expect(screen.queryByLabelText('简约视图')).toBeNull()
-
-    fireEvent.mouseDown(screen.getByRole('tab', { name: '玩家背包' }))
     expect(screen.getByText('请先登录！')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /导入 \.plr/ })).toBeNull()
+    expect(screen.queryByLabelText('简约视图')).toBeNull()
   })
 
   it('服务器未安装插件时给出提醒', async () => {
@@ -199,38 +193,6 @@ describe('PlayerManagerPage', () => {
     expect(URL.createObjectURL).toHaveBeenCalled()
   })
 
-  it('「查看存档」：未登录导入 .plr 也能展示（本地导入徽章 + 导出图片）', async () => {
-    const look: PlayerLook = {
-      ...emptyPlayerLook('本地角色', false),
-      items: [{ slot: 0, id: 4956, stack: 1, prefix: 0, favorited: false }],
-    }
-    const importPlayer = vi.fn(async () => look)
-    renderPage(makeTransport({ importPlayer }), false)
-
-    // 默认就是「查看存档」tab，不需要登录
-    const fileInput = screen.getByTestId('players-plr-input') as HTMLInputElement
-    const file = new File([new Uint8Array([1, 2, 3])], 'x.plr')
-    fireEvent.change(fileInput, { target: { files: [file] } })
-
-    await waitFor(() => expect(importPlayer).toHaveBeenCalled())
-    expect(await screen.findByText('本地导入')).toBeTruthy()
-    expect(screen.getByText('本地角色')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /导出图片/ })).toBeTruthy()
-    expect(screen.getByLabelText('简约视图')).toBeTruthy()
-  })
-
-  it('拖入 .plr 文件同样可以查看', async () => {
-    const importPlayer = vi.fn(async () => emptyPlayerLook('拖进来的', false))
-    renderPage(makeTransport({ importPlayer }), false)
-
-    const drop = screen.getByTestId('players-save-drop')
-    const file = new File([new Uint8Array([1, 2, 3])], 'drop.plr')
-    fireEvent.drop(drop, { dataTransfer: { files: [file] } })
-
-    await waitFor(() => expect(importPlayer).toHaveBeenCalled())
-    expect(await screen.findByText('拖进来的')).toBeTruthy()
-  })
-
   it('输入时清除上一次的错误', async () => {
     const playerLook = vi.fn(async () => {
       throw new TshockRequestError('bad_response', 'boom')
@@ -293,7 +255,8 @@ describe('PlayerManagerPage 探测失败（旧后端 / 网络异常）', () => {
     })
     renderManage(transport)
     expect(await screen.findByText('无法检测 PlayerManager 插件')).toBeTruthy()
-    // 不应再是纯空白：顶部 tab 仍可见，页面不再渲染重复标题。
-    expect(screen.getByRole('tab', { name: '查看存档' })).toBeTruthy()
+    // 页面已不再有 tab（查看存档独立成菜单），但提醒与说明必须在，不能是空白页。
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.getByText('Unexpected token <')).toBeTruthy()
   })
 })

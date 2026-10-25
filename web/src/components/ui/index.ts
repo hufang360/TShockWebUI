@@ -91,6 +91,15 @@ export {
   SidebarSeparator,
   useSidebar,
 } from './Sidebar'
+export {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  BreadcrumbEllipsis,
+} from './Breadcrumb'
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './Tooltip'
 export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent } from './Popover'
 export {

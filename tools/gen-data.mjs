@@ -627,8 +627,12 @@ function main() {
   const npcId2key = parseConstMap(read(join(trSrc, 'Terraria.ID/NPCID.cs')), 'short');
   // /sb (spawnboss) 的合法参数：从 TShock SpawnBoss() 的 switch 解析（用于 NPC 图鉴右栏）。
   const { byId: sbById, allIds: sbAllIds } = parseSpawnBoss(read(join(tshockSrc, 'TShockAPI/Commands.cs')));
+  // 英文名一并写入：`/tpnpc` 只认**名字**（不认 ID），且 TShock 会同时匹配英文名，
+  // 用英文名生成的指令在中文 / 英文服务器上都有效（见 docs/页面-召唤NPC.md）。
+  const enNpcName = locEn.NPCName ?? {};
   const npcs = [...npcId2key.keys()].sort((a, b) => a - b).map((id) => {
-    const entry = { id, key: npcId2key.get(id) };
+    const key = npcId2key.get(id);
+    const entry = { id, key, en: enNpcName[key] ?? key };
     const aliases = sbById.get(id);
     if (aliases && aliases.length) {
       // 取最长别名作为展示用的规范写法（如 "eye of cthulhu"），完整别名留在 sbAliases。
@@ -752,7 +756,7 @@ function main() {
     meta: {
       gameVersion,
       count: npcs.length,
-      source: 'Terraria.ID/NPCID.cs + loc.NPCName + TShockAPI/Commands.cs SpawnBoss()',
+      source: 'Terraria.ID/NPCID.cs + loc.NPCName + loc.en-US + TShockAPI/Commands.cs SpawnBoss()',
     },
     npcs,
   });

@@ -4,6 +4,8 @@ import { CollapseChevron } from '@/components/CollapseChevron'
 import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
 import {
+  Alert,
+  AlertDescription,
   Badge,
   Button,
   Collapsible,
@@ -96,7 +98,7 @@ function OutputBlock({
       <Button
         size="icon-sm"
         variant="ghost"
-        className="touch-visible absolute top-1.5 right-1.5 rounded-full opacity-0 transition-opacity group-hover/rich:opacity-100 focus-visible:opacity-100"
+        className="touch-visible absolute top-0.5 right-0.5 size-9 rounded-full opacity-0 transition-opacity group-hover/rich:opacity-100 focus-visible:opacity-100"
         aria-label={t('action.copy')}
         title={copied ? t('action.copied') : t('action.copy')}
         onClick={(e) => {
@@ -130,8 +132,13 @@ export function CommandOutput({
       {showStatus && (
         <Badge tone={STATUS_TONE[result.status]}>{t(`status.${result.status}`)}</Badge>
       )}
-      {result.message && <p className="text-xs text-foreground/90">{result.message}</p>}
       <OutputBlock output={result.output} itemsById={itemsById} prefixesById={prefixesById} atlas={atlas} />
+      {/* 失败原因放在富文本下方：用 Alert 说明「为什么没执行」，与输出区分开。 */}
+      {result.message && (
+        <Alert variant={STATUS_TONE[result.status] === 'danger' ? 'destructive' : 'warning'}>
+          <AlertDescription className="text-xs">{result.message}</AlertDescription>
+        </Alert>
+      )}
     </div>
   )
 }
@@ -169,7 +176,7 @@ function ResultItem({
   const favorited = isFavorite?.(command) ?? false
   const toggleLabel = collapsed ? t('result.expand') : t('result.collapse')
   return (
-    <div className="group/result rounded-xl bg-card/40 p-3">
+    <div className="group/result rounded-xl border border-border/60 bg-card/40 p-1.5">
       <Collapsible open={!collapsed} onOpenChange={(o) => setCollapsed(!o)}>
         {/* 表头整块可点击折叠：指令文本可鼠标选中复制（选中时不折叠）。 */}
         <CollapsibleTrigger asChild>
@@ -190,12 +197,16 @@ function ResultItem({
           >
             <span
               className={cn(
-                'min-w-0 flex-1 truncate font-pixel text-sm select-text',
+                'min-w-0 flex-1 truncate font-pixel text-sm font-semibold select-text',
                 abnormal ? 'text-destructive' : 'text-foreground',
               )}
               title={command}
             >
               {command}
+            </span>
+            {/* 执行时间紧挨操作区（收藏 / 删除）左侧。 */}
+            <span className="shrink-0 text-2xs text-muted-foreground tabular-nums">
+              {new Date(entry.ts).toLocaleTimeString()}
             </span>
             {/* 收藏 / 删除：hover 卡片才出现；点击不触发展开 / 折叠。 */}
             <div
@@ -206,7 +217,7 @@ function ResultItem({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="shrink-0"
+                  className="size-8 shrink-0"
                   aria-pressed={favorited}
                   aria-label={favorited ? t('editor.unfavorite') : t('editor.favorite')}
                   title={favorited ? t('editor.unfavorite') : t('editor.favorite')}
@@ -219,7 +230,7 @@ function ResultItem({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="shrink-0"
+                  className="size-8 shrink-0"
                   aria-label={t('result.remove')}
                   title={t('result.remove')}
                   onClick={() => onRemove(entry.seq)}
@@ -235,16 +246,13 @@ function ResultItem({
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="mt-2 flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              {/* 执行成功不显示 tag；异常状态 tag 在最左。 */}
-              {abnormal && (
+          <div className="mt-1.5 flex flex-col gap-2">
+            {/* 异常状态 tag；执行成功不显示。执行时间已移到表头操作区左侧。 */}
+            {abnormal && (
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={STATUS_TONE[result.status]}>{t(`status.${result.status}`)}</Badge>
-              )}
-              <span className="text-2xs text-muted-foreground">
-                {new Date(entry.ts).toLocaleTimeString()}
-              </span>
-            </div>
+              </div>
+            )}
             <CommandOutput
               result={result}
               itemsById={itemsById}
@@ -313,7 +321,7 @@ export function ResultPanel({
     <div
       ref={ref}
       onScroll={onScroll}
-      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pr-1"
+      className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1"
     >
       <LoadEarlier hidden={hidden} step={step} onLoad={loadEarlier} />
       {shown.map((entry) => (

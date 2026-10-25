@@ -175,15 +175,13 @@ export function CommandCard({
                   {unavailableText ?? t('home.needLogin')}
                 </p>
               ) : result ? (
-                <div className="max-h-40 overflow-y-auto">
-                  <CommandOutput
-                    result={result}
-                    showStatus={result.status !== 'ok'}
-                    itemsById={itemsById}
-                    prefixesById={prefixesById}
-                    atlas={atlas}
-                  />
-                </div>
+                <CommandOutput
+                  result={result}
+                  showStatus={result.status !== 'ok'}
+                  itemsById={itemsById}
+                  prefixesById={prefixesById}
+                  atlas={atlas}
+                />
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">

@@ -16,7 +16,7 @@ export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElemen
   return (
     <div
       data-slot="card-header"
-      className={cn('flex items-center justify-between gap-3 px-4 py-3', className)}
+      className={cn('flex items-center justify-between gap-1.5 px-2 py-1.5', className)}
       {...props}
     />
   )
@@ -38,5 +38,5 @@ export function CardTitle({ className, children }: { className?: string; childre
 }
 
 export function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div data-slot="card-body" className={cn('px-4 pb-4', className)} {...props} />
+  return <div data-slot="card-body" className={cn('px-2 pb-2', className)} {...props} />
 }

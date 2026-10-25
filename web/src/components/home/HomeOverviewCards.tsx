@@ -36,7 +36,7 @@ import type { Dataset, HistoryEntry, TabId } from '@/types'
  */
 
 /** 「最近执行」卡片固定高度，内容超出时内部滚动。 */
-const RECENT_CARD_HEIGHT = 'xl:h-56'
+const RECENT_CARD_HEIGHT = 'xl:h-64'
 
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (

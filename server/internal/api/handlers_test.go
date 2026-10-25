@@ -777,8 +777,12 @@ func TestCapabilitiesAggregated(t *testing.T) {
 	f.routes["/webui/batch"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]any{"results": []any{}}) }
 	f.routes["/webui/requests"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]any{"requests": []any{}}) }
 	f.routes["/webui/requests/all"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 200, map[string]any{"requests": []any{}}) }
-	f.routes["/pm/look"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 name 参数"}) }
-	f.routes["/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 serial 参数"}) }
+	f.routes["/pm/look"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 name 参数"})
+	}
+	f.routes["/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 serial 参数"})
+	}
 	f.routes["/webui/auth/request"] = func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]any{"status": "200", "code": "player_offline", "message": "该玩家不在线"})
 	}
@@ -804,11 +808,11 @@ func TestCapabilitiesAggregated(t *testing.T) {
 			Installed bool   `json:"installed"`
 			Version   string `json:"version"`
 		} `json:"messenger"`
-		Batch    struct{ Plugin, Ingame bool } `json:"batch"`
-		Player   struct{ Plugin, Permission bool } `json:"player"`
+		Batch    struct{ Plugin, Ingame bool }           `json:"batch"`
+		Player   struct{ Plugin, Permission bool }       `json:"player"`
 		Fish     struct{ Plugin, Rest, Permission bool } `json:"fish"`
-		Requests struct{ Plugin, Submit, Review bool } `json:"requests"`
-		WebAuth  struct{ Plugin bool } `json:"webauth"`
+		Requests struct{ Plugin, Submit, Review bool }   `json:"requests"`
+		WebAuth  struct{ Plugin bool }                   `json:"webauth"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("解析失败：%v", err)
@@ -1204,53 +1208,6 @@ func TestPlayerLookPluginMissing(t *testing.T) {
 	rec := do(h, http.MethodGet, "/api/player/look?name=hf", nil, cookie, false)
 	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "plugin_not_installed") {
 		t.Fatalf("HTTP %d body=%s，期望 501 plugin_not_installed", rec.Code, rec.Body.String())
-	}
-}
-
-// TestPlayerImportNoAuthNeeded：「查看存档」是公开工具，未登录也能上传 .plr（不再要求会话）。
-func TestPlayerImportNoAuthNeeded(t *testing.T) {
-	srv, _ := newServer(t, "http://127.0.0.1:1", nil)
-	rec := do(srv.Handler(), http.MethodPost, "/api/player/import", strings.NewReader("not-a-player-file"), nil, true)
-	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "bad_request") {
-		t.Fatalf("HTTP %d body=%s，期望 400 bad_request（未登录也应走到解析）", rec.Code, rec.Body.String())
-	}
-	if strings.Contains(rec.Body.String(), "not_authenticated") {
-		t.Fatalf("body=%s，不应再要求登录", rec.Body.String())
-	}
-}
-
-func TestPlayerImportCSRF(t *testing.T) {
-	srv, _ := newServer(t, "http://127.0.0.1:1", nil)
-	rec := do(srv.Handler(), http.MethodPost, "/api/player/import", nil, nil, false)
-	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "csrf") {
-		t.Fatalf("HTTP %d body=%s，期望 403 csrf", rec.Code, rec.Body.String())
-	}
-}
-
-// TestPlayerImportBadFile：非法文件返回可读的 400（前端据此显示具体错误）。
-func TestPlayerImportBadFile(t *testing.T) {
-	f := newFake(okLoginRoutes())
-	ts := httptest.NewServer(f)
-	defer ts.Close()
-	srv, _ := newServer(t, ts.URL, nil)
-	h := srv.Handler()
-	cookie := loginCookie(t, h, "alice", "pw")
-
-	req := httptest.NewRequest(http.MethodPost, "/api/player/import", strings.NewReader("not-a-player-file"))
-	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("X-Requested-With", "tswui")
-	req.AddCookie(cookie)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "bad_request") {
-		t.Fatalf("HTTP %d body=%s，期望 400 bad_request", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), "无法解析角色存档") {
-		t.Fatalf("body=%s，期望包含具体错误", rec.Body.String())
-	}
-	// 本地导入不应触碰 TShock。
-	if f.count("/pm/look") != 0 {
-		t.Fatalf("导入不应调用 /pm/look")
 	}
 }
 

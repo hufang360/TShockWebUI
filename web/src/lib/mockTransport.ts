@@ -362,21 +362,6 @@ export class MockTransport implements BackendTransport {
     return { filename: `${trimmed}.plr`, blob }
   }
 
-  async importPlayer(data: ArrayBuffer): Promise<PlayerLook> {
-    await delay(200)
-    if (data.byteLength === 0) throw new TshockRequestError('validation', '文件为空')
-    return {
-      ...emptyPlayerLook('本地角色', false),
-      health: 120,
-      maxHealth: 120,
-      mana: 0,
-      maxMana: 20,
-      items: mockInventory(),
-      skinVariant: 2,
-      hair: 15,
-    }
-  }
-
   async fishCapabilities(): Promise<FishCapabilities> {
     await delay(80)
     return { plugin: true, rest: true, permission: true }

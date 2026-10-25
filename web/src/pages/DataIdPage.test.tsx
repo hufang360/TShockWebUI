@@ -4,14 +4,38 @@ import { DatasetProvider } from '@/lib/datasetContext'
 import { resetDataIdState } from '@/lib/dataIdState'
 import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
+import type { BackendTransport, MeInfo } from '@/lib/tshock'
 import type { Dataset } from '@/types'
 import { DataIdPage } from './DataIdPage'
 
-function renderPage(dataset: Dataset = makeDataset(), lang: 'zh' | 'en' = 'zh') {
+/** 只实现 `/me`（权限）的最小传输层；不登录时页面不会调用它。 */
+function permsTransport(permissions: string[], username = 'Alice'): BackendTransport {
+  return {
+    mock: false,
+    label: 'test',
+    me: async (): Promise<MeInfo> => ({
+      username,
+      group: 'default',
+      permissions,
+      canUseApi: true,
+      canRunCommands: true,
+    }),
+  } as unknown as BackendTransport
+}
+
+function renderPage(
+  dataset: Dataset = makeDataset(),
+  lang: 'zh' | 'en' = 'zh',
+  opts: { authenticated?: boolean; transport?: BackendTransport } = {},
+) {
   return render(
     <I18nProvider lang={lang}>
       <DatasetProvider value={dataset}>
-        <DataIdPage />
+        <DataIdPage
+          authenticated={opts.authenticated ?? false}
+          serverId="default"
+          transport={opts.transport}
+        />
       </DatasetProvider>
     </I18nProvider>,
   )
@@ -61,9 +85,8 @@ describe('DataIdPage', () => {
     // 数据源是 shadcn Tabs（role=tablist），下划线样式，且位于工具条最顶部
     const tablist = screen.getByRole('tablist', { name: 'NPC / 图格 / 墙 / Buff' })
     expect(tablist).toBeTruthy()
-    // 主 Tab 独立置顶；搜索、结果数、NPC 分类和右侧页面操作在下方工具行。
-    const card = screen.getByRole('button', { name: '页面设置' }).closest('[data-slot="card"]')
-    expect(card).toBeTruthy()
+    // 主 Tab 与工具行都不套卡片：搜索、结果数、NPC 分类和右侧页面操作直接铺在页面上。
+    expect(document.querySelector('[data-slot="card"]')).toBeNull()
     expect(tablist.closest('[data-slot="card"]')).toBeNull()
     // Tab 是第一行，搜索框位于其后。
     expect(
@@ -73,10 +96,8 @@ describe('DataIdPage', () => {
     const categoryTabs = screen.getByTestId('npc-category-tabs')
     expect(categoryTabs).toBeTruthy()
     expect(categoryTabs.className).toContain('bg-accent')
-    expect(
-      categoryTabs.compareDocumentPosition(screen.getByRole('button', { name: '页面设置' })) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    // 页面设置 / 全屏在顶栏右侧（见 AppShell 的 TopBarActions），不再占工具行。
+    expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
     // 默认图标视图（表格视图未勾选），视图选项收进页面设置；不再有底部翻页器。
     const popover = openSettings()
     expect(within(popover).getByRole('checkbox', { name: '表格视图' }).getAttribute('data-state')).toBe(
@@ -85,6 +106,23 @@ describe('DataIdPage', () => {
     expect(within(popover).getByText('参考数据')).toBeTruthy()
     expect(within(popover).getByRole('button', { name: '导出表格' })).toBeTruthy()
     expect(screen.queryByTestId('dataid-pager')).toBeNull()
+  })
+
+  it('页面设置可隐藏图标格里的 ID 与名称', () => {
+    renderPage()
+    const cell = screen.getByTitle('蓝史莱姆 #1')
+    expect(within(cell).getByText('蓝史莱姆')).toBeTruthy()
+    expect(within(cell).getByText('1')).toBeTruthy()
+
+    openSettings()
+    const cb = screen.getByLabelText('隐藏 ID 和名称')
+    fireEvent.click(cb)
+    expect(cb.getAttribute('data-state')).toBe('checked')
+    const hidden = screen.getByTitle('蓝史莱姆 #1')
+    expect(within(hidden).queryByText('蓝史莱姆')).toBeNull()
+    expect(within(hidden).queryByText('1')).toBeNull()
+    // 只留图标：格子宽度仍是 72（`w-18`）。
+    expect(hidden.className).toContain('w-18')
   })
 
   it('全屏时隐藏搜索和 Tabs，只保留页面设置 / 退出按钮，图标铺满水平宽度', () => {
@@ -178,7 +216,7 @@ describe('DataIdPage', () => {
     }
   })
 
-  it('贴图绘制区默认 64×64，切到 Boss 后 128×128', () => {
+  it('网格里的贴图绘制区：默认 64×64，切到 Boss 翻倍到 128×128', () => {
     renderPage()
     const cell = screen.getByTitle('蓝史莱姆 #1')
     const canvas = cell.querySelector('canvas') as HTMLCanvasElement
@@ -187,8 +225,8 @@ describe('DataIdPage', () => {
 
     selectNpcCategory('Boss')
     const bossCanvas = screen.getByTitle('克苏鲁之眼 #4').querySelector('canvas') as HTMLCanvasElement
-    expect(bossCanvas.style.width).toBe('64px')
-    expect(bossCanvas.style.height).toBe('64px')
+    expect(bossCanvas.style.width).toBe('128px')
+    expect(bossCanvas.style.height).toBe('128px')
   })
 
   it('分类筛选：小动物只显示小动物', () => {
@@ -229,11 +267,11 @@ describe('DataIdPage', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
     expect(screen.getByTitle('黑曜石皮 #1')).toBeTruthy()
     expect(screen.getByTitle('再生 #2')).toBeTruthy()
-    // 图标来自 `data/buff-atlas.png`（`BuffIcon` 画 canvas），网格图标 48×48
+    // 图标来自 `data/buff-atlas.png`（`BuffIcon` 画 canvas），网格图标 64×64
     const canvas = screen.getByTitle('黑曜石皮 #1').querySelector('canvas') as HTMLCanvasElement
     expect(canvas).toBeTruthy()
-    expect(canvas.style.width).toBe('48px')
-    expect(canvas.style.height).toBe('48px')
+    expect(canvas.style.width).toBe('64px')
+    expect(canvas.style.height).toBe('64px')
     expect(screen.queryByRole('table')).toBeNull()
 
     enableTable()
@@ -329,6 +367,85 @@ describe('DataIdPage', () => {
     expect(within(detail).getByText('生命水晶 #29')).toBeTruthy()
     expect(within(detail).getByText('3×2')).toBeTruthy()
     expect(within(detail).getByText('多格')).toBeTruthy()
+  })
+
+  it('NPC 详情：有两条权限才显示 /spawnboss 与 /spawnmob，并带属性名', async () => {
+    const transport = permsTransport(['tshock.npc.spawnboss', 'tshock.npc.spawnmob'])
+    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
+
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(await within(detail).findByText('Boss召唤指令')).toBeTruthy()
+    expect(within(detail).getByText('/spawnboss "eye of cthulhu"')).toBeTruthy()
+    // 部分 Boss 还有单字简写（别名），单独一行。
+    expect(within(detail).getByText('/sb eoc')).toBeTruthy()
+    expect(within(detail).getByText('NPC召唤指令')).toBeTruthy()
+    expect(within(detail).getByText('/spawnmob 4')).toBeTruthy()
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByTestId('dataid-detail')).toBeNull())
+
+    // 普通怪：没有 `sb`，即使有 Boss 权限也不显示 /spawnboss。
+    fireEvent.click(screen.getByTitle('蓝史莱姆 #1'))
+    const detail2 = await screen.findByTestId('dataid-detail')
+    expect(within(detail2).queryByText('Boss召唤指令')).toBeNull()
+    expect(within(detail2).getByText('/spawnmob 1')).toBeTruthy()
+  })
+
+  it('NPC / Buff 详情：通配权限（*、tshock.*）也算有权限', async () => {
+    for (const wildcard of ['*', 'tshock.*', 'tshock.npc.*']) {
+      const transport = permsTransport([wildcard])
+      const view = renderPage(makeDataset(), 'zh', { authenticated: true, transport })
+      fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+      const detail = await screen.findByTestId('dataid-detail')
+      expect(await within(detail).findByText('/spawnboss "eye of cthulhu"')).toBeTruthy()
+      expect(within(detail).getByText('/spawnmob 4')).toBeTruthy()
+      view.unmount()
+    }
+  })
+
+  it('拿不到权限（/api/me 失败）时仍然显示，不隐藏', async () => {
+    const transport = {
+      mock: false,
+      label: 'test',
+      me: async () => {
+        throw new Error('not implemented')
+      },
+    } as unknown as BackendTransport
+    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
+
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(await within(detail).findByText('/spawnmob 4')).toBeTruthy()
+  })
+
+  it('NPC 详情：只有 spawnmob 权限时不显示 /spawnboss', async () => {
+    const transport = permsTransport(['tshock.npc.spawnmob'])
+    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
+
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(await within(detail).findByText('/spawnmob 4')).toBeTruthy()
+    expect(within(detail).queryByText('Boss召唤指令')).toBeNull()
+  })
+
+  it('NPC 详情：未登录不显示召唤指令', async () => {
+    renderPage()
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(within(detail).getByText('内部名')).toBeTruthy()
+    expect(within(detail).queryByText(/\/spawn(boss|mob)/)).toBeNull()
+  })
+
+  it('Buff 详情：有 tshock.buff.others 才显示 /gbuff <玩家> <buffID>', async () => {
+    const transport = permsTransport(['tshock.buff.others'])
+    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
+    fireEvent.click(await screen.findByTitle('再生 #2'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(await within(detail).findByText('增益指令')).toBeTruthy()
+    expect(within(detail).getByText('/gbuff Alice 2')).toBeTruthy()
   })
 
   it('表格行默认不可点，hover 出现的详情按钮才打开抽屉', () => {

@@ -28,7 +28,7 @@ export function PlayerLookPanel({
   actions,
 }: {
   look: PlayerLook
-  /** 数据来自本地 .plr（显示「本地导入」徽章、不显示在线 / 离线）。 */
+  /** 数据来自本地 .plr（不显示在线 / 离线徽章）。 */
   imported: boolean
   /** 简约视图：隐藏银行与配装。 */
   compact: boolean
@@ -47,9 +47,7 @@ export function PlayerLookPanel({
         <div className="flex min-w-0 flex-1 flex-col gap-3 pt-2 pl-2">
           <div className="flex flex-wrap items-center gap-2 text-lg font-semibold">
             {look.name}
-            {imported ? (
-              <Badge tone="mock">{t('players.imported')}</Badge>
-            ) : (
+            {!imported && (
               <Badge tone={look.online ? 'success' : 'neutral'}>
                 {look.online ? t('players.online') : t('players.offline')}
               </Badge>

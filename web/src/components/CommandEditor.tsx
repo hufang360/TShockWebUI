@@ -30,6 +30,8 @@ export interface CommandEditorProps {
   invalid?: boolean
   /** 发送按钮左侧的附加操作（如指令 / 聊天模式切换）。 */
   beforeSend?: ReactNode
+  /** 紧凑尺寸（浮动终端用）：降低输入框高度与字号，节省纵向空间。 */
+  compact?: boolean
 }
 
 export function CommandEditor({
@@ -47,6 +49,7 @@ export function CommandEditor({
   history,
   invalid = false,
   beforeSend,
+  compact = false,
 }: CommandEditorProps) {
   const { t } = useI18n()
   const inputId = useId()
@@ -245,7 +248,8 @@ export function CommandEditor({
       )}
       <div
         className={cn(
-          'flex items-center gap-2 rounded-full bg-card pr-1.5 pl-4',
+          'flex items-center gap-2 rounded-full border border-border bg-card pl-4',
+          compact ? 'pr-1' : 'pr-1.5',
           'focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring',
           invalid && 'ring-1 ring-destructive/60',
         )}
@@ -257,11 +261,12 @@ export function CommandEditor({
           rows={1}
           wrap="off"
           className={cn(
-            'editor h-11 min-w-0 flex-1 resize-none overflow-x-auto overflow-y-hidden bg-transparent py-2',
+            'editor min-w-0 flex-1 resize-none overflow-x-auto overflow-y-hidden bg-transparent',
+            compact ? 'h-8 py-1' : 'h-11 py-2',
             'text-foreground placeholder:text-muted-foreground focus:outline-none',
             invalid && 'text-destructive caret-destructive',
           )}
-          style={{ fontSize }}
+          style={{ fontSize: compact ? Math.max(12, fontSize - 3) : fontSize }}
           value={value}
           spellCheck={false}
           autoComplete="off"
@@ -306,7 +311,7 @@ export function CommandEditor({
           <Button
             size="icon"
             variant="primary"
-            className="size-9 shrink-0 rounded-full"
+            className={cn('shrink-0 rounded-full', compact ? 'size-7' : 'size-9')}
             onClick={onExecute}
             disabled={busy}
             aria-label={busy ? t('editor.running') : t('editor.execute')}

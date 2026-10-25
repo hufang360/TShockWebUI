@@ -75,7 +75,7 @@ describe('HomePage 未登录', () => {
 
     expect(screen.getByText('请先登录！')).toBeTruthy()
     expect(screen.queryByText('服务器状态')).toBeNull()
-    expect(screen.queryByRole('button', { name: '首页布局' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '管理卡片' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '登录' }))
     expect(onLogin).toHaveBeenCalledTimes(1)
@@ -96,7 +96,7 @@ describe('HomePage 卡片管理', () => {
     expect(screen.getByText('服务器状态')).toBeTruthy()
     expect(screen.getByText('在线玩家')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     // 内置卡片行：有「内置」徽标与指令，且不可编辑。
     const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
@@ -110,7 +110,7 @@ describe('HomePage 卡片管理', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
     fireEvent.click(within(timeRow).getByRole('switch', { name: '隐藏' }))
@@ -138,7 +138,7 @@ describe('HomePage 卡片管理', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: '添加卡片' }))
     fireEvent.change(within(dialog).getByLabelText('卡片名称'), { target: { value: '全服 公告' } })
@@ -159,7 +159,7 @@ describe('HomePage 卡片管理', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     const row = within(dialog).getByRole('listitem', { name: '钓鲈鱼' })
     fireEvent.click(within(row).getByRole('button', { name: '删除卡片' }))
@@ -338,7 +338,7 @@ describe('HomePage 卡片管理', () => {
     expect(screen.getByText('Boss 战伤害')).toBeTruthy()
 
     // 管理弹框里仍能看到它，并标记「缺少插件」。
-    fireEvent.click(screen.getByRole('button', { name: '首页布局' }))
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     const row = within(dialog).getByRole('listitem', { name: 'Boss 进度' })
     expect(within(row).getByText('缺少插件')).toBeTruthy()

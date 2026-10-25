@@ -1,7 +1,7 @@
 # TShockWebUI — 常用任务入口（薄封装，真正逻辑在 scripts/ 与各子项目）
 #
 #   make            # 显示帮助
-#   make data       # 生成 data/（需 TR_SRC / SPRITE_DIR / dotnet 9）
+#   make data       # 生成 data/ 与颜色表（需 TR_SRC / SPRITE_DIR / TEDIT_DIR / dotnet 9）
 #   make web        # 安装依赖并构建前端 → web/dist
 #   make lint       # go vet + 前端 typecheck/lint
 #   make test       # 后端 go test -race + 前端 vitest
@@ -37,6 +37,7 @@ data:
 	python3 tools/gen-buff-atlas.py
 	python3 tools/gen-brand-assets.py
 	bash tools/gen-game-data.sh
+	node tools/gen-world-colors.mjs   # 世界缩略图颜色表 → web/src/lib/save/worldColors.generated.ts（需 TEDIT_DIR）
 
 web:
 	cd web && npm ci && npm run build

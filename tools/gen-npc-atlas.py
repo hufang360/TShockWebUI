@@ -44,7 +44,7 @@ DEFAULT_TR_SRC = os.path.join(PROJECT, "..", "tr-code-1458")
 DEFAULT_SPRITE = os.path.join(PROJECT, "..", "tr-sprite-1458", "Content", "Images")
 DEFAULT_OUT_JSON = os.path.join(PROJECT, "data", "npc-atlas.json")
 DEFAULT_OUT_PNG = os.path.join(PROJECT, "data", "npc-atlas.png")
-# 用户自备的 NPC 贴图覆盖（图片不入库；登记表入库）。
+# 用户自备的 NPC 贴图覆盖（图片与登记表都入库，保证图集可复现；文件名不要有空格）。
 DEFAULT_OVERRIDES = os.path.join(HERE, "npc-overrides.json")
 DEFAULT_OVERRIDE_DIR = os.path.join(HERE, "npc-overrides")
 
@@ -176,6 +176,8 @@ def load_overrides(path):
 def apply_override(spec, override_dir):
     """按覆盖配置裁出最终要放进图集的那块图。"""
     file = spec["file"]
+    if " " in os.path.basename(file):
+        print(f"⚠ 文件名含空格，请改用下划线（{file} → {file.replace(' ', '_')}）", file=sys.stderr)
     path = file if os.path.isabs(file) else os.path.join(override_dir, file)
     if not os.path.exists(path):
         print(f"⚠ 覆盖图片不存在：{path}", file=sys.stderr)
