@@ -2,6 +2,9 @@ name: Pages (static demo)
 
 # 只部署前端静态站：数据 / 物品图鉴 / 查看存档 / 查看世界可用，指令与登录为 Mock。
 # 真实执行必须用 Docker 单容器（同源 /api/*），见 README。
+#
+# 注意：GitHub Free 的私有仓库不支持 Pages。私有仓库上下面两个 job 会直接跳过；
+# 仓库转为 public（或使用支持私有 Pages 的计划）后，下一次触发即可正常部署。
 on:
   push:
     branches: [master]
@@ -23,6 +26,7 @@ concurrency:
 jobs:
   build:
     name: Build static demo
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +56,7 @@ jobs:
   deploy:
     name: Deploy
     needs: build
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

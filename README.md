@@ -98,14 +98,16 @@ docker compose -f deploy/docker-compose.example.yml up -d
 
 ### GitHub Pages（仅静态演示）
 
-前端也可以单独部署到 GitHub Pages，作为**不连后端的演示站**：
+前端也可以单独部署到 GitHub Pages，作为**不连后端的演示站**（部署后地址通常是
+**<https://hufang360.github.io/TShockWebUI/>**）：
 
-**<https://hufang360.github.io/TShockWebUI/>**
+> **前置条件**：仓库必须是 **public**，或你的 GitHub 计划支持私有仓库 Pages。
+> 当前仓库是 private，GitHub Free 不支持 Pages；`pages.yml` 在私有仓库上会跳过构建 / 部署。
 
 - 使用 `VITE_TRANSPORT=mock` 构建；登录、指令执行、服务器动态都是 Mock，页面顶部会显示「演示模式，未连接真实服务器」。
 - 物品 ID / 数据 ID / 查看存档 / 查看世界等纯本地功能可正常使用。
 - 不能执行真实指令、不能登录真实 TShock；生产部署仍请使用 Docker 单容器 + 同源 `/api/*`。
-- 工作流：`.github/workflows/pages.yml`（推送 `web/**` / `data/**` 时自动构建部署）。
+- 工作流：`.github/workflows/pages.yml`（推送 `web/**` / `data/**` 时自动构建部署；私有仓库会跳过）。
   首次使用需在仓库 **Settings → Pages → Source** 选择 **GitHub Actions**（workflow 也会尝试自动启用）。
 
 ### TShock 侧前置条件（很重要）

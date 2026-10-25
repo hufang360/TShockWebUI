@@ -254,7 +254,8 @@ docker compose -f deploy/docker-compose.example.yml up -d
 页面顶部会明确显示「演示模式，未连接真实服务器」。纯本地功能（物品 ID / 数据 ID / 查看存档 / 查看世界）正常；
 **不能执行真实指令、不能登录真实 TShock**。
 
-- 地址：<https://hufang360.github.io/TShockWebUI/>
+- 部署后地址：<https://hufang360.github.io/TShockWebUI/>
+- **前置条件**：仓库需为 public，或计划支持私有仓库 Pages；GitHub Free 私有仓库会跳过该 workflow。
 - 工作流：`.github/workflows/pages.yml`
 - 构建：`VITE_TRANSPORT=mock VITE_BASE=/<repo>/ npm run build`
 - 生产部署仍以单容器 + 同源 `/api/*` 为准（§6.1）；Pages 只是展示用前端。
