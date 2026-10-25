@@ -1,0 +1,61 @@
+name: Pages (static demo)
+
+# 只部署前端静态站：数据 / 物品图鉴 / 查看存档 / 查看世界可用，指令与登录为 Mock。
+# 真实执行必须用 Docker 单容器（同源 /api/*），见 README。
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'web/**'
+      - 'data/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build static demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Build
+        working-directory: web
+        env:
+          VITE_TRANSPORT: mock
+          # project pages: /<repo>/；用户主页仓库 /<user>.github.io 时 base_path 为空 → /
+          VITE_BASE: ${{ steps.pages.outputs.base_path }}/
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

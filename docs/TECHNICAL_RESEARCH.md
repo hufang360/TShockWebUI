@@ -226,6 +226,8 @@ TShock 自己的解析（`TShockAPI/Utils.cs#GetItemFromTag`）：
 > band2 曾计划「纯静态站点 + nginx 反代 `/tshock/` + token 存 `localStorage` + 子路径 `base=/tr/`」。
 > band3 已改为 **单容器 + Go 后端 + 后端内存会话 + HttpOnly Cookie**（见 `docs/ARCHITECTURE.md`）。
 > 下面只保留仍成立的结论；其余（nginx、浏览器存 token、`tswui:auth` 键、子路径 base）全部废弃。
+> 例外：2026-10 起 GitHub Pages **仅静态演示**（`VITE_TRANSPORT=mock`）重新使用 `VITE_BASE` 子路径，
+> 不影响生产单容器的 `base=/` 与同源 `/api/*`（见 `docs/ARCHITECTURE.md` §6.4）。
 
 **为什么浏览器不能直连 TShock REST**（`TShockAPI/Rest/Rest.cs`，结论仍成立）：
 

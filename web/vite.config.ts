@@ -49,10 +49,12 @@ function dataDirPlugin(): Plugin {
   }
 }
 
-// 单容器交付（设计原则与约束 §4.1）：站点固定在根路径 `/`，
-// 静态资源与 `/api/*` 同源；子路径部署不在本版范围。
+// 单容器交付（设计原则与约束 §4.1）：默认固定在根路径 `/`，静态资源与 `/api/*` 同源。
+// GitHub Pages 演示构建通过 VITE_BASE 改成仓库子路径（如 `/TShockWebUI/`）。
+const base = (process.env.VITE_BASE || '/').replace(/\/*$/, '/')
+
 export default defineConfig({
-  base: '/',
+  base,
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [react(), tailwindcss(), dataDirPlugin()],
   resolve: {

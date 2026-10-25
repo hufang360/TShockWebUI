@@ -23,11 +23,11 @@
 | # | 决策 | 理由 |
 | --- | --- | --- |
 | ADR-1 | **单容器交付**：前端静态资源 + Go 后端 + TShock 反代合一 | 一份镜像、一个端口，IP:端口 / 域名都能用 |
-| ADR-2 | **后端用 Go 1.27，标准库 only**，`CGO_ENABLED=0` 静态二进制 | 实测全量（含 4.6MB 前端）仅 **9.7MB**；零依赖、无供应链风险、跨架构交叉编译 |
+| ADR-2 | **后端用 Go 1.27，标准库 only**，`CGO_ENABLED=0` 静态二进制 | 实测全量（含前端 + data）约 **16MB**；零依赖、无供应链风险、跨架构交叉编译 |
 | ADR-3 | 运行时基础镜像用 **`gcr.io/distroless/static-debian12:nonroot`**（备选 `scratch`） | 加 ~2MB，自带 CA 证书（可反代 HTTPS 的 TShock）、非 root |
 | ADR-4 | **浏览器不再持有 TShock token**；后端内存会话 + `HttpOnly` Cookie | token 不进 JS，XSS 无法直接搬走；凭证改走 POST body |
 | ADR-5 | 浏览器**只调用固定 `/api/*`**，容器**不暴露通用 `/tshock/` 代理** | 收窄攻击面，避免「任意 URL 转发」；只暴露业务所需端点 |
-| ADR-6 | 前端 `base=/`，API 用相对路径 `/api`、数据用 `/data` | 同一份构建适配 `http://IP:8080` 与 `https://域名` |
+| ADR-6 | 生产前端 `base=/`，API 用相对路径 `/api`、数据用 `/data`；GitHub Pages 演示用 `VITE_BASE=/<repo>/` | 同一份构建适配 `http://IP:8080` 与 `https://域名`；Pages 仅静态演示 |
 | ADR-7 | TLS 由**外层**（Caddy/Nginx/Cloudflare）终止；容器内 HTTP `:8080` | 镜像保持小且简单；IP:端口 场景直接跑 HTTP |
 | ADR-8 | 保留 **Mock 传输**，作为离线开发/自动化测试用，界面必须显式标注 | 不把 Mock 冒充真实功能（AGENTS 铁律） |
 | ADR-9 | 已知 `allowServer=false` 由**前端和后端双重拒绝**；未知/插件指令**放行给 TShock 判定**（后端内嵌 `commands.json`） | 纵深防御；插件指令无法静态枚举，TShock 仍是最终权限边界 |
@@ -39,7 +39,7 @@
 ## 2. 组件与数据流
 
 ```
-浏览器 (React SPA, base=/, 静态资源由容器提供)
+浏览器 (React SPA；生产 base=/，GitHub Pages 演示为子路径)
   │  同源 fetch
   ├─ GET  /data/*.json  /data/items-atlas.png      ← Go 内嵌静态资源
   ├─ GET  /assets/*                                 ← Go 内嵌静态资源
@@ -237,7 +237,6 @@ docker compose -f deploy/docker-compose.example.yml up -d
 
 要点：`TSHOCK_URL=http://tshock:7878`、无外层 TLS 时 `COOKIE_SECURE=false`、`webui` 依赖 `tshock`；
 7878 只让 `webui` 容器访问，不对外。
-```
 
 ### 6.3 访问方式
 
@@ -247,6 +246,18 @@ docker compose -f deploy/docker-compose.example.yml up -d
 | 套域名 + 外层 TLS | `https://tr.example.com` → 反代到 `:8080` | 外层设 `COOKIE_SECURE=true`；容器内仍是 HTTP |
 
 外层反代不需要再配 `/tshock/`——浏览器只走 `/api/*`。
+
+
+### 6.4 GitHub Pages（仅静态演示）
+
+前端单独部署到 GitHub Pages 时没有同源 `/api/*`，因此构建固定使用 `VITE_TRANSPORT=mock`，
+页面顶部会明确显示「演示模式，未连接真实服务器」。纯本地功能（物品 ID / 数据 ID / 查看存档 / 查看世界）正常；
+**不能执行真实指令、不能登录真实 TShock**。
+
+- 地址：<https://hufang360.github.io/TShockWebUI/>
+- 工作流：`.github/workflows/pages.yml`
+- 构建：`VITE_TRANSPORT=mock VITE_BASE=/<repo>/ npm run build`
+- 生产部署仍以单容器 + 同源 `/api/*` 为准（§6.1）；Pages 只是展示用前端。
 
 ---
 
@@ -263,7 +274,7 @@ cd server && TSHOCK_URL=http://127.0.0.1:7878 go run .
 cd web && npm run dev
 ```
 - `web/vite.config.ts` 增加 `server.proxy`：`/api` → `http://localhost:8080`。
-- 生产构建时前端 `base=/`；开发时也用 `/`。
+- 生产构建时前端 `base=/`；开发时也用 `/`。GitHub Pages 演示构建用 `VITE_BASE=/<repo>/` + `VITE_TRANSPORT=mock`，见 `.github/workflows/pages.yml`。
 - Go 本地运行需要 `server/internal/webdist/` 有内容（或回退到从 `web/dist` 读盘，见 `记录-实现与验收.md`）。推荐：本地用 `WEB_DIST_DIR=../web/dist` 覆盖内嵌资源，避免每次 rebuild。
 
 ### 前端传输层（现状）
