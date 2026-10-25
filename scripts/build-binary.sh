@@ -115,7 +115,8 @@ echo "==> 编译 ${OUT}（CGO_ENABLED=0，静态）"
 (
   cd server
   CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-    go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o "$OUT_ABS" .
+    go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid= -X main.version=${VERSION}" -o "$OUT_ABS" .
 )
 
 size=$(wc -c <"$OUT_ABS" | tr -d ' ')

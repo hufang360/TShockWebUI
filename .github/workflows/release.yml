@@ -163,6 +163,9 @@ jobs:
         with:
           name: plugin-dll
           path: release-assets
+      - name: Generate checksums
+        working-directory: release-assets
+        run: sha256sum tswui-* WebUI-*.dll > SHA256SUMS
       - name: Create / update release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -180,7 +183,7 @@ jobs:
 
   docker:
     name: Docker (GHCR + Docker Hub)
-    needs: [prepare, verify]
+    needs: [prepare, verify, web]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -192,6 +195,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
+      # Dockerfile 使用预构建前端；与二进制 / Release 资产共用同一份 web/dist。
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -230,4 +238,6 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ needs.prepare.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: ${{ steps.tags.outputs.tags }}

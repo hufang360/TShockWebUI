@@ -288,10 +288,10 @@ TShock 的错误与命令输出都经过 i18n（`i18n/zh_CN/TShockAPI.po`）。�
 
 ### 8.4 容器镜像
 
-- Dockerfile 多阶段（`node:24-alpine` → `golang:1.27-alpine` → `gcr.io/distroless/static-debian12:nonroot`）。
-- 实测镜像体积 **12.9MB**（≤ 30MB 目标）。
+- Dockerfile：预构建 `web/dist` → `golang:1.27-alpine`（`BUILDPLATFORM` 上交叉编译，`TARGETOS/TARGETARCH`）→ `gcr.io/distroless/static-debian12:nonroot`。
+- 实测镜像体积：当前约 **19–20MB**（≤ 30MB 目标；早期原型为 12.9MB）。
 - 前端数据不再用 `web/public/data` 符号链接：`vite.config.ts` 的 `dataDirPlugin` 开发时从
-  仓库根 `data/` 提供 `/data/*`，构建时复制到 `dist/data`；Dockerfile 用 `COPY data/ /data/` 注入。
+  仓库根 `data/` 提供 `/data/*`，构建时复制到 `dist/data`；Dockerfile 把 `data/` 覆盖进 `server/internal/webdist/data/`。
 - 静态资源的 SPA 兜底只对**无扩展名**路径生效；`/assets/*`、`/data/*` 缺失一律 404。
 
 ### 8.5 已验证的端到端行为（容器运行，`TSHOCK_URL=http://host.docker.internal:7878`）

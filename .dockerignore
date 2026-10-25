@@ -1,6 +1,5 @@
 # 构建上下文裁剪
 **/node_modules
-web/dist
 server/internal/webdist
 .git
 .gitignore

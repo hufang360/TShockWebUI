@@ -143,7 +143,7 @@ try {
   $env:GOARCH = $GOARCH
   Push-Location (Join-Root 'server')
   try {
-    & go build -trimpath -ldflags "-s -w -X main.version=$Version" -o $OutAbs .
+    & go build -trimpath -buildvcs=false -ldflags "-s -w -buildid= -X main.version=$Version" -o $OutAbs .
     if ($LASTEXITCODE -ne 0) { Die 'go build 失败' }
   } finally { Pop-Location }
 } finally {

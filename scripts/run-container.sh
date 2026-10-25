@@ -5,6 +5,7 @@
 # 用法：
 #   scripts/run-container.sh                      # 构建镜像并（重）启动容器，映射到 :18080
 #   NO_BUILD=1 scripts/run-container.sh           # 跳过构建，直接用现有镜像
+#   SKIP_WEB_BUILD=1 scripts/run-container.sh     # 复用现有 web/dist，不重新构建前端
 #   PORT=8080 scripts/run-container.sh            # 指定宿主机端口
 #   TSHOCK_URL=http://host.docker.internal:7878 scripts/run-container.sh
 #   TSHOCK_METHOD=GET scripts/run-container.sh    # 出站改回 GET（默认 POST）
@@ -37,6 +38,7 @@ ALLOW_CUSTOM_TARGETS=${TSHOCK_ALLOW_CUSTOM_TARGETS:-true}
 ALLOW_INGAME_COMMANDS=${TSWUI_ALLOW_INGAME_COMMANDS:-false}
 NETWORK=${NETWORK:-}
 NO_BUILD=${NO_BUILD:-0}
+SKIP_WEB_BUILD=${SKIP_WEB_BUILD:-0}
 FOREGROUND=${FOREGROUND:-0}
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -51,6 +53,21 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 if [ "$NO_BUILD" != "1" ]; then
+  # Dockerfile 只消费预构建的 web/dist：二进制与镜像共用同一份前端产物。
+  if [ "$SKIP_WEB_BUILD" != "1" ]; then
+    if ! command -v npm >/dev/null 2>&1; then
+      echo "错误：未找到 npm，请先安装 Node 24+（或设 SKIP_WEB_BUILD=1 复用 web/dist）。" >&2
+      exit 1
+    fi
+    echo "==> 构建前端（web/dist）"
+    if [ ! -d web/node_modules ]; then
+      (cd web && npm ci)
+    fi
+    (cd web && npm run build)
+  elif [ ! -f web/dist/index.html ]; then
+    echo "错误：SKIP_WEB_BUILD=1 但 web/dist/index.html 不存在。" >&2
+    exit 1
+  fi
   echo "==> 构建镜像 ${IMAGE}（版本 ${VERSION}）"
   docker build --build-arg "VERSION=$VERSION" -t "$IMAGE" .
 else

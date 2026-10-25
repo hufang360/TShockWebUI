@@ -87,7 +87,7 @@ TShock REST API  (env TSHOCK_URL，默认 http://127.0.0.1:7878)
 ```
 TShockWebUI/
 ├── AGENTS.md
-├── Dockerfile                    # 多阶段：前端 → Go → distroless（见 6.1）
+├── Dockerfile                    # 预构建 web/dist → Go 交叉编译 → distroless（见 6.1）
 ├── data/                         # 生成的数据（勿手改；含图集 PNG）
 ├── deploy/                       # docker-compose 示例
 ├── docs/                         # 架构 / 接口 / 插件 / 专题文档
@@ -112,7 +112,7 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 ## 4. Go 后端职责（详细）
 
 ### 4.1 静态资源
-- `//go:embed all:webdist` 内嵌 `web/dist` 全部内容（构建期由 Dockerfile 或脚本拷入 `server/internal/webdist/`）。
+- `//go:embed all:webdist` 内嵌 `web/dist` 全部内容（构建期由脚本拷入 `server/internal/webdist/`；Dockerfile 消费预构建的 `web/dist`，不在镜像内跑 Node）。
 - 路由：`/`、`/assets/*`、`/data/*`、`/favicon.png`（猛爪手套物品图标，`tools/gen-brand-assets.py` 生成）。
 - 未命中的非 `/api` 路径回退到 `index.html`（SPA 兜底）。
 - 缓存头：`/assets/*`（带哈希）`Cache-Control: public, max-age=31536000, immutable`；`/data/items-atlas.png` `max-age=604800`；JSON `max-age=3600`。
@@ -206,13 +206,25 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 
 ## 6. 构建与部署
 
-### 6.1 Dockerfile（多阶段）
+### 6.1 Dockerfile（预构建前端 + Go 交叉编译）
 
-根目录 [`Dockerfile`](../Dockerfile)：`node` 构建前端 → `golang:1.27-alpine` 编出静态二进制（内嵌 `web/dist`）→
+根目录 [`Dockerfile`](../Dockerfile)：**先用 `make web`（CI 由 `web` job 产出并下载 `web-dist`）生成 `web/dist`**，
+再交给 `golang:1.27-alpine` 编译静态二进制（内嵌 `web/dist` 与 `data/`）→
 `gcr.io/distroless/static-debian12:nonroot` 运行。**以根文件为唯一来源，此处不再内嵌副本（避免漂移）**。
 
-- 体积参考（本机实测同结构原型）：二进制 ~9.7MB + distroless ~2MB → **镜像约 12MB**。
-- 多架构：`docker buildx build --platform linux/amd64,linux/arm64 -t tshockwebui .`
+- **前端只构建一次**：二进制 / GitHub Release 资产 / Docker 镜像共用同一份 `web/dist`。
+- **不在镜像里跑 Node**：Dockerfile 只保留 Go 构建；`scripts/run-container.sh` 会在 `docker build` 前自动构建前端。
+- **Go 在 `BUILDPLATFORM` 上交叉编译**：`GOOS=$TARGETOS GOARCH=$TARGETARCH` + `CGO_ENABLED=0`，
+  arm64 镜像不再在 QEMU 里跑 Go 编译器；最终 distroless 阶段仍按目标平台生成。
+- **可复现构建**：基础镜像按 digest 固定；Go 使用 `-trimpath -buildvcs=false -ldflags="-s -w -buildid= ..."`。
+- 体积参考（本机实测）：二进制 ~16MB + distroless ~2MB → **镜像约 19–20MB**（amd64 19.9MB / arm64 19.2MB）。
+- 多架构（先构建前端）：
+
+  ```bash
+  make web
+  docker buildx build --platform linux/amd64,linux/arm64 -t tshockwebui .
+  ```
+
 - 若 TShock 走 HTTPS 且想再省：可换 `scratch`，但需自行注入 CA 证书；默认用 distroless。
 
 ### 6.2 docker-compose 示例（与 TShock 同机）

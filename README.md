@@ -42,7 +42,7 @@ Terraria **TShock** 服务器的**玩家 Web 指令伴侣**：在浏览器里舒
   └─ 同源 API  /api/*                    ← 唯一后端接口
                      │
                      ▼
-单容器镜像 (~13MB, distroless)
+单容器镜像 (~20MB, distroless)
   └─ Go 后端（Go 1.27，标准库 only）
        ├─ 静态资源服务（内嵌 webdist）
        ├─ 内存会话 + HttpOnly Cookie（持有 TShock token）
@@ -65,6 +65,9 @@ TShock REST API（默认 http://127.0.0.1:7878，同网络 compose 用 http://ts
 
 
 ```bash
+# 0) 构建前端（Dockerfile 使用预构建的 web/dist）
+make web
+
 # 1) 构建镜像
 docker build -t tshockwebui:latest .
 
@@ -76,11 +79,12 @@ docker run -d --name tswui -p 8080:8080 \
 # 3) 打开 http://127.0.0.1:8080
 ```
 
-或者用脚本（自动构建 + 探活 + 报告 TShock 可达性）：
+或者用脚本（自动构建前端 + 镜像 + 探活 + 报告 TShock 可达性）：
 
 ```bash
 scripts/run-container.sh                      # 映射到 :18080
 PORT=8080 NETWORK=ts_default TSHOCK_URL=http://tshock:7878 scripts/run-container.sh
+SKIP_WEB_BUILD=1 scripts/run-container.sh     # 复用现有 web/dist，不重新构建前端
 NO_BUILD=1 scripts/run-container.sh           # 跳过构建，用现有镜像
 ```
 
@@ -281,7 +285,7 @@ cd server && go test ./...
 
 ```
 TShockWebUI/
-├── Dockerfile                  # 多阶段：前端 → Go → distroless（单容器）
+├── Dockerfile                  # 预构建 web/dist → Go 交叉编译 → distroless（单容器）
 ├── data/                       # 生成的数据（勿手改）
 ├── deploy/                     # docker-compose 部署示例
 ├── dist/                       # 单文件构建产物（脚本生成，不入库）
