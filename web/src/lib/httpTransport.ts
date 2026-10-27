@@ -291,7 +291,15 @@ export class HttpTransport implements BackendTransport {
           signal: controller.signal,
         })
         if (!res.ok || !res.body) {
-          handlers.onError(new TshockRequestError('unavailable', `事件流连接失败（${res.status}）`))
+          // 403 等错误要保留后端错误码（token_invalid / auth），上游才能走「重新登录」而不是当成网络抖动。
+          const { code, message } = res.ok ? {} : await readError(res)
+          handlers.onError(
+            new TshockRequestError(
+              kindFromCode(code),
+              message ?? `事件流连接失败（${res.status}）`,
+              res.status,
+            ),
+          )
           return
         }
         const reader = res.body.getReader()
@@ -324,6 +332,16 @@ export class HttpTransport implements BackendTransport {
               } catch {
                 /* 忽略单帧坏数据 */
               }
+              continue
+            }
+            if (parsed.event === 'reset') {
+              let instance = ''
+              try {
+                instance = (JSON.parse(parsed.data) as { instance?: string }).instance ?? ''
+              } catch {
+                /* 缺 payload 也照样重置 */
+              }
+              handlers.onReset?.(instance)
               continue
             }
             try {

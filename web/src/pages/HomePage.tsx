@@ -119,6 +119,7 @@ export function HomePage({
     extra,
     available: eventsPlugin,
     refreshedAt: feedRefreshedAt,
+    switchedAt: feedSwitchedAt,
     refresh: refreshFeed,
   } = useServerFeed({
     transport,
@@ -127,6 +128,7 @@ export function HomePage({
     maxEvents: 20,
     refreshInterval: eventsRefreshInterval,
     refreshToken: feedToken,
+    onTokenInvalid,
   })
 
   // 卡片布局：顺序 / 隐藏 / 自定义卡片（tswui:homeCards）。
@@ -565,6 +567,7 @@ export function HomePage({
               events={events}
               extra={extra}
               refreshedAt={feedRefreshedAt}
+              switchedAt={feedSwitchedAt}
               eventsPlugin={eventsPlugin}
               dataset={dataset}
               onRefresh={refreshFeed}

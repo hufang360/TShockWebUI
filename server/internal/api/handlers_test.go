@@ -1755,3 +1755,149 @@ func TestCommandIngameDisabled(t *testing.T) {
 		t.Fatalf("未开启时不应调用插件 /webui/batch")
 	}
 }
+
+// newServerWithWeb 构造一个用自定义静态资源表（fstest.MapFS）的 Server。
+func newServerWithWeb(t *testing.T, web fs.FS) *api.Server {
+	t.Helper()
+	cfg := config.Default()
+	cfg.TShockURL = "http://127.0.0.1:1"
+	cfg.TShockTimeout = 2 * time.Second
+	return api.New(api.Deps{
+		Config:   cfg,
+		Version:  "test-1.0",
+		Sessions: session.New(cfg.SessionTTL, cfg.MaxSessions),
+		TShock:   tshock.NewClient(cfg.TShockURL, cfg.TShockTimeout, testLogger()),
+		Commands: tshock.DefaultCommands(),
+		Web:      web,
+		Logger:   testLogger(),
+	})
+}
+
+func doWithHeader(h http.Handler, method, path, key, value string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, nil)
+	req.Header.Set(key, value)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// /data/*.json 必须带 ETag + no-cache：升级后不会继续用一小时的旧 commands.json，
+// 未变化时回 304 省流量（见 docs/TODO.md P2）。
+func TestDataJSONETagAnd304(t *testing.T) {
+	web := func(body string) fs.FS {
+		return fstest.MapFS{
+			"index.html":            &fstest.MapFile{Data: []byte("ok")},
+			"data/commands.json":    &fstest.MapFile{Data: []byte(body)},
+			"data/player-atlas.png": &fstest.MapFile{Data: []byte("PNG")},
+			"assets/app-1.js":       &fstest.MapFile{Data: []byte("js")},
+		}
+	}
+	h := newServerWithWeb(t, web(`{"a":1}`)).Handler()
+
+	first := do(h, http.MethodGet, "/data/commands.json", nil, nil, false)
+	if first.Code != http.StatusOK {
+		t.Fatalf("HTTP %d", first.Code)
+	}
+	if got := first.Body.String(); got != `{"a":1}` {
+		t.Fatalf("body = %q", got)
+	}
+	etag := first.Header().Get("ETag")
+	if !strings.HasPrefix(etag, `W/"`) || !strings.HasSuffix(etag, `"`) {
+		t.Fatalf("ETag = %q，期望弱 ETag（W/\"内容哈希\"）", etag)
+	}
+	if cc := first.Header().Get("Cache-Control"); cc != "no-cache" {
+		t.Fatalf("Cache-Control = %q，期望 no-cache", cc)
+	}
+	if ct := first.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+
+	// 带同一个 ETag 再请求 → 304，且没有响应体。
+	same := doWithHeader(h, http.MethodGet, "/data/commands.json", "If-None-Match", etag)
+	if same.Code != http.StatusNotModified {
+		t.Fatalf("命中 ETag 应 304，实际 %d", same.Code)
+	}
+	if same.Body.Len() != 0 {
+		t.Fatalf("304 不应带响应体，实际 %q", same.Body.String())
+	}
+
+	// 内容变了（换一份静态资源表）→ ETag 必须变，并且回 200 + 新内容。
+	h2 := newServerWithWeb(t, web(`{"a":2}`)).Handler()
+	changed := doWithHeader(h2, http.MethodGet, "/data/commands.json", "If-None-Match", etag)
+	if changed.Code != http.StatusOK {
+		t.Fatalf("内容变化后应 200，实际 %d", changed.Code)
+	}
+	if changed.Header().Get("ETag") == etag {
+		t.Fatal("内容变化后 ETag 不应相同")
+	}
+	if got := changed.Body.String(); got != `{"a":2}` {
+		t.Fatalf("body = %q", got)
+	}
+
+	// 其他静态资源的缓存语义不变：图集 PNG 长缓存、/assets/* immutable。
+	if cc := do(h, http.MethodGet, "/data/player-atlas.png", nil, nil, false).Header().Get("Cache-Control"); cc != "public, max-age=604800" {
+		t.Fatalf("图集 PNG Cache-Control = %q", cc)
+	}
+	if cc := do(h, http.MethodGet, "/assets/app-1.js", nil, nil, false).Header().Get("Cache-Control"); cc != "public, max-age=31536000, immutable" {
+		t.Fatalf("/assets Cache-Control = %q", cc)
+	}
+
+	// HEAD 也要给 ETag（浏览器/代理用它做校验）。
+	head := do(h, http.MethodHead, "/data/commands.json", nil, nil, false)
+	if head.Code != http.StatusOK || head.Header().Get("ETag") != etag {
+		t.Fatalf("HEAD: %d ETag=%q", head.Code, head.Header().Get("ETag"))
+	}
+}
+
+// TestEventsInstancePassthrough：/api/events 透传插件事件库的实例标识；
+// 同一个地址 / 端口换了服（instance 变化）时，后端必须作废旧缓存，
+// 后续 /api/serverinfo 不能继续返回旧服的世界状态。
+func TestEventsInstancePassthrough(t *testing.T) {
+	f := newFake(okLoginRoutes())
+	var mu sync.Mutex
+	instance := "A"
+	worldName := "旧服"
+	f.routes["/webui/events"] = func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		inst := instance
+		mu.Unlock()
+		writeJSON(w, 200, map[string]any{"events": []any{}, "lastSeq": 1, "instance": inst})
+	}
+	f.routes["/webui/serverinfo"] = func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		name := worldName
+		mu.Unlock()
+		writeJSON(w, 200, map[string]any{"name": name, "worldId": 1})
+	}
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	// 先让后端把旧服的世界状态缓存下来。
+	rec := do(h, http.MethodGet, "/api/serverinfo", nil, cookie, false)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "旧服") {
+		t.Fatalf("serverinfo 首次：HTTP %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = do(h, http.MethodGet, "/api/events?since=0", nil, cookie, false)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"instance":"A"`) {
+		t.Fatalf("events 应透传 instance：HTTP %d %s", rec.Code, rec.Body.String())
+	}
+
+	// 同地址换了一个服：instance 变了，世界状态也应立刻重新拉取。
+	mu.Lock()
+	instance = "B"
+	worldName = "新服"
+	mu.Unlock()
+
+	rec = do(h, http.MethodGet, "/api/events?since=1", nil, cookie, false)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"instance":"B"`) {
+		t.Fatalf("events 应透传新 instance：HTTP %d %s", rec.Code, rec.Body.String())
+	}
+	rec = do(h, http.MethodGet, "/api/serverinfo", nil, cookie, false)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "新服") {
+		t.Fatalf("换服后 serverinfo 仍是旧缓存：HTTP %d %s", rec.Code, rec.Body.String())
+	}
+}

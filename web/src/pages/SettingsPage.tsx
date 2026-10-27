@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Plug, ShieldAlert } from 'lucide-react'
 import {
   Badge,
@@ -13,13 +13,16 @@ import { CollapsibleCard } from '@/components/CollapsibleCard'
 import { LoginGate } from '@/components/LoginGate'
 import { useI18n } from '@/lib/i18n'
 import { APP_VERSION } from '@/lib/version'
+import { useCommandResults } from '@/lib/commandResults'
 import { useLocalState } from '@/hooks/useLocalState'
 import { PluginDiagnosticsCard } from '@/components/PluginDiagnosticsCard'
 import { WebAccountSection } from '@/components/WebAccountSection'
 import { CustomModulesSection } from '@/components/settings/CustomModulesSection'
 import { PreferencesCards } from '@/components/settings/PreferencesCards'
 import {
+  MODULE_BY_ID,
   MODULE_DEFS,
+  fixedCardResultKey,
   isModuleEnabled,
   setModuleEnabled,
   type ModuleDef,
@@ -38,7 +41,7 @@ import {
 } from '@/lib/moduleCards'
 import { StorageKeys } from '@/lib/storage'
 import { TshockRequestError, type BackendTransport, type ServerCapabilities } from '@/lib/tshock'
-import type { Settings } from '@/types'
+import type { CommandResult, Settings } from '@/types'
 
 interface SettingsPageProps {
   settings: Settings
@@ -67,6 +70,26 @@ interface CapState {
 }
 
 /**
+ * 世界管理没有 REST 探测端点，只能看 `/wi` 的执行结果（与模块页同一个结果 key）。
+ * `command_error` 说明指令存在，只是参数/用法问题 → 已安装。
+ */
+function worldStateOf(res: CommandResult): CapState {
+  switch (res.status) {
+    case 'ok':
+    case 'command_error':
+      return { status: 'ready' }
+    case 'no_permission':
+      return { status: 'no-permission' }
+    case 'command_not_found':
+      return { status: 'missing' }
+    case 'token_invalid':
+      return { status: 'auth' }
+    default:
+      return { status: 'error', message: res.message }
+  }
+}
+
+/**
  * 设置（作为右侧正文内容，而非弹框）。
  * 「激活模块」会实时探测插件并展示状态；开关本身只控制侧边栏入口显隐，不受安装状态限制。
  */
@@ -89,9 +112,17 @@ export function SettingsPage({
     players: { status: 'checking' },
     store: { status: 'checking' },
     requisition: { status: 'checking' },
-    // 世界管理不探测插件（无法可靠探知 WorldModify），只要登录即可激活。
-    world: { status: 'ready' },
+    world: { status: 'checking' },
   })
+  // 世界管理的探测结果与模块页共用（key = 模块页的 `world:fixed:/wi`）。
+  const { results: commandResults, setResult: setCommandResult } = useCommandResults()
+  const worldProbeCommand = MODULE_BY_ID.get('world')?.cards?.[0]?.command ?? '/wi'
+  const worldProbeKey = fixedCardResultKey('world', worldProbeCommand)
+  // 用 ref 读缓存结果，避免 probeAll 因结果变化而重建（否则联调 effect 会反复探测）。
+  const commandResultsRef = useRef(commandResults)
+  useEffect(() => {
+    commandResultsRef.current = commandResults
+  }, [commandResults])
   // 「统一执行」（批量执行）开关：全局偏好，首页与鱼店右侧卡片共用。
   const [batchMode, setBatchMode] = useLocalState(StorageKeys.homeBatch, false)
   // 用户是否手动改过：改过后不再被「检测到插件自动开启」覆盖。
@@ -130,7 +161,6 @@ export function SettingsPage({
   /** 模块 id → 能力状态（纯函数，便于统一解释「缺插件 / 无权限 / 版本过旧」）。 */
   const capStateOf = useCallback(
     (id: ModuleId, caps: ServerCapabilities): CapState => {
-      if (id === 'world') return { status: 'ready' }
       if (id === 'requisition') {
         if (!caps.requests.plugin) return { status: 'missing' }
         if (!caps.requests.submit && !caps.requests.review) return { status: 'no-permission' }
@@ -150,45 +180,46 @@ export function SettingsPage({
     [],
   )
 
-  const probeAll = useCallback(async () => {
-    if (!authenticated) {
-      setCaps({
-        players: { status: 'auth' },
-        store: { status: 'auth' },
-        requisition: { status: 'auth' },
-        world: { status: 'auth' },
-      })
-      setBatchPlugin(null)
-      return
-    }
-    setCaps({
-      players: { status: 'checking' },
-      store: { status: 'checking' },
-      requisition: { status: 'checking' },
-      world: { status: 'ready' },
-    })
-    setBatchPlugin(null)
-    // 统一能力矩阵：一次请求拿到全部插件状态（以前是 4 个端点各探一轮）。
-    // fresh=true 绕过服务端 3 秒微缓存，保证「设置页」看到的是刚装上插件后的真实状态。
-    try {
-      const caps = await transport.capabilities(true)
-      if (!caps.reachable) {
-        // TShock 不可达：不给出「缺插件」的误导结论。
-        const down: CapState = { status: 'error', message: t('modules.probeFailed') }
-        setCaps({ players: down, store: down, requisition: down, world: { status: 'ready' } })
-        setBatchPlugin(null)
-        return
+  /**
+   * 世界管理探测：跑一次 `/wi`（非强制时先用模块页留下的最近结果）。
+   * 与首页 / 模块页共用 `command_not_found` 判定，因此无需新接口、也不提权。
+   */
+  const probeWorld = useCallback(
+    async (force: boolean): Promise<CapState> => {
+      const cached = commandResultsRef.current[worldProbeKey]
+      if (!force && cached) return worldStateOf(cached)
+      try {
+        const res = await transport.runCommand(worldProbeCommand)
+        setCommandResult(worldProbeKey, res)
+        if (res.status === 'token_invalid') {
+          onTokenInvalid()
+          return { status: 'auth' }
+        }
+        return worldStateOf(res)
+      } catch (err) {
+        if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
+          onTokenInvalid()
+          return { status: 'auth' }
+        }
+        return {
+          status: 'error',
+          message: err instanceof Error ? err.message : t('modules.probeFailed'),
+        }
       }
-      setCaps({
-        players: capStateOf('players', caps),
-        store: capStateOf('store', caps),
-        requisition: capStateOf('requisition', caps),
-        world: { status: 'ready' },
-      })
-      setBatchPlugin(caps.batch.plugin)
-    } catch (err) {
-      if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
-        onTokenInvalid()
+    },
+    [
+      transport,
+      setCommandResult,
+      onTokenInvalid,
+      t,
+      worldProbeCommand,
+      worldProbeKey,
+    ],
+  )
+
+  const probeAll = useCallback(
+    async (force = false) => {
+      if (!authenticated) {
         setCaps({
           players: { status: 'auth' },
           store: { status: 'auth' },
@@ -198,14 +229,55 @@ export function SettingsPage({
         setBatchPlugin(null)
         return
       }
-      const failed: CapState = {
-        status: 'error',
-        message: err instanceof Error ? err.message : t('modules.probeFailed'),
-      }
-      setCaps({ players: failed, store: failed, requisition: failed, world: { status: 'ready' } })
+      setCaps({
+        players: { status: 'checking' },
+        store: { status: 'checking' },
+        requisition: { status: 'checking' },
+        world: { status: 'checking' },
+      })
       setBatchPlugin(null)
-    }
-  }, [authenticated, capStateOf, transport, onTokenInvalid, t])
+      // 统一能力矩阵：一次请求拿到全部插件状态（以前是 4 个端点各探一轮）。
+      // fresh=true 绕过服务端 3 秒微缓存，保证「设置页」看到的是刚装上插件后的真实状态。
+      try {
+        const caps = await transport.capabilities(true)
+        if (!caps.reachable) {
+          // TShock 不可达：不给出「缺插件」的误导结论。
+          const down: CapState = { status: 'error', message: t('modules.probeFailed') }
+          setCaps({ players: down, store: down, requisition: down, world: down })
+          setBatchPlugin(null)
+          return
+        }
+        // 世界管理没有 REST 端点：复用最近一次 `/wi` 结果；「重新检测」强制重跑。
+        const world = await probeWorld(force)
+        setCaps({
+          players: capStateOf('players', caps),
+          store: capStateOf('store', caps),
+          requisition: capStateOf('requisition', caps),
+          world,
+        })
+        setBatchPlugin(caps.batch.plugin)
+      } catch (err) {
+        if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
+          onTokenInvalid()
+          setCaps({
+            players: { status: 'auth' },
+            store: { status: 'auth' },
+            requisition: { status: 'auth' },
+            world: { status: 'auth' },
+          })
+          setBatchPlugin(null)
+          return
+        }
+        const failed: CapState = {
+          status: 'error',
+          message: err instanceof Error ? err.message : t('modules.probeFailed'),
+        }
+        setCaps({ players: failed, store: failed, requisition: failed, world: failed })
+        setBatchPlugin(null)
+      }
+    },
+    [authenticated, capStateOf, transport, onTokenInvalid, t, probeWorld],
+  )
 
   // 切换服务器后必须重新探测（不同服务器安装的插件不同）。
   useEffect(() => {
@@ -213,7 +285,7 @@ export function SettingsPage({
       players: { status: 'checking' },
       store: { status: 'checking' },
       requisition: { status: 'checking' },
-      world: { status: 'ready' },
+      world: { status: 'checking' },
     })
     setBatchPlugin(null)
     void probeAll()
@@ -341,7 +413,7 @@ export function SettingsPage({
         icon={<Plug />}
         bodyClassName="flex flex-col gap-3 pt-0"
         headerExtra={
-          <Button size="sm" variant="ghost" onClick={() => void probeAll()}>
+          <Button size="sm" variant="ghost" onClick={() => void probeAll(true)}>
             {t('modules.recheck')}
           </Button>
         }

@@ -20,10 +20,13 @@ import type {
   Prefix,
   RecipesData,
   TileWallData,
+  TileNamesData,
+  PermissionsData,
 } from '@/types'
 import { ATLAS_JSON_FETCH } from './atlas'
 import { readJson, removeKey, StorageKeys, writeJson } from './storage'
 import { extraParamSetsFor } from './commandMeta'
+import { resolveTileName } from './tiles'
 import type { RuntimeCommand } from './transport'
 
 const BASE = import.meta.env.BASE_URL
@@ -81,7 +84,7 @@ function withCommandMeta(base: Dataset): Dataset {
  */
 export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
   const culture = cultureOf(lang)
-  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, loc, tiles, walls, drops] = await Promise.all([
+  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, loc, tiles, walls, drops, tileNames, permissions] = await Promise.all([
     fetchJson<{ items: Omit<Item, 'name'>[] }>('items.json'),
     fetchJson<{ prefixes: Omit<Prefix, 'name'>[] }>('prefixes.json'),
     fetchJson<{ npcs: Omit<Npc, 'name'>[] }>('npcs.json'),
@@ -100,6 +103,8 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     fetchJson<TileWallData>('tiles.json'),
     fetchJson<TileWallData>('walls.json'),
     fetchJson<ItemDropsData>('item-drops.json'),
+    fetchJson<TileNamesData>('tile-names.json'),
+    fetchJson<PermissionsData>('permissions.json'),
   ])
 
   // 名字从官方本地化解析（不再落在 items.json / prefixes.json 里）。
@@ -142,6 +147,16 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     if (set) rollablePrefixesById.set(Number(id), set)
   }
 
+  // 物品 id → 物品（`tileNameById` 与 dataset 自己都用这一份，别建两遍 6195 条的 Map）
+  const itemsById = new Map(items.map((it) => [it.id, it]))
+
+  // 图格显示名（口径同游戏地图图例）：MapObject → 图例物品 → 代表物品 → 常量名。
+  // 放进 dataset 预计算，页面/搜索/导出都能直接用（754 条，成本可忽略）。
+  const tileNameById = new Map<number, string>()
+  for (const tile of tiles.entries) {
+    tileNameById.set(tile.id, resolveTileName(tile, { tileNames, loc, itemsById }))
+  }
+
   const itemDropsById = new Map<number, ItemDropEntry[]>()
   for (const [id, list] of Object.entries(drops.items)) itemDropsById.set(Number(id), list)
 
@@ -153,10 +168,16 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     npcs,
     /** `data/tiles.json`：图格 ID 表 */
     tiles,
+    /** `data/tile-names.json`：图格 → 地图图例名来源 */
+    tileNames,
+    /** `data/permissions.json`：权限节点 + 内置用户组（补全用） */
+    permissions,
     /** `data/walls.json`：墙 ID 表 */
     walls,
     /** tiles.id -> tile */
     tilesById: new Map(tiles.entries.map((t) => [t.id, t])),
+    /** tiles.id -> 显示名（与游戏地图图例口径一致） */
+    tileNameById,
     /** walls.id -> wall */
     wallsById: new Map(walls.entries.map((w) => [w.id, w])),
     buffs,
@@ -174,7 +195,7 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     itemDrops: drops,
     itemDropsById,
     loc,
-    itemsById: new Map(items.map((it) => [it.id, it])),
+    itemsById,
     prefixesById: new Map(prefixes.map((p) => [p.id, p])),
     npcsById: new Map(npcs.map((n) => [n.id, n])),
     buffsById: new Map(buffs.map((b) => [b.id, b])),

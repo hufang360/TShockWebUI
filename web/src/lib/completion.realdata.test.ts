@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { computeCompletions, paramHintFor } from './completion'
 import { makeDataset } from '@/test/fixtures'
-import type { CommandDef } from '@/types'
+import type { CommandDef, PermissionsData } from '@/types'
 
 /**
  * 用**真实生成的数据**（data/commands.json，由 tools/gen-data.mjs 从 TShock 源码提取）
@@ -211,5 +211,66 @@ describe('运行期补全数据（NPC / buff / 区域 / 传送点）', () => {
   it('没有运行时数据时区域/传送点不给候选（不猜）', () => {
     expect(computeCompletions(at('/warp ho'))).toHaveLength(0)
     expect(computeCompletions(at('/region tp 主')).every((c) => c.kind !== 'region')).toBe(true)
+  })
+})
+
+describe('权限节点 / 用户组补全（data/permissions.json）', () => {
+  // 用真实生成的 permissions.json（从 TShock 源码抽取）
+  const permissions = JSON.parse(
+    readFileSync(resolve(process.cwd(), '../data/permissions.json'), 'utf8'),
+  ) as PermissionsData
+  const withPerms = makeDataset({ commands, permissions })
+
+  it('数据本身：节点与内置组都从 TShock 源码抽到了，且每个节点都带说明', () => {
+    expect(permissions.meta.permissionCount).toBe(permissions.permissions.length)
+    expect(permissions.permissions.length).toBeGreaterThan(150)
+    expect(permissions.permissions.every((p) => p.node.startsWith('tshock.') || p.node.includes('.'))).toBe(true)
+    expect(permissions.permissions.every((p) => p.desc.length > 0)).toBe(true)
+    // 本项目的两条关键 REST 权限必须在
+    const nodes = new Set(permissions.permissions.map((p) => p.node))
+    expect(nodes.has('tshock.rest.useapi')).toBe(true)
+    expect(nodes.has('tshock.rest.command')).toBe(true)
+    expect(permissions.groups).toContain('default')
+    expect(permissions.groups).toContain('guest')
+  })
+
+  it('/group addperm <组> <Tab> 出权限节点候选，插入的是节点原文', () => {
+    // 注意：`/group addperm` 的第 2 个参数是**组名**，第 3 个才是权限节点
+    const text = '/group addperm default tshock.'
+    const items = computeCompletions({ dataset: withPerms, text, caret: text.length, players: [] })
+    expect(items.length).toBeGreaterThan(0)
+    expect(items[0].kind).toBe('permission')
+    expect(items[0].insert.startsWith('tshock.')).toBe(true)
+    // 说明来自 TShock 源码的 [Description]
+    expect(items[0].detail.length).toBeGreaterThan(0)
+  })
+
+  it('/group addperm 按说明搜（例如 rest）也能命中', () => {
+    const text = '/group addperm default rest'
+    const items = computeCompletions({ dataset: withPerms, text, caret: text.length, players: [] })
+    // `rest` 命中一堆 REST 节点（`detail` 里也含 rest），断言集合里有 useapi 即可
+    expect(items.some((i) => i.kind === 'permission' && i.insert.startsWith('tshock.rest.'))).toBe(true)
+  })
+
+  it('`/group addperm <Tab>` 的第 2 个参数出内置用户组候选', () => {
+    // 注意：`/group <Tab>` 本身是**子命令**补全（add / addperm / del…），用户组名出现在子命令之后
+    const text = '/group addperm de'
+    const items = computeCompletions({ dataset: withPerms, text, caret: text.length, players: [] })
+    expect(items.some((i) => i.kind === 'group' && i.insert === 'default')).toBe(true)
+  })
+
+  it('/itemban allow <Tab> 与 /region allowg <Tab> 也出用户组候选', () => {
+    // `/itemban allow <物品名> <组名>`：组名在**第 3**个参数
+    const allowText = '/itemban allow 29 gu'
+    const allow = computeCompletions({ dataset: withPerms, text: allowText, caret: allowText.length, players: [] })
+    expect(allow.some((i) => i.kind === 'group' && i.insert === 'guest')).toBe(true)
+
+    const region = computeCompletions({
+      dataset: withPerms,
+      text: '/region allowg vi',
+      caret: '/region allowg vi'.length,
+      players: [],
+    })
+    expect(region.some((i) => i.kind === 'group' && i.insert === 'vip')).toBe(true)
   })
 })

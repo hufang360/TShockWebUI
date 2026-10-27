@@ -25,6 +25,28 @@ export interface Prefix {
   name: string
 }
 
+/** TShock 权限节点（`data/permissions.json`；只是内置/默认集合，允许手输任意值）。 */
+export interface PermissionNode {
+  node: string
+  /** TShock 源码里 `[Description]` 的可读说明。 */
+  desc: string
+}
+
+/** `data/permissions.json` 的形状。 */
+export interface PermissionsData {
+  meta: {
+    tshockVersion: string
+    permissionCount: number
+    groupCount: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  permissions: PermissionNode[]
+  /** TShock 内置/默认用户组名（自定义组只有运行期知道）。 */
+  groups: string[]
+}
+
 /** NPC（ID → 内部名；显示名从 loc.NPCName 解析）。 */
 export interface Npc {
   id: number
@@ -188,6 +210,8 @@ export type ParamKind =
   | 'buff'
   | 'region'
   | 'warp'
+  | 'permission'
+  | 'group'
   | 'number'
   | 'text'
 
@@ -425,6 +449,28 @@ export interface PrefixSetsData {
   items: Record<string, number>
 }
 
+/**
+ * `data/tile-names.json`：图格 → **地图图例名来源**（来自 `Terraria/Lang.cs` 的 `BuildMapAtlas()`）。
+ *
+ * 世界里生成、玩家不能放置的图格（生命水晶、罐子、影球…）没有「代表物品」，
+ * 名字只能靠这张表：`items` 指物品 id（用 `loc.ItemName` 解析），`objects` 指 `MapObject` 键
+ * （用 `loc.MapObject` 解析）；两者都没有才回退 `tiles.json` 的常量名。
+ */
+export interface TileNamesData {
+  meta: {
+    gameVersion: string
+    source: string
+    generatedBy: string
+    itemCount: number
+    objectCount: number
+    note: string
+  }
+  /** 图格 id → 物品 id。 */
+  items: Record<string, number>
+  /** 图格 id → `MapObject` 键。 */
+  objects: Record<string, string>
+}
+
 /** `data/prefix-mods.json`。 */
 export interface PrefixModsData {
   meta: { count: number; source: string; generatedBy: string; note: string }
@@ -453,8 +499,12 @@ export interface Dataset {
   tiles: TileWallData
   /** `data/walls.json`：墙 ID 表 */
   walls: TileWallData
+  /** `data/tile-names.json`：图格 → 地图图例名来源 */
+  tileNames: TileNamesData
   /** tiles.id -> tile */
   tilesById: Map<number, TileWallEntry>
+  /** tiles.id -> 显示名（MapObject → 代表物品名 → 常量名，与游戏地图图例口径一致） */
+  tileNameById: Map<number, string>
   /** walls.id -> wall */
   wallsById: Map<number, TileWallEntry>
   buffs: Buff[]
@@ -490,6 +540,8 @@ export interface Dataset {
   prefixesById: Map<number, Prefix>
   /** npcs.id -> npc */
   npcsById: Map<number, Npc>
+  /** `data/permissions.json`：权限节点 + 内置用户组名（补全用） */
+  permissions: PermissionsData
   /** buffs.id -> buff */
   buffsById: Map<number, Buff>
   /** 小写 name / alias -> command */

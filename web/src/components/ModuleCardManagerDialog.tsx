@@ -24,6 +24,8 @@ interface ModuleCardManagerDialogProps {
   /** 编辑自定义卡片的名称 / 指令（内置卡片不可编辑）。 */
   onUpdate: (id: string, patch: { name?: string; command?: string }) => void
   onRemove: (id: string) => void
+  /** 固定卡片依赖的插件未安装时返回 true（置灰并标「缺少插件」）。 */
+  pluginMissing?: (id: string) => boolean
 }
 
 /**
@@ -39,17 +41,27 @@ export function ModuleCardManagerDialog({
   onAdd,
   onUpdate,
   onRemove,
+  pluginMissing,
 }: ModuleCardManagerDialogProps) {
   const { t } = useI18n()
   const byId = new Map(cards.map((c) => [c.id, c]))
 
-  const items: ManagerCard[] = cards.map((card) => ({
-    id: card.id,
-    name: card.name,
-    command: card.command,
-    custom: card.custom,
-    badges: card.custom ? undefined : <Badge>{t('home.manageBuiltin')}</Badge>,
-  }))
+  const items: ManagerCard[] = cards.map((card) => {
+    const missing = card.custom ? false : pluginMissing?.(card.id) === true
+    return {
+      id: card.id,
+      name: card.name,
+      command: card.command,
+      custom: card.custom,
+      disabled: missing,
+      badges: card.custom ? undefined : (
+        <>
+          <Badge>{t('home.manageBuiltin')}</Badge>
+          {missing && <Badge tone="warn">{t('home.managePluginMissing')}</Badge>}
+        </>
+      ),
+    }
+  })
 
   return (
     <CardManagerSheet

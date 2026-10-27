@@ -1,4 +1,5 @@
-import type { CommandDef, Dataset, Item } from '@/types'
+import type { CommandDef, Dataset, Item, TileNamesData, TileWallData } from '@/types'
+import { resolveTileName } from '@/lib/tiles'
 import { extraParamSetsFor } from '@/lib/commandMeta'
 
 export const testItems: Item[] = [
@@ -151,8 +152,52 @@ function withCommandMeta(commands: CommandDef[]): CommandDef[] {
   })
 }
 
-export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {  const items = overrides.items ?? testItems
+export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
+  const items = overrides.items ?? testItems
   const commands = withCommandMeta(overrides.commands ?? testCommands)
+  /** 图格表 fixture（与 tiles / tilesById 共用一份）。 */
+  const testTiles: TileWallData = {
+    meta: {
+      gameVersion: '1.4.5.8',
+      count: 3,
+      withItem: 1,
+      source: 'test',
+      generatedBy: 'test',
+      note: '',
+    },
+    entries: [
+      { id: 0, key: 'Dirt', item: null },
+      { id: 5, key: 'Trees', item: null, frameImportant: true },
+      { id: 1, key: 'Stone', item: 29, size: [3, 2] },
+      { id: 12, key: 'Heart', item: null },
+    ],
+  }
+  const testTileNames: TileNamesData = {
+    meta: {
+      gameVersion: '1.4.5.8',
+      source: 'test',
+      generatedBy: 'test',
+      itemCount: 1,
+      objectCount: 0,
+      note: '',
+    },
+    // 图格 12（生命水晶）在游戏里是「图例名 = 物品 29」
+    items: { '12': 29 },
+    objects: {},
+  }
+  const tiles = overrides.tiles ?? testTiles
+  const tileNames = overrides.tileNames ?? testTileNames
+  const itemsById = new Map(items.map((it) => [it.id, it]))
+  // 与生产一致：按「MapObject → 图例物品 → 代表物品 → 常量名」预计算显示名
+  const tileNameById =
+    overrides.tileNameById ??
+    new Map(
+      tiles.entries.map((tile) => [
+        tile.id,
+        resolveTileName(tile, { tileNames, loc: overrides.loc ?? ({} as Dataset['loc']), itemsById }),
+      ]),
+    )
+
   const commandsByToken = new Map<string, CommandDef>()
   for (const cmd of commands) {
     commandsByToken.set(cmd.name.toLowerCase(), cmd)
@@ -213,13 +258,24 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {  const 
       },
       entries: [{ id: 1, key: 'Stone', item: 29 }],
     },
-    tilesById:
-      overrides.tilesById ??
-      new Map([
-        [0, { id: 0, key: 'Dirt', item: null }],
-        [5, { id: 5, key: 'Trees', item: null, frameImportant: true }],
-        [1, { id: 1, key: 'Stone', item: 29, size: [3, 2] }],
-      ]),
+    tileNames,
+    tileNameById,
+    permissions: overrides.permissions ?? {
+      meta: {
+        tshockVersion: 'test',
+        permissionCount: 2,
+        groupCount: 2,
+        source: 'test',
+        generatedBy: 'test',
+        note: '',
+      },
+      permissions: [
+        { node: 'tshock.rest.useapi', desc: 'create REST tokens' },
+        { node: 'tshock.world.time', desc: 'change time' },
+      ],
+      groups: ['default', 'guest'],
+    },
+    tilesById: overrides.tilesById ?? new Map(tiles.entries.map((t) => [t.id, t])),
     wallsById: overrides.wallsById ?? new Map([[1, { id: 1, key: 'Stone', item: 29 }]]),
     commands,
     atlas: {
@@ -237,7 +293,7 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {  const 
       },
       regions: Object.fromEntries(items.map((it) => [String(it.icon), [0, 0, 16, 16]])),
     },
-    itemsById: new Map(items.map((it) => [it.id, it])),
+    itemsById,
     prefixesById: new Map([[81, { id: 81, key: 'Legendary', name: '传奇' }]]),
     npcsById: new Map([
       [1, { id: 1, key: 'BlueSlime', name: '蓝史莱姆' }],

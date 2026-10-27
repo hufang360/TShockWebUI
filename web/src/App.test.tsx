@@ -589,13 +589,13 @@ it('「查看存档」是独立侧边栏菜单：未登录也能用，不依赖�
   expect(screen.getByRole('button', { name: /导入 \.plr/ })).toBeTruthy()
 })
 
-it('侧边栏「指令小抄」：NPC管理列出 Boss，点击填进浮动终端', async () => {
+it('侧边栏「小抄」：NPC管理列出 Boss，点击填进浮动终端', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
   await loginAsAlice()
 
-  fireEvent.click(screen.getAllByRole('button', { name: '指令小抄' })[0])
+  fireEvent.click(screen.getAllByRole('button', { name: '小抄' })[0])
   expect(await screen.findByRole('tab', { name: '默认' })).toBeTruthy()
   expect(window.location.hash).toBe('#/commands')
 
@@ -609,7 +609,7 @@ it('侧边栏「指令小抄」：NPC管理列出 Boss，点击填进浮动终�
   fireEvent.click(screen.getByRole('button', { name: /渔夫\s*#369/ }))
   expect(input.value).toBe('/tpnpc Angler')
 })
-it('旧的「召唤NPC」地址回落到「指令小抄」', async () => {
+it('旧的「召唤NPC」地址回落到「小抄」', async () => {
   mockFetch()
   window.history.replaceState(null, '', '#/spawn')
   render(<App transport={new MockTransport()} />)

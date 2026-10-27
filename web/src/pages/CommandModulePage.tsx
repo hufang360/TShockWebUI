@@ -60,6 +60,8 @@ interface CommandModulePageProps {
   keyPrefix: string
   /** 固定卡片（不可删除）。 */
   fixedCards?: FixedCardDef[]
+  /** 固定卡片依赖的第三方插件名（如 `WorldModify`）：指令不存在时提示未安装。 */
+  pluginName?: string
 }
 
 /** 通用「指令卡片模块」页：世界管理 / 自定义模块共用。 */
@@ -76,6 +78,7 @@ export function CommandModulePage({
   desc,
   keyPrefix,
   fixedCards,
+  pluginName,
 }: CommandModulePageProps) {
   const { t } = useI18n()
   const { cards, add, update, remove } = useModuleCards(serverId, moduleId)
@@ -86,6 +89,7 @@ export function CommandModulePage({
         id: `fixed:${c.command}`,
         name: t(c.nameKey),
         command: c.command,
+        fixed: true,
         manualKey: `${keyPrefix}fixed:${c.command}`,
         defaultManual: c.manual === true,
       })),
@@ -124,6 +128,7 @@ export function CommandModulePage({
             onAddCard={add}
             onUpdateCard={update}
             onRemoveCard={remove}
+            pluginName={pluginName}
           />
         </div>
         <NotebookCard moduleId={moduleId} />

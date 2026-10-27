@@ -593,3 +593,59 @@ describe('SettingsPage 激活模块', () => {
     expect(screen.getByText(`TShockWebUI ${APP_VERSION}`)).toBeTruthy()
   })
 })
+
+describe('SettingsPage 世界管理插件探测', () => {
+  const renderSettings = (transport: BackendTransport) =>
+    render(
+      <I18nProvider lang="zh">
+        <SettingsPage
+          settings={settings}
+          onChange={vi.fn()}
+          serverId="default"
+          transport={transport}
+          authenticated
+          modules={DEFAULT_MODULES}
+          onModulesChange={vi.fn()}
+          customModules={[]}
+          onCustomModulesChange={vi.fn()}
+          onTokenInvalid={vi.fn()}
+          onLogin={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+  /** 世界管理那一行（`ModuleRow` 是 `<li>`）。 */
+  const worldRow = () => screen.getByText('世界管理').closest('li') as HTMLElement
+
+  it('/wi 返回「指令不存在」→ 世界管理显示未安装', async () => {
+    renderSettings(
+      fakeTransport({
+        runCommand: async () => ({ status: 'command_not_found', output: [], message: '' }),
+      }),
+    )
+    openModuleTab('已适配')
+    await waitFor(() => expect(within(worldRow()).getByText('未安装')).toBeTruthy())
+  })
+
+  it('/wi 返回权限不足 → 世界管理显示无权限（不误报未安装）', async () => {
+    renderSettings(
+      fakeTransport({
+        runCommand: async () => ({
+          status: 'no_permission',
+          output: ['你没有权限使用该指令。'],
+          message: '权限不足，无法执行该指令',
+        }),
+      }),
+    )
+    openModuleTab('已适配')
+    await waitFor(() => expect(within(worldRow()).getByText('无权限')).toBeTruthy())
+    expect(within(worldRow()).queryByText('未安装')).toBeNull()
+    expect(within(worldRow()).getByText('已安装插件，但你的用户组缺少权限，暂不可用。')).toBeTruthy()
+  })
+
+  it('/wi 成功 → 世界管理显示已安装', async () => {
+    renderSettings(fakeTransport())
+    openModuleTab('已适配')
+    await waitFor(() => expect(within(worldRow()).getByText('已安装')).toBeTruthy())
+  })
+})

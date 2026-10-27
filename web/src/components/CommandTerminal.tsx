@@ -151,7 +151,7 @@ export function CommandTerminal({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isOpen, close])
 
-  // 外部带文本打开（如「指令小抄」页点一条记录）：覆盖草稿并让输入框重新聚焦。
+  // 外部带文本打开（如「小抄」页点一条记录）：覆盖草稿并让输入框重新聚焦。
   const [focusToken, setFocusToken] = useState(0)
   useEffect(() => {
     if (!request) return

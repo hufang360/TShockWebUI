@@ -581,18 +581,22 @@ TShock **运行时**指令目录（含 `/fish`、`/pm`、本插件的 `/web` 等
 invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosses{} }`。
 
 ### `GET /api/events?since=&limit=&tail=`
-服务器动态事件流：`{ events: [{ seq, type, text, time, source? }], lastSeq, firstSeq? }`；
+服务器动态事件流：`{ events: [{ seq, type, text, time, source? }], lastSeq, firstSeq?, instance? }`；
 `type ∈ join|leave|boss|announce|npc|chat`（`webui` 为旧插件的兼容值；`announce` = 世界公告如 Boss 苏醒 / 事件开始；`npc` = 旅商到达）。
 - **增量轮询**：传 `since=` 上次的 `lastSeq`，返回之后的事件（插件缺失 / 旧插件均可用）。
 - **取最近 N 条**：传 `tail=N` 返回**最新** N 条（升序），用于「打开网页先看最近 N 条」。
   新插件走磁盘历史（`/webui/events?tail=N`）；**旧插件（含 RC2）后端自动降级**：拉一页 `since=0` 再取尾部。
 - 聊天的 `source ∈ game|webui`（`webui` = 网页发言，见下）；旧插件可能不返回 `source`。
 - `chat` 为玩家聊天（插件配置 `RecordChat` 可关）；事件在插件内存（新插件另按天落盘，见插件文档），重启不一定清空。
+- `instance`（新插件，能力 `events_instance`）：事件库实例标识。同一个服务器地址 / 端口下换成另一个服时它会变，
+  前端据此清空本地事件重拉而不是把两个服的事件混排；旧插件不返回，前端退回「`lastSeq` 回退」判定。
 
 ### `GET /api/events/stream?since=`（SSE）
 以 `text/event-stream` 持续推送（网页打开「动态」时用）：
 - `event: message` + `data: <ServerEvent>`：一条事件；
 - `event: world` + `data: <ServerInfoExtra>`：世界状态（约 20s 一帧；前端用它更新徽标 / 游戏内时间）；
+- `event: reset` + `data: {"instance":"..."}`：上游换了实例（同一地址下换了另一个服）。
+  前端收到后清空事件列表、重置 `since`、重新取最近 N 条并重连；建连时发现实例已变则只发这一帧，不再下发旧实例数据。
 - 心跳为注释帧 `: ping`；错误用 `event: error` + `data: {"code":"..."}` 后断开，前端据此降级为轮询。
 - 需要登录；后端**每个上游共享一个轮询器**（`feedhub.go`）拉 `/webui/events?since=`，fan-out 给所有订阅者，
   因此 TShock REST 请求数与在线人数无关；轮询间隔空闲自适应（2.5s → 5s → 10s）。

@@ -36,6 +36,73 @@ export function cacheFor(transport: BackendTransport): Map<string, PlayerCache> 
   return cache
 }
 
+/**
+ * 自带 Demo 角色存档的静态资源路径（`web/public/demo/Joy.plr`，构建后随前端一起发布）。
+ *
+ * 用途与「查看世界」的 `demo/world.wld` 相同：手边没有存档也能看到这一页长什么样，
+ * 且和用户自己选的文件走完全一样的本地解析路径（不上传、不需要登录）。
+ */
+export const DEMO_PLR_URL = `${import.meta.env.BASE_URL}demo/Joy.plr`
+
+/** 取出自带 Demo 角色存档（当作一个普通本地文件返回，后续流程与手动选择完全一致）。 */
+export async function loadDemoPlrFile(): Promise<File> {
+  const res = await fetch(DEMO_PLR_URL, { credentials: 'same-origin' })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const blob = await res.blob()
+  return new File([blob], 'Joy.plr', { type: 'application/octet-stream' })
+}
+
+/** 角色难度（`.plr` 的 `difficulty`）→ i18n key 后缀。 */
+export function playerDifficultyKey(difficulty: number): string {
+  switch (difficulty) {
+    case 3:
+      return 'journey'
+    case 2:
+      return 'hardcore'
+    case 1:
+      return 'mediumcore'
+    default:
+      return 'softcore'
+  }
+}
+
+/**
+ * 游玩时长（.NET TimeSpan tick，10^7 = 1 秒）→ `HH:MM:SS`（小时不封顶，如 `37:23:37`）。
+ *
+ * 固定宽度、等宽数字排版，和「最后保存」一样是纯数值，不随语言变形。
+ */
+export function formatPlayTime(ticks: number | undefined): string {
+  if (!ticks || ticks <= 0) return ''
+  const total = Math.floor(ticks / 1e7)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`
+}
+
+/** BUFF 剩余时间（存档里是 tick，60 tick = 1 秒）→ `m:ss` / `h:mm:ss`。 */
+export function formatBuffTime(ticks: number): string {
+  const total = Math.max(0, Math.floor(ticks / 60))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const seconds = String(total % 60).padStart(2, '0')
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}`
+    : `${minutes}:${seconds}`
+}
+
+/**
+ * 最后保存时间：`.plr` 里存的是 `DateTime.UtcNow.ToBinary()`（真 UTC），
+ * 所以这里**换成浏览器本地时区**再显示（`YYYY-MM-DD HH:mm`）。
+ *
+ * 注意与世界存档不同：`.wld` 里存的是保存时的**本地墙上时间**（`DateTime.Now`），那边不做换算。
+ */
+export function formatSaveTime(iso: string | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 /** 触发浏览器下载（导出 .plr / 导出图片共用）。 */
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)

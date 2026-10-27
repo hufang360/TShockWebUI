@@ -130,3 +130,142 @@ it('提供 eventsStream 时用长连接接收事件', async () => {
   })
   expect(close).toHaveBeenCalled()
 })
+
+/**
+ * 同一个地址 / 端口后面可能换了另一个服（另一份存档目录）：
+ * 插件事件库的 `instance` 变化后，旧事件必须清空，不能和新服的事件串在一起。
+ */
+it('实例标识变化时清空旧事件并按新实例重拉', async () => {
+  let swapped = false
+  const eventsTail = vi.fn(async () =>
+    swapped
+      ? {
+          events: [{ seq: 1, type: 'join', text: '新服玩家', time: '' }],
+          lastSeq: 1,
+          instance: 'B',
+        }
+      : {
+          events: [
+            { seq: 41, type: 'join', text: '旧服玩家', time: '' },
+            { seq: 42, type: 'join', text: '旧服玩家2', time: '' },
+          ],
+          lastSeq: 42,
+          instance: 'A',
+        },
+  )
+  const transport = fakeTransport({
+    serverInfoExtra: async () => ({}) as ServerInfoExtra,
+    eventsTail,
+  })
+
+  const { result } = renderHook(() =>
+    useServerFeed({ transport, authenticated: true, serverId: 'default', refreshInterval: 60000 }),
+  )
+
+  await waitFor(() => expect(result.current.events).toHaveLength(2))
+  expect(result.current.events.map((e) => e.text)).toEqual(['旧服玩家', '旧服玩家2'])
+
+  // 换服：新事件库从 seq=1 重新开始。
+  swapped = true
+  act(() => result.current.refresh())
+
+  await waitFor(() => expect(result.current.events.map((e) => e.text)).toEqual(['新服玩家']))
+  expect(eventsTail.mock.calls.length).toBeGreaterThanOrEqual(3)
+  // 界面据此短暂提示「已切换服务器」（而不是让用户以为列表自己被清空了）。
+  expect(result.current.switchedAt).not.toBeNull()
+})
+
+/** SSE 换实例时后端会发 `event: reset`：前端清空列表、重新取历史并重连。 */
+it('SSE 收到 reset 帧后清空列表并重新连接', async () => {
+  let instance = 'A'
+  let emitReset: ((instance: string) => void) | null = null
+  const close = vi.fn()
+  const eventsTail = vi.fn(async () => ({
+    events: [
+      {
+        seq: instance === 'A' ? 9 : 1,
+        type: 'join',
+        text: instance === 'A' ? '旧服' : '新服',
+        time: '',
+      },
+    ],
+    lastSeq: instance === 'A' ? 9 : 1,
+    instance,
+  }))
+  const eventsStream = vi.fn(
+    (handlers: { onEvent: (e: ServerEvent) => void; onReset?: (instance: string) => void }) => {
+      emitReset = handlers.onReset ?? null
+      return close
+    },
+  )
+  const transport = fakeTransport({
+    serverInfoExtra: async () => ({}) as ServerInfoExtra,
+    eventsTail,
+    eventsStream,
+  })
+
+  const { result } = renderHook(() =>
+    useServerFeed({ transport, authenticated: true, serverId: 'default', refreshInterval: 60000 }),
+  )
+
+  await waitFor(() => expect(eventsStream).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(result.current.events.map((e) => e.text)).toEqual(['旧服']))
+
+  instance = 'B'
+  act(() => emitReset?.('B'))
+
+  await waitFor(() => expect(result.current.events.map((e) => e.text)).toEqual(['新服']))
+  expect(close).toHaveBeenCalled()
+  await waitFor(() => expect(eventsStream).toHaveBeenCalledTimes(2))
+})
+
+/**
+ * 登录态失效（换服后旧 token 通常失效 / 后端重启）：走统一的重新登录流程，
+ * 而不是把 403 当成瞬时错误按刷新间隔反复重试。
+ */
+it('登录态失效时拉起重新登录，且只弹一次', async () => {
+  const onTokenInvalid = vi.fn(async () => true)
+  const transport = fakeTransport({
+    serverInfoExtra: async () => {
+      throw new TshockRequestError('token', '登录已失效')
+    },
+    events: async () => ({ events: [], lastSeq: 0 }),
+  })
+
+  renderHook(() =>
+    useServerFeed({
+      transport,
+      authenticated: true,
+      serverId: 'default',
+      refreshInterval: 60000,
+      onTokenInvalid,
+    }),
+  )
+
+  await waitFor(() => expect(onTokenInvalid).toHaveBeenCalledTimes(1))
+  // 不应因为「还没登录成功」而反复弹登录框。
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(onTokenInvalid).toHaveBeenCalledTimes(1)
+})
+
+/** 没有提供登录流程时保持旧行为：按瞬时错误重试（不永久停摆）。 */
+it('未提供登录流程时 token 错误按瞬时错误重试', async () => {
+  vi.useFakeTimers()
+  const serverInfoExtra = vi.fn(async () => {
+    throw new TshockRequestError('token', '登录已失效')
+  })
+  const transport = fakeTransport({ serverInfoExtra, events: async () => ({ events: [], lastSeq: 0 }) })
+
+  renderHook(() =>
+    useServerFeed({ transport, authenticated: true, serverId: 'default', refreshInterval: 60000 }),
+  )
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0)
+  })
+  expect(serverInfoExtra).toHaveBeenCalledTimes(1)
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000)
+  })
+  expect(serverInfoExtra.mock.calls.length).toBeGreaterThanOrEqual(2)
+})

@@ -19,10 +19,26 @@ export interface TileSpec {
   repeat?: number
 }
 
+/** 合成箱子：位置 + 内容（`[物品 id, 数量, 词缀]`）。 */
+export interface ChestSpec {
+  x: number
+  y: number
+  name?: string
+  items?: [id: number, stack: number, prefix?: number][]
+}
+
 export interface WorldSpec {
   width: number
   height: number
   tiles: (x: number, y: number) => TileSpec
+  /** 箱子（写进第 3 段，供「地图分析」统计）。 */
+  chests?: ChestSpec[]
+  /** 招牌文本（第 4 段）。 */
+  signs?: { x: number; y: number; text: string }[]
+  /** 城镇 NPC（第 5 段）：只写类型 + 名字，够统计数量。 */
+  npcs?: { netId: number; name: string }[]
+  /** 图格实体数量（第 6 段只有一个 int32）。 */
+  tileEntities?: number
   name?: string
   seed?: string
   release?: number
@@ -31,7 +47,8 @@ export interface WorldSpec {
   rockLevel?: number
 }
 
-class Writer {
+/** 小端写手（导出让需要手搓某一段的测试复用，比如 NPC 段按版本门槛拼）。 */
+export class Writer {
   private bytes: number[] = []
 
   get length(): number {
@@ -115,11 +132,16 @@ class Writer {
   }
 }
 
-/** `DateTime.ToBinary()`（UTC Kind）：100ns ticks，高 2 位 = 1。 */
-export function dotnetTicks(iso: string): bigint {
+/**
+ * `DateTime.ToBinary()`：100ns ticks + 高 2 位的 Kind。
+ *
+ * - `kind: 'utc'`（默认）→ 高 2 位 = 1，ticks 是 UTC；
+ * - `kind: 'local'` → 高 2 位 = 2，ticks 是**本地墙上时间**（世界「创建时间」就是这种）。
+ */
+export function dotnetTicks(iso: string, kind: 'utc' | 'local' = 'utc'): bigint {
   const ms = new Date(iso).getTime()
   const epochTicks = 621355968000000000n
-  return BigInt(ms) * 10000n + epochTicks + (1n << 62n)
+  return BigInt(ms) * 10000n + epochTicks + (kind === 'utc' ? 1n << 62n : 2n << 62n)
 }
 
 /** 生成一份合成世界存档（release 326）。 */
@@ -147,9 +169,13 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   w.i16(sections)
   const pointerPos = w.length
   for (let i = 0; i < sections; i++) w.i32(0)
-  // 图格 frame 表：图格 0 不帧化，图格 1 帧化（带 UV）。
-  w.i16(2)
-  w.u8(0b10)
+  // 图格 frame 表：真实世界是「每个图格 id 1 位」，长度 = TileID.Count（1.4.5.8 是 754），
+  // 只有图格 1 帧化（带 UV）。位图做小了会让解码器把超出范围的 id 误判成帧化。
+  const frameIds = 754
+  w.i16(frameIds)
+  const frameBits = new Uint8Array(Math.ceil(frameIds / 8))
+  frameBits[0] = 0b10 // 图格 1
+  w.raw(frameBits)
 
   // ---- 第 1 段：头部字段 ----
   const section1 = w.length
@@ -172,7 +198,8 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   w.bool(false) // zenith
   w.bool(false) // skyblock
 
-  w.u64(dotnetTicks('2024-05-06T07:08:09Z'))
+  // 与现实一致：CreationTime 是 DateTime.Now（本地 Kind），最后游玩是 DateTime.UtcNow（UTC Kind）
+  w.u64(dotnetTicks('2024-05-06T07:08:09Z', 'local'))
   w.u64(dotnetTicks('2025-01-02T03:04:05Z'))
 
   w.u8(0) // MoonType
@@ -293,10 +320,85 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
       y += t.repeat ?? 0
     }
   }
-  const end = w.length
+  // ---- 第 3 段：箱子 ----
+  const pointers: number[] = [section1, section2]
+  pointers.push(w.length) // 第 2 段（图格）结束
 
-  // 回填段指针：0 = 文件头结束、1 = 头部结束（= 图格段起点）、2 起指向末尾（本解析器不读）。
-  const pointers = [section1, section2, section2, ...new Array(sections - 3).fill(end)]
+  const chests = spec.chests ?? []
+  w.i16(chests.length)
+  // release < 294：容量是整段共享的一个 int16（写在列表之前）；≥294 才是每个箱子自带 int32
+  const sharedCapacity = release < 294
+  if (sharedCapacity) w.i16(40)
+  for (const chest of chests) {
+    w.i32(chest.x)
+    w.i32(chest.y)
+    w.str(chest.name ?? '')
+    const items = chest.items ?? []
+    if (!sharedCapacity) w.i32(40) // maxItems（游戏固定 40）
+    for (let slot = 0; slot < 40; slot++) {
+      const item = items[slot]
+      if (!item) {
+        w.i16(0)
+        continue
+      }
+      const [id, stack, prefix = 0] = item
+      w.i16(stack)
+      // `stack < 0` 在游戏里表示「只堆 1 个但带词缀」，后面仍跟 id + prefix
+      if (stack !== 0) {
+        w.i32(id)
+        w.u8(prefix)
+      }
+    }
+  }
+  pointers.push(w.length)
+
+  // ---- 第 4 段：招牌（text, x, y）----
+  const signs = spec.signs ?? []
+  w.i16(signs.length)
+  for (const sign of signs) {
+    w.str(sign.text)
+    w.i32(sign.x)
+    w.i32(sign.y)
+  }
+  pointers.push(w.length)
+
+  // ---- 第 5 段：NPC（release ≥268 的微光列表 + 城镇 NPC 循环 + 第二个循环）----
+  const npcs = spec.npcs ?? []
+  if (release >= 268) w.i32(0) // 微光化 NPC id 列表
+  for (const npc of npcs) {
+    w.bool(true)
+    w.i32(npc.netId)
+    w.str(npc.name)
+    w.f32(100) // position.X
+    w.f32(100) // position.Y
+    w.bool(false) // homeless
+    w.i32(Math.floor(width / 2)) // homeTileX
+    w.i32(20) // homeTileY
+    w.u8(1) // BitsByte：bit0 = townNPC
+    w.i32(0) // townNpcVariationIndex
+    w.bool(false) // homelessDespawn
+  }
+  w.bool(false)
+  w.bool(false) // 第二个循环直接结束
+  pointers.push(w.length)
+
+  // ---- 第 6 段：图格实体（只写数量，够统计）----
+  w.i32(spec.tileEntities ?? 0)
+  pointers.push(w.length)
+
+  // ---- 第 7–11 段：内容对解析器/编辑器都是不透明字节，给几个可辨识的桩数据 ----
+  for (let i = 7; i < sections; i++) {
+    w.u8(0xa0 + i)
+    w.u8(0x5a)
+    w.i16(i)
+    pointers.push(w.length)
+  }
+
+  // ---- footer：bool true + 世界名 + worldId（游戏加载时会与头部比较） ----
+  w.bool(true)
+  w.str(name)
+  w.i32(4242)
+
   for (let i = 0; i < sections; i++) w.patchU32(pointerPos + i * 4, pointers[i])
 
   return w.toBytes()

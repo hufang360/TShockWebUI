@@ -2,6 +2,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -108,6 +109,11 @@ type Server struct {
 	// 能力矩阵微缓存（/api/capabilities，见 capabilities.go）。
 	capMu    sync.Mutex
 	capCache map[string]capCacheEntry
+
+	// data/*.json 的 ETag 缓存（内容哈希 + 原始字节）。
+	// 内嵌资源在进程生命周期内不可变，所以不必失效；测试里每个 Server 各一份。
+	dataMu    sync.Mutex
+	dataCache map[string]dataAsset
 }
 
 type metaCacheEntry struct {
@@ -1021,8 +1027,61 @@ func (s *Server) staticHandler() http.Handler {
 		}
 
 		setCacheHeaders(w, name)
+		if isDataJSON(name) {
+			s.serveDataJSON(w, r, name)
+			return
+		}
 		http.ServeFileFS(w, r, s.web, name)
 	})
+}
+
+// isDataJSON 判断是不是 `data/*.json`（指令表 / 物品表 / 图集裁切信息等）。
+//
+// 这些文件随版本变化，但文件名不带哈希：用「ETag + no-cache」让浏览器每次校验，
+// 未变回 304（省流量），变了立即用新数据（不会升级后还读一小时旧 `commands.json`）。
+func isDataJSON(name string) bool {
+	return strings.HasPrefix(name, "data/") && strings.HasSuffix(name, ".json")
+}
+
+// dataAsset 是 `data/*.json` 的内容哈希与原始字节（内嵌资源不可变，算一次即可）。
+type dataAsset struct {
+	etag string
+	body []byte
+}
+
+// dataFile 取（必要时首次读取并计算）某个数据文件的 ETag 与内容。
+func (s *Server) dataFile(name string) (dataAsset, error) {
+	s.dataMu.Lock()
+	defer s.dataMu.Unlock()
+	if a, ok := s.dataCache[name]; ok {
+		return a, nil
+	}
+	body, err := fs.ReadFile(s.web, name)
+	if err != nil {
+		return dataAsset{}, err
+	}
+	// 内容哈希做弱 ETag：同一个 body 可能以 gzip / 原样两种编码返回（见 gzipMiddleware），
+	// 弱校验对所有编码都等价，浏览器命中就走 304（不传 body）。
+	sum := sha256.Sum256(body)
+	a := dataAsset{etag: `W/"` + hex.EncodeToString(sum[:16]) + `"`, body: body}
+	if s.dataCache == nil {
+		s.dataCache = make(map[string]dataAsset)
+	}
+	s.dataCache[name] = a
+	return a, nil
+}
+
+// serveDataJSON 带 ETag 地返回 `data/*.json`：`If-None-Match` 命中回 304（由 ServeContent 处理）。
+func (s *Server) serveDataJSON(w http.ResponseWriter, r *http.Request, name string) {
+	a, err := s.dataFile(name)
+	if err != nil {
+		writeError(w, http.StatusNotFound, codeNotFound, "资源不存在")
+		return
+	}
+	w.Header().Set("ETag", a.etag)
+	// no-cache = 允许本地缓存，但每次都要带 If-None-Match 校验（不是「不缓存」）。
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeContent(w, r, path.Base(name), time.Time{}, bytes.NewReader(a.body))
 }
 
 func setCacheHeaders(w http.ResponseWriter, name string) {
@@ -1033,14 +1092,13 @@ func setCacheHeaders(w http.ResponseWriter, name string) {
 		// 图集 PNG 长缓存；前端用「内容哈希 ?v=...」做缓存失效（见 web/src/lib/atlas.ts），
 		// 图集一变哈希就变，不会出现「新 regions + 旧 PNG」的图标错位。
 		w.Header().Set("Cache-Control", "public, max-age=604800")
-	case strings.HasPrefix(name, "data/") && strings.HasSuffix(name, "-atlas.json"):
-		// 图集裁切信息很小，且带着 PNG 的内容哈希：每次校验，保证哈希及时更新。
-		w.Header().Set("Cache-Control", "no-cache")
-	case strings.HasPrefix(name, "demo/"):
-		// 自带 Demo 世界（`web/public/demo/world.wld`）：固定内容，天级缓存足够。
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-	case strings.HasPrefix(name, "data/") && strings.HasSuffix(name, ".json"):
+	case strings.HasPrefix(name, "data/"):
+		// `data/*.json` 根本不会走到这里（走 serveDataJSON，ETag + no-cache）；
+		// 剩下的 data/ 文件不多（如 .bin），短缓存即可。
 		w.Header().Set("Cache-Control", "public, max-age=3600")
+	case strings.HasPrefix(name, "demo/"):
+		// 自带 Demo 存档（`web/public/demo/world.wld` / `demo/Joy.plr`）：固定内容，天级缓存足够。
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	case name == "index.html":
 		w.Header().Set("Cache-Control", "no-cache")
 	}

@@ -1,5 +1,5 @@
 /**
- * 指令字符串拼装的小工具（多处在用：NPC 详情、指令小抄页、Buff 详情）。
+ * 指令字符串拼装的小工具（多处在用：NPC 详情、小抄页、Buff 详情）。
  *
  * TShock 的 `CommandArgs.ParseParameters()` 会处理引号，所以**含空格的参数必须加引号**，
  * 否则会被拆成多个参数（如 `/tpnpc Traveling Merchant`）。

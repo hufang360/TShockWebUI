@@ -115,7 +115,10 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 - `//go:embed all:webdist` 内嵌 `web/dist` 全部内容（构建期由脚本拷入 `server/internal/webdist/`；Dockerfile 消费预构建的 `web/dist`，不在镜像内跑 Node）。
 - 路由：`/`、`/assets/*`、`/data/*`、`/favicon.png`（猛爪手套物品图标，`tools/gen-brand-assets.py` 生成）。
 - 未命中的非 `/api` 路径回退到 `index.html`（SPA 兜底）。
-- 缓存头：`/assets/*`（带哈希）`Cache-Control: public, max-age=31536000, immutable`；`/data/items-atlas.png` `max-age=604800`；JSON `max-age=3600`。
+- 缓存头：`/assets/*`（带哈希）`Cache-Control: public, max-age=31536000, immutable`；图集 PNG（`data/items-atlas.png` / `player-atlas.png` / `npc-atlas.png`）`max-age=604800`；`/demo/*`（自带 Demo 存档）`max-age=86400`；
+  `data/*.json`（指令表 / 物品表 / 图集裁切信息）用 **内容哈希弱 ETag + `Cache-Control: no-cache`**：
+  每次带 `If-None-Match` 校验，未变回 **304**，变了立刻生效（不会升级后还读一小时旧 `commands.json`）。
+  ETag 用 `W/"…"` 是因为同一份 JSON 可能以 gzip / 原样两种编码返回（`Vary: Accept-Encoding`）。
 - 对文本类型（`text/html`、`text/css`、`application/javascript`、`application/json`、`image/svg+xml`）启用 gzip（自定义中间件，`gzip.Writer`，`Content-Encoding` 协商）。
 
 ### 4.2 会话层（`internal/session`）

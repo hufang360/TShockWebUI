@@ -553,7 +553,17 @@ function main() {
   // ── 2. 官方本地化（按语言拆分为 loc.<culture>.json）─────────────
   // 只保留前端运行期真正用到的分类：物品名 / 词缀名 / 配方组名。
   // 值逐字取自官方 JSON，不做任何改写；文件保持游戏原生的两级 {分类:{key:值}} 格式。
-  const LOC_CATEGORIES = ['ItemName', 'Prefix', 'Misc', 'LegacyMisc', 'NPCName', 'BuffName'];
+  // `MapObject` 是「地图图例名」（树 / 矿石 / 门 / 罐子…），图格显示名要用它，
+  // 与 `data/tile-names.json`（图格 → 图例名来源）配合，见 tools/gen-tile-names.mjs。
+  const LOC_CATEGORIES = [
+    'ItemName',
+    'Prefix',
+    'Misc',
+    'LegacyMisc',
+    'NPCName',
+    'BuffName',
+    'MapObject',
+  ];
   const loadLocBundle = (culture) => {
     const files = [
       `Terraria.Localization.Content.${culture}.Items.json`,
@@ -707,6 +717,13 @@ function main() {
     buff: 'buff',
     region: 'region',
     warpname: 'warp',
+    // 权限节点 / 内置用户组：候选来自 data/permissions.json（TShock 源码抽取，可重复生成）。
+    // 只给「内置 / 默认」集合，自定义与插件节点仍可手输（见 tools/gen-permissions.mjs 顶部说明）。
+    permissions: 'permission',
+    'permissions...': 'permission',
+    permission: 'permission',
+    group: 'group',
+    'group name': 'group',
   };
   for (const c of commands) {
     for (const set of c.paramSets || []) {

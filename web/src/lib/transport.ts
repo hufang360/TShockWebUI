@@ -107,6 +107,11 @@ export interface EventsPage {
   lastSeq: number
   /** 最新一批的起始 seq（新插件的 tail 模式返回）；缺省为 0。 */
   firstSeq?: number
+  /**
+   * 事件库实例标识（新插件返回）：同一个地址 / 端口下换了服（另一份存档目录）时它会变。
+   * 变了就说明手上缓存的事件 / 世界状态属于另一个服，必须清空重拉。
+   */
+  instance?: string
 }
 
 /** SSE 事件流回调（由传输层解析后回调）。 */
@@ -115,6 +120,11 @@ export interface EventsStreamHandlers {
   onEvent: (event: ServerEvent) => void
   /** 收到一帧世界状态（徽标 / 游戏内时间）；未实现 / 旧后端可不提供。 */
   onWorld?: (info: ServerInfoExtra) => void
+  /**
+   * 上游换了实例（同一个地址 / 端口后面是另一个服）：调用方应清空列表并重拉。
+   * 参数是新实例标识；旧后端不会发这一帧。
+   */
+  onReset?: (instance: string) => void
   /** 连接失败 / 中断（调用方据此降级为轮询）。 */
   onError: (err: unknown) => void
 }
@@ -333,6 +343,35 @@ export interface PlayerLook {
   usedAmbrosia: boolean
   unlockedSuperCart: boolean
   enabledSuperCart: boolean
+  // 以下字段只有本地 `.plr` 存档（`lib/save/plr.ts`）会填，TShock `/pm/look` 不提供。
+  /** 存档版本号（`.plr` 的 `release`，如 326）。 */
+  saveVersion?: number
+  /** 由存档版本号映到的游戏版本号（如 `1.4.5.8`）。 */
+  gameVersion?: string
+  /** 难度：0 软核 / 1 中核 / 2 硬核 / 3 旅途。 */
+  difficulty?: number
+  /** 游玩时长（.NET TimeSpan tick，10^7 = 1 秒）。 */
+  playTimeTicks?: number
+  /** Golf 累计分数。 */
+  golferScore?: number
+  /** 税收金币。 */
+  taxMoney?: number
+  /** PVE / PVP 死亡次数。 */
+  deathsPve?: number
+  deathsPvp?: number
+  /** 最后一次保存时间（ISO 8601，UTC 墙上时间）。 */
+  lastSaved?: string
+  /** 当前生效的 BUFF（`ticks` 是剩余 tick，60 tick = 1 秒）。 */
+  buffs?: { type: number; ticks: number }[]
+  /** 已研究的物品种类数（`.plr` ≥218 的研究进度条数；读不到就不给）。 */
+  researchedCount?: number
+  /** 研究进度明细：`persistentId` 与 `data/items.json` 的 `key` 一致（如 `LifeCrystal`）。 */
+  research?: { persistentId: string; count: number }[]
+  /**
+   * 按世界分开的重生点列表（`.plr` 的 `spX/spY/spI/spN`）。
+   * 本地单文件里「玩家现在想用哪个世界」无法确定，所以整份列出，由界面展示世界名 + 坐标。
+   */
+  spawns?: { x: number; y: number; world: string; worldId: number }[]
 }
 
 /** 构造一个空白的 `PlayerLook`（Mock / 测试用；真实数据由后端 `/api/player/look` 提供）。 */

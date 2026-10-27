@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_MODULES,
   autoActivateModules,
+  fixedCardResultKey,
   isModuleEnabled,
   sanitizeModules,
   setModuleEnabled,
@@ -94,5 +95,11 @@ describe('autoActivateModules（探测到插件自动激活）', () => {
       requisition: false,
     })
     expect(next).toBe(DEFAULT_MODULES)
+  })
+
+  it('固定卡片结果 key 与模块页 / 设置页共用', () => {
+    // CommandModulePage 的 keyPrefix = `world:`，卡片 id = `fixed:/wi`。
+    expect(fixedCardResultKey('world', '/wi')).toBe('world:fixed:/wi')
+    expect(fixedCardResultKey('m:1', '/help')).toBe('m:1:fixed:/help')
   })
 })

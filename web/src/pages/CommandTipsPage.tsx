@@ -192,7 +192,7 @@ function TipsCard({
 }
 
 /**
- * 指令小抄（侧边栏「查询」分组）：`/worldevent`、`/worldmode`、`/time` 等世界操作，
+ * 小抄（侧边栏「查询」分组）：`/worldevent`、`/worldmode`、`/time` 等世界操作，
  * 以及 `/spawnboss`、`/spawnmob`、`/tpnpc`、`/maxspawns`、`/godmode` 等 NPC 操作。
  *
  * 页面只**生成指令**：点一行把完整指令覆盖到右下角「指令」浮窗（不自动执行），

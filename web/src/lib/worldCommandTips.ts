@@ -1,5 +1,5 @@
 /**
- * 「指令小抄」页用的指令清单（**手工维护**）。
+ * 「小抄」页用的指令清单（**手工维护**）。
  *
  * 全部按 TShock 6.2.1 源码核实（`TShockAPI/Commands.cs`），这些指令都是 `allowServer=true`，
  * 所以能经 `/api/command`（rawcmd）执行；权限仍由 TShock 判定。

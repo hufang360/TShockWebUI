@@ -39,8 +39,12 @@ const (
 	// CapEventsHistory：新插件支持 /webui/events?tail=N（磁盘历史 + 取最新 N 条）。
 	// 旧插件（含 RC2）没有此能力，后端会自动降级为「拉 since=0 再取尾部」。
 	CapEventsHistory = "events_history"
-	CapSessions      = "sessions"
-	CapChat          = "chat"
+	// CapEventsInstance：新插件在 /webui/events 响应里返回 instance（事件库实例标识）。
+	// 同一个地址 / 端口下换了服（另一份存档目录）时它会变，后端据此作废旧缓存；
+	// 旧插件没有这个字段，后端退回「seq 回退」启发式。
+	CapEventsInstance = "events_instance"
+	CapSessions       = "sessions"
+	CapChat           = "chat"
 	// CapRequests：物资申请（/webui/requests、/create、/cancel）。
 	CapRequests = "requests"
 	// CapRequestsReview：物资申请审核 / 补发（/webui/requests/all、/review、/deliver）。

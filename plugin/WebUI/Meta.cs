@@ -44,6 +44,7 @@ namespace WebUI
                 "serverinfo",  // /webui/serverinfo
                 "events",      // /webui/events
                 "events_history", // /webui/events?tail=N（磁盘历史 + 取最新 N 条）
+                "events_instance", // /webui/events 返回 instance（同地址换服时后端据此作废缓存）
                 "sessions",    // /webui/auth/sessions + /webui/auth/revoke
                 "chat",        // /webui/chat
                 "requests",    // /webui/requests*（物资申请：玩家提交 / 查看 / 撤回）

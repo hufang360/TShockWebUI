@@ -39,6 +39,7 @@ namespace WebUI
         private static readonly LinkedList<Dictionary<string, object>> Buffer =
             new LinkedList<Dictionary<string, object>>();
         private static long _seq;
+        private static string _instance;
 
         // ---------- 持久化 ----------
         private static WebAuthConfig _cfg;
@@ -49,11 +50,23 @@ namespace WebUI
         private static string _currentDay;   // 当前写入的日期（yyyy-MM-dd，UTC）
         private static StreamWriter _current;
 
+        /// <summary>
+        /// 事件库的实例标识（首次生成后持久化在 <c>tshock/WebUI/instance.id</c>）。
+        ///
+        /// 同一个<b>地址 / 端口</b>下可能先后开不同的服（另一份存档目录）：那时 <c>seq</c> 会重新开始，
+        /// 这个标识也会变，后端据此作废旧缓存并重新拉取；同一份历史重启后不变（事件仍然连续）。
+        /// </summary>
+        public static string Instance
+        {
+            get { return _instance; }
+        }
+
         /// <summary>由插件在 Initialize 时调用：建目录、恢复尾部、裁剪、启动写线程。</summary>
         public static void Init(WebAuthConfig cfg)
         {
             _cfg = cfg;
             _dir = System.IO.Path.Combine(TShock.SavePath, "WebUI", "events");
+            LoadInstance();
             try
             {
                 Directory.CreateDirectory(_dir);
@@ -127,6 +140,7 @@ namespace WebUI
                 {
                     { "events", events },
                     { "lastSeq", _seq },
+                    { "instance", _instance },
                 };
             }
         }
@@ -144,6 +158,7 @@ namespace WebUI
                     { "events", events },
                     { "firstSeq", events.Count > 0 ? events[0]["seq"] : 0 },
                     { "lastSeq", _seq },
+                    { "instance", _instance },
                 };
             }
         }
@@ -171,6 +186,32 @@ namespace WebUI
         }
 
         // ---------- 持久化实现 ----------
+
+        /// <summary>读取 / 创建实例标识；失败时退回进程级随机值（仍能区分不同的服）。</summary>
+        private static void LoadInstance()
+        {
+            var path = System.IO.Path.Combine(TShock.SavePath, "WebUI", "instance.id");
+            try
+            {
+                if (File.Exists(path))
+                {
+                    var text = File.ReadAllText(path).Trim();
+                    if (text.Length > 0)
+                    {
+                        _instance = text;
+                        return;
+                    }
+                }
+                _instance = Guid.NewGuid().ToString("N");
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+                File.WriteAllText(path, _instance);
+            }
+            catch (Exception ex)
+            {
+                if (string.IsNullOrEmpty(_instance)) _instance = Guid.NewGuid().ToString("N");
+                TShock.Log.ConsoleError("[WebUI] 事件实例标识读写失败（退回进程级随机值）：" + ex.Message);
+            }
+        }
 
         private static bool ShouldPersist(string type)
         {

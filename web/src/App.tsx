@@ -288,7 +288,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       { id: 'save', label: t('nav.save'), icon: UserRound, group: 'players', onPrefetch: () => preloadRoute('save') },
       // 查看世界同样是公开工具（上传本地 .wld，不读 TShock），排在「世界管理」模块之前。
       { id: 'worldview', label: t('nav.worldView'), icon: MapIcon, group: 'world', onPrefetch: () => preloadRoute('worldview') },
-      // 指令小抄：世界事件 / 时间 / 召唤等指令的生成器（不依赖插件，恒在）。
+      // 小抄：世界事件 / 时间 / 召唤等指令的生成器（不依赖插件，恒在）。
     ]
     const icons: Record<string, typeof House> = { players: Users, store: Fish, requisition: ClipboardList, world: Globe2 }
     const groups: Record<string, NavItem['group']> = {

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import type { BackendTransport } from '@/lib/tshock'
 import { playerStubs } from '@/test/playerStubs'
@@ -23,6 +23,13 @@ describe('formatGameTime', () => {
     expect(feedRefreshLabel(t, 1000, { dayTime: true, time: 0 } as never)).toContain('G:04:30')
     expect(feedRefreshLabel(t, null, null)).toBeNull()
   })
+
+  it('带上世界名（用来区分同一地址下先后开的不同服）', () => {
+    const t = (key: string, vars?: Record<string, string | number>) =>
+      key === 'home.feedRefreshedAt' ? `R:${vars?.time}` : `G:${vars?.time}`
+    const label = feedRefreshLabel(t, 1000, { name: '山丘', dayTime: true, time: 0 } as never)
+    expect(label).toMatch(/^山丘 · R:.+ · G:04:30$/)
+  })
 })
 
 describe('formatEventTime', () => {
@@ -43,6 +50,10 @@ describe('formatEventTime', () => {
   it('非法时间返回空串', () => {
     expect(formatEventTime(t, '', now)).toBe('')
   })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('ServerFeedList', () => {
@@ -87,6 +98,36 @@ describe('ServerFeedList', () => {
     )
     expect(screen.getByText(/刷新于/)).toBeTruthy()
     expect(screen.getByText(/游戏内 05:30/)).toBeTruthy()
+  })
+
+  it('上游换了服时短暂提示「已切换服务器」', () => {
+    const { rerender } = render(
+      <I18nProvider lang="zh">
+        <ServerFeedList events={[]} extra={null} switchedAt={null} />
+      </I18nProvider>,
+    )
+    expect(screen.queryByText('已切换服务器')).toBeNull()
+
+    rerender(
+      <I18nProvider lang="zh">
+        <ServerFeedList events={[]} extra={null} switchedAt={Date.now()} />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('已切换服务器')).toBeTruthy()
+  })
+
+  it('换服提示 10 秒后自己消失', () => {
+    vi.useFakeTimers()
+    render(
+      <I18nProvider lang="zh">
+        <ServerFeedList events={[]} extra={null} switchedAt={Date.now()} />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('已切换服务器')).toBeTruthy()
+    act(() => {
+      vi.advanceTimersByTime(10_000)
+    })
+    expect(screen.queryByText('已切换服务器')).toBeNull()
   })
 
   it('事件按时间升序渲染（最旧在上、最新在下），旧记录可懒加载', () => {

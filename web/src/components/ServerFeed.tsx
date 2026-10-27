@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ArrowDown, RefreshCw } from 'lucide-react'
 import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
@@ -13,6 +13,9 @@ import type { Atlas, Item, Prefix } from '@/types'
 
 /** 「动态」tab 默认渲染最近 N 条，更早的用「加载更早」按钮按批展开。 */
 const FEED_WINDOW = 30
+
+/** 换服提示显示多久（毫秒）。 */
+const SWITCH_HINT_MS = 10_000
 
 /** 「动态」tab 的事件类型筛选。 */
 const FEED_FILTERS = ['all', 'presence', 'boss', 'announce', 'npc', 'chat'] as const
@@ -94,7 +97,11 @@ export function formatGameTime(extra: ServerInfoExtra | null): string | null {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-/** 「刷新于 HH:MM:SS · 游戏内 HH:MM」。无数据时返回 null。 */
+/**
+ * 「世界名 · 刷新于 HH:MM:SS · 游戏内 HH:MM」。无数据时返回 null。
+ *
+ * 世界名用来区分「同一个服务器地址下先后开的不同服」（换服后世界名会变）。
+ */
 export function feedRefreshLabel(
   t: (key: string, vars?: Record<string, string | number>) => string,
   refreshedAt: number | null,
@@ -102,6 +109,8 @@ export function feedRefreshLabel(
 ): string | null {
   if (refreshedAt == null && !extra) return null
   const parts: string[] = []
+  const world = extra?.name?.trim()
+  if (world) parts.push(world)
   if (refreshedAt != null) {
     parts.push(t('home.feedRefreshedAt', { time: new Date(refreshedAt).toLocaleTimeString() }))
   }
@@ -158,6 +167,8 @@ interface ServerFeedListProps {
   extra: ServerInfoExtra | null
   /** 上次刷新的本地时间戳（展示「刷新时间 + 游戏内时间」）。 */
   refreshedAt?: number | null
+  /** 最近一次「上游换了服」的时间戳：短暂提示后自行消失。 */
+  switchedAt?: number | null
   /** 最多展示条数；不传则全部。 */
   limit?: number
   /** 事件为空时的占位文案。 */
@@ -180,6 +191,7 @@ export function ServerFeedList({
   unavailableText,
   unavailable,
   refreshedAt,
+  switchedAt,
   itemsById,
   prefixesById,
   atlas,
@@ -189,6 +201,15 @@ export function ServerFeedList({
   const { ref, onScroll, start, hidden, loadEarlier, step, atBottom, scrollToBottom } =
     useBottomList<HTMLUListElement>(events.length, { initial: FEED_WINDOW })
   const now = useNow()
+  // 换服提示只显示一小会儿：用户看到「列表自己换了」就知道原因，不必一直挂着。
+  // 用「已关闭的那一次时间戳」派生，避免在 effect 里同步 setState（会多一轮渲染）。
+  const [dismissedSwitchedAt, setDismissedSwitchedAt] = useState<number | null>(null)
+  const showSwitched = switchedAt != null && switchedAt !== dismissedSwitchedAt
+  useEffect(() => {
+    if (switchedAt == null) return
+    const id = window.setTimeout(() => setDismissedSwitchedAt(switchedAt), SWITCH_HINT_MS)
+    return () => window.clearTimeout(id)
+  }, [switchedAt])
   if (unavailable) {
     return <p className="text-xs text-warning">{unavailableText ?? t('editor.eventsPluginMissing')}</p>
   }
@@ -262,8 +283,19 @@ export function ServerFeedList({
           )}
         </div>
       )}
-      {refreshLabel && (
-        <span className="text-2xs text-muted-foreground">{refreshLabel}</span>
+      {(refreshLabel || showSwitched) && (
+        <div className="flex min-w-0 items-center gap-2 text-2xs text-muted-foreground">
+          {refreshLabel && (
+            <span className="min-w-0 truncate" title={refreshLabel}>
+              {refreshLabel}
+            </span>
+          )}
+          {showSwitched && (
+            <span className="shrink-0 text-info" title={t('feed.switchedHint')}>
+              {t('feed.switched')}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )
@@ -278,6 +310,7 @@ export function ServerFeedTab({
   serverId,
   refreshInterval,
   refreshToken,
+  onTokenInvalid,
   itemsById,
   prefixesById,
   atlas,
@@ -289,19 +322,22 @@ export function ServerFeedTab({
   refreshInterval: number
   /** 外部刷新令牌（例如底部聊天输入框发送成功后刷新）。 */
   refreshToken?: number
+  /** 登录态失效时拉起统一重新登录流程（403 规则）。 */
+  onTokenInvalid?: () => Promise<boolean>
   itemsById?: Map<number, Item>
   prefixesById?: Map<number, Prefix>
   atlas?: Atlas
 }) {
   const { t } = useI18n()
   const [filter, setFilter] = useState<FeedFilter>('all')
-  const { events, extra, available, refreshedAt, refresh } = useServerFeed({
+  const { events, extra, available, refreshedAt, switchedAt, refresh } = useServerFeed({
     transport,
     authenticated,
     serverId,
     maxEvents: 500,
     refreshInterval,
     refreshToken,
+    onTokenInvalid,
   })
   const filtered = useMemo(
     () => (filter === 'all' ? events : events.filter((e) => matchesFilter(e, filter))),
@@ -340,6 +376,7 @@ export function ServerFeedTab({
         unavailable={available === false}
         unavailableText={t('editor.eventsPluginMissing')}
         refreshedAt={refreshedAt}
+        switchedAt={switchedAt}
         itemsById={itemsById}
         prefixesById={prefixesById}
         atlas={atlas}

@@ -65,10 +65,12 @@ type ServerEvent struct {
 
 // EventsPage 是 /webui/events 的结果。
 // FirstSeq 仅在新插件的 tail 模式下返回（最新一批的起始 seq）。
+// Instance 是插件事件库的实例标识（同一地址换服会变），旧插件不返回。
 type EventsPage struct {
 	Events   []ServerEvent `json:"events"`
 	LastSeq  int64         `json:"lastSeq"`
 	FirstSeq int64         `json:"firstSeq,omitempty"`
+	Instance string        `json:"instance,omitempty"`
 }
 
 // SessionInfo 是本插件铸造的一条 web 会话（不含 token 明文）。

@@ -121,7 +121,8 @@
   - **自定义**：自定义模块列表 + 创建表单。
   每个 tab 顶部一行说明，下方复用同一个 `ModuleRow`（名称 + 状态徽标 + 依赖说明 + 开关）。
   登录成功后 App 会探测插件，**已安装且有权限的玩家管理 / 鱼店会自动激活**（侧边栏入口直接出现）；
-  用户手动拨过开关的模块记入 `tswui:modulesSet`，不再被自动激活覆盖；世界管理无法可靠探测，保持手动。
+  用户手动拨过开关的模块记入 `tswui:modulesSet`，不再被自动激活覆盖；世界管理靠执行 `/wi` 探测
+  （复用模块页最近一次结果，面板右上角「重新检测」强制重探），但**不参与自动激活**，保持手动。
 - **模块开关与插件状态解耦**：内置 / 自定义模块（包括玩家管理）都能自由开关，开关只控制侧边栏显隐；插件未安装、无权限、版本过旧或后来被卸载时，
   开关仍可操作，状态徽标只用于说明页面数据是否可用。关闭模块后直达 URL 会回到首页。
 - 两栏布局：**左列 = 界面偏好（置顶）→ 激活模块**；右列 = 执行行为 / 数据刷新 / 信使诊断 / 在线授权与账户。
@@ -134,7 +135,7 @@
   数据 ID 的 Boss 分类把贴图放大到 **128**、格子/图标区 **144**；页面设置可「隐藏 ID 和名称」，只留图标。
 - 触屏设备（`hover: none` / `pointer: coarse`）上，折叠箭头、刷新、复制、收藏、删除等操作常显；桌面仍可 hover 渐进显示，键盘通过 `focus-within` 显示。
 - 当前页签同步为 URL hash（映射见 `web/src/lib/routes.ts`）；浏览器前进 / 后退、刷新和分享链接均可用。localStorage 中的 `tswui:ui.activeTab` 仅作为无 hash 时的兜底。
-  - 内置页面用短名：`#/home`、`#/cmd`（指令）、`#/commands`（指令小抄）、`#/items`、`#/dataid`、`#/plr`（查看存档）、`#/pm`（玩家管理）、`#/wm`（世界管理）、`#/fish`（鱼店）、`#/settings`；`#/spawn` 旧链接回落到指令小抄。
+  - 内置页面用短名：`#/home`、`#/cmd`（指令）、`#/commands`（小抄）、`#/items`、`#/dataid`、`#/plr`（查看存档）、`#/pm`（玩家管理）、`#/wm`（世界管理）、`#/fish`（鱼店）、`#/settings`；`#/spawn` 旧链接回落到小抄。
   - 自定义插件页用**主指令**：`/clip` → `#/ext-clip`，`/chest` → `#/ext-chest`（`ext-` + 主指令第一段，小写）。
   - 旧地址继续兼容：`#/save`、`#/players`、`#/world`、`#/store`、`#/commands`、`#/spawn`、旧的自定义模块 `#/m:%3Cid%3E`，打开后会把地址替换成新的短名。
 - `Input` / `Textarea` / `InputGroupInput` / `NativeSelect` 未显式传 `id` 时自动生成稳定 id 与 name，避免表单字段缺少语义。
@@ -158,10 +159,15 @@
   首页默认开，世界管理的 `/relive`、`/cleartomb` 默认关（`ModuleCardDef.manual`）。
 - `status === 'no_permission'` 时卡片**保留**，下方显示本地化「没有执行该指令的权限」，并隐藏后端重复的中文 message
   （与「指令不存在 → `command_not_found`」区分，见 `docs/插件-世界管理.md`）。
-- `status === 'command_not_found'`（指令不存在 = 提供该指令的插件没装）时，**内置指令卡片**自动隐藏、
+- `status === 'command_not_found'`（指令不存在 = 提供该指令的插件没装）时，**首页内置指令卡片**自动隐藏、
   在「管理卡片」里置灰并标「缺少插件」，也不再参与自动刷新 /「统一执行」；
   手动「刷新全部」**不跳过**这些卡片（并重探一次 PlayerManager），装上插件后点一下即可恢复；
   自定义卡片不隐藏（玩家自己填的指令，结果区展示即可）。
+- **世界管理的固定卡片**同样把 `command_not_found` 当成「插件未安装」：由第一张固定卡片（`/wi`）探测，
+  命中时页面顶部显示「服务器未安装 WorldModify 插件」+「重新检测」，4 张固定卡片改显示「插件未安装」
+  （不展示 TShock 原文），「管理卡片」里置灰标「缺少插件」；`no_permission` 不算缺插件。
+  缺插件期间自动刷新不再重跑固定卡片；设置页「激活模块 → 已适配」复用同一个 `/wi` 结果显示已安装 / 未安装 / 无权限，
+  详见 `docs/插件-世界管理.md` §3。
 
 ## 模块与指令卡片
 
@@ -314,7 +320,8 @@
 - 工具卡一行：**导入 .wld**（primary；解析中转 Spinner）+ **来个 Demo**（outline + `Sparkles`，拉自带的空白世界）+
   **导出 .wld**（outline，导入过才显示）+ 右侧一行说明（格式；解析中改成「正在渲染缩略图… N%」，
   用 `role="status"`）；文件选择框隐藏，整页可拖放（`data-testid="world-drop"`）。
-- 工具卡下方固定一条 `Alert variant="info"`（`ShieldCheck`）：**「全部在你的浏览器里完成、不会上传服务器」**。
+- ~~工具卡下方固定一条 `Alert variant="info"`（`ShieldCheck`）~~：已按用户要求移除（2026-10-26），
+  页面不再重复强调「本地解析」——工具卡右侧的说明文案已经交代清楚。
   空态用 `Empty`，错误用 `Alert variant="destructive"`。
 - 概览卡：**缩略图**（`<canvas>` + `putImageData`，位图按像素预算做到 1 图格 = 1 像素，按容器平滑缩放；
   外层是可点击按钮，hover 显示「点击查看原图」→ `Dialog` 里放 1:1 大图 + `overflow-auto` 滚动）→
@@ -327,9 +334,9 @@
 
 - 顶部下划线 tab：**指令 / 聊天**（记忆到 `tswui:commandPageTab`）；聊天 = 服务器动态 + 发言框。
 - 底部输入框右侧按钮与顶部 tab 双向联动；工具面板开关在顶栏右侧，面板无标题栏（**物品 / 收藏 / 历史**）。
-- 指令库已移到独立的「指令小抄」页；空态里的「打开指令库」按钮跳到该页。
+- 指令库已移到独立的「小抄」页；空态里的「打开指令库」按钮跳到该页。
 
-## 指令小抄（`pages/CommandTipsPage.tsx`）
+## 小抄（`pages/CommandTipsPage.tsx`）
 
 - 侧边栏「常用」分组，**排在「指令」下方**，图标 `ScrollText`，地址 `#/commands`。
 - 页面 tab：**默认 / NPC管理 / 指令库**；默认与 NPC管理是原小抄内容，指令库是原指令页工具面板的指令列表（点一条填进浮动终端）。
@@ -344,84 +351,5 @@
 
 ## 变更记录
 
-- v1.53：卡片内边距减半（`Card` / `CardHeader` / `CardBody`），首页 / 指令卡片 / 世界管理 / 鱼店的卡片间距 `gap-4 → gap-2`；指令结果条目加描边；
-  「小抄」从指令页移回侧边栏（`#/commands`，放在「指令」下方，图标 `ScrollText`），指令库并入该页作为第三个 tab；指令页工具面板保留 物品 / 收藏 / 历史。
-- v1.52：顶栏重排（左：标题 + 页面说明 ⓘ；右：上次刷新 → 刷新 → 管理 → 指令；手机 `…` 用 DropdownMenu 收纳页面操作与终端）；
-  首页左栏两组半宽卡片 + Boss 战伤害整行 + Boss 进度最后；物品/数据 ID 图标网格统一 72/64 与 8/16 间距，Boss 2×、可隐藏文字；
-  物品详情新增 `/give`；数据 ID 指令改两行并补 Boss 简写；世界管理与自定义模块统一两栏 + 记事本；
-  设置页「界面偏好」移到左列顶部；`PlayerSavePage` 更名 `PlrPage`，新增导出 `.plr`，导出图片 / 简约视图进顶栏；全屏操作坞移到右上角并在 4 秒无操作后收起。
-- v1.51：URL 改短名（`#/plr` / `#/pm` / `#/wm` / `#/fish`），自定义插件页用主指令路由（`#/ext-clip` / `#/ext-chest`，旧地址兼容）；
-  侧栏的「隐藏侧栏」移回页头（主题 / 语言按钮之后，顶栏只在收起时显示「显示侧栏」）；顶栏加下边线；
-  数据 ID 的图标底改为与输入框同色（`bg-accent`）、去描边、120×120（图标 96×96）；格子宽 120、文字截断；
-  图标网格（`components/dataid/IconGrid.tsx`）按容器宽度算列数，并把剩余宽度均摊进列间距（8–32px），最后一列贴右边缘；明显剩余时整体居中；
-  hover 只让图标底变色，整格（文字 + 图标）一起上浮；搜索工具行上下各留 4px；手机端 NPC 分类 tab 换到下一行。正文区上下内边距统一 `p-4`。
-- v1.50：顶栏收敛：面包屑只显示当前页面；页面操作（上次刷新 / 管理卡片 / 刷新全部 / 页面设置 / 全屏）移入顶栏右侧（`TopBarActions` + `IconAction` + `InfoPopover`），
-  首页 / 世界管理 / 鱼店去掉正文标题与描述行，指令页顶部改为「指令 / 聊天 / 小抄」三个 tab（工具面板开关进顶栏、去掉面板标题栏）；
-  物品 ID / 数据 ID 全屏时操作坞数秒后收成右侧小竖条；亮色正文改纯白；物品网格按宽度铺满。
-- v1.49：布局改版：侧栏 `collapsible="offcanvas"`（收起时完全隐藏，重新展开靠内容区顶栏按钮 / `Cmd/Ctrl+B` / 拖动边缘），侧栏与内容区平铺；
-  侧栏页头只有「WebUI」文字 + 主题 / 语言快捷按钮；收起 / 展开按钮与面包屑在内容区吸顶顶栏（`h-12`），正文上下间距收紧；新增 `ui/Breadcrumb.tsx`，「常用」分组补上标题。
-- v1.48：首页首屏增加草稿 / 最近指令入口；指令页空态改为居中编辑器；触屏与键盘不再依赖 hover 操作；数据 ID 改容器查询列数；设置拆出“执行行为”；统一“数据 ID / 首页布局 / 工具面板 / 批量执行卡片”等术语；页签同步 URL hash；补齐表单字段语义；主色改为克制的苔藓绿。
-- v1.47：卡片管理弹层改为纵向操作结构并加宽，添加按钮增加有效性禁用；数据图鉴顶部改为搜索 / 信息、数据源、分类三层；补齐列表型自定义按钮的焦点环、表单提交禁用态和首页管理按钮权重。
-- v1.46：新增 `Skeleton`，懒加载路由、鱼店货架和角色背包使用页面 / 内容骨架；补 `RouteErrorBoundary`（chunk 加载失败可重新加载）；侧栏导航悬停 / 聚焦时预取页面 chunk；新增「跳到主内容」链接。
-- v1.45：路由按需加载：首页 / 指令保留在首屏主包，物品图鉴、数据图鉴、角色档案、鱼店、物资申请、模块页、设置页改为独立 chunk；主入口 JS 由约 940 kB 降到约 399 kB，构建不再出现 >500 kB 警告。自定义模块增加拖拽与上移 / 下移排序。
-- v1.44：信息架构与体验收敛。侧栏改为四组；导航统一为「物品图鉴 / 数据图鉴 / 角色档案」，角色档案页签为「查看存档 / 玩家背包」。首页移动端先展示概览、快捷入口默认隐藏；指令页新增可操作空态；鱼店「游戏内指令」在 REST 可用时默认收起。移动端按钮和侧栏导航扩大触控热区，新增 `prefers-reduced-motion` 降级，并清理物品图鉴残留的 10px 字号。
-- v1.43：数据ID 的 Buff 表格补上**图标列**：新增 `components/BuffIcon.tsx` + `lib/buffAtlas.ts`（懒加载 `data/buff-atlas.json` / `.png`，沿用图集的内容哈希 + `no-store` + 尺寸校验三层防护），表格 24×24、详情 96×96。图标来自游戏原图 `Buff_<id>.png`，由新增的 `tools/gen-buff-atlas.py` 生成（400 个 32×32，1022×428，137 KB）。
-- v1.42：数据ID 的代码命名从 **Codex** 统一为 **DataId**（对应页面中文名）：`CodexPage` → `DataIdPage`、`components/codex/CodexViews` → `components/dataid/DataIdViews`、`lib/codexState` → `lib/dataIdState`；`CodexKind` / `CodexState` 与 `read/remember/reset` 函数、i18n 键 `codex.*` / `nav.codex`、`data-testid="codex-*"` 同步改为 `DataId` / `dataId`。页面 tab id `codex` → `dataid`，`App.tsx` 保留 `codex` / `npcs` / `tiles` 旧 id 的兼容映射。行为不变。
-- v1.41：数据ID 新增 **Buff** 页签（`data/buffs.json` + `loc.BuffName`）：表格列 `BuffID / 名称 / 内部名`，与图格 / 墙共用「两列表格」开关与底部翻页器；**不设图标列**（无 Buff 图标集，不用物品图标冒充）；点行开右侧 `Sheet` 详情；最近搜索单独记在 `tswui:buffs:searchHistory`。
-- v1.40：新增 `ui/Drawer.tsx`（**Base UI** 版 shadcn Drawer，项目里唯一的非 radix 组件，原因见「已核实的例外」）：物品详情从右侧 `Sheet` 改为**可堆叠抽屉**——桌面右侧滑入 / 移动端底部滑入（带手柄），在抽屉里点配方材料 / 产物（或提示里的「合成表」）会**再叠一层**，父层缩小变暗留在后面。关闭语义：**× ＝ 关掉整个抽屉**，**「返回」＝ 只关当前这层**（`Esc` / 点遮罩 / 滑走同「返回」）。新增 `action.back`（返回）。
-- v1.39：玩家管理页改为 **tablist**（`Tabs`：查看存档 / 玩家管理，两项**独占一整行**均分宽度；「简约视图」开关在下一行右侧；页内按钮改常规尺寸 `md`，与「物资申请」一致）；「查看存档」公开（不需要登录 / 插件）：导入 `.plr`（含拖拽）+ 角色视图，两个 tab 共用 `components/player/PlayerLookPanel.tsx`；新增「导出图片」（`lib/playerShot.ts` + `lib/playerAvatarDraw.ts`，canvas 重画，不截 DOM）。侧边栏「玩家管理」入口恒在，模块开关只控制「玩家管理」tab。
-- v1.38：数据图鉴改名**数据ID**，NPC / 图格 / 墙 改用 shadcn `Tabs`（`role=tablist`，独占一整行，NPC 分类筛选在下一行）；「两列表格」开关从工具条移到**表格上面一行**。鱼店商品详情：属性标签统一改到**值框上面一行的左上角**（`Field` 竖排）。执行结果富文本字号降到 `text-xs`（12px / `leading-5`），**行内物品图标保持 24px 不变**。
-- v1.37：按 shadcn Critical Rules 做了一次全量核对（styling / forms / composition / icons），只发现零星偏差并修正：
-  物品图鉴的「仅显示图标 / 单列 / 复制含标签」三项与数据图鉴的「两列表格」改为 `Field orientation="horizontal"` + `FieldLabel htmlFor`
-  （不再裸 `<label>` 包 `Checkbox` 再重复写 `aria-label`）；侧栏账号菜单的 `DropdownMenuLabel` 包进 `DropdownMenuGroup`；
-  侧栏拖动条（`SidebarRail`）的中文无障碍名称改由 `AppShell` 传入（新增键 `nav.toggleSidebar`）。
-  审核结论与**刻意保留的例外**（物品提示的游戏原样配色、`ItemTooltip` 的 `z-[100]`、`ui/` 内建英文 `aria-label`、`Card` 自有命名）
-  已记入本文「已核实的例外」，以后不用重复报。
-
-- v1.36：指令结果卡片与指令卡片（首页 / 模块 / 鱼店）：**表头整块可点击**折叠 / 展开（收藏 / 删除按钮除外），标题 / 指令文字可鼠标选中。新增 `hooks/useCollapsed.ts`（`tswui:collapsedCards`）按 key 记忆展开状态，`ResultEntry.collapsed` 随结果持久化；`useBottomList` 补 `ResizeObserver`，容器量高 / 尺寸变化后重新贴底（结果区总是停在最新一条）。新增 `lib/selection.ts` 的 `hasTextSelection()`：选中文字时不折叠。**结果按服务器分开存储**：指令页 `tswui:commandResults` 改为 `serverId -> ResultEntry[]`，内存结果 `CommandResultsProvider` 接收 `serverId` 并按服务器分桶。
-- v1.35：「NPC 图鉴」与「数据 ID」合并为**数据图鉴**（侧边栏「数据图鉴」，`CodexPage`）：同一套网格切换 NPC / 图格 / 墙，翻页器改走物品图鉴底部那套（件数 ｜ 数据版本 + 每页 + `Pagination`），NPC 与图格 / 墙的详情一律改**右侧抽屉**（`Sheet`）。`SearchInput` 的「最近搜索」改为**聚焦不弹、打字才弹**，并新增输入框内的历史按钮（`historyOnFocus` / `historyToggle`），物品图鉴同步生效。
-- v1.34：自定义模块新增「顶部说明」`desc`（设置里与名称 / 主指令一起可编，留空回退默认提示，模块页 `desc` 取它）；「自动执行」控件首页由 `Checkbox` 改为 `Switch`，与模块 / 鱼店管理卡片一致；插件缺失时设置里「统一执行」开关显示为关（保留用户偏好）。新增 `docs/审查-UI一致性与体验.md`（UI 一致性审查 + 业务建议 + 降级矩阵）。
-
-- v1.33：物品图鉴：默认「全部物品」（去掉手气不错 / 换一批）、「分组 + 集合」合并为一个 InputGroup 下拉、tips 悬停延迟 350ms；合成表分区图标固定 531/36/5362、条件图标化（猩红 5533 / 腐化 5532 / 水 206 / 蜂蜜 1128 / 岩浆 207 / 雪 593）、`notDecraftable` 紫色「不微光」标签、制作站前加分割线、条目 hover 右上角浮动复制（含 / 不含 `[i:..]` 标签，两个勾选框移到内容下方居左）。指令：执行按钮改小飞机图标、结果卡片收藏 / 删除与折叠箭头同步 hover、已收藏为实心星（不黄色）。新增 `Badge` 的 `purple` 语义色、`SearchInput` / `CollapseChevron` / `ConfirmButton` / `BatchDeleteControls` / `SelectIndicator` / `useBatchSelect` / `useRovingFocus`。
-- v1.32：卡片表头统一为 `[图标] 标题 [状态] ……………… [刷新] [∨]`：右侧操作按钮**默认隐藏、hover 表头才显、折叠时不显**；折叠箭头移到最右（展开 hover 显、折叠常显）。`CollapseChevron` 新增 `reveal` 参数。首页：最近执行限 5 条；快捷入口改 outline，文本「指令 / 物品图鉴」+ 鱼店 / 玩家管理（仅模块激活）+ 设置；管理卡片：指令换行、自动执行改 `Checkbox`、可见性改 `Switch`、去掉上下箭头。指令：左栏卡片透明无投影、输入框与执行按钮白底（outline）。自定义模块：管理卡片也改右侧 `Sheet`；页面两栏（左卡片 / 右记事本 textarea）。物品图鉴：合成表 / 用于合成 / 微光转换图标 = 531 / 36 / 5362。
-- v1.31：全站折叠箭头统一为 `components/CollapseChevron.tsx`：**展开时箭头在文字右侧、默认隐藏、hover 标题才淡入（向下）；折叠时始终显示（向右）**；触发元素带 `group/title`。应用：`CollapsibleCard`（设置页全部卡片 / 账户）、`CommandCard`（首页 / 鱼店 / 模块指令卡片）、玩家管理分组标题、合成表分区、指令结果卡片、指令右栏整列。新增：设置页激活模块图标尺寸向首页卡片靠齐；HomeCardManager 改**右侧 `Sheet` 抽屉**（标题改「管理卡片」）；首页左栏改**单列 + `min-h-28 max-h-96`**；鱼店/模块指令卡片支持折叠；`ModuleCardManagerDialog` 自定义卡片可**再次编辑**；物品图鉴搜索框加清空按钮（`SearchInput`）；合成表分区图标固定（无 / 22 / 11）且「N 条未显示」可点加载更多、可分解物品在合成表补一条 5362（微光）分解记录；物品详情词缀下拉与 tips 并排（group）；指令收藏去掉小字行、物品 tab 默认展示收藏（点击追加 ID 并从收藏移除）。
-- v1.30：设置页改**两栏**（`xl:grid-cols-[minmax(0,1fr)_360px]`）：左列 = 激活模块，右列 = 界面偏好 / 数据刷新 / 在线授权 / 账户（`WebAccountSection`）；**「统一执行」从「界面偏好」移到「数据刷新」卡片**。
-- v1.29：指令页左列改为**单张 `Card`**（参考鱼店两栏）：整页 `xl:h-[var(--cmd-fill)]` 锁到实测可用高度；卡片内 = 头部（标题 + 清空结果）+ **可滚动结果区**（`ResultPanel` 改 `flex-1 min-h-0 overflow-y-auto`）+ `Separator` + **底部输入框**；去掉原来的 sticky 吸附输入框与 `min-h-[40vh]`。修复：量高 `useLayoutEffect` 依赖 `authenticated`——未登录时先渲染 `LoginGate`、`rootRef` 未挂载，登录后需重新量高，否则卡片高度变窄（刷新才恢复）；鱼店同款问题一并修复。
-- v1.28：指令页右侧 tab 键盘交互 / 布局细节：「指令」与「收藏」搜索框 `↑↓/Enter` 进入列表、列表内 `↑↓` 移动并高亮；指令搜索忽略前导 `/`（`/setup` 可匹配）；「收藏」点击/Enter 即送入左侧输入框（物品追加 ID、指令替换内容）；去掉指令收藏行首图标；「删除」入口移到「清空」左侧，历史在其左侧新增「去重」（保留最新）；四个 tab 搜索框统一为 `SearchInput`（有内容时右边缘出现圆形 ✕）；指令编辑器输入框有内容时也在右边缘显示圆形 ✕。新增 `hooks/useRovingFocus.ts`、`components/SearchInput.tsx`。
-- v1.27：指令页右侧 tab 重构：物品搜索框缩小且边距对齐（键盘上下键高亮当前行）；「指令」tab 去掉收藏星标、搜索框字体缩小；「收藏」tab 改为单行条目 + 可折叠「物品（N）/指令（N）」分区，点选 + Ctrl / ⌘ 点击送入左侧输入框，去掉执行 / 载入 / 逐行删除 / 回车图标；「历史」tab 新增搜索；收藏与历史右上角新增「删除」批量选择（默认不显示逐行删除图标），抽出 `useBatchSelect` / `BatchDeleteControls` / `SelectIndicator`。
-- v1.26：登录框左栏对齐参考图：标题居中（`text-lg`）、登录按钮改**通栏 `size="lg"`**、去掉 `DialogFooter` 深色底（「登录帮助」居中置底、取消按钮只在在线授权等待时出现）；右栏文字改为「WebUI / TShock伴侣」。令牌 / 在线授权下的返回按钮参照「其他登录方式」小区域（分隔行 + 通栏 outline 按钮 `UserRound`），文案统一为「密码登录」、令牌按钮改为「令牌登录」；「登录帮助」移到左下角；修复赋权提示里长命令行按 max-content 撑出左栏、盖到右侧插画的问题（`AlertDescription` + 行容器加 `min-w-0`）；密码登录失败的 403 拆成逐条清单（新增 `login.failedTitle` / `login.failedWhy` / `login.cause.*`），文案改走 i18n（英文界面不再显示后端中文 message）。
-- v1.25：站点 favicon 换成**猛爪手套**物品图标（`web/public/favicon.png`，`tools/gen-brand-assets.py` 由物品图集生成，替换原 shadcn `favicon.svg`）；登录框大屏改**左右两栏**（右侧插画列 + 品牌，小屏隐藏）；「访问令牌 · 在线授权」从文字链改为「其他登录方式」分隔行 + 两个 Alt Line 按钮。
-- v1.23：指令页「收藏 / 历史」统一：行底色统一 `bg-accent/40`；删除统一 `Trash2` + `icon-sm`（历史新增独立文案 `editor.historyRemove`）；收藏空态改用 `Empty`；收藏新增「清空收藏」（物品 + 指令）与说明行；收藏搜索同时过滤物品与指令；指令收藏/历史改为**点行内文字载入编辑器**（`CornerDownLeft` 提示），收藏的 ▶ 禁用时提示原因。新增共享 `ConfirmButton`（就地二次确认，`action.clearConfirm` / `action.cancel`），用于**清空结果 / 清空历史 / 清空收藏 / 清空队列**及首页「恢复默认卡片」。
-- v1.26：物品图鉴工具条改版：**一级模式 `ToggleGroup`（手气不错 / 全部物品 / 制作界面 / ⭐ 收藏）+ `分组` 二级下拉**（收藏与制作界面平级、一键可达）；`ToggleGroupItem` 加 `cursor-pointer`。
-- v1.25：物品详情新增**词缀下拉预览**（伤害/暴击/速度/击退随词缀变化，数据 `data/prefix-mods.json`）；鱼店详情抽屉重排（标题「商品详情」+ 图标/名称居中在下、价格标签在上、右下角 3120 图标点缀、点外关闭）+ 鱼店页面背景点缀（水波光晕 + 淡鱼）。
-- v1.24：物品图鉴详情抽屉在无合成信息时右下角加**半透明工作台插画**；鱼店商品详情由居中 `Dialog` 改为**右侧 `Sheet` 抽屉**（标题栏左图标 + 名称，字段列对齐，点外不关）。
-- v1.23：物品图鉴详情从居中弹框改为**右侧抽屉**（`Sheet`）；合成表图标去掉外框格子、数量改为图标角标（不再有 `×N` 文字）。
-- v1.22：物品图鉴主筛选从 `Select` 改为 **`DropdownMenu`（漏斗 +「筛选」描边按钮 + 菜单）**；左侧新增 ⭐ 收藏开关（`ItemFavoritesProvider`）；物品提示可鼠标滑入/选中文字，右上角 ⭐ 收藏；「物品分组」默认选「工具」并取消「全部」页签；每页新增 360 且跨刷新记忆；`TabsTrigger` 加 `cursor-pointer`。
-- v1.21：物品图鉴筛选收敛为**单个主 `Select` + 上下文控件**（全部物品→「换一批」；物品分组→创意菜单 Tabs；集合分组→第二级集合 `Select`），新增 `ui/Select.tsx`（Radix `@radix-ui/react-select`，分隔线用 `SelectSeparator`）；翻页默认每页 100（`PAGE_SIZE`；选项仍 50 / 100 / 200 / 500）。
-- v1.20：登录框底部改用 `DialogFooter`（AlertDialog 同款底色/分隔线）；「访问令牌 · 在线授权」居左；当前服务器行去掉「服务器」文字，改为图标 + 地址 + 圆点 + 切换图标。
-- v1.19：连通性检测改为每行图标按钮（`Wifi`/`WifiOff`/`LoaderCircle`），放在垃圾桶左边；内置项只有检测按钮。
-- v1.18：后端服务器弹框（`ServerSwitcherDialog`）重做：标题改「后端服务器」；列表显示完整 URL、加逐行连通性圆点；新增默认收起、通栏 outline「添加服务器」按钮且新增不自动切换；支持修改已保存地址；登录框内「访问令牌 / 在线授权 / 服务器、账号卡片」可点元素统一手型。
-- v1.17：登录框修复帮助浮层「点输入框又弹回」的焦点死循环（不抢焦点 / 不还焦点 / outside 关闭）；当前服务器行移到次要登录方式下一行；切换服务器弹框打开时聚焦 IP 输入框。
-- v1.16：登录框「登录帮助」改到底部（取消/登录所在行的左侧）并用 `Popover`（hover / 点击）；「访问令牌 · 在线授权」加醒目；服务器行下移一点；新增 `ui/Popover.tsx`（依赖 `@radix-ui/react-popover`）。
-- v1.15：`ServerSwitcherDialog` 地址行整合为「协议（只读输入框）+ 主机 + 端口」一行，协议由底部「HTTPS」勾选框切换；服务器列表整行（地址 + 垃圾桶）共用背景/hover，去掉横向滚动条（`overflow-x-hidden`）。
-- v1.14：统一「玩家名」术语；服务器地址统一走 `hostPortLabel`（IPv6 加方括号，切换弹框内置项也补上 scheme 标签）；登录框服务器行改为单行。
-- v1.13：登录框简化（默认只看账号密码，次要方式与帮助收起）+ 顶部「当前服务器」行可直接打开切换服务器弹框。
-- v1.12：侧栏账号卡片未登录时，在其上方新增一条登录按钮，点击直接打开登录框。
-- v1.11：侧栏「执行队列」从导航区移到页脚、固定在账号卡片上方（`AppShell` 的 `sidebarExtra` 渲染进 `SidebarFooter`）；去掉与页脚重复的内边距。
-- v1.10：「设置」从侧栏页脚移入导航并固定排在末尾（模块恒在其上）；删除 `SettingsMenu`（含单测）。
-- v1.9：侧栏左上角新增语言 / 主题多状态图标按钮 `QuickPreferences`；主题新增 `auto`（跟随系统 `prefers-color-scheme`），`ThemeName = 'light' | 'dark' | 'auto'`；设置页主题 `ToggleGroup` 同步支持三态。
-- v1.8：新增 `LoginGate`；首页 / 指令 / 指令卡片模块（世界管理 + 自定义）/ 玩家管理 / 鱼店 / 设置未登录时统一为「隐藏内容 + 请先登录！」。
-- v1.7：玩家管理新增角色全身图 `PlayerAvatar`（纯 canvas，不进 shadcn 组件清单）。
-- v1.2：图鉴翻页器改 shadcn `Pagination` + `NativeSelect`；`Button` 补 `data-icon` 尺寸兜底与 `icon/icon-sm`。
-- v1.3：`AppShell` 改 shadcn `Sidebar`（offcanvas）；空格子提示改 shadcn `Tooltip`；登录框改 `Dialog`；全项目 `space-y-*` → `flex flex-col gap-*`；
-  设置页原生 `<select>` 改 `NativeSelect`；新增 `Separator` / `Sheet`。
-- v1.4：补齐缺失的 shadcn 组件（`Spinner` / `Empty` / `Alert` / `Field` / `InputGroup` / `Label` / `Checkbox` / `Slider` / `ToggleGroup`）；
-  新增语义状态色 `success` / `warning` / `info` 并替换 `chart-*` 冒充；列表行 / 折叠 / 拖拽等裸 `<button>` 改 `Button`；
-  分隔线改 `Separator`；登录 / 设置 / 服务器表单改 `Field`；加载态统一 `Spinner`；选项集改 `ToggleGroup`；
-  空态统一 `Empty`；提示统一 `Alert`。
-- v1.5：指令页（`CommandPage`，原 `EditorPage`）重构：右侧拆为 物品 / 指令 / 收藏 / 历史 四个 tab；
-  结果卡片与历史“指令在最左、异常标红、收藏仅限成功结果”；底部输入框去掉多余标题行，补全下拉改为向上展开并把键盘提示收进下拉；
-  物品面板精简（去标题 / 去小字，回车插入 ID）；玩家管理页 `PlayerManagerPage`（原 `PlayersPage`）重命名。
-- v1.6：抽出共享 `CommandCard`（首页 + 鱼店右侧指令卡片复用）；鱼店右侧新增指令卡片列（`FishCommandCards`）；
-  「统一执行」开关从首页搬到设置（`Switch`，`tswui:homeBatch`）；物品图鉴 toolbar/翻页器/详情弹框改版（见 `docs/页面-物品图鉴.md`）；
-  新增 `DialogFooter`（底部操作区，底色比卡片深），物品详情 / 商品详情 的操作按钮移入底部。
+历史变更（v1.2 → v1.53，含组件新增 / 重命名 / 布局改版）见
+[`记录-改版日志.md`](记录-改版日志.md#ui-组件v12--v153)。本文件只写**当前**组件清单与使用约定。

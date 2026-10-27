@@ -1,15 +1,29 @@
-import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
+import { BuffIcon } from '@/components/BuffIcon'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { ItemIcon } from '@/components/ItemIcon'
 import { SlotTooltip } from '@/components/SlotTooltip'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui'
 import { useDataset } from '@/lib/datasetContext'
+import type { Dataset } from '@/types'
 import { PERMANENT_BOOSTS } from '@/lib/playerBoosts'
+import {
+  formatBuffTime,
+  formatPlayTime,
+  formatSaveTime,
+  playerDifficultyKey,
+} from '@/lib/playerPage'
 import { useI18n, type I18n } from '@/lib/i18n'
 import {
   EQUIP_GROUP_A,
@@ -304,7 +318,9 @@ export function LoadoutBlock({
 }) {
   const { t } = useI18n()
   const cols = loadoutColumns(findGroup(groupKey).start)
-  const hasAny = cols.some((c) => sliceGroup(look, c).length > 0)
+  // 注意：`sliceGroup` 永远返回固定长度的窗口（组的大小），**不能**用 `.length > 0` 判断有没有东西，
+  // 否则三块配装即使全空也会一直渲染出来（正是这个 bug，已用单测钉住）。
+  const hasAny = cols.some((c) => countItems(sliceGroup(look, c)) > 0)
   if (!hasAny) return null
   const total = cols.reduce((n, c) => n + countItems(sliceGroup(look, c)), 0)
   return (
@@ -331,6 +347,9 @@ export function LoadoutBlock({
 }
 
 export function PlayerInfoPanel({ look }: { look: PlayerLook }) {
+  /** 研究进度明细弹窗（只有本地存档带 `research` 时可点）。 */
+  const [researchOpen, setResearchOpen] = useState(false)
+  const [researchQuery, setResearchQuery] = useState('')
   const { t } = useI18n()
   const dataset = useDataset()
   // 只显示物品图标（名字交给物品 tooltip），不再重复写文字；未使用/未解锁的变淡。
@@ -344,46 +363,163 @@ export function PlayerInfoPanel({ look }: { look: PlayerLook }) {
     />
   )
   const quests = Number(look.questsCompleted ?? 0)
-  // 属性行：标签走 muted、数值加重并等宽（tabular-nums），拉开「属性 · 属性值」的层次；
-  // 上限 / 单位用 muted 弱化，不再和数值黏成一坨。
-  const attr = (label: string, value: ReactNode) => (
-    <>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium tabular-nums">{value}</dd>
-    </>
-  )
+  const playTime = formatPlayTime(look.playTimeTicks)
+  const savedAt = formatSaveTime(look.lastSaved)
+  // 死亡次数：只有真的死过才显示，免得每份存档都多一行「0 / 0」。
+  const deaths = Number(look.deathsPve ?? 0) + Number(look.deathsPvp ?? 0)
+
+  /**
+   * 属性行：**成对**排两列（生命 / 魔力、模式 / 版本、游戏时间 / 最后保存、Golf / 渔夫任务），
+   * 容器够窄时自动退回一列。只有本地 `.plr` 才有的字段没数据就整行不出现。
+   */
+  const rows: { label: string; value: ReactNode }[] = [
+    {
+      label: t('players.hp'),
+      value: (
+        <>
+          {look.health}
+          <span className="font-normal text-muted-foreground"> / {look.maxHealth}</span>
+        </>
+      ),
+    },
+    {
+      label: t('players.mp'),
+      value: (
+        <>
+          {look.mana}
+          <span className="font-normal text-muted-foreground"> / {look.maxMana}</span>
+        </>
+      ),
+    },
+    ...(look.difficulty != null
+      ? [
+          {
+            label: t('players.difficulty'),
+            value: t(`players.difficulty.${playerDifficultyKey(look.difficulty)}`),
+          },
+        ]
+      : []),
+    ...(look.gameVersion ? [{ label: t('players.version'), value: look.gameVersion }] : []),
+    ...(playTime ? [{ label: t('players.playTime'), value: playTime }] : []),
+    ...(savedAt ? [{ label: t('players.lastSaved'), value: savedAt }] : []),
+    ...(look.golferScore != null ? [{ label: t('players.golf'), value: look.golferScore }] : []),
+    {
+      label: t('players.quests'),
+      value: (
+        <>
+          {quests}
+          <span className="font-normal text-muted-foreground"> {t('players.questsUnit')}</span>
+        </>
+      ),
+    },
+    ...(deaths > 0 ? [{ label: t('players.deaths'), value: deaths }] : []),
+    ...(look.researchedCount != null
+      ? [
+          {
+            label: t('players.research'),
+            value: (
+              <>
+                {look.research && look.research.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setResearchOpen(true)}
+                    className="underline decoration-dotted underline-offset-2 hover:text-primary"
+                    data-testid="players-research-open"
+                  >
+                    {look.researchedCount}
+                  </button>
+                ) : (
+                  look.researchedCount
+                )}
+                <span className="font-normal text-muted-foreground"> {t('players.researchUnit')}</span>
+              </>
+            ),
+          },
+        ]
+      : []),
+    ...(look.spawnX >= 0
+      ? [
+          {
+            label: t('players.spawn'),
+            value: (
+              <>
+                {look.spawnX}, {look.spawnY}
+              </>
+            ),
+          },
+        ]
+      : []),
+  ]
+
   return (
     <div className="flex flex-col gap-2 text-sm text-foreground">
-      <dl className="mt-1 grid w-fit max-w-full grid-cols-[auto_auto] items-baseline gap-x-3 gap-y-1">
-        {attr(
-          t('players.hp'),
-          <>
-            {look.health}
-            <span className="font-normal text-muted-foreground"> / {look.maxHealth}</span>
-          </>,
-        )}
-        {attr(
-          t('players.mp'),
-          <>
-            {look.mana}
-            <span className="font-normal text-muted-foreground"> / {look.maxMana}</span>
-          </>,
-        )}
-        {attr(
-          t('players.quests'),
-          <>
-            {quests}
-            <span className="font-normal text-muted-foreground"> {t('players.questsUnit')}</span>
-          </>,
-        )}
-        {look.spawnX >= 0 && attr(t('players.spawn'), <>{look.spawnX}, {look.spawnY}</>)}
-      </dl>
+      {/* 两列网格用**自身宽度**判断（`@container` + `@[260px]`），不看视口：
+          侧栏展开 / 收起、窗口缩放时都不会把数值挤成两行。 */}
+      <div className="@container mt-1">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 @[260px]:grid-cols-2">
+          {rows.map(({ label, value }) => (
+            <div key={label} className="flex min-w-0 items-baseline gap-2">
+              <dt className="shrink-0 text-muted-foreground">{label}</dt>
+              <dd className="min-w-0 truncate font-medium tabular-nums">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
       {/* 恶魔之心 / 火把神 / 矿车升级 + 7 个消耗品：都归到「永久增强」下；
           容器只有半宽，图标多时自动换行（`flex-wrap`）。 */}
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span className="mr-0.5 text-muted-foreground">{t('players.boost.title')}</span>
         {PERMANENT_BOOSTS.map((b) => itemIcon(b.itemId, look[b.field] === true))}
       </div>
+      {/* 研究进度明细：点「已研究 N 种」打开。持久 ID 与 `data/items.json` 的 `key` 一致，
+          所以不需要额外数据表就能对回物品名。 */}
+      {researchOpen && look.research && (
+        <ResearchDialog
+          entries={look.research}
+          open={researchOpen}
+          query={researchQuery}
+          onQuery={setResearchQuery}
+          onClose={() => setResearchOpen(false)}
+        />
+      )}
+      {/* 重生点：`.plr` 是**按世界分开**存的（世界名 + 坐标）。只在本地存档里出现；
+          导出图片不含这一堆（条目数不定），图片里只带 `/pm/look` 能给的当前重生点。 */}
+      {look.spawns && look.spawns.length > 0 && (
+        <div className="flex flex-col gap-0.5" data-testid="players-spawns">
+          <span className="text-muted-foreground">
+            {t('players.spawns.title')}（{look.spawns.length}）
+          </span>
+          <ul className="flex flex-col gap-0.5 text-2xs text-muted-foreground">
+            {look.spawns.map((spawn) => (
+              <li key={`${spawn.worldId}:${spawn.x}:${spawn.y}`} className="flex min-w-0 gap-2">
+                <span className="min-w-0 truncate">{spawn.world || `#${spawn.worldId}`}</span>
+                <span className="shrink-0 tabular-nums">
+                  {spawn.x}, {spawn.y}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {/* 当前 BUFF：图标 + 剩余时间（名字看图标 tooltip）；没有 BUFF 时整行不显示。 */}
+      {look.buffs && look.buffs.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-muted-foreground">{t('players.buff.title')}</span>
+          {look.buffs.map((buff) => {
+            const name = dataset?.buffsById.get(buff.type)?.name ?? `#${buff.type}`
+            return (
+              <SlotTooltip key={buff.type} label={`${name} · ${formatBuffTime(buff.ticks)}`}>
+                <span className="flex items-center gap-1">
+                  <BuffIcon id={buff.type} size={22} name={name} />
+                  <span className="text-2xs tabular-nums text-muted-foreground">
+                    {formatBuffTime(buff.ticks)}
+                  </span>
+                </span>
+              </SlotTooltip>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -447,3 +583,88 @@ function Slot({
 
   return tipLabel ? <SlotTooltip label={tipLabel}>{frame}</SlotTooltip> : frame
 }
+
+/**
+ * 研究进度明细弹窗：按「物品名 / 内部键名」搜索，列出「物品 × 已研究数量」。
+ *
+ * `persistentId` 就是物品的内部键名（`data/items.json` 的 `key`），与游戏
+ * `ContentSamples.ItemPersistentIdsByNetIds` 完全一致（已用 GameDump 导出对过 6161 条，0 不一致）。
+ */
+function ResearchDialog({
+  entries,
+  open,
+  query,
+  onQuery,
+  onClose,
+}: {
+  entries: { persistentId: string; count: number }[]
+  open: boolean
+  query: string
+  onQuery: (next: string) => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const dataset = useDataset()
+  // 内部键名 → 物品（一次建表；8195 件物品量级可忽略）
+  const byKey = useMemo(() => {
+    const map = new Map<string, PlayerItemIconItem>()
+    for (const item of dataset?.items ?? []) map.set(item.key, item)
+    return map
+  }, [dataset])
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? entries.filter(
+        (e) =>
+          e.persistentId.toLowerCase().includes(q) ||
+          (byKey.get(e.persistentId)?.name ?? '').toLowerCase().includes(q),
+      )
+    : entries
+  const shown = filtered.slice(0, 300)
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t('players.research.title')}</DialogTitle>
+          <DialogDescription>
+            {t('players.research.desc', { n: entries.length })}
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder={t('players.research.search')}
+          aria-label={t('players.research.search')}
+        />
+        <p className="text-2xs text-muted-foreground tabular-nums">
+          {t('players.research.matched', { n: filtered.length, total: entries.length })}
+        </p>
+        <ul className="flex max-h-[50vh] flex-col gap-0.5 overflow-y-auto" data-testid="players-research-list">
+          {shown.map((entry) => {
+            const item = byKey.get(entry.persistentId)
+            return (
+              <li key={entry.persistentId} className="flex items-center gap-2 text-sm">
+                {item ? (
+                  <ItemIcon item={item} atlas={dataset?.atlas} size={20} />
+                ) : (
+                  <span className="size-5 shrink-0 rounded bg-muted" aria-hidden />
+                )}
+                <span className="min-w-0 truncate">{item?.name ?? entry.persistentId}</span>
+                <span className="ml-auto shrink-0 text-2xs text-muted-foreground tabular-nums">
+                  ×{entry.count}
+                </span>
+              </li>
+            )
+          })}
+          {shown.length === 0 && (
+            <li className="px-1 py-3 text-center text-sm text-muted-foreground">
+              {t('players.research.none')}
+            </li>
+          )}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** `ResearchDialog` 只需要图标 + 名字这两个字段。 */
+type PlayerItemIconItem = Dataset['items'][number]

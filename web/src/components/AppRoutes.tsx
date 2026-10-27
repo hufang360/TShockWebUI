@@ -238,6 +238,7 @@ export function AppRoutes({
           title={t('nav.world')}
           desc={t('page.world.desc')}
           fixedCards={MODULE_BY_ID.get('world')?.cards}
+          pluginName={MODULE_BY_ID.get('world')?.pluginName}
         />
       )}
       {customModules

@@ -154,6 +154,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			s.writePluginError(ctx, w, &sess, client, tshock.CapEventsHistory, err)
 			return
 		}
+		s.observeEventsInstance(client, page)
 		writeJSON(w, http.StatusOK, page)
 		return
 	}
@@ -166,7 +167,19 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		s.writePluginError(ctx, w, &sess, client, tshock.CapEvents, err)
 		return
 	}
+	s.observeEventsInstance(client, page)
 	writeJSON(w, http.StatusOK, page)
+}
+
+// observeEventsInstance 把非流式端点看到的实例身份告诉 hub：
+// 同地址换服时作废旧缓存，并让正在看 SSE 的页面重新同步。
+func (s *Server) observeEventsInstance(client *tshock.Client, page *tshock.EventsPage) {
+	if page == nil || page.Instance == "" {
+		return
+	}
+	if s.hubFor(client).observeInstance(page.Instance) {
+		s.invalidateFeedCaches(client.BaseURL())
+	}
 }
 
 // eventsTail 取最新 N 条：新插件直接 tail；旧插件拉一页后取尾部。
@@ -234,6 +247,12 @@ func (s *Server) handleEventsStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hub := s.hubFor(client)
+	// 建连时先看一次实例：同一个地址 / 端口后面换了服时，旧事件 / 世界状态都不再属于当前服，
+	// 直接发一帧 reset 让前端重同步，不再下发旧实例的 first / backlog。
+	reset := hub.observeInstance(first.Instance)
+	if reset {
+		s.invalidateFeedCaches(client.BaseURL())
+	}
 	sub := hub.subscribe(sess.TShockToken)
 	defer hub.unsubscribe(sub)
 
@@ -249,6 +268,9 @@ func (s *Server) handleEventsStream(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, "retry: 3000\n\n")
 
 	lastSeq := since
+	if reset {
+		lastSeq = 0
+	}
 	writeMessage := func(e tshock.ServerEvent) {
 		if e.Seq <= lastSeq {
 			return
@@ -256,15 +278,19 @@ func (s *Server) handleEventsStream(w http.ResponseWriter, r *http.Request) {
 		writeSSE(w, e.Seq, "message", e)
 		lastSeq = e.Seq
 	}
-	// 建连那一次的结果 + hub 缓存的增量（重连 / 多标签时补齐缺口）。
-	for _, e := range first.Events {
-		writeMessage(e)
-	}
-	for _, e := range hub.backlog(lastSeq) {
-		writeMessage(e)
-	}
-	if info := hub.world(30 * time.Second); info != nil {
-		writeSSE(w, 0, "world", info)
+	if reset {
+		writeSSE(w, 0, "reset", map[string]string{"instance": first.Instance})
+	} else {
+		// 建连那一次的结果 + hub 缓存的增量（重连 / 多标签时补齐缺口）。
+		for _, e := range first.Events {
+			writeMessage(e)
+		}
+		for _, e := range hub.backlog(lastSeq) {
+			writeMessage(e)
+		}
+		if info := hub.world(30 * time.Second); info != nil {
+			writeSSE(w, 0, "world", info)
+		}
 	}
 	_ = rc.Flush()
 
@@ -282,6 +308,12 @@ func (s *Server) handleEventsStream(w http.ResponseWriter, r *http.Request) {
 				if ev.world != nil {
 					writeSSE(w, 0, "world", ev.world)
 				}
+			case feedReset:
+				// 换了实例：前端清空列表后重拉；本连接从新实例的 seq 0 重新计。
+				// 旧实例的帧一定排在这一帧之前（同一个通道、顺序写入），客户端收到 reset 就清空，
+				// 所以这里不需要丢弃任何帧 —— 丢后面的反而会把新实例的事件弄丢。
+				lastSeq = 0
+				writeSSE(w, 0, "reset", map[string]string{"instance": ev.instance})
 			case feedError:
 				writeSSEError(w, ev.code, "事件流已失效")
 				_ = rc.Flush()

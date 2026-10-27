@@ -119,6 +119,7 @@ export function EventsCard({
   events,
   extra,
   refreshedAt,
+  switchedAt,
   eventsPlugin,
   dataset,
   onRefresh,
@@ -127,6 +128,8 @@ export function EventsCard({
   events: ComponentProps<typeof ServerFeedList>['events']
   extra: ComponentProps<typeof ServerFeedList>['extra']
   refreshedAt: number | null
+  /** 最近一次「上游换了服」的时间戳（短暂提示）。 */
+  switchedAt: number | null
   /** 信使插件可用性；false = 未安装（隐藏「查看全部」）。 */
   eventsPlugin: boolean | null
   dataset: Dataset
@@ -174,6 +177,7 @@ export function EventsCard({
           events={events}
           extra={extra}
           refreshedAt={refreshedAt}
+          switchedAt={switchedAt}
           limit={6}
           emptyText={t('home.eventsEmpty')}
           itemsById={dataset.itemsById}

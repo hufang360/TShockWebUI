@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react'
-import { Download, Camera, Rows3, Upload } from 'lucide-react'
+import { Download, Camera, Pencil, Rows3, Sparkles, Upload } from 'lucide-react'
+import { ConfirmButton } from '@/components/ConfirmButton'
 import { IconAction } from '@/components/IconAction'
+import { PlrEditPanel } from '@/components/player/PlrEditPanel'
 import { PlayerLookPanel } from '@/components/player/PlayerLookPanel'
 import { TopBarActions } from '@/components/TopBar'
 import {
@@ -20,9 +22,19 @@ import { useLocalState } from '@/hooks/useLocalState'
 import { usePlayerShot } from '@/hooks/usePlayerShot'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
-import { cacheFor } from '@/lib/playerPage'
+import { loadItemLimits, type ItemLimits } from '@/lib/itemLimits'
+import { cacheFor, downloadBlob, loadDemoPlrFile } from '@/lib/playerPage'
 import { SaveFormatError } from '@/lib/save/bytes'
-import { parsePlrFile } from '@/lib/save/plr'
+import { parsePlr, parsePlrFile, type PlrPlayer, type PlrTrack } from '@/lib/save/plr'
+import {
+  buildPlrEdits,
+  draftFromPlayer,
+  isDraftDirty,
+  validatePlrDraft,
+  type PlrEditDraft,
+  type PlrItemCatalog,
+} from '@/lib/save/plrEdit'
+import { applyPlrEdits } from '@/lib/save/plrWrite'
 import { StorageKeys } from '@/lib/storage'
 import type { BackendTransport, PlayerLook } from '@/lib/tshock'
 
@@ -62,7 +74,19 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
   const [saveFile, setSaveFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const { shooting, runShot } = usePlayerShot(dataset, setError)
+
+  /** 编辑态：原始字节 + 偏移表 + 解析结果 + 草稿（`null` = 只读）。 */
+  const [edit, setEdit] = useState<{
+    bytes: Uint8Array
+    player: PlrPlayer
+    track: PlrTrack
+    draft: PlrEditDraft
+  } | null>(null)
+  /** 物品数量 / 禁入背包规则（进入编辑态时懒加载）。 */
+  const [limits, setLimits] = useState<ItemLimits | null>(null)
+  const [limitsFailed, setLimitsFailed] = useState(false)
 
   /** 在本机解析 .plr（不上传）：解密 + 读字段都在浏览器里完成，结果只用于展示。 */
   const runImport = useCallback(
@@ -73,6 +97,8 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
         const result = parsePlrFile(new Uint8Array(await file.arrayBuffer()))
         setSaveFile(file)
         setSaveLook(result)
+        setEdit(null)
+        setNotice(null)
         const c = cacheFor(transport)
         c.set(serverId, { ...c.get(serverId), saveLook: result })
       } catch (err) {
@@ -83,6 +109,80 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
     },
     [transport, serverId, t],
   )
+
+  /** 来个 Demo：取自带的那份角色存档（同样是本地解析，不经过任何接口）。 */
+  const runDemo = useCallback(async () => {
+    setError(null)
+    try {
+      await runImport(await loadDemoPlrFile())
+    } catch {
+      setError(t('players.err.demoFailed'))
+    }
+  }, [runImport, t])
+
+  /** 进入编辑态：拿原始字节 → 解析（顺带记录偏移表）→ 生成草稿。 */
+  const startEdit = useCallback(async () => {
+    if (!saveFile) return
+    setError(null)
+    setNotice(null)
+    try {
+      const bytes = new Uint8Array(await saveFile.arrayBuffer())
+      const track: PlrTrack = { release: 0, boosts: {}, inventory: [], equipment: {}, storage: {}, loadouts: [] }
+      const player = parsePlr(bytes, track)
+      setEdit({ bytes, player, track, draft: draftFromPlayer(player, track) })
+      if (!limits) {
+        try {
+          setLimits(await loadItemLimits())
+          setLimitsFailed(false)
+        } catch {
+          setLimitsFailed(true)
+        }
+      }
+    } catch (err) {
+      setError(err instanceof SaveFormatError ? err.message : t('save.err.readFailed'))
+    }
+  }, [saveFile, limits, t])
+
+  /** 校验用的物品目录：id 是否存在（dataset）+ 堆叠上限 / 禁入名单（item-limits.json）。 */
+  const catalog: PlrItemCatalog = {
+    hasItem: (id) => dataset?.itemsById.has(id) ?? false,
+    maxStack: (id) => limits?.maxStackById.get(id),
+    blocked: (id) => limits?.noInventory.has(id) ?? false,
+    prefixes: (id) => dataset?.rollablePrefixesById.get(id),
+  }
+  const issues = edit ? validatePlrDraft(edit.draft, { catalog, original: edit.player }) : []
+  const dirty = edit ? isDraftDirty(edit.player, edit.track, edit.draft) : false
+  // `limits` 没就绪时不能保存：堆叠上限 / 禁入背包名单都在里面，缺了校验就会「写进去被游戏截断」。
+  // （`limitsFailed` 另外单独拦：加载失败时同样不允许存。）
+  const canSave = Boolean(edit) && issues.length === 0 && !limitsFailed && limits != null
+
+  /** 保存：生成新字节 → 下载 → 用**重新解析的结果**刷新预览（保证看到的就是写出去的）。 */
+  const saveEdit = () => {
+    if (!edit || !saveFile || !canSave) return
+    const edits = buildPlrEdits(edit.player, edit.track, edit.draft)
+    if (Object.keys(edits).length === 0) {
+      setNotice(t('save.edit.noChange'))
+      setEdit(null)
+      return
+    }
+    try {
+      const out = applyPlrEdits(edit.bytes, edit.track, edits)
+      const name = saveFile.name || 'player.plr'
+      const payload = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer
+      downloadBlob(new Blob([payload], { type: 'application/octet-stream' }), name)
+      const file = new File([payload], name, { type: 'application/octet-stream' })
+      const look = parsePlrFile(out)
+      setSaveFile(file)
+      setSaveLook(look)
+      const c = cacheFor(transport)
+      c.set(serverId, { ...c.get(serverId), saveLook: look })
+      setEdit(null)
+      setError(null)
+      setNotice(t('save.edit.saved'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('save.err.readFailed'))
+    }
+  }
 
   const pickImport = () => importRef.current?.click()
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -128,7 +228,7 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
       onDrop={onDrop}
       data-testid="players-save-drop"
     >
-      {saveLook && (
+      {saveLook && !edit && (
         <TopBarActions>
           <IconAction
             label={t('players.shot')}
@@ -148,21 +248,69 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
 
       <Card>
         <CardBody className="flex flex-wrap items-center gap-3 pt-2">
-          <Button variant="primary" disabled={busy} onClick={pickImport}>
-            {importing ? (
-              <Spinner aria-hidden data-icon="inline-start" />
-            ) : (
-              <Upload data-icon="inline-start" />
-            )}
-            {t('players.import')}
-          </Button>
-          {saveFile && (
-            <Button variant="outline" disabled={busy} onClick={exportPlr}>
-              <Download data-icon="inline-start" />
-              {t('players.exportPlr')}
-            </Button>
+          {edit ? (
+            <>
+              <Button variant="primary" disabled={!canSave} onClick={saveEdit}>
+                <Download data-icon="inline-start" />
+                {t('save.edit.save')}
+              </Button>
+              {dirty ? (
+                <ConfirmButton
+                  size="md"
+                  variant="outline"
+                  confirmLabel={t('save.edit.discardConfirm')}
+                  confirmVariant="danger"
+                  onConfirm={() => {
+                    setEdit(null)
+                    setNotice(null)
+                  }}
+                >
+                  {t('save.edit.discard')}
+                </ConfirmButton>
+              ) : (
+                <Button variant="outline" onClick={() => setEdit(null)}>
+                  {t('save.edit.discard')}
+                </Button>
+              )}
+              <p className="min-w-0 flex-1 text-2xs text-muted-foreground">
+                {issues.length > 0
+                  ? t('save.edit.err.int')
+                  : limitsFailed
+                    ? t('save.edit.err.noLimits')
+                    : t('save.edit.notice')}
+              </p>
+            </>
+          ) : (
+            <>
+              <Button variant="primary" disabled={busy} onClick={pickImport}>
+                {importing ? (
+                  <Spinner aria-hidden data-icon="inline-start" />
+                ) : (
+                  <Upload data-icon="inline-start" />
+                )}
+                {t('players.import')}
+              </Button>
+              <Button variant="outline" disabled={busy} onClick={() => void runDemo()}>
+                <Sparkles data-icon="inline-start" />
+                {t('players.demo')}
+              </Button>
+              {saveFile && (
+                <Button variant="outline" disabled={busy} onClick={exportPlr}>
+                  <Download data-icon="inline-start" />
+                  {t('players.exportPlr')}
+                </Button>
+              )}
+              {saveFile && saveLook && dataset && (
+                <Button variant="outline" disabled={busy} onClick={() => void startEdit()}>
+                  <Pencil data-icon="inline-start" />
+                  {t('save.edit')}
+                </Button>
+              )}
+              <p className="min-w-0 flex-1 text-2xs text-muted-foreground">
+                {t('players.saveHint')}
+              </p>
+            </>
           )}
-          <p className="min-w-0 flex-1 text-2xs text-muted-foreground">{t('players.saveHint')}</p>
           {fileInput}
         </CardBody>
       </Card>
@@ -173,7 +321,33 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
         </Alert>
       )}
 
-      {saveLook ? (
+      {notice && !error && (
+        <Alert variant="info">
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      )}
+
+      {edit && limitsFailed && (
+        <Alert variant="destructive">
+          <AlertDescription>{t('save.edit.err.noLimits')}</AlertDescription>
+        </Alert>
+      )}
+
+      {edit ? (
+        <>
+          <Alert variant="info">
+            <AlertDescription>{t('save.edit.sscc')}</AlertDescription>
+          </Alert>
+          <PlrEditPanel
+            player={edit.player}
+            track={edit.track}
+            draft={edit.draft}
+            issues={issues}
+            limits={limits}
+            onChange={(draft) => setEdit((prev) => (prev ? { ...prev, draft } : prev))}
+          />
+        </>
+      ) : saveLook ? (
         <PlayerLookPanel
           look={saveLook}
           imported

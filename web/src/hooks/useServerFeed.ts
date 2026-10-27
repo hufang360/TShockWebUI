@@ -24,6 +24,11 @@ export interface ServerFeedState {
   available: boolean | null
   /** 上次成功刷新的本地时间戳；未刷新过为 null。 */
   refreshedAt: number | null
+  /**
+   * 最近一次「上游换了服」的本地时间戳（同一个地址 / 端口下换了另一个服）；
+   * 没发生过为 null。界面据此显示一小会儿提示，然后自行消失。
+   */
+  switchedAt: number | null
   /** 手动立即刷新一次（如发言成功后）。 */
   refresh: () => void
 }
@@ -49,15 +54,31 @@ export function useServerFeed(opts: {
   refreshInterval: number
   /** 外部触发刷新：数值变化即刷新一次（不重置已有事件）。 */
   refreshToken?: number
+  /**
+   * 登录态失效（token / 会话）时走统一的重新登录流程（AGENTS.md：任何 403 都回登录）。
+   * 不传则按瞬时错误重试。
+   */
+  onTokenInvalid?: () => Promise<boolean>
 }): ServerFeedState {
-  const { transport, authenticated, serverId, maxEvents = 20, refreshInterval, refreshToken } = opts
+  const {
+    transport,
+    authenticated,
+    serverId,
+    maxEvents = 20,
+    refreshInterval,
+    refreshToken,
+    onTokenInvalid,
+  } = opts
   const [events, setEvents] = useState<ServerEvent[]>([])
   const [extra, setExtra] = useState<ServerInfoExtra | null>(null)
   const [available, setAvailable] = useState<boolean | null>(null)
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null)
+  const [switchedAt, setSwitchedAt] = useState<number | null>(null)
   const lastSeqRef = useRef(0)
   // 是否已经拉过一次「最近 N 条」历史；避免 lastSeq=0 时每次都重新 tail。
   const historyLoadedRef = useRef(false)
+  // 上游事件库的实例标识（同一个地址 / 端口后面可能换了另一个服）。
+  const instanceRef = useRef('')
   const refreshRef = useRef<() => void>(() => {})
 
   useEffect(() => {
@@ -67,8 +88,10 @@ export function useServerFeed(opts: {
       setEvents((prev) => (prev.length === 0 ? prev : []))
       setAvailable((prev) => (prev === null ? prev : null))
       setRefreshedAt((prev) => (prev === null ? prev : null))
+      setSwitchedAt((prev) => (prev === null ? prev : null))
       lastSeqRef.current = 0
       historyLoadedRef.current = false
+      instanceRef.current = ''
     }
     if (!authenticated) {
       reset()
@@ -81,6 +104,23 @@ export function useServerFeed(opts: {
     let closeStream: (() => void) | null = null
     // SSE 失败后的冷却：避免后端不支持流式时每次 tick 都重试造成紧凑循环。
     let streamCooldownUntil = 0
+    // 本次挂载是否已经拉起过重新登录（避免登录框被反复顶掉）。
+    let authRequested = false
+    const isAuthError = (err: unknown) =>
+      err instanceof TshockRequestError && (err.kind === 'auth' || err.kind === 'token')
+    /**
+     * 登录态失效 → 拉起重新登录；返回 true 表示「已按登录态失效处理，不要再重试」。
+     * 不 await 登录结果：登录成功后 `authenticated` 变化会让本 effect 重建并重新拉取；
+     * 用户取消登录则保持未登录态（本 effect 随 authenticated=false 卸载）。
+     */
+    const requestReauth = (err: unknown): boolean => {
+      if (!isAuthError(err) || !onTokenInvalid) return false
+      if (!authRequested) {
+        authRequested = true
+        void onTokenInvalid().catch(() => {})
+      }
+      return true
+    }
     // 切换服务器 / 重新登录：清空上一条流，避免把两个服务器的事件拼在一起。
     reset()
 
@@ -92,6 +132,27 @@ export function useServerFeed(opts: {
         const deduped = merged.filter((e, i) => i === 0 || e.seq !== merged[i - 1].seq)
         return deduped.length > maxEvents ? deduped.slice(-maxEvents) : deduped
       })
+    }
+
+    /**
+     * 上游换了实例（同一地址 / 端口后面换成另一个服）：
+     * 手上的事件 / 世界状态都属于旧服，**静默作废并重拉**（不弹错误）。
+     */
+    const handleInstanceReset = () => {
+      lastSeqRef.current = 0
+      historyLoadedRef.current = false
+      setEvents((prev) => (prev.length === 0 ? prev : []))
+      setExtra((prev) => (prev === null ? prev : null))
+      setSwitchedAt(Date.now())
+      refreshRef.current()
+    }
+
+    /** 响应的实例标识与手头不同 → 需要重同步（首次看到只记录）。 */
+    const instanceChanged = (instance?: string) => {
+      if (!instance || instance === instanceRef.current) return false
+      const first = instanceRef.current === ''
+      instanceRef.current = instance
+      return !first
     }
 
     const schedule = (ms: number) => {
@@ -110,11 +171,13 @@ export function useServerFeed(opts: {
             mergeEvents([e])
             setRefreshedAt(Date.now())
           },
-          onError: () => {
+          onError: (err) => {
             if (cancelled) return
             closeStream?.()
             closeStream = null
             streamCooldownUntil = Date.now() + 60000
+            // 登录态失效：交给统一登录流程，别用轮询反复撞 403。
+            if (requestReauth(err)) return
             // 立刻用轮询补一次，别等一个刷新间隔。
             refreshRef.current()
           },
@@ -124,6 +187,13 @@ export function useServerFeed(opts: {
             setExtra(info)
             setAvailable(true)
             setRefreshedAt(Date.now())
+          },
+          onReset: (instance) => {
+            if (cancelled) return
+            closeStream?.()
+            closeStream = null
+            if (instance) instanceRef.current = instance
+            handleInstanceReset()
           },
         },
         lastSeqRef.current,
@@ -152,6 +222,11 @@ export function useServerFeed(opts: {
             // 打开页面先看最近 N 条（新插件 = 磁盘历史；旧插件后端会自动降级取尾部）。
             const page = await transport.eventsTail(maxEvents)
             if (cancelled) return
+            if (instanceChanged(page.instance)) {
+              // 已经是另一个服的历史：丢掉旧列表，立刻按新实例重拉。
+              handleInstanceReset()
+              return
+            }
             lastSeqRef.current = page.lastSeq
             historyLoadedRef.current = true
             mergeEvents(page.events.slice(-maxEvents))
@@ -161,6 +236,11 @@ export function useServerFeed(opts: {
               Math.max(maxEvents, EVENTS_FETCH_MIN),
             )
             if (cancelled) return
+            // 新插件：实例标识变化即换服；旧插件（无 instance）退回「seq 回退」判定。
+            if (instanceChanged(page.instance) || page.lastSeq < lastSeqRef.current) {
+              handleInstanceReset()
+              return
+            }
             lastSeqRef.current = page.lastSeq
             mergeEvents(page.events)
           }
@@ -176,6 +256,8 @@ export function useServerFeed(opts: {
           setExtra(null)
           // 插件可能稍后才装 / 后端二进制过期：**不要永久停摆**，慢速重试直到恢复。
           schedule(MISSING_RETRY_MS)
+        } else if (requestReauth(err)) {
+          // 已拉起重新登录：等登录成功（authenticated 变化）后本 effect 重建并重拉。
         } else {
           // 瞬时错误（超时 / 服务不可用）：按正常间隔重试，避免卡死。
           schedule(refreshInterval)
@@ -210,7 +292,7 @@ export function useServerFeed(opts: {
       closeStream?.()
       closeStream = null
     }
-  }, [authenticated, transport, serverId, maxEvents, refreshInterval])
+  }, [authenticated, transport, serverId, maxEvents, refreshInterval, onTokenInvalid])
 
   // 页面数据刷新间隔触发 → 连带刷新服务器动态（不重置已有事件）。
   const lastTokenRef = useRef(refreshToken ?? 0)
@@ -221,5 +303,5 @@ export function useServerFeed(opts: {
     refreshRef.current()
   }, [refreshToken])
 
-  return { events, extra, available, refreshedAt, refresh: () => refreshRef.current() }
+  return { events, extra, available, refreshedAt, switchedAt, refresh: () => refreshRef.current() }
 }

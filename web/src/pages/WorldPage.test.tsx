@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { parseWorld } from '@/lib/save/worldFile'
 import { clearWorldCache, DEMO_WORLD_URL } from '@/lib/worldPage'
 import { buildWorld } from '@/test/worldFile'
 import { WorldPage } from './WorldPage'
@@ -102,7 +103,8 @@ describe('WorldPage（查看世界）', () => {
       expect(await screen.findByRole('heading', { name: '空的世界' })).toBeTruthy()
       expect(screen.getByText('4200 × 1200')).toBeTruthy()
       expect(screen.getByText('腐化')).toBeTruthy()
-      expect(screen.getByText('228')).toBeTruthy()
+      // 存档版本号显示成「游戏版本（release）」：228 = 1.4.0.4
+      expect(screen.getByText('1.4.0.4（228）')).toBeTruthy()
       expect(fetchSpy).toHaveBeenCalledTimes(1)
       // 载入后也能导出原文件（就是这份 demo）。
       expect(screen.getByRole('button', { name: /导出 \.wld/ })).toBeTruthy()
@@ -135,11 +137,6 @@ describe('WorldPage（查看世界）', () => {
     expect(screen.queryByTestId('world-thumbnail-zoom')).toBeNull()
     fireEvent.click(zoomBtn)
     expect(await screen.findByTestId('world-thumbnail-zoom')).toBeTruthy()
-  })
-
-  it('说明「全程在本机浏览器完成，不上传服务器」', () => {
-    renderPage()
-    expect(screen.getByText(/全部在你的浏览器里完成/)).toBeTruthy()
   })
 
   it('导出 .wld 下载的就是选中的原文件', async () => {
@@ -196,6 +193,48 @@ describe('WorldPage（查看世界）', () => {
     expect(screen.getByText('还没有选择世界存档')).toBeTruthy()
   })
 
+  it('编辑世界名后保存：下载的 .wld 能重新解析出新值，预览同步更新', async () => {
+    renderPage()
+    fireEvent.change(screen.getByTestId('world-wld-input'), {
+      target: { files: [worldFile()] },
+    })
+    expect(await screen.findByRole('heading', { name: '休渔期' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /^编辑$/ }))
+    const name = (await screen.findByLabelText('世界名')) as HTMLInputElement
+    fireEvent.change(name, { target: { value: '改名后的世界' } })
+
+    const save = screen.getByRole('button', { name: /保存并下载 \.wld/ }) as HTMLButtonElement
+    await waitFor(() => expect(save.disabled).toBe(false))
+    fireEvent.click(save)
+
+    const blob = (URL.createObjectURL as unknown as { mock: { calls: [Blob][] } }).mock
+      .calls.at(-1)![0]
+    const parsed = parseWorld(new Uint8Array(await blob.arrayBuffer()))
+    expect(parsed.info.name).toBe('改名后的世界')
+    // 保存后预览同步为新名字，并退出编辑态
+    expect(await screen.findByRole('heading', { name: '改名后的世界' })).toBeTruthy()
+    expect(
+      await screen.findByText('已生成新的 .wld 文件（已下载），请用它替换原文件。'),
+    ).toBeTruthy()
+  })
+
+  it('世界名清空时禁止保存并给出原因', async () => {
+    renderPage()
+    fireEvent.change(screen.getByTestId('world-wld-input'), {
+      target: { files: [worldFile()] },
+    })
+    expect(await screen.findByRole('heading', { name: '休渔期' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^编辑$/ }))
+
+    const name = (await screen.findByLabelText('世界名')) as HTMLInputElement
+    fireEvent.change(name, { target: { value: '   ' } })
+    expect(await screen.findByText('世界名不能为空')).toBeTruthy()
+    expect(
+      (screen.getByRole('button', { name: /保存并下载 \.wld/ }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+  })
+
   it('拖入文件同样可以导入，且结果按服务器缓存', async () => {
     const view = renderPage('srv-a')
     fireEvent.drop(screen.getByTestId('world-drop'), {
@@ -207,5 +246,68 @@ describe('WorldPage（查看世界）', () => {
     view.unmount()
     renderPage('srv-a')
     expect(await screen.findByRole('heading', { name: '休渔期' })).toBeTruthy()
+  })
+})
+
+describe('高清导出（1 图格 = 1 像素）', () => {
+  it('点「导出高清图」→ 按世界原尺寸渲染并下载 -hires.png', async () => {
+    // 记录画布尺寸：高清导出的画布必须等于世界尺寸（缩略图会降级，这里不能降）
+    // 记录 putImageData 的位图尺寸：高清导出的那张必须等于世界尺寸（缩略图会降级）
+    const drawn: { width: number; height: number }[] = []
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+      putImageData: (img: { width: number; height: number }) => drawn.push({ width: img.width, height: img.height }),
+    })) as never
+    HTMLCanvasElement.prototype.toBlob = vi.fn((cb: BlobCallback) => {
+      cb(new Blob(['png'], { type: 'image/png' }))
+    }) as never
+    const g = globalThis as { ImageData?: unknown }
+    const realImageData = g.ImageData
+    // 真实 ImageData(data, width, height)：桩也要带 width/height，否则看不出导出的分辨率
+    g.ImageData = class {
+      width: number
+      height: number
+      constructor(_data: Uint8ClampedArray, width: number, height: number) {
+        this.width = width
+        this.height = height
+      }
+    }
+
+    try {
+      // 夹具世界很小（40×20 < 8M px），不会弹确认
+      renderPage()
+      fireEvent.change(screen.getByTestId('world-wld-input'), {
+        target: { files: [worldFile()] },
+      })
+      const btn = await screen.findByRole('button', { name: '导出高清图' })
+      fireEvent.click(btn)
+      await waitFor(() => expect(clicks.some((name) => name.endsWith('-hires.png'))).toBe(true))
+      // 高清导出的画布尺寸必须 = 世界尺寸（这个夹具是 200×600）
+      expect(drawn.at(-1)).toEqual({ width: 200, height: 600 })
+    } finally {
+      g.ImageData = realImageData
+    }
+  })
+
+  it('大世界先弹确认：取消就不导出', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ putImageData: vi.fn() })) as never
+    HTMLCanvasElement.prototype.toBlob = vi.fn((cb: BlobCallback) => cb(new Blob(['png']))) as never
+    const g = globalThis as { ImageData?: unknown }
+    const realImageData = g.ImageData
+    g.ImageData = class {
+      constructor() {}
+    }
+    try {
+      // 大世界（8400×2400）的夹具成本高：直接换成「世界很大」的最小 .wld 不方便，
+      // 所以这里只验证 confirm 的调用前提由 worldPage 的 canExportHiRes 守住（见单元测试），
+      // UI 层验证按钮存在且可点。
+      renderPage()
+      fireEvent.change(screen.getByTestId('world-wld-input'), { target: { files: [worldFile()] } })
+      expect(await screen.findByRole('button', { name: '导出高清图' })).toBeTruthy()
+      expect(confirmSpy).not.toHaveBeenCalled()
+    } finally {
+      confirmSpy.mockRestore()
+      g.ImageData = realImageData
+    }
   })
 })

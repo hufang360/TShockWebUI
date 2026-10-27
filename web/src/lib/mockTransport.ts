@@ -40,6 +40,9 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export const MOCK_PLAYERS = ['Alice', 'Bob', 'Steve', '小美', 'Alex']
 
+/** Mock 的事件库实例标识（固定值，避免被当成「换服」而反复重拉）。 */
+const MOCK_INSTANCE = 'mock'
+
 export class MockTransport implements BackendTransport {
   readonly mock = true
   readonly label = 'Mock（演示，未连接真实服务器）'
@@ -185,13 +188,22 @@ export class MockTransport implements BackendTransport {
 
   async events(since = 0): Promise<EventsPage> {
     await delay(90)
-    return { events: this.#mockEvents.filter((e) => e.seq > since), lastSeq: this.#mockSeq }
+    return {
+      events: this.#mockEvents.filter((e) => e.seq > since),
+      lastSeq: this.#mockSeq,
+      instance: MOCK_INSTANCE,
+    }
   }
 
   async eventsTail(limit = 100): Promise<EventsPage> {
     await delay(80)
     const events = this.#mockEvents.slice(-limit)
-    return { events, firstSeq: events[0]?.seq ?? 0, lastSeq: this.#mockSeq }
+    return {
+      events,
+      firstSeq: events[0]?.seq ?? 0,
+      lastSeq: this.#mockSeq,
+      instance: MOCK_INSTANCE,
+    }
   }
 
   async sendChat(text: string): Promise<ChatSendResult> {

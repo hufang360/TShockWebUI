@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gen-game-data.sh —— 生成 data/recipes.json 与 data/item-stats.json 与 data/item-groups.json
+# gen-game-data.sh —— 生成 data/ 下的合成表 / 物品属性 / 分组 / 微光 / 词缀 / 图格墙表 / 物品上限 / 图格图例名
 #
 # 依赖：
 #   - dotnet 9 SDK（首次会自动从 NuGet 还原 TShock 6.2.1 / OTAPI）
@@ -49,6 +49,15 @@ TR_SRC="$TR_SRC" OUT="$REPO/data/prefix-mods.json" node "$HERE/gen-prefix-mods.m
 
 echo "== gen-prefix-sets =="
 RAW="$PREFIX_SETS_RAW" OUT="$REPO/data/prefix-sets.json" node "$HERE/gen-prefix-sets.mjs"
+
+echo "== item limits（.plr 编辑器的数量校验） =="
+dotnet "$HERE/gamedump/bin/Release/net9.0/GameDump.dll" --item-limits "$REPO/data/item-limits.json"
+
+echo "== gen-tile-names（图格 → 地图图例名来源） =="
+TR_SRC="$TR_SRC" OUT="$REPO/data/tile-names.json" node "$HERE/gen-tile-names.mjs"
+
+echo "== gen-permissions（权限节点 + 内置用户组） =="
+TSHOCK_SRC="${TSHOCK_SRC:-$REPO/../TShock}" OUT="$REPO/data/permissions.json" node "$HERE/gen-permissions.mjs"
 
 echo "== tile styles =="
 dotnet "$HERE/gamedump/bin/Release/net9.0/GameDump.dll" --tile-styles "$TILE_STYLES_RAW"

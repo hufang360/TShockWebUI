@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { CommandResultsProvider } from '@/lib/commandResults'
@@ -8,9 +8,10 @@ import { resetRefreshGate } from '@/lib/refreshGate'
 import { makeDataset } from '@/test/fixtures'
 import { playerStubs } from '@/test/playerStubs'
 import type { BackendTransport } from '@/lib/tshock'
+import type { CommandResult } from '@/types'
 import { CommandModulePage, type FixedCardDef } from './CommandModulePage'
 
-function fakeTransport(runCommand: (cmd: string) => Promise<{ status: 'ok'; output: string[] }>) {
+function fakeTransport(runCommand: (cmd: string) => Promise<CommandResult>) {
   return {
     mock: false,
     label: 'test',
@@ -52,6 +53,7 @@ function renderPage(
               keyPrefix="world:"
               title="世界管理"
               fixedCards={fixedCards}
+              pluginName="WorldModify"
             />
           </CommandResultsProvider>
         </ExecutionQueueProvider>
@@ -125,5 +127,70 @@ describe('CommandModulePage', () => {
     // 点卡片自己的按钮才执行。
     fireEvent.click(screen.getByRole('button', { name: '执行' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/relive'))
+  })
+})
+
+describe('CommandModulePage 插件探测', () => {
+  it('固定卡片「指令不存在」→ 提示插件未安装，卡片不再展示原始失败输出', async () => {
+    const runCommand = vi.fn().mockResolvedValue({
+      status: 'command_not_found',
+      output: ['输入的命令无效。使用/help 获取可用的指令列表。'],
+      message: '指令不存在（提供该指令的插件可能未安装）',
+    })
+    renderPage(fakeTransport(runCommand))
+
+    expect(await screen.findByText('服务器未安装 WorldModify 插件')).toBeTruthy()
+    // 固定卡片统一显示「插件未安装」，不再展示 TShock 原文 / 后端提示
+    expect(screen.getAllByText('插件未安装')).toHaveLength(2)
+    expect(screen.queryByText('输入的命令无效。使用/help 获取可用的指令列表。')).toBeNull()
+    expect(screen.queryByText('指令不存在（提供该指令的插件可能未安装）')).toBeNull()
+
+    // 首轮只跑一次 /wi、/bi（不会因提示刷新而反复重跑）
+    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(2))
+
+    // 「管理卡片」里仍能看到固定卡片，并标「缺少插件」
+    fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getAllByText('缺少插件')).toHaveLength(2)
+  })
+
+  it('无权限（no_permission）不算插件未安装', async () => {
+    const runCommand = vi.fn().mockResolvedValue({
+      status: 'no_permission',
+      output: ['你没有权限使用该指令。'],
+      message: '权限不足，无法执行该指令',
+    })
+    renderPage(fakeTransport(runCommand))
+
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/wi'))
+    expect(screen.queryByText('服务器未安装 WorldModify 插件')).toBeNull()
+    expect(screen.queryByText('插件未安装')).toBeNull()
+  })
+
+  it('「重新检测」：装上插件后提示消失、卡片恢复', async () => {
+    let installed = false
+    const runCommand = vi.fn().mockImplementation((cmd: string): Promise<CommandResult> => {
+      if (!installed) {
+        return Promise.resolve({
+          status: 'command_not_found',
+          output: ['输入的命令无效。使用/help 获取可用的指令列表。'],
+          message: '指令不存在（提供该指令的插件可能未安装）',
+        })
+      }
+      return Promise.resolve(
+        cmd === '/wi'
+          ? { status: 'ok', output: ['世界：测试'] }
+          : { status: 'ok', output: [] },
+      )
+    })
+    renderPage(fakeTransport(runCommand))
+
+    expect(await screen.findByText('服务器未安装 WorldModify 插件')).toBeTruthy()
+
+    installed = true
+    fireEvent.click(screen.getByRole('button', { name: '重新检测' }))
+
+    await waitFor(() => expect(screen.queryByText('服务器未安装 WorldModify 插件')).toBeNull())
+    expect(await screen.findByText('世界：测试')).toBeTruthy()
   })
 })

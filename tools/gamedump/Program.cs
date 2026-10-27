@@ -30,6 +30,17 @@ internal static class Program
             return;
         }
 
+        // 轻量模式：导出「每件物品的 maxStack + 不允许出现在背包里的物品」。
+        //   dotnet GameDump.dll --item-limits /tmp/item-limits.json
+        // 用途：`.plr` 编辑器的数量校验 —— 游戏加载存档时 `Item.FixAgainstExploit()`
+        // 会把超限数量截到 maxStack、把 ItemsThatShouldNotBeInInventory 直接变空气。
+        if (args.Length > 0 && args[0] == "--item-limits")
+        {
+            Bootstrap();
+            DumpItemLimits(args.Length > 1 ? args[1] : "/tmp/item-limits.json");
+            return;
+        }
+
         var trSrc = args.Length > 0 ? args[0] : Environment.GetEnvironmentVariable("TR_SRC") ?? "";
         var recipesOut = args.Length > 1 ? args[1] : "/tmp/recipes-raw.json";
         var itemsOut = args.Length > 2 ? args[2] : "/tmp/items-raw.json";
@@ -182,6 +193,40 @@ internal static class Program
         Console.WriteLine($"[prefix-sets] {items.Count} items, {sets.Count} sets -> {outPath}");
     }
 
+    // ── 物品数量上限（.plr 编辑器校验用）────────────────────
+    // 直接读游戏自己的 `Item.maxStack`（默认 CommonMaxStack = 9999，武器/工具等由 SetDefaults 覆盖成 1/100…），
+    // 以及 `ItemID.Sets.ItemsThatShouldNotBeInInventory`（加载时会被 TurnToAir 的 id 集合）。
+    private static void DumpItemLimits(string outPath)
+    {
+        var maxStack = new Dictionary<int, int>();
+        for (int type = 1; type < ItemID.Count; type++)
+        {
+            var it = new Item();
+            try { it.SetDefaults(type); } catch { }
+            maxStack[type] = it.maxStack;
+        }
+        var noInventory = new List<int>();
+        for (int type = 1; type < ItemID.Count; type++)
+        {
+            if (ItemID.Sets.ItemsThatShouldNotBeInInventory[type]) noInventory.Add(type);
+        }
+        var payload = new
+        {
+            meta = new
+            {
+                gameVersion = AssemblyVersion(),
+                itemCount = maxStack.Count,
+                source = "Item.maxStack + ItemID.Sets.ItemsThatShouldNotBeInInventory @ OTAPI " + AssemblyVersion(),
+                generatedBy = "tools/gamedump/Program.cs DumpItemLimits",
+                note = "maxStack 为游戏自身的堆叠上限；noInventory 里的 id 在加载存档时会被 FixAgainstExploit 变成空气",
+            },
+            maxStack,
+            noInventory,
+        };
+        File.WriteAllText(outPath, JsonSerializer.Serialize(payload));
+        Console.WriteLine($"[limits] {maxStack.Count} items, {noInventory.Count} blocked -> {outPath}");
+    }
+
     private static void Bootstrap()
     {
         Terraria.Program.SavePath = Path.Combine(Path.GetTempPath(), "gamedump-save");
@@ -194,6 +239,19 @@ internal static class Program
         // 模拟开木匣会走 Player.GetItem → PopupText.NewText（需要客户端 UI，会 NRE）；
         // Main.showItemText=false 让 NewText 直接返回 -1（与服务器一致）。
         Terraria.Main.showItemText = false;
+
+        // 读存档时的 `Item.netDefaults(type)` 依赖 `ContentSamples.ItemsByType`（游戏里有专函数初始化）。
+        // 无头环境不会跑 ContentSamples.Initialize()（它要造全部 NPC/物品样本），这里手工铺一遍，
+        // 否则 `Player.LoadPlayer` 会在第一个物品上抛异常、只留下 loadStatus=UnknownError。
+        if (Terraria.ID.ContentSamples.ItemsByType.Count == 0)
+        {
+            for (int i = -65; i < ItemID.Count; i++)
+            {
+                var it = new Item();
+                try { it.SetDefaults(i); } catch { }
+                Terraria.ID.ContentSamples.ItemsByType[i] = it;
+            }
+        }
     }
 
     // ── 配方 ────────────────────────────────────────────────

@@ -162,7 +162,9 @@ export function buildPlayerShotLayout(look: PlayerLook, labels: ShotLabels): Pla
     group('players.group.inventory', labels.groups['players.group.inventory'] ?? '', slotItems(look, findGroup('players.group.inventory')), INV_COLS, PAD, backpackY),
     group('players.group.coins', labels.groups['players.group.coins'] ?? '', slotItems(look, findGroup('players.group.coins')), 1, coinsX, gridY),
     group('players.group.ammo', labels.groups['players.group.ammo'] ?? '', slotItems(look, findGroup('players.group.ammo')), 1, ammoX, gridY),
-    group('players.group.trash', labels.groups['players.group.trash'] ?? '', slotItems(look, findGroup('players.group.trash')), 1, trashX, trashY - (TITLE_H + TITLE_GAP)),
+    // 垃圾桶没有标题（页面上就是一个带图标的格子）：label 传空串，但 `group()` 会为标题预留
+    // `TITLE_H + TITLE_GAP` 的高度，所以这里的 y 要减回去，保证格子落在 `trashY`。
+    group('players.group.trash', '', slotItems(look, findGroup('players.group.trash')), 1, trashX, trashY - (TITLE_H + TITLE_GAP)),
   ]
 
   // 装备区：B 组（杂项染料 / 杂项装备）在左，A 组（染料 / 时装 / 装备）在右，组间留大一点的空隙。
@@ -351,11 +353,15 @@ export async function renderPlayerShotCanvas({
   }
 
   for (const g of layout.groups) {
-    if (g.slots.length > 0) {
+    if (g.slots.length > 0 && g.label) {
       text({ x: g.titleX, y: g.titleY, text: g.label, size: 12, tone: 'muted' }, colors.muted)
     }
     for (const slot of g.slots) {
       drawSlotFrame(ctx, slot.x, slot.y, colors)
+      // 垃圾桶格子在页面上是「空格子 + 垃圾桶图标」，图片里照样画一个，别写成文字。
+      if (g.key === 'players.group.trash' && slot.item.id <= 0) {
+        drawTrashIcon(ctx, slot.x, slot.y, colors)
+      }
       if (!atlas || !atlasImage) continue
       drawItem(ctx, slot, atlas.regions[String(itemIconKey(dataset, slot.item))], atlasImage)
     }
@@ -400,6 +406,56 @@ function drawSlotFrame(
   ctx.globalAlpha = 1
   ctx.strokeStyle = colors.border
   ctx.lineWidth = 1
+  ctx.stroke()
+  ctx.restore()
+}
+
+/**
+ * 空格子的垃圾桶图标（与页面 `Trash2` 同款：lucide 24×24 路径，等比放进格子中心）。
+ * 只画线不填充，颜色用 muted、40% 透明（页面是 `text-muted-foreground/40`）。
+ */
+function drawTrashIcon(
+  ctx: CanvasRenderingContext2D,
+  slotX: number,
+  slotY: number,
+  colors: ShotColors,
+) {
+  const size = 20
+  const s = size / 24
+  const x = slotX + (SLOT - size) / 2
+  const y = slotY + (SLOT - size) / 2
+  const px = (v: number) => x + v * s
+  const py = (v: number) => y + v * s
+  ctx.save()
+  ctx.globalAlpha = 0.4
+  ctx.strokeStyle = colors.muted
+  ctx.lineWidth = 2 * s
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  const line = (x1: number, y1: number, x2: number, y2: number) => {
+    ctx.moveTo(px(x1), py(y1))
+    ctx.lineTo(px(x2), py(y2))
+  }
+  // M3 6h18（桶盖）
+  ctx.beginPath()
+  line(3, 6, 21, 6)
+  // M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2（提手）
+  ctx.moveTo(px(8), py(6))
+  ctx.lineTo(px(8), py(4))
+  ctx.arc(px(10), py(4), 2 * s, Math.PI, Math.PI * 1.5)
+  ctx.lineTo(px(14), py(2))
+  ctx.arc(px(14), py(4), 2 * s, Math.PI * 1.5, 0)
+  ctx.lineTo(px(16), py(6))
+  // M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6（桶身）
+  ctx.moveTo(px(19), py(6))
+  ctx.lineTo(px(19), py(20))
+  ctx.arc(px(17), py(20), 2 * s, 0, Math.PI * 0.5)
+  ctx.lineTo(px(7), py(22))
+  ctx.arc(px(7), py(20), 2 * s, Math.PI * 0.5, Math.PI)
+  ctx.lineTo(px(5), py(6))
+  // M10 11v6 / M14 11v6（两条竖线）
+  line(10, 11, 10, 17)
+  line(14, 11, 14, 17)
   ctx.stroke()
   ctx.restore()
 }

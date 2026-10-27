@@ -52,11 +52,64 @@ export interface WorldInfo {
   bossesDowned: string[]
   spawn: WorldPoint
   dungeon: WorldPoint
+  /** 当日时间（0–54000，4:30 起算）；只用于编辑态回填。 */
+  time: number
+  dayTime: boolean
+  /** 月相 0–8。 */
+  moonPhase: number
+  bloodMoon: boolean
+  eclipse: boolean
   groundLevel: number
   rockLevel: number
   /** ISO 时间（UTC）；存档没记录时为 null。 */
   createdAt: string | null
   lastPlayed: string | null
+}
+
+/** 一个可编辑字符串在文件里的位置：`pos` = 7 位长度前缀起始（绝对偏移），`size` = 含前缀的总字节数。 */
+export interface WorldTrackString {
+  pos: number
+  size: number
+}
+
+/**
+ * 可编辑字段的**绝对字节偏移**表（由 `parseWorld(data, track)` 记录）。
+ *
+ * `.wld` 没有加密，但**头部段长度一变，后面所有段都要平移、指针表要重写**，
+ * 所以除了字段偏移，还要记下段指针表与 footer 的位置（见 `docs/计划-wld编辑.md` §2/§3）。
+ */
+export interface WorldTrack {
+  /** 存档版本号（箱子段 `<294` 是共享容量、≥294 是每箱自带，重建时要按它选格式）。 */
+  release: number
+  /** 段数（= 指针个数）。 */
+  sections: number
+  /** 指针表起始（绝对偏移，指向第 0 个指针）。 */
+  pointersAt: number
+  /** 各段**结束**位置（绝对偏移，来自文件里的指针表）。 */
+  pointers: number[]
+  /** `FileMetadata.Revision` 的偏移（保存时 +1，与游戏一致）。 */
+  revisionAt: number
+  /** 头部段开始（= pointers[0]）与结束（= pointers[1]）。 */
+  headerAt: number
+  headerEnd: number
+  /** footer 起始（= 最后一段结束位置）。 */
+  footerAt: number
+  worldId: number
+  name: WorldTrackString
+  /** 种子文本（release ≥ 180 才是字符串；179 是 int32，记不了就不给）。 */
+  seed?: WorldTrackString
+  /** 难度：>=209 是 int32，更早是 bool。 */
+  gameMode?: number
+  gameModeIsInt?: boolean
+  spawn?: number
+  time?: number
+  dayTime?: number
+  moonPhase?: number
+  bloodMoon?: number
+  eclipse?: number
+  hardmode?: number
+  /** Boss / 事件位（键与 `WorldInfo.bossesDowned` 一致）。 */
+  bosses: Partial<Record<string, number>>
 }
 
 /** 解析结果：`info` 给页面展示，`tilesAt` / `frameImportant` 给缩略图渲染。 */
@@ -77,12 +130,35 @@ function formatGuid(b: Uint8Array): string {
   )
 }
 
+/** 文件头 / 头部段的段指针说明见 `footerStartOf`。 */
 function bad(message: string): SaveFormatError {
   return new SaveFormatError(`不是有效的 Terraria 世界存档: ${message}`)
 }
 
+/**
+ * footer 起点 = 最后一个**有效**的段结束位置。
+ *
+ * 为什么不直接取 `pointers[sections - 1]`：老存档（release < 210）没有 bestiary / 创造之力段，
+ * 但指针表长度是按新版固定写死的，多出来的槽位是 **0**（游戏读取端按版本号决定检查哪些槽，
+ * 这些槽根本不看；footer 是**顺序读**的，不靠指针定位）。
+ * 实测例：1.3.5.3（release 194）的世界 `Double Cross -zh.wld` 是 10 个指针，最后一个为 0。
+ *
+ * 顺带校验指针单调性：不单调说明头部损坏，宁可报错也不要「猜」一个位置去写（写错就毁档）。
+ */
+function footerStartOf(pointers: readonly number[], headerEnd: number, length: number): number {
+  let at = headerEnd
+  for (let i = 2; i < pointers.length; i++) {
+    const p = pointers[i]
+    if (p === 0) continue
+    if (p < at) throw bad(`段指针顺序异常（第 ${i} 段：${p}）`)
+    at = p
+  }
+  if (at <= headerEnd || at > length) throw bad('段指针异常：定位不到文件尾（footer）')
+  return at
+}
+
 /** 解析 `.wld` 头部（第 0 / 1 段），返回世界信息 + 图格段位置。 */
-export function parseWorld(data: ArrayBuffer | Uint8Array): ParsedWorld {
+export function parseWorld(data: ArrayBuffer | Uint8Array, track?: WorldTrack): ParsedWorld {
   const r = new ByteReader(data instanceof Uint8Array ? data : new Uint8Array(data))
   // 最快的拒绝：连文件头都放不下的文件不必再谈版本 / 结构。
   if (r.length < 64) throw bad('文件太小，不像是世界存档')
@@ -110,6 +186,7 @@ export function parseWorld(data: ArrayBuffer | Uint8Array): ParsedWorld {
   if (new TextDecoder().decode(head.subarray(0, 7)) !== MAGIC || head[7] !== FILE_TYPE_WORLD) {
     throw bad('不是 Terraria PC 世界存档（文件头不匹配）')
   }
+  const revisionAt = r.pos
   const revision = r.i32()
   const flags = r.u64()
   const favorite = (flags & 1) === 1
@@ -117,6 +194,7 @@ export function parseWorld(data: ArrayBuffer | Uint8Array): ParsedWorld {
   // 段指针 + 图格 frame 表。
   const sections = r.i16()
   if (sections < 3 || sections > 32) throw bad(`段数异常（${sections}）`)
+  const pointersAt = r.pos
   const pointers: number[] = []
   for (let i = 0; i < sections; i++) {
     const p = r.i32()
@@ -146,26 +224,62 @@ export function parseWorld(data: ArrayBuffer | Uint8Array): ParsedWorld {
     bossesDowned: [],
     spawn: { x: 0, y: 0 },
     dungeon: { x: 0, y: 0 },
+    time: 0,
+    dayTime: false,
+    moonPhase: 0,
+    bloodMoon: false,
+    eclipse: false,
     groundLevel: 0,
     rockLevel: 0,
     createdAt: null,
     lastPlayed: null,
   }
 
-  readHeaderFlags(r, info)
+  // 子表在这里初始化（与 `parsePlr` 一致）：调用方传 `{}` 就能用，不必知道内部结构。
+  if (track) track.bosses = {}
+  readHeaderFlags(r, info, track)
 
   if (r.pos !== pointers[1]) {
     throw bad(`头部字段长度与段指针不一致（${r.pos} ≠ ${pointers[1]}）`)
   }
   validate(info)
+  if (track) {
+    track.release = release
+    track.sections = sections
+    track.pointersAt = pointersAt
+    track.pointers = pointers
+    track.revisionAt = revisionAt
+    track.headerAt = pointers[0] ?? 0
+    track.headerEnd = pointers[1] ?? 0
+    // 老存档（release < 210）没有 bestiary / 创造之力段，但指针表长度是按新版固定写死的，
+    // 多出来的槽位写 **0**（游戏读取端按版本号决定要不要检查这些槽，根本不看）。
+    // 所以 footer 起点 = 最后一个**有效**（> 0）的段结束位置，不能直接取 `pointers[sections-1]`。
+    track.footerAt = footerStartOf(pointers, track.headerEnd, r.length)
+    track.worldId = info.worldId
+  }
   return { info, tilesAt: pointers[1], frameImportant }
 }
 
 /** 读头部字段（顺序逐条对照 `WorldFile.LoadHeader`；只支持 140+，低门槛的门槛恒成立）。 */
-function readHeaderFlags(r: ByteReader, w: WorldInfo): void {
-  w.name = r.str()
+function readHeaderFlags(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
+  /** 读一个 .NET 字符串；给了 track 就顺手记下它在文件里的位置与总字节数。 */
+  const str = (): { value: string; span: WorldTrackString } => {
+    const pos = r.pos
+    const value = r.str()
+    return { value, span: { pos, size: r.pos - pos } }
+  }
+  const name = str()
+  w.name = name.value
+  if (track) track.name = name.span
+
   if (w.release >= 179) {
-    w.seed = w.release === 179 ? String(r.i32()) : r.str()
+    if (w.release === 179) {
+      w.seed = String(r.i32()) // 179 的种子是 int32（不是字符串，不给编辑）
+    } else {
+      const seed = str()
+      w.seed = seed.value
+      if (track) track.seed = seed.span
+    }
     w.worldGenVersion = r.u64()
   }
   if (w.release >= 181) w.guid = formatGuid(r.bytes(16))
@@ -177,7 +291,7 @@ function readHeaderFlags(r: ByteReader, w: WorldInfo): void {
     throw bad(`世界尺寸异常（${w.width} × ${w.height}）`)
   }
 
-  readDifficulty(r, w)
+  readDifficulty(r, w, track)
 
   // 创建 / 最后游玩时间（DateTime.ToBinary）。
   if (w.release >= 141) w.createdAt = dotnetBinaryToIso(r.i64b())
@@ -186,22 +300,40 @@ function readHeaderFlags(r: ByteReader, w: WorldInfo): void {
   // moonType + 背景树 7 + 洞穴背景 8 + 冰/丛林/地狱背景 2（不展示，只消费）。
   r.skip(1 + 7 * 4 + 8 * 4 + 2 * 4)
 
+  if (track) track.spawn = r.pos
   w.spawn = { x: r.i32(), y: r.i32() }
   w.groundLevel = r.f64()
   w.rockLevel = r.f64()
-  // time / dayTime / moonPhase / bloodMoon / eclipse（不展示，只消费）。
-  r.skip(8 + 1 + 4 + 1 + 1)
+  // time / dayTime / moonPhase / bloodMoon / eclipse：编辑态要回填，所以始终读进来。
+  if (track) track.time = r.pos
+  w.time = r.f64()
+  if (track) track.dayTime = r.pos
+  w.dayTime = r.boolean()
+  if (track) track.moonPhase = r.pos
+  w.moonPhase = r.i32()
+  if (track) track.bloodMoon = r.pos
+  w.bloodMoon = r.boolean()
+  if (track) track.eclipse = r.pos
+  w.eclipse = r.boolean()
   w.dungeon = { x: r.i32(), y: r.i32() }
   w.evil = r.boolean() ? 'crimson' : 'corruption'
 
-  readProgress(r, w)
+  readProgress(r, w, track)
 }
 
 /** 难度 + 特殊种子（游戏格式 209 起统一为 int32 GameMode）。 */
-function readDifficulty(r: ByteReader, w: WorldInfo): void {
+function readDifficulty(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
   if (w.release < 209) {
+    if (track) {
+      track.gameMode = r.pos
+      track.gameModeIsInt = false
+    }
     w.gameMode = r.boolean() ? 1 : 0
     return
+  }
+  if (track) {
+    track.gameMode = r.pos
+    track.gameModeIsInt = true
   }
   w.gameMode = r.i32()
   if (w.release < 222) return
@@ -228,15 +360,42 @@ function readDifficulty(r: ByteReader, w: WorldInfo): void {
   if (w.release >= 302 && r.boolean()) w.specialSeeds.push('skyblock')
 }
 
+/**
+ * 可编辑的 Boss / 事件位，**顺序与 `WorldFile.LoadHeader` 的写序一致**（编辑面板按这个顺序渲染）。
+ *
+ * 只收录「玩家在游戏里能看到」的那些；万圣节/圣诞节 Boss、四柱、末日事件等内部位不开放编辑。
+ */
+export const WORLD_BOSS_KEYS = [
+  'eyeOfCthulhu',
+  'evilBoss',
+  'skeletron',
+  'queenBee',
+  'destroyer',
+  'twins',
+  'skeletronPrime',
+  'anyMech',
+  'plantera',
+  'golem',
+  'slimeKing',
+  'goblins',
+  'frostLegion',
+  'pirates',
+  'dukeFishron',
+  'martians',
+  'lunaticCultist',
+  'moonLord',
+] as const
+
 /** 读布尔位（版本 < from 时不消费）。 */
 function flag(r: ByteReader, release: number, from: number): boolean {
   return release >= from ? r.boolean() : false
 }
 
 /** Boss / 事件进度 + 头部剩余字段（顺序同 `WorldFile.LoadHeader`）。 */
-function readProgress(r: ByteReader, w: WorldInfo): void {
+function readProgress(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
   const release = w.release
   const boss = (key: string) => {
+    if (track) track.bosses[key] = r.pos
     if (r.boolean()) w.bossesDowned.push(key)
   }
   const skipFlag = () => {
@@ -265,6 +424,7 @@ function readProgress(r: ByteReader, w: WorldInfo): void {
   }
   // shadowOrbSmashed / spawnMeteor / shadowOrbCount / altarCount / hardMode。
   r.skip(2 + 1 + 4)
+  if (track) track.hardmode = r.pos
   w.hardmode = r.boolean()
   flag(r, release, 257) // afterPartyOfDoom
   // invasionDelay / invasionSize / invasionType / invasionX / slimeRainTime / sundialCooldown。

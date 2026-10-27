@@ -2,7 +2,18 @@ import { searchItems } from './items'
 import { enumLabelsFor } from './commandMeta'
 import type { CommandDef, CommandParam, CommandParamSet, Dataset, Item, Lang } from '@/types'
 
-export type CompletionKind = 'command' | 'item' | 'player' | 'prefix' | 'enum' | 'npc' | 'buff' | 'region' | 'warp'
+export type CompletionKind =
+  | 'command'
+  | 'item'
+  | 'player'
+  | 'prefix'
+  | 'enum'
+  | 'npc'
+  | 'buff'
+  | 'region'
+  | 'warp'
+  | 'permission'
+  | 'group'
 
 /**
  * 参数候选（取值 / 字面量子命令）最多列出多少条。
@@ -443,6 +454,34 @@ export function computeParamCompletions({
           label: `${n.name} (${n.id})`,
           detail: n.key,
           insert: String(n.id),
+          range,
+          suffix: ' ',
+        })
+      }
+      break
+    case 'permission':
+      // 插节点原文（`tshock.world.time`）；候选项来自 TShock 源码里的内置节点，
+      // 自定义/插件节点只有运行期知道 —— 这里只是候选，手输任意值仍然有效。
+      for (const p of filter(dataset.permissions.permissions, (x) => [x.node, x.desc]).slice(0, limit)) {
+        out.push({
+          id: `param:permission:${p.node}`,
+          kind: 'permission',
+          label: p.node,
+          detail: p.desc,
+          insert: p.node,
+          range,
+          suffix: ' ',
+        })
+      }
+      break
+    case 'group':
+      for (const g of filter(dataset.permissions.groups, (x) => [x]).slice(0, limit)) {
+        out.push({
+          id: `param:group:${g}`,
+          kind: 'group',
+          label: g,
+          detail: zh ? '内置用户组' : 'Built-in group',
+          insert: g,
           range,
           suffix: ' ',
         })

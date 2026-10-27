@@ -533,6 +533,7 @@ export function CommandPage({
                   serverId={serverId}
                   refreshInterval={settings.eventsRefreshInterval}
                   refreshToken={feedRefreshToken}
+                  onTokenInvalid={onTokenInvalid}
                   itemsById={dataset.itemsById}
                   prefixesById={dataset.prefixesById}
                   atlas={dataset.atlas}

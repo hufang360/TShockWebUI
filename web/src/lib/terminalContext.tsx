@@ -9,7 +9,7 @@ import type { ReactNode } from 'react'
  */
 export interface TerminalApi {
   isOpen: boolean
-  /** 打开终端；给定文本时**覆盖**输入框草稿（如「指令小抄」页点一条记录）。 */
+  /** 打开终端；给定文本时**覆盖**输入框草稿（如「小抄」页点一条记录）。 */
   open: (text?: string) => void
   close: () => void
   toggle: () => void

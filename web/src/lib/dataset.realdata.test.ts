@@ -33,6 +33,16 @@ const prefixSets = readJson<{
   sets: number[][]
   items: Record<string, number>
 }>('prefix-sets.json')
+const permissionsData = readJson<{
+  meta: { permissionCount: number; groupCount: number; tshockVersion: string }
+  permissions: { node: string; desc: string }[]
+  groups: string[]
+}>('permissions.json')
+const itemLimits = readJson<{
+  meta: { itemCount: number; gameVersion: string }
+  maxStack: Record<string, number>
+  noInventory: number[]
+}>('item-limits.json')
 
 describe('真实数据：语言拆分契约', () => {
   it('items.json / prefixes.json 不含任何语言字段', () => {
@@ -343,5 +353,50 @@ describe('真实数据：NPC / buff（参数补全数据源）', () => {
     expect(ds.npcsById.get(113)?.sb).toBe('wall of flesh')
     // 普通怪物没有 /sb
     expect(ds.npcsById.get(1)?.sb).toBeUndefined()
+  })
+})
+
+describe('真实数据：物品数量上限（item-limits.json）', () => {
+  it('覆盖全部物品，且是游戏自身的堆叠上限', () => {
+    expect(itemLimits.meta.itemCount).toBeGreaterThan(6000)
+    expect(Object.keys(itemLimits.maxStack)).toHaveLength(itemLimits.meta.itemCount)
+    // 铜/银/金币 100、大多数物品 9999（`Item.CommonMaxStack`），少数拾取物 1。
+    expect(itemLimits.maxStack['71']).toBe(100) // 铜币
+    expect(itemLimits.maxStack['74']).toBe(9999) // 白金比索
+    expect(itemLimits.maxStack['1']).toBe(9999) // 铁镐
+    expect(itemLimits.maxStack['58']).toBe(1) // 生命之心
+    // 每个值都必须是正整数
+    for (const n of Object.values(itemLimits.maxStack)) expect(n).toBeGreaterThan(0)
+  })
+
+  it('禁入背包的 id 名单与源码一致（加载时会被 FixAgainstExploit 变成空气）', () => {
+    expect(new Set(itemLimits.noInventory)).toEqual(
+      new Set([58, 184, 1734, 1735, 1867, 1868, 3453, 3454, 3455, 4143, 5013, 6135, 6136]),
+    )
+  })
+})
+
+describe('真实数据：权限节点 / 内置用户组（permissions.json）', () => {
+  it('从 TShock 源码抽到的节点数量与 meta 一致，且每个都有说明', () => {
+    expect(permissionsData.permissions).toHaveLength(permissionsData.meta.permissionCount)
+    expect(permissionsData.permissions.length).toBeGreaterThan(150)
+    expect(permissionsData.permissions.every((p) => p.desc.length > 0)).toBe(true)
+  })
+
+  it('本项目依赖的两条 REST 权限在表里（登录 / 执行指令要用到）', () => {
+    const nodes = new Set(permissionsData.permissions.map((p) => p.node))
+    expect(nodes.has('tshock.rest.useapi')).toBe(true)
+    expect(nodes.has('tshock.rest.command')).toBe(true)
+  })
+
+  it('内置用户组齐全（默认组 + 逐级管理员）', () => {
+    expect(new Set(permissionsData.groups)).toEqual(
+      new Set(['admin', 'default', 'guest', 'insecure-guest', 'newadmin', 'owner', 'trustedadmin', 'vip']),
+    )
+  })
+
+  it('权限节点没有重复', () => {
+    const nodes = permissionsData.permissions.map((p) => p.node)
+    expect(nodes).toHaveLength(new Set(nodes).size)
   })
 })

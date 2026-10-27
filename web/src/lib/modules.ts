@@ -38,6 +38,8 @@ export interface ModuleDef {
   hintKey: string
   /** 设置里对依赖插件的说明。 */
   requiresKey: string
+  /** 固定卡片依赖的第三方插件名（如 `WorldModify`）：指令不存在时提示插件未安装。 */
+  pluginName?: string
   /** 固定指令卡片（不可删除）。 */
   cards?: ModuleCardDef[]
 }
@@ -70,6 +72,7 @@ export const MODULE_DEFS: ModuleDef[] = [
     titleKey: 'nav.world',
     hintKey: 'nav.worldHint',
     requiresKey: 'modules.requires.worldModify',
+    pluginName: 'WorldModify',
     cards: [
       { nameKey: 'world.card.info', command: '/wi' },
       { nameKey: 'world.card.boss', command: '/bi' },
@@ -84,6 +87,14 @@ export const MODULE_BY_ID = new Map(MODULE_DEFS.map((m) => [m.id, m]))
 
 /** 自定义模块 id 前缀。 */
 export const CUSTOM_MODULE_PREFIX = 'm:'
+
+/**
+ * 固定卡片的全局指令结果 key（`<moduleId>:fixed:<command>`，如 `world:fixed:/wi`）。
+ * 世界管理页（`CommandModulePage` + `ModuleCardsPanel`）与设置页共用同一份结果。
+ */
+export function fixedCardResultKey(moduleId: ModuleId, command: string): string {
+  return `${moduleId}:fixed:${command}`
+}
 
 export function isCustomModuleId(id: string): boolean {
   return id.startsWith(CUSTOM_MODULE_PREFIX) && id.length > CUSTOM_MODULE_PREFIX.length

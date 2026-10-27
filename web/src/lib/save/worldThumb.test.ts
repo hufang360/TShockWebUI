@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildWorld } from '@/test/worldFile'
-import { parseWorld } from './worldFile'
+import { parseWorld, type WorldTrack } from './worldFile'
 import { renderWorldThumbnail } from './worldThumb'
 
 const rgbaAt = (thumb: { width: number; pixels: Uint8ClampedArray }, x: number, y: number) => {
@@ -115,5 +115,52 @@ describe('世界缩略图渲染（本地）', () => {
     expect(small.width * small.height).toBeLessThanOrEqual(500_000)
     expect(small.width).toBe(1050) // res = ceil(sqrt(5.04M / 500k)) = 4 → 4200/4
     expect(small.height).toBe(300)
+  })
+})
+
+describe('颜色表：1.4.5 新增图格', () => {
+  it('753（GiantTiki）按游戏公式从 158 推导：逐通道 ×0.95', async () => {
+    const { TILE_COLORS } = await import('./worldColors.generated')
+    const t158 = TILE_COLORS[158]
+    const ch = (v: number) => Math.min(255, Math.round(v * 0.95))
+    const expected = (ch((t158 >> 16) & 0xff) << 16) | (ch((t158 >> 8) & 0xff) << 8) | ch(t158 & 0xff)
+    expect(TILE_COLORS[753]).toBe(expected)
+    expect(TILE_COLORS[753]).not.toBe(0)
+  })
+
+  it('游戏本身没给颜色的图格保持 0（由渲染层退回中性灰）', async () => {
+    const { TILE_COLORS } = await import('./worldColors.generated')
+    for (const id of [127, 135, 210, 428, 504, 541]) {
+      expect(TILE_COLORS[id]).toBe(0)
+    }
+  })
+
+  it('表长覆盖到 753（GiantTiki 是当前最大图格 id）', async () => {
+    const { TILE_COLORS } = await import('./worldColors.generated')
+    expect(TILE_COLORS.length).toBeGreaterThan(753)
+  })
+})
+
+describe('高清导出：强制 1 图格 = 1 像素', () => {
+  it('res: 1 → 输出尺寸等于世界尺寸（不降级），像素统计与缩略图一致', async () => {
+    const bytes = buildWorld({ width: 300, height: 120, tiles: () => ({ typ: 1 }) })
+    const parsed = parseWorld(bytes, {} as WorldTrack)
+    const normal = await renderWorldThumbnail(bytes, parsed, { maxPixels: 1_000, yieldEvery: 1e9 })
+    const hires = await renderWorldThumbnail(bytes, parsed, { res: 1, yieldEvery: 1e9 })
+    // 默认预算很小 → 会降级；高清必须是原尺寸
+    expect(normal.width).toBeLessThan(300)
+    expect(hires.width).toBe(300)
+    expect(hires.height).toBe(120)
+    expect(hires.pixels.length).toBe(300 * 120 * 4)
+    // 统计与分辨率无关（同一次解码）
+    expect([...hires.stats.tiles.entries()]).toEqual([...normal.stats.tiles.entries()])
+  })
+
+  it('res 小于 1 或非整数时按安全值处理（不会算出 0 宽）', async () => {
+    const bytes = buildWorld({ width: 10, height: 6, tiles: () => ({ typ: 1 }) })
+    const parsed = parseWorld(bytes, {} as WorldTrack)
+    const weird = await renderWorldThumbnail(bytes, parsed, { res: 0.5, yieldEvery: 1e9 })
+    expect(weird.width).toBeGreaterThan(0)
+    expect(weird.height).toBeGreaterThan(0)
   })
 })
