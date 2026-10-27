@@ -160,6 +160,16 @@ if ($Smoke) {
   if ($GOOS -ne $hostGoos -or $GOARCH -ne $hostGoarch) {
     Write-Host "==> 跳过冒烟测试（$GOOS/$GOARCH 无法在 $hostGoos/$hostGoarch 上直接运行）"
   } else {
+    # 端口被占用（例如上次冒烟残留的进程）会让「健康检查通过」其实连到别人的进程，
+    # 冒烟就变成假通过 —— 先确认端口是空的，否则直接失败让人处理。
+    $portBusy = $false
+    try {
+      $probe = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$SmokePort/healthz" -TimeoutSec 2
+      $portBusy = $probe.StatusCode -eq 200
+    } catch { }
+    if ($portBusy) {
+      Die "端口 $SmokePort 上已有服务在跑（可能是上次冒烟的残留），冒烟结果不可信；先结束它，或用 -SmokePort <其它端口> 重试"
+    }
     Write-Host "==> 冒烟测试 http://127.0.0.1:$SmokePort"
     $savedListen = $env:LISTEN
     $savedLogLevel = $env:LOG_LEVEL
@@ -183,6 +193,10 @@ if ($Smoke) {
       }
       $rootCode = (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$SmokePort/" -TimeoutSec 5).StatusCode
       $health = (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$SmokePort/healthz" -TimeoutSec 5).Content
+      # 再确认一次「连到的就是本次构建」：版本号必须与注入的一致。
+      if ($health -notmatch [regex]::Escape("`"version`":`"$Version`"")) {
+        Die "冒烟连到的不是本次构建（期望版本 $Version，实际：$health）"
+      }
       Write-Host "  /healthz $health"
       Write-Host "  / HTTP $rootCode"
     } finally {

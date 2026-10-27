@@ -129,6 +129,12 @@ if [ "$SMOKE" = "1" ]; then
   elif ! command -v curl >/dev/null 2>&1; then
     echo "==> 跳过冒烟测试（未安装 curl）"
   else
+    # 端口被占用（例如上次冒烟残留的进程）会让「健康检查通过」其实连到别人的进程，
+    # 冒烟就变成假通过 —— 先确认端口是空的，否则直接失败让人处理。
+    if curl -fsS --max-time 2 "http://127.0.0.1:${SMOKE_PORT}/healthz" >/dev/null 2>&1; then
+      die "端口 ${SMOKE_PORT} 上已有服务在跑（可能是上次冒烟的残留），冒烟结果不可信；
+       先结束它，或用 SMOKE_PORT=<其它端口> 重试"
+    fi
     echo "==> 冒烟测试 http://127.0.0.1:${SMOKE_PORT}"
     log=$(mktemp)
     LISTEN=":${SMOKE_PORT}" LOG_LEVEL=warn "$OUT_ABS" >"$log" 2>&1 &
@@ -150,6 +156,14 @@ if [ "$SMOKE" = "1" ]; then
     root_code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${SMOKE_PORT}/")
     data_code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${SMOKE_PORT}/data/meta.json")
     reported=$(curl -s "http://127.0.0.1:${SMOKE_PORT}/healthz")
+    # 再确认一次「连到的就是本次构建」：版本号必须与注入的一致。
+    case "$reported" in
+      *"\"version\":\"${VERSION}\""*) : ;;
+      *)
+        kill "$pid" 2>/dev/null || true
+        die "冒烟连到的不是本次构建（期望版本 ${VERSION}，实际：${reported}）"
+        ;;
+    esac
     echo "  /healthz ${reported}"
     echo "  / HTTP ${root_code}，/data/meta.json HTTP ${data_code}"
     kill "$pid" 2>/dev/null || true
