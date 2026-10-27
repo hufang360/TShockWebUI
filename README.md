@@ -102,7 +102,7 @@ docker compose -f deploy/docker-compose.example.yml up -d
 **<https://hufang360.github.io/TShockWebUI/>**）：
 
 > **前置条件**：仓库必须是 **public**，或你的 GitHub 计划支持私有仓库 Pages。
-> 当前仓库是 private，GitHub Free 不支持 Pages；`pages.yml` 在私有仓库上会跳过构建 / 部署。
+> 当前仓库是 public，Pages 已按 `build_type=workflow` 启用；私有仓库上 `pages.yml` 会跳过构建 / 部署。
 
 - 使用 `VITE_TRANSPORT=mock` 构建；登录、指令执行、服务器动态都是 Mock，页面顶部会显示「演示模式，未连接真实服务器」。
 - 物品 ID / 数据 ID / 查看存档 / 查看世界等纯本地功能可正常使用。

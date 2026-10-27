@@ -5,6 +5,7 @@ name: Pages (static demo)
 #
 # 注意：GitHub Free 的私有仓库不支持 Pages。私有仓库上下面两个 job 会直接跳过；
 # 仓库转为 public（或使用支持私有 Pages 的计划）后，下一次触发即可正常部署。
+# 现状（2026-10-27）：仓库为 public，Pages 已按 build_type=workflow 启用并首次部署成功。
 on:
   push:
     branches: [master]
