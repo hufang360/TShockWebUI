@@ -9,10 +9,11 @@ import { FishCommandCards } from '@/components/FishCommandCards'
 import { TopBarActions } from '@/components/TopBar'
 import { CELL_ICON_SIZE, GoodCell, GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
 import { cn } from '@/lib/cn'
+import { splitFishArgs } from '@/lib/fishArgs'
+import { isDegradedGood } from '@/lib/fishGood'
 import {
   Alert,
   AlertDescription,
-  Badge,
   Button,
   Card,
   CardBody,
@@ -47,11 +48,11 @@ import type { BackendTransport, FishBuyResult, FishCapabilities, FishGood, FishS
  * 鱼店（TShock 第三方插件 FishShop）。
  *
  * 参照「物品图鉴」：工具条一张卡片，商品网格直接铺在页面上（无卡片背景）；
- * 点击商品弹出详情弹框（价格 / 解锁 / 别名 / 商品 / 备注都渲染 [i:..] 图标）。
+ * 点击商品弹出详情弹框（价格 / 解锁 / 别名 / 限购 / 购买时机 / 备注都渲染 [i:..] 图标）。
  *
- * 走插件自带的 REST 端点（新版 `/fishshop/*`，老版 `/v3/fishshop/*` 由后端回退）：
- *   - /api/fish/capabilities → 插件是否在 / 有没有 REST 接口 / 有没有权限
- *   - /api/fish/list → 货架（含 icon / buyMax / needArgs）
+ * 走插件自带的 REST 端点（`/fishshop/*`）：
+ *   - /api/fish/capabilities → 插件是否在 / 有没有 REST 接口 / 有没有权限（后端就是读一次 /fishshop/list）
+ *   - /api/fish/list → 货架（含 icon / iconId / buyMax / needArgs / argCount / 限购与时机）
  *   - /api/fish/buy  → 为自己购买
  *
  * 插件版本过旧（v1.6.2 之前只有游戏内指令）或没权限时，左侧只显示提示；
@@ -88,8 +89,14 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   /** 货架上次刷新时间（刷新图标 tooltip 用）。 */
   const [lastShopLoadedAt, setLastShopLoadedAt] = useState<number | null>(null)
 
-  // 详情弹框
-  const [selected, setSelected] = useState<FishGood | null>(null)
+  // 详情弹框：`selectedSnapshot` 只是「点了哪一条」，真正展示/购买用的是派生出来的
+  // `selected`（同一 serial 的最新货架数据）——这样刷新货架后「我的进度」「能不能买」
+  // 会自动跟着变，而货架暂时为空（加载失败）时仍能显示上一次的快照。
+  const [selectedSnapshot, setSelected] = useState<FishGood | null>(null)
+  const selected = useMemo(() => {
+    if (!selectedSnapshot) return null
+    return shop?.goods.find((g) => g.serial === selectedSnapshot.serial) ?? selectedSnapshot
+  }, [selectedSnapshot, shop])
   const [amount, setAmount] = useState('1')
   const [args, setArgs] = useState('')
   const [confirming, setConfirming] = useState(false)
@@ -170,7 +177,16 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     setLoading(true)
     setError(null)
     try {
-      setShop(await transport.fishList())
+      // 先要「个人状态」（self=1）：能知道「还能买几次 / 冷却还剩几秒 / 为什么不能买」。
+      // 它要求玩家在游戏里在线，不在线时上游 400 → 静默退回普通货架，不打扰玩家。
+      let data: FishShop
+      try {
+        data = await transport.fishList({ self: true })
+      } catch (err) {
+        if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) throw err
+        data = await transport.fishList()
+      }
+      setShop(data)
       setLastShopLoadedAt(Date.now())
     } catch (err) {
       if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
@@ -218,11 +234,37 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const maxBuy = selected?.buyMax ?? 1
   const adjustable = !needArgs && maxBuy > 1
   const buyAmount = needArgs ? 1 : adjustable ? Math.min(maxBuy, Math.max(1, Number.parseInt(amount, 10) || 1)) : 1
-  const argsReady = !needArgs || args.trim().length > 0
-  const hasLimit =
-    (selected?.allowGroup?.length ?? 0) > 0 ||
-    (selected?.allowPlayers?.length ?? 0) > 0 ||
-    (selected?.denyPlayers?.length ?? 0) > 0
+  // 需要的参数个数（只有 1 个时不特意提示，一个输入框本来就一眼能看懂）。
+  // `{args}` 记 1（`{args}` 会拿到全部参数）；`{0}{1}…` 取最大序号 +1。
+  // 少给参数会被插件拒或让指令缺参执行，所以这里先卡住。
+  const argCount = selected?.argCount ?? (needArgs ? 1 : 0)
+  // 参数**原样**发给插件（前端不做转义 / 拼接），个数则按插件的 `SplitRestArgs` 规则数：
+  // 按空白拆、引号包住的算一个参数。两边规则不一致就会出现「按钮能点但插件认为参数不够」，
+  // 所以这里复用同一套规则，见 `lib/fishArgs.ts`。
+  const argTokens = splitFishArgs(args)
+  const argsReady = !needArgs || argTokens.length >= Math.max(1, argCount)
+
+  // 个人状态（只有货架带 `canBuy` 时才有；没带 = 不知道，不能当成「不能买」）。
+  const hasSelfState = selected?.canBuy !== undefined
+  // 上游已明确说不能买（限购已满 / 售完 / 冷却中 / 死了 / 昼夜不对…）→ 别让玩家白点一次。
+  const blocked = selected?.canBuy === false
+  // 降级条目：商品自身配置有误时插件只回基础字段（其余为空），点进去也买不了。
+  const degraded = isDegradedGood(selected)
+  const personalNotes: string[] = []
+  if (hasSelfState) {
+    if ((selected?.myRemain ?? -1) >= 0) {
+      personalNotes.push(t('fish.myRemain', { n: selected?.myRemain ?? 0 }))
+    }
+    if ((selected?.serverRemain ?? -1) >= 0) {
+      personalNotes.push(t('fish.serverRemain', { n: selected?.serverRemain ?? 0 }))
+    }
+    if ((selected?.myCdRemain ?? 0) > 0) {
+      personalNotes.push(t('fish.myCd', { n: selected?.myCdRemain ?? 0 }))
+    } else if ((selected?.serverCdRemain ?? 0) > 0) {
+      personalNotes.push(t('fish.serverCdRemain', { n: selected?.serverCdRemain ?? 0 }))
+    }
+  }
+  // 限购 / 冷却 / 时机：插件给的都是**静态上限**（"你还剩几次"只有购买时才知道），只做展示。
   const limitLines: string[] = []
   if (selected?.allowGroup?.length) {
     limitLines.push(`${t('fish.limitGroup')}：${selected.allowGroup.join('、')}`)
@@ -232,6 +274,30 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   }
   if (selected?.denyPlayers?.length) {
     limitLines.push(`${t('fish.denyPlayers')}：${selected.denyPlayers.join('、')}`)
+  }
+  if ((selected?.limit ?? 0) > 0) {
+    limitLines.push(t('fish.limitPerPlayer', { n: selected?.limit ?? 0 }))
+  }
+  if ((selected?.serverLimit ?? 0) > 0) {
+    limitLines.push(t('fish.limitServer', { n: selected?.serverLimit ?? 0 }))
+  }
+  if ((selected?.cd ?? 0) > 0) {
+    limitLines.push(t('fish.cd', { n: selected?.cd ?? 0 }))
+  }
+  if ((selected?.serverCd ?? 0) > 0) {
+    limitLines.push(t('fish.serverCd', { n: selected?.serverCd ?? 0 }))
+  }
+  const hasLimit = limitLines.length > 0
+  // needDay / needNight 是配置（settings.json 预设）里的「白天 / 夜晚不让买」，两个都为 true
+  // 时等于全天关闭，直接说一句，别并排显示「只能白天买」「只能夜晚买」自相矛盾。
+  const timingLines: string[] = []
+  if (selected?.needAlive) timingLines.push(t('fish.needAlive'))
+  if (selected?.needDay && selected?.needNight) {
+    timingLines.push(t('fish.needDayNight'))
+  } else if (selected?.needDay) {
+    timingLines.push(t('fish.needDay'))
+  } else if (selected?.needNight) {
+    timingLines.push(t('fish.needNight'))
   }
 
   const confirmBuy = useCallback(async () => {
@@ -245,7 +311,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       setBuyResult(res)
       setConfirming(false)
       // 冷却数秒：按钮禁用 + 提示闪烁，避免玩家连点重复购买。
-      setBuyCooldown(3)
+      // 没发货（已自动全额退款）时不给冷却：什么都没拿到，让人干等 3 秒只会莫名其妙。
+      setBuyCooldown(res.refunded === true ? 0 : 3)
       void loadShop()
     } catch (err) {
       if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
@@ -473,15 +540,18 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 ))}
               </div>
             ) : goods.length === 0 ? (
-              <Empty className="min-h-40 border border-dashed">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Fish />
-                  </EmptyMedia>
-                  <EmptyTitle>{t('fish.empty')}</EmptyTitle>
-                  <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
+              // 拉货架失败（如「商店打烊」）时错误已在工具条提示，这里不再说「没有匹配的商品」（会让人以为搜错了）。
+              error ? null : (
+                <Empty className="min-h-40 border border-dashed">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Fish />
+                    </EmptyMedia>
+                    <EmptyTitle>{t('fish.empty')}</EmptyTitle>
+                    <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )
             ) : (
               <div
                 className="grid gap-2"
@@ -533,7 +603,6 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                     ) : null}
                     {selected.name}
                   </p>
-                  {selected.refund && <Badge tone="accent">{t('fish.refundable')}</Badge>}
                 </div>
               </SheetHeader>
 
@@ -543,6 +612,9 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   <Field label={t('fish.cost')}>
                     {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
                   </Field>
+                  {personalNotes.length > 0 && (
+                    <Field label={t('fish.myState')}>{renderRichLines(personalNotes)}</Field>
+                  )}
                   {selected.unlock.trim() && (
                     <Field label={t('fish.unlock')}>{renderRich(selected.unlock)}</Field>
                   )}
@@ -550,10 +622,28 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                     <Field label={t('fish.alias')}>{renderRich(selected.map.join(', '))}</Field>
                   )}
                   {hasLimit && <Field label={t('fish.limit')}>{renderRichLines(limitLines)}</Field>}
+                  {timingLines.length > 0 && (
+                    <Field label={t('fish.timing')}>{renderRichLines(timingLines)}</Field>
+                  )}
+                  {selected.check?.trim() && (
+                    <Field label={t('fish.check')}>{renderRich(selected.check)}</Field>
+                  )}
                   {selected.comment.trim() && (
                     <Field label={t('fish.comment')}>{renderRich(selected.comment)}</Field>
                   )}
                 </dl>
+
+                {/* 上游已判定不能买（限购满了 / 售完 / 冷却中 / 死了 / 昼夜不对）：先说清楚，别让玩家白点 */}
+                {blocked && !confirming && (
+                  <Alert>
+                    <AlertDescription>{selected?.blockReason || t('fish.cannotBuy')}</AlertDescription>
+                  </Alert>
+                )}
+                {degraded && !confirming && (
+                  <Alert>
+                    <AlertDescription>{t('fish.degraded')}</AlertDescription>
+                  </Alert>
+                )}
 
                 {/* 确认 / 参数（操作按钮在底部操作区） */}
                 {confirming && (
@@ -564,15 +654,14 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                         : t('fish.buyConfirm', { n: buyAmount })}
                     </p>
                     <p className="text-xs text-muted-foreground">{t('fish.buyHint')}</p>
-                    {selected.refund && (
-                      <p className="text-xs text-warning">{t('fish.refundHint')}</p>
-                    )}
                   </div>
                 )}
 
                 {!confirming && needArgs && (
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t('fish.args')}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {argCount > 1 ? t('fish.argsMulti', { n: argCount }) : t('fish.args')}
+                    </span>
                     <Input
                       ref={argsRef}
                       value={args}
@@ -610,7 +699,15 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   </Alert>
                 )}
 
-                {buyResult && (
+                {buyResult && buyResult.refunded === true && (
+                  <Alert
+                    className={cn('flex flex-col gap-1', buyCooldown > 0 && 'tswui-flash')}
+                  >
+                    <AlertDescription>{renderRich(t('fish.buyRefunded', { name: buyResult.name || selected.name }))}</AlertDescription>
+                  </Alert>
+                )}
+
+                {buyResult && buyResult.refunded !== true && (
                   <Alert
                     variant="success"
                     className={cn('flex flex-col gap-1', buyCooldown > 0 && 'tswui-flash')}
@@ -624,6 +721,11 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                         }),
                       )}
                     </AlertDescription>
+                    {buyResult.requested != null && buyResult.requested > buyResult.amount && (
+                      <AlertDescription className="text-xs text-warning">
+                        {t('fish.buyClamped', { n: buyResult.amount, req: buyResult.requested })}
+                      </AlertDescription>
+                    )}
                     <AlertDescription className="font-medium text-foreground">
                       {t('fish.successHint')}
                     </AlertDescription>
@@ -663,7 +765,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                       ref={buyRef}
                       variant="primary"
                       className="h-8"
-                      disabled={!argsReady || buyCooldown > 0}
+                      disabled={!argsReady || buyCooldown > 0 || blocked || degraded}
                       onClick={() => setConfirming(true)}
                     >
                       <ShoppingCart data-icon="inline-start" />

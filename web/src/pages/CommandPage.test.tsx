@@ -363,6 +363,34 @@ describe('CommandPage 物品收藏', () => {
   })
 })
 
+describe('CommandPage 执行后清空输入框', () => {
+  it('发送成功后输入框清空（结果仍在结果区）', async () => {
+    localStorage.setItem('tswui:draft', JSON.stringify('/time'))
+    const runCommand = vi
+      .fn()
+      .mockResolvedValue({ status: 'ok', output: ['已把时间设置为 12:00'], message: '' })
+
+    renderEditor(fakeTransport(runCommand), vi.fn().mockResolvedValue(true))
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+
+    await screen.findByText('已把时间设置为 12:00')
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement).value).toBe(''),
+    )
+  })
+
+  it('前端拦下的指令不清空（保留原文便于修改重发）', async () => {
+    localStorage.setItem('tswui:draft', JSON.stringify('/i 29'))
+    const runCommand = vi.fn()
+
+    renderEditor(fakeTransport(runCommand), vi.fn().mockResolvedValue(true))
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+
+    await waitFor(() => expect(screen.getAllByText(/只能在游戏内执行/).length).toBeGreaterThan(0))
+    expect((screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement).value).toBe('/i 29')
+  })
+})
+
 describe('CommandPage 历史', () => {
   it('批量删除：进入删除状态后可多选删除', async () => {
     localStorage.setItem(

@@ -34,9 +34,14 @@ function goodIsNativeItem(good: FishGood): boolean {
   return firstItemTag(good.desc) !== null
 }
 
-/** 商品对应的物品标签：优先 `icon` 字段，其次 `desc`。 */
+/**
+ * 商品对应的物品标签：优先 `icon` 字段，其次插件的 `iconId`，最后 `desc`。
+ * `iconId` 是插件给的结构化图标 id（`0` = 没配图标），不用解析 `[i:..]` 字符串。
+ */
 function goodIcon(good: FishGood): GoodItemTag | null {
-  return firstItemTag(good.icon) ?? firstItemTag(good.desc)
+  const tag = firstItemTag(good.icon) ?? firstItemTag(good.desc)
+  if (tag) return tag
+  return good.iconId ? { itemId: good.iconId } : null
 }
 
 /** 商品里物品的词缀名（若有）；用于提示与名称前的词缀显示。 */

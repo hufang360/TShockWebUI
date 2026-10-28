@@ -22,7 +22,6 @@ const GOOD: FishGood = {
   cost: '[i/s2:73] 2 金币',
   unlock: '',
   comment: '备注 [i:29]',
-  refund: false,
 }
 
 const ARG_GOOD: FishGood = {
@@ -36,7 +35,6 @@ const ARG_GOOD: FishGood = {
   cost: '[i/s1:73] 1 金币',
   unlock: '',
   comment: '',
-  refund: false,
 }
 
 function fakeTransport(overrides: Partial<BackendTransport> = {}): BackendTransport {
@@ -219,6 +217,20 @@ describe('FishShopPage', () => {
     expect(screen.queryByText('货架')).toBeNull()
   })
 
+  it('货架接口业务失败（商店打烊）时展示上游原文，不说「没有匹配的商品」', async () => {
+    renderPage(
+      fakeTransport({
+        fishList: async () => {
+          throw new TshockRequestError('validation', '商店打烊', 400)
+        },
+      }),
+    )
+    // 上游文案原样展示：错误是商店状态，不是插件没有 / 搜不到东西。
+    expect(await screen.findByText('商店打烊')).toBeTruthy()
+    expect(screen.queryByText('没有匹配的商品')).toBeNull()
+    expect(screen.queryByText('需安装 鱼店 插件，无法获取货架数据。')).toBeNull()
+  })
+
   it('离开后再进入页面会重新拉货架（不受刷新间隔闸门影响）', async () => {
     const fishList = vi.fn(async () => shopOf([GOOD]))
     const first = renderPage(fakeTransport({ fishList }))
@@ -240,7 +252,6 @@ describe('FishShopPage', () => {
       cost: '[i/s15:73]',
       unlock: '',
       comment: '',
-      refund: false,
     }
     renderPage(fakeTransport({ fishList: async () => shopOf([service]) }))
 
@@ -281,7 +292,7 @@ describe('FishShopPage', () => {
 
 
 
-  it('限购条件显示在详情里', async () => {
+  it('限购条件显示在详情里（限制一行）', async () => {
     const limited: FishGood = {
       ...GOOD,
       serial: 228,
@@ -293,10 +304,203 @@ describe('FishShopPage', () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([limited]) }))
     fireEvent.click(await screen.findByRole('button', { name: 'GM' }))
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText('限购')).toBeTruthy()
+    expect(within(dialog).getByText('限制')).toBeTruthy()
     expect(within(dialog).getByText(/仅限用户组：GM/)).toBeTruthy()
     expect(within(dialog).getByText(/仅限玩家：hf、star/)).toBeTruthy()
     expect(within(dialog).getByText(/禁止玩家：bad/)).toBeTruthy()
+  })
+
+  it('限购次数 / 冷却 / 时机 / 购买前检查来自插件的结构化字段', async () => {
+    const rich: FishGood = {
+      ...GOOD,
+      serial: 300,
+      name: '召唤机械骷髅王',
+      limit: 3,
+      serverLimit: 10,
+      cd: 60,
+      serverCd: 30,
+      needAlive: true,
+      needNight: true,
+      check: '需先击败骷髅王',
+    }
+    renderPage(fakeTransport({ fishList: async () => shopOf([rich]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '召唤机械骷髅王' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/每人限购 3 次/)).toBeTruthy()
+    expect(within(dialog).getByText(/全服限量 10 件/)).toBeTruthy()
+    expect(within(dialog).getByText(/冷却 60 秒/)).toBeTruthy()
+    expect(within(dialog).getByText(/全服冷却 30 秒/)).toBeTruthy()
+    expect(within(dialog).getByText('购买时机')).toBeTruthy()
+    expect(within(dialog).getByText(/死亡时不能买/)).toBeTruthy()
+    expect(within(dialog).getByText(/只能夜晚买/)).toBeTruthy()
+    expect(within(dialog).getByText('购买前检查')).toBeTruthy()
+    expect(within(dialog).getByText(/需先击败骷髅王/)).toBeTruthy()
+  })
+
+  it('白天 / 夜晚都不让买时只说一句，不并排显示自相矛盾的两行', async () => {
+    const closed: FishGood = { ...GOOD, serial: 301, name: '全天关闭', needDay: true, needNight: true }
+    renderPage(fakeTransport({ fishList: async () => shopOf([closed]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '全天关闭' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/白天和夜晚都不能买/)).toBeTruthy()
+    expect(within(dialog).queryByText(/只能白天买/)).toBeNull()
+    expect(within(dialog).queryByText(/只能夜晚买/)).toBeNull()
+  })
+
+  it('没有限购 / 时机 / 检查的商品不显示这些行', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByText('限制')).toBeNull()
+    expect(within(dialog).queryByText('购买时机')).toBeNull()
+    expect(within(dialog).queryByText('购买前检查')).toBeNull()
+  })
+
+  it('多个透传参数时提示参数个数', async () => {
+    const multi: FishGood = { ...ARG_GOOD, serial: 161, name: '放置建筑', argCount: 2 }
+    renderPage(fakeTransport({ fishList: async () => shopOf([multi]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '放置建筑' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('参数（2 个，用空格分隔）')).toBeTruthy()
+  })
+
+  it('个人状态：先按 self=1 拉货架，拿不到就静默退回普通货架', async () => {
+    const fishList = vi
+      .fn()
+      .mockRejectedValueOnce(new TshockRequestError('validation', '玩家 Alice 不在线，请先进入游戏', 400))
+      .mockResolvedValue(shopOf([GOOD]))
+    renderPage(fakeTransport({ fishList }))
+
+    expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
+    // 不在线不是错误：页面上不该出现那条文案
+    expect(screen.queryByText(/不在线/)).toBeNull()
+    // 第一次要个人状态，失败后第二次退回不带 self 的普通货架。
+    expect(fishList.mock.calls[0][0]).toEqual({ self: true })
+    expect(fishList.mock.calls[1]).toEqual([])
+  })
+
+  it('个人状态：显示还能买几次 / 冷却剩余', async () => {
+    const good: FishGood = { ...GOOD, limit: 3, myCount: 2, myRemain: 1, myCdRemain: 30, canBuy: true }
+    renderPage(fakeTransport({ fishList: async () => shopOf([good]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('我的进度')).toBeTruthy()
+    expect(within(dialog).getByText(/还能买 1 次/)).toBeTruthy()
+    expect(within(dialog).getByText(/冷却中，还需 30 秒/)).toBeTruthy()
+    expect((within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('买完刷新货架后，弹框里的「我的进度」跟着更新', async () => {
+    let remain = 1
+    const fishList = vi.fn(async () =>
+      shopOf([{ ...GOOD, limit: 3, myRemain: remain, myCount: 3 - remain, canBuy: true }]),
+    )
+    const fishBuy = vi.fn(async () => {
+      remain = 0
+      return { serial: 1, name: '生命水晶', amount: 1, requested: 1, refunded: false, cost: '5 金币' }
+    })
+    renderPage(fakeTransport({ fishList, fishBuy }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/还能买 1 次/)).toBeTruthy()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '购买' }))
+    fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
+
+    // 刷新后回到「还能买 0 次」（上游 canBuy 仍是 true，Mock 没改它）
+    await waitFor(() => expect(within(dialog).getByText(/还能买 0 次/)).toBeTruthy())
+  })
+
+  it('个人状态：上游说买不了时显示原因并禁用购买', async () => {
+    const good: FishGood = { ...GOOD, canBuy: false, blockReason: '已达个人限购', myRemain: 0 }
+    renderPage(fakeTransport({ fishList: async () => shopOf([good]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('已达个人限购')).toBeTruthy()
+    expect((within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('参数按插件的引号规则数：引号里的空格不算多一个参数', async () => {
+    const multi: FishGood = { ...ARG_GOOD, serial: 162, name: '保存建筑', argCount: 2 }
+    renderPage(fakeTransport({ fishList: async () => shopOf([multi]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '保存建筑' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByRole('textbox', { name: '参数' })
+    const buy = within(dialog).getByRole('button', { name: '购买' })
+
+    fireEvent.change(input, { target: { value: '"我的 小屋"' } })
+    expect((buy as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(input, { target: { value: '"我的 小屋" 10' } })
+    expect((buy as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('商品没发出去（自动退款）时不说「已购买」', async () => {
+    const fishBuy = vi.fn(async () => ({
+      serial: 1,
+      name: '柚子仪式',
+      amount: 0,
+      requested: 1,
+      refunded: true,
+      cost: '',
+    }))
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), fishBuy }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '购买' }))
+    fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
+
+    expect(await within(dialog).findByText(/本次未发货，已全额退款/)).toBeTruthy()
+    expect(within(dialog).queryByText(/已购买/)).toBeNull()
+    // 什么都没发出去，不该让人等冷却（也不该出现「被夹小」提示）
+    expect(within(dialog).queryByText(/单次上限只给了/)).toBeNull()
+    expect((within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('降级条目（配置有误）提示并禁用购买', async () => {
+    const broken: FishGood = {
+      ...GOOD,
+      serial: 400,
+      name: '坏商品',
+      comment: '该商品配置有误，已降级显示（详情见服务端控制台）',
+    }
+    renderPage(fakeTransport({ fishList: async () => shopOf([broken]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '坏商品' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('这件商品配置有误，暂时买不了。')).toBeTruthy()
+    expect((within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('需要多个参数时，参数个数不够就不能点购买', async () => {
+    const multi: FishGood = { ...ARG_GOOD, serial: 161, name: '放置建筑', argCount: 2 }
+    renderPage(fakeTransport({ fishList: async () => shopOf([multi]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '放置建筑' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByRole('textbox', { name: '参数' })
+    const buy = within(dialog).getByRole('button', { name: '购买' })
+
+    expect((buy as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(input, { target: { value: '小房间' } })
+    expect((buy as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(input, { target: { value: '小房间 10' } })
+    expect((buy as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('实际成交件数被单次上限夹小时提示一句', async () => {
+    const fishBuy = vi.fn(async () => ({
+      serial: 1,
+      name: '生命水晶',
+      amount: 999,
+      requested: 5000,
+      cost: '5 金币',
+    }))
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), fishBuy }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByRole('spinbutton'), { target: { value: '999' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '购买' }))
+    fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
+    expect(await within(dialog).findByText(/单次上限只给了 999 件（你想买 5000 件）/)).toBeTruthy()
   })
 
   it('价格为空的商品显示带背景的“免费”', async () => {

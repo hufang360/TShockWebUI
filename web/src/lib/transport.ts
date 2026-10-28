@@ -250,29 +250,80 @@ export interface ServerCapabilities {
   webauth: WebAuthCapabilities
 }
 
-/** 鱼店货架上的一条商品。 */
+/** 鱼店货架上的一条商品（字段见 `docs/REST-API.md` §2.1，上游「只增不改名」）。 */
 export interface FishGood {
   serial: number
   name: string
   /** 插件配置的商品图标标签（如 `[i:5041]`）；服务类商品的 desc 只有文字，靠它展示图标。可能为空。 */
   icon?: string
+  /** 图标的物品 id（`0` = 没配图标）：不想解析 `icon` 字符串就用它。 */
+  iconId?: number
   /** 单次最多可购买件数（1 = 不允许调数量）。 */
   buyMax?: number
   /** 指令类商品含 `{args}`/`{0}` 占位符：购买时需填参数（此时不调数量）。 */
   needArgs?: boolean
+  /** 需要的透传参数个数（`0` = 不需要；`{args}` 记 1；`{0}{1}…` 取最大序号 +1）。 */
+  argCount?: number
   /** 分类 / 别名标签（插件侧为 List<string>）。 */
   map: string[]
   desc: string
   cost: string
   unlock: string
   comment: string
-  refund: boolean
   /** 限购（空 = 不限）：限制用户组（白名单）。 */
   allowGroup?: string[]
   /** 限购（空 = 不限）：限制玩家（白名单）。 */
   allowPlayers?: string[]
   /** 限购：禁止玩家（黑名单）。 */
   denyPlayers?: string[]
+
+  // ── 结构化追加字段（展示 / 粗筛能否购买） ──
+  /** 商品 id：`>0` 原版物品，`<0` 内置商品/服务（多条商品可共用同一个 id）。 */
+  id?: number
+  /** 单次发放的堆叠数量。 */
+  stack?: number
+  /** 词缀数值 id（`0` = 无词缀）。 */
+  prefix?: number
+  /** 单件价格的铜币数（不含扣物品）。 */
+  costMoney?: number
+  /** 要扣的物品（不含货币）。 */
+  costItems?: { id: number; stack: number }[]
+  /** 购买前检查（`check`）的说明文本，空 = 无检查。 */
+  check?: string
+  /** 每个玩家的限购次数（`0` = 不限）。这是**配置值**，"还剩几次" 只有购买时才知道。 */
+  limit?: number
+  /** 全服限购总数（`0` = 不限）。 */
+  serverLimit?: number
+  /** 同一玩家重复购买的冷却秒数（`0` = 不限）。 */
+  cd?: number
+  /** 全服冷却秒数（`0` = 不限）。 */
+  serverCd?: number
+  /** 死亡状态不能买。 */
+  needAlive?: boolean
+  /** 只能白天买。 */
+  needDay?: boolean
+  /** 只能夜晚买。 */
+  needNight?: boolean
+  /** 店名（**只有 `ask` 返回**；list 的店名在顶层 name）。 */
+  shop?: string
+
+  // ── 个人状态（**仅请求带 `self=1` 时返回**；缺省 = 不知道，不是「不能买」） ──
+  /** 粗判能否买（只算限购 / 冷却 / 白名单 / 生死昼夜，不含商品的 `check`）。`undefined` = 没带 self。 */
+  canBuy?: boolean
+  /** `canBuy === false` 时上游给的原因文案（如「已达个人限购」）。 */
+  blockReason?: string
+  /** 该玩家已买过几次（按商品 id 统计）。 */
+  myCount?: number
+  /** 全服已卖出几个。 */
+  serverCount?: number
+  /** 还能买几次；`-1` = 不限。 */
+  myRemain?: number
+  /** 全服还能卖几个；`-1` = 不限。 */
+  serverRemain?: number
+  /** 个人冷却剩余秒数（0 = 可买）。 */
+  myCdRemain?: number
+  /** 全服冷却剩余秒数（0 = 可买）。 */
+  serverCdRemain?: number
 }
 
 /** `GET /api/fish/list`：货架。 */
@@ -286,7 +337,15 @@ export interface FishShop {
 export interface FishBuyResult {
   serial: number
   name: string
+  /** **实际成交件数**（会被 `buyMax` / 物品堆叠上限夹小）。 */
   amount: number
+  /** 请求的件数（没被夹小时与 `amount` 相同）。 */
+  requested?: number
+  /**
+   * `true` = 动作执行了但商品没发出去（仪式失败等），支付已自动全额退还到鱼罐，
+   * 此时 `amount` 为 `0`、`cost` 为空串。
+   */
+  refunded?: boolean
   cost: string
 }
 
@@ -502,10 +561,15 @@ export interface BackendTransport {
 
   /** 实时探测第三方插件 FishShop：是否安装 / 是否有权限。 */
   fishCapabilities(): Promise<FishCapabilities>
-  /** 查看鱼店货架（新版插件不需要额外权限；老版本需要 fishshop.rest.use）。 */
-  fishList(): Promise<FishShop>
-  /** 询价单条商品。 */
-  fishAsk(serial: number): Promise<FishGood>
+  /**
+   * 查看鱼店货架（新版插件不需要额外权限；老版本需要 fishshop.rest.use）。
+   *
+   * `self: true` → 让上游按「当前登录玩家」算限购 / 冷却，每条多返回个人状态
+   * （`canBuy` / `myRemain` / `myCdRemain` …）。代价是该玩家必须在线，否则上游 400。
+   */
+  fishList(opts?: { self?: boolean }): Promise<FishShop>
+  /** 询价单条商品（`self` 同 `fishList`）。 */
+  fishAsk(serial: number, opts?: { self?: boolean }): Promise<FishGood>
   /** 为自己购买；amount 默认 1，args 替换指令类商品的 {args} 占位符。 */
   fishBuy(serial: number, amount: number, args?: string): Promise<FishBuyResult>
 

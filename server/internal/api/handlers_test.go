@@ -780,8 +780,8 @@ func TestCapabilitiesAggregated(t *testing.T) {
 	f.routes["/pm/look"] = func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 name 参数"})
 	}
-	f.routes["/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, 400, map[string]any{"status": 400, "error": "缺少 serial 参数"})
+	f.routes["/fishshop/list"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 200, map[string]any{"status": 200, "response": map[string]any{"name": "鱼店", "total": 0}})
 	}
 	f.routes["/webui/auth/request"] = func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]any{"status": "200", "code": "player_offline", "message": "该玩家不在线"})
@@ -1272,7 +1272,7 @@ func TestUnknownAPIPathReturnsJSON404(t *testing.T) {
 // ---------- 鱼店（第三方插件 FishShop） ----------
 
 func TestFishCapabilitiesPluginMissing(t *testing.T) {
-	// 未注册 /fishshop/ask 与 /v3/fishshop/ask → fake 回 404；rawcmd 也 404 → 判「未安装」。
+	// 未注册 /fishshop/list → fake 回 404；rawcmd 也 404 → 判「未安装」。
 	f := newFake(okLoginRoutes())
 	ts := httptest.NewServer(f)
 	defer ts.Close()
@@ -1291,7 +1291,7 @@ func TestFishCapabilitiesPluginMissing(t *testing.T) {
 	}
 }
 
-// 老版本插件（v1.6.2 之前）只有游戏内指令：REST 全 404 但 /fish 能跑 → plugin:true, rest:false。
+// 老版本插件（v1.6.2 之前）只有游戏内指令：/fishshop/list 404 但 /fish 能跑 → plugin:true, rest:false。
 func TestFishCapabilitiesOldPluginHasNoREST(t *testing.T) {
 	routes := okLoginRoutes()
 	routes["/v3/server/rawcmd"] = func(w http.ResponseWriter, _ *http.Request) {
@@ -1317,7 +1317,7 @@ func TestFishCapabilitiesOldPluginHasNoREST(t *testing.T) {
 
 func TestFishCapabilitiesNoPermission(t *testing.T) {
 	routes := okLoginRoutes()
-	routes["/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) {
+	routes["/fishshop/list"] = func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 403, map[string]any{"error": "未授权。用户没有权限使用指定的 API 终结点。"})
 	}
 	f := newFake(routes)
@@ -1335,6 +1335,101 @@ func TestFishCapabilitiesNoPermission(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	if !out.Plugin || !out.REST || out.Permission {
 		t.Fatalf("应为 {plugin:true, rest:true, permission:false}，实际 %+v", out)
+	}
+}
+
+// 业务失败（商店打烊）也是上游 400：端点存在、权限通过 → 探测仍通过，
+// 上游文案交给 /api/fish/list 原样展示（不再误报「无法检测鱼店插件」）。
+func TestFishCapabilitiesBusinessFailureStillPresent(t *testing.T) {
+	routes := okLoginRoutes()
+	routes["/fishshop/list"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 400, map[string]any{"status": 400, "error": "商店打烊"})
+	}
+	f := newFake(routes)
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	rec := do(h, http.MethodGet, "/api/fish/capabilities", nil, cookie, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out tshock.FishCapability
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	if !out.Plugin || !out.REST || !out.Permission {
+		t.Fatalf("应为 {plugin:true, rest:true, permission:true}，实际 %+v", out)
+	}
+
+	// 同一次探针端点被复用：货架接口应把「商店打烊」原样带给前端。
+	list := do(h, http.MethodGet, "/api/fish/list", nil, cookie, false)
+	if list.Code != http.StatusBadRequest || !strings.Contains(list.Body.String(), "商店打烊") {
+		t.Fatalf("HTTP %d body=%s，期望 400 + 商店打烊", list.Code, list.Body.String())
+	}
+}
+
+// 上游新字段必须原样透传到 /api/fish/list（前端靠它们显示限购 / 冷却 / 时机 / 检查）。
+// 这里按「上游 JSON 字面量」校验，字段名写错会立刻红。
+func TestFishListPassesThroughStructuredFields(t *testing.T) {
+	routes := okLoginRoutes()
+	routes["/fishshop/list"] = func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":200,"response":{"name":"鱼店","total":1,"goods":[{
+			"serial":1,"name":"生命水晶","icon":"[i:29]","buyMax":999,"needArgs":false,"map":["物品"],
+			"desc":"[i:29] 生命水晶","cost":"5 金币","unlock":"","comment":"",
+			"allowGroup":["GM"],"allowPlayers":[],"denyPlayers":[],
+			"id":29,"stack":5,"prefix":0,"iconId":29,"argCount":0,
+			"costMoney":500,"costItems":[{"id":29,"stack":3}],"check":"需先击败骷髅王",
+			"limit":3,"serverLimit":10,"cd":60,"serverCd":30,
+			"needAlive":true,"needDay":false,"needNight":true}]}}`))
+	}
+	f := newFake(routes)
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	rec := do(h, http.MethodGet, "/api/fish/list", nil, cookie, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Name  string `json:"name"`
+		Goods []struct {
+			IconID    int   `json:"iconId"`
+			ArgCount  int   `json:"argCount"`
+			CostMoney int64 `json:"costMoney"`
+			CostItems []struct {
+				ID    int `json:"id"`
+				Stack int `json:"stack"`
+			} `json:"costItems"`
+			Check       string `json:"check"`
+			Limit       int    `json:"limit"`
+			ServerLimit int    `json:"serverLimit"`
+			CD          int    `json:"cd"`
+			ServerCD    int    `json:"serverCd"`
+			NeedAlive   bool   `json:"needAlive"`
+			NeedDay     bool   `json:"needDay"`
+			NeedNight   bool   `json:"needNight"`
+		} `json:"goods"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("解析失败：%v", err)
+	}
+	g := out.Goods[0]
+	if g.IconID != 29 || g.ArgCount != 0 || g.CostMoney != 500 {
+		t.Fatalf("g = %+v", g)
+	}
+	if len(g.CostItems) != 1 || g.CostItems[0].ID != 29 || g.CostItems[0].Stack != 3 {
+		t.Fatalf("costItems = %+v", g.CostItems)
+	}
+	if g.Check != "需先击败骷髅王" || g.Limit != 3 || g.ServerLimit != 10 || g.CD != 60 || g.ServerCD != 30 {
+		t.Fatalf("check/limit = %+v", g)
+	}
+	if !g.NeedAlive || g.NeedDay || !g.NeedNight {
+		t.Fatalf("timing = %+v", g)
 	}
 }
 
@@ -1364,6 +1459,82 @@ func TestFishListSuccess(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	if out.Name != "鱼店" || len(out.Goods) != 1 || out.Goods[0].Serial != 1 {
 		t.Fatalf("shop = %+v", out)
+	}
+}
+
+// ?self=1 必须透传到上游；不带时不带（否则上游会要求玩家在线，普通查询会莫名 400）。
+func TestFishListPassesSelfParam(t *testing.T) {
+	var seen []string
+	routes := okLoginRoutes()
+	routes["/fishshop/list"] = func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.Query().Get("self"))
+		writeJSON(w, 200, map[string]any{
+			"status":   200,
+			"response": map[string]any{"name": "鱼店", "total": 0, "goods": []map[string]any{}},
+		})
+	}
+	f := newFake(routes)
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	for _, path := range []string{"/api/fish/list?self=1", "/api/fish/list", "/api/fish/list?self=0"} {
+		if rec := do(h, http.MethodGet, path, nil, cookie, false); rec.Code != http.StatusOK {
+			t.Fatalf("%s → HTTP %d body=%s", path, rec.Code, rec.Body.String())
+		}
+	}
+	want := []string{"1", "", ""}
+	for i, w := range want {
+		if seen[i] != w {
+			t.Fatalf("self 序列 = %v，期望 %v", seen, want)
+		}
+	}
+}
+
+// /api/fish/ask：serial 必填；上游 response 的 `shop`（店名）要原样透传。
+func TestFishAskRequiresSerial(t *testing.T) {
+	f := newFake(okLoginRoutes())
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	for _, path := range []string{"/api/fish/ask", "/api/fish/ask?serial=0", "/api/fish/ask?serial=x"} {
+		rec := do(h, http.MethodGet, path, nil, cookie, false)
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "bad_request") {
+			t.Fatalf("%s → HTTP %d body=%s，期望 400 bad_request", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestFishAskPassesShopName(t *testing.T) {
+	routes := okLoginRoutes()
+	routes["/fishshop/ask"] = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"status":   200,
+			"response": map[string]any{"serial": 1, "name": "生命水晶", "shop": "hf 的鱼店", "limit": 3, "argCount": 0},
+		})
+	}
+	f := newFake(routes)
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, nil)
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	rec := do(h, http.MethodGet, "/api/fish/ask?serial=1", nil, cookie, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out tshock.FishGood
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("解析失败：%v", err)
+	}
+	if out.Shop != "hf 的鱼店" || out.Limit != 3 {
+		t.Fatalf("out = %+v", out)
 	}
 }
 

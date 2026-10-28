@@ -419,13 +419,14 @@ export class HttpTransport implements BackendTransport {
     return (await res.json()) as FishCapabilities
   }
 
-  async fishList(): Promise<FishShop> {
-    const res = await request('/fish/list')
+  async fishList(opts?: { self?: boolean }): Promise<FishShop> {
+    const res = await request(`/fish/list${opts?.self ? '?self=1' : ''}`)
     return (await res.json()) as FishShop
   }
 
-  async fishAsk(serial: number): Promise<FishGood> {
-    const res = await request(`/fish/ask?serial=${encodeURIComponent(String(serial))}`)
+  async fishAsk(serial: number, opts?: { self?: boolean }): Promise<FishGood> {
+    const q = `serial=${encodeURIComponent(String(serial))}${opts?.self ? '&self=1' : ''}`
+    const res = await request(`/fish/ask?${q}`)
     return (await res.json()) as FishGood
   }
 

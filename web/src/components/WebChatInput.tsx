@@ -97,7 +97,7 @@ export function WebChatInput({
       >
         <InputGroup
           className={cn(
-            'h-11 rounded-full bg-card pr-1 pl-4 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring',
+            'h-11 rounded-full border border-border bg-card pr-1 pl-4 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring',
             compact && 'h-8',
           )}
         >

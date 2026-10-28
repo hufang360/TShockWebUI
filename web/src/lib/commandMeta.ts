@@ -217,8 +217,6 @@ const LABELS: Record<string, Record<string, LabelPair>> = {
     list: { zh: '浏览货架', en: 'List goods' },
     ask: { zh: '询价', en: 'Ask price' },
     buy: { zh: '购买', en: 'Buy' },
-    // 仅 v1.6.2 ~ v1.6.6 有；新版插件已删除自助退款（仍保留补全，老服可用）。
-    refund: { zh: '退款', en: 'Refund' },
     info: { zh: '钓鱼信息', en: 'Fish info' },
     jar: { zh: '鱼罐（查看 / 存 / 取）', en: 'Fish jar' },
     rank: { zh: '消费榜', en: 'Spending rank' },
@@ -419,7 +417,6 @@ const EXTRA_PARAM_SETS: Record<string, CommandParamSet[]> = {
     cmd('fish', 'list', [{ name: '页码/搜索', required: false, kind: 'text' }]),
     cmd('fish', 'ask', [{ name: '商品', required: false, kind: 'text' }]),
     cmd('fish', 'buy', [{ name: '商品', required: true, kind: 'text' }, { name: '数量', required: false, kind: 'number' }]),
-    cmd('fish', 'refund', [{ name: '商品', required: false, kind: 'text' }]),
     cmd('fish', 'info'),
     cmd(
       'fish',

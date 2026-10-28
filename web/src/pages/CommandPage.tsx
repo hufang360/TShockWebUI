@@ -229,10 +229,15 @@ export function CommandPage({
     runtimeValues,
   })
 
+  // 指令真正发出去后清空输入框（与浮动终端一致）；被前置校验拦下时保留原文，方便改后重发。
+  // 清空前比对文本：等待期间已经另敲了新内容就不抹掉。
   const execute = useCallback(() => {
     if (running) return
-    void runCommandText(text)
-  }, [running, runCommandText, text])
+    const sent = text
+    void runCommandText(sent).then((outcome) => {
+      if (outcome.dispatched) setText((prev) => (prev === sent ? '' : prev))
+    })
+  }, [running, runCommandText, text, setText])
 
   const loadText = useCallback(
     (cmd: string) => {
@@ -540,7 +545,7 @@ export function CommandPage({
                 />
               </CardBody>
             </Card>
-            <div className="shrink-0 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <div className="shrink-0 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-3">
               {chatComposer}
             </div>
             </>

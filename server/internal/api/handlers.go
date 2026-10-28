@@ -1385,12 +1385,22 @@ func (s *Server) handleFishList(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.TShockTimeout)
 	defer cancel()
 
-	shop, err := client.FishList(ctx, sess.TShockToken)
+	shop, err := client.FishList(ctx, sess.TShockToken, fishWantSelf(r))
 	if err != nil {
 		s.writeFishError(w, &sess, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, shop)
+}
+
+// fishWantSelf 解析 `?self=1`：要求上游按「token 同名玩家」的身份算限购 / 冷却，
+// 每条多返回个人状态（`canBuy` / `myRemain` / `myCdRemain` …）。
+//
+// 代价是**该玩家必须在线**，否则上游 400「玩家 X 不在线」——调用方（前端）可据此退回
+// 不带的普通查询，所以这里只做透传，不替调用方决定。
+func fishWantSelf(r *http.Request) bool {
+	v := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("self")))
+	return v == "1" || v == "true" || v == "yes" || v == "on"
 }
 
 // fishSerialParam 解析并校验 serial 查询参数（正整数）。
@@ -1421,7 +1431,7 @@ func (s *Server) handleFishAsk(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.TShockTimeout)
 	defer cancel()
 
-	good, err := client.FishAsk(ctx, sess.TShockToken, serial)
+	good, err := client.FishAsk(ctx, sess.TShockToken, serial, fishWantSelf(r))
 	if err != nil {
 		s.writeFishError(w, &sess, err)
 		return

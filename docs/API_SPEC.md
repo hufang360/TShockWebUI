@@ -358,13 +358,19 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 
 > 插件接入细节（权限/字段/坑）见 [插件-鱼店.md](插件-鱼店.md)。
 
-实时探测第三方插件 FishShop 的可用性（需要会话）。后端用**空 `serial`** 调一次
-`POST {TSHOCK_URL}/fishshop/ask`（老版本 `v1.6.2 ~ v1.6.6` 的 `/v3/fishshop/ask` 由后端自动回退）：
-403 = 无权限，400 = 存在（插件报「缺少 serial 参数」）。
+实时探测第三方插件 FishShop 的可用性（需要会话）。后端用**同一端点**读一次货架看能不能通：
+`GET {TSHOCK_URL}/fishshop/list?token=`（与 §5.6 同一个上游端点，只是丢弃返回的货架）。
 
-新旧前缀都 `404` 时再跑一次只读的 rawcmd `/fish help`，用来区分：
-- 指令不存在 → 没装插件；
-- 指令能跑 → 装了老版本插件（v1.6.2 之前只有游戏内指令、没有 REST 接口）。
+| 上游 | 判定 |
+| --- | --- |
+| `2xx` | `plugin=true, rest=true, permission=true` |
+| `400`（业务失败，如「商店打烊」） | 同上：端点在、权限也过了，只能怪商店自己的状态；文案留给 §5.6 原样展示 |
+| `403` | 后端用 `/tokentest` 区分：token 有效 → `permission=false`（老版本缺 `fishshop.rest.use`）；token 无效 → `401 token_invalid` |
+| `404` | 再跑一次只读 rawcmd `/fish help`：指令能跑 → `plugin=true, rest=false`（老版本只有游戏内指令）；指令不存在 → 全部 `false`（未安装） |
+
+> 为什么不用 `/fishshop/ask` 探测：`ask` 的语义是「问某个商品怎么卖」，空 `serial` 只能靠插件回
+> 「缺少 serial 参数」反推「端点在」，属于借报错探测；`list` 本身只是一次只读取数，
+> 且与真在用货架的是同一个端点，探到的就是玩家真会遇到的。
 
 成功 `200`：
 ```json
@@ -374,17 +380,24 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 - `plugin=true, rest=false` → 装了**老版本插件**（没有 REST 接口），前端提示「版本过旧」；
   右侧「钓鱼信息」卡片（`/fish info`）不依赖接口，仍可用。
 - `permission=false` → 已安装且提供 REST，但**老版本插件**缺 `fishshop.rest.use`（新版插件不需要任何
-  自定义权限，探测走「缺 serial → 400」分支，`permission` 恒为 `true`）。
+  自定义权限，`permission` 恒为 `true`）。
 - 插件上游状态码：`401` 没带 token；`403` 只表示 token 无效 / 用户组已变动（老版本缺权限也是 403，
   后端用 `/tokentest` 区分后才会给 `permission=false`）。
 - 上游 token 失效 → `401 token_invalid`（后端已清会话）。
+- **商店打烊不影响能力**：货架接口的任何 `400` 都只说明业务上买不到，插件本身可用；
+  此时 `plugin/rest/permission` 均为 `true`，页面会进到货架区域并显示上游原文。
 
 ---
 
-## 5.6 `GET /api/fish/list`
+## 5.6 `GET /api/fish/list[?self=1]`
 
 查看鱼店货架（需要会话）。上游**新版不需要任何自定义权限**（只要 token 有效；老版本需要 `fishshop.rest.use`）。
-后端转发到 `POST {TSHOCK_URL}/fishshop/list`（老版本回退 `/v3/fishshop/list`）。
+后端转发到 `GET {TSHOCK_URL}/fishshop/list`（**不复 `/v3/fishshop/*`**：那个前缀只存在于未对外的
+v1.6.2 ~ v1.6.6，现已删除，避免每次调用多打一次空请求）。
+
+`self=1`（也接受 `true` / `yes` / `on`）→ 让上游按 **token 同名玩家**的身份算限购 / 冷却，
+每条多返回个人状态字段（下表）；代价是**该玩家必须在线**，否则上游 `400 fishshop_error`
+（文案「玩家 X 不在线，请先进入游戏」）。前端先试 `self=1`，失败就静默退回不带它的普通查询。
 
 成功 `200`：
 ```json
@@ -392,22 +405,55 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
   "name": "鱼店", "total": 2,
   "goods": [{ "serial": 1, "name": "生命水晶", "icon": "[i:29]", "buyMax": 999, "needArgs": false,
               "map": ["物品"], "desc": "[i:29] 生命水晶 x5", "cost": "5 金币", "unlock": "",
-              "comment": "" }]
+              "comment": "", "allowGroup": [], "allowPlayers": [], "denyPlayers": [],
+              "id": 29, "stack": 5, "prefix": 0, "iconId": 29, "argCount": 0,
+              "costMoney": 500, "costItems": [{ "id": 29, "stack": 3 }], "check": "",
+              "limit": 3, "serverLimit": 0, "cd": 0, "serverCd": 0,
+              "needAlive": false, "needDay": false, "needNight": false }]
 }
 ```
-- `icon` 是插件配置的商品图标标签（`[i:ID]`，可能为空）。服务类商品（时间/天气/buff 等）
-  `desc` 只有文字，前端用 `icon` 显示真实图标；为空则回退解析 `desc`。
-- `buyMax` 单次最多可购买件数（1 = 不显示数量调节框）。
-- `needArgs` = 指令类商品含 `{args}`/`{0}` 占位符，购买时需填参数（此时不再调数量）。
-- `comment`（备注）也可能含 `[i:..]` 物品标签，前端同样渲染成图标。
+字段与上游 `docs/REST-API.md` §2.1 一一对应（上游约定「只增不改名」，新字段直接加、老字段别动）：
+
+| 字段 | 用途 |
+| --- | --- |
+| `serial` / `name` / `map` / `desc` / `cost` / `unlock` / `comment` | 展示（`cost`/`comment` 可能含 `[i:..]` 图标） |
+| `icon` | 插件配置的图标标签（`[i:ID]`，可能为空）；服务类商品的 `desc` 只有文字，靠它显示图标 |
+| `iconId` | 图标的物品 id（`0` = 没配）；不想解析 `icon` 字符串就用它 |
+| `buyMax` / `needArgs` / `argCount` | 单次上限 / 是否要参数 / 需要几个参数 |
+| `allowGroup` / `allowPlayers` / `denyPlayers` | 白名单 / 黑名单 |
+| `id` / `stack` / `prefix` | 商品 id（`<0` = 内置服务）、发放堆叠、词缀 id |
+| `costMoney` / `costItems` | 结构化价格：铜币数 + 要扣的物品（不含货币） |
+| `check` | 购买前检查（`check`）的说明文本 |
+| `limit` / `serverLimit` / `cd` / `serverCd` | 限购次数 / 全服限量 / 冷却 / 全服冷却（都是**配置值**，`0` = 不限） |
+| `needAlive` / `needDay` / `needNight` | 死亡不能买 / 只能白天买 / 只能夜晚买 |
+
+个人状态（**仅 `self=1` 时出现**；前端靠「有没有 `canBuy`」区分「不知道」与「不能买」）：
+
+| 字段 | 用途 |
+| --- | --- |
+| `canBuy` | 粗判能否买（只算限购 / 冷却 / 白名单 / 生死昼夜，**不含**商品的 `check`） |
+| `blockReason` | `canBuy=false` 时上游给的原因（如「已达个人限购」「只能在晚上购买！」）；可买时为空 |
+| `myCount` / `serverCount` | 该玩家已买几次 / 全服已卖出几个（按商品 `id` 统计） |
+| `myRemain` / `serverRemain` | 还能买几次 / 全服还能卖几个；`-1` = 不限 |
+| `myCdRemain` / `serverCdRemain` | 个人 / 全服冷却剩余秒数（`0` = 可买） |
+
+> **降级条目**：某条商品自身配置有误时，上游只回基础字段（文本为空、数值 0/1、数组为空），
+> `comment` 固定以「该商品配置有误」开头。前端据此标记「暂时买不了」并禁用购买按钮。
+
+- `limit`/`cd` 是**静态上限**，不是「你还剩几次 / 还要等几秒」——剩余量与调用者绑定，`list`/`ask`
+  以服务器身份查询拿不到；想预判能否购买只能用这些静态值 + `check`/`needAlive`/`needDay`/`needNight` 粗筛，
+  最终以 `/api/fish/buy` 的报错为准。
 - 未安装插件 / 版本过旧 → `501 plugin_not_installed` / `501 plugin_outdated`；无权限 → `403 no_permission`。
-- 业务失败（如「商店打烊」）→ `400 fishshop_error`，`message` 为上游原文。
+- 业务失败（如「商店打烊: 未击败 血肉墙」）→ `400 fishshop_error`，`message` 为上游原文。
 
 ---
 
 ## 5.7 `GET /api/fish/ask?serial=<编号>`
 
-询价单条商品（字段同 `goods`，另含 `allowGroup`）。缺/非法 `serial` → `400 bad_request`。
+询价单条商品。上游 `GET /fishshop/ask?serial=`：`response` = §5.6 的**单条商品字段全集**，
+另多一个 `shop`（店名；`list` 的店名在顶层 `name`）。同样支持 `?self=1`（多返回个人状态，要求玩家在线）。
+前端目前不用（`list` 已含全部字段），接口保留。
+缺/非法 `serial` → `400 bad_request`；商品不存在 → `400 fishshop_error`，文案带可用编号范围。
 
 ---
 
@@ -421,9 +467,14 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 ```json
 { "serial": 3, "amount": 5, "args": "" }
 ```
-- `amount` 缺省 / <1 归一化为 1；`args` 会替换指令类商品 `cmds` 的 `{args}` 占位符。
+- `amount` 缺省 / <1 归一化为 1（**上游会拒**：非整数 / <1 直接 400，所以本接口永远发 ≥1）；
+  `args` 按空格拆成多个参数，替换指令类商品 `cmds` 的 `{args}` / `{0}{1}…` 占位符（个数见 `argCount`）。
 
-成功 `200`：`{ "serial": 3, "name": "...", "amount": 5, "cost": "25 金币" }`。
+成功 `200`：`{ "serial": 3, "name": "...", "amount": 5, "requested": 5, "refunded": false, "cost": "25 金币" }`。
+- `amount` 是**实际成交件数**（会被 `buyMax` / 物品堆叠上限夹小），`requested` 是请求件数；
+  两者不等时前端要明确告诉玩家少发了多少（别只显示请求值）。
+- `refunded=true` = 动作执行了但商品没发出去（如仪式失败），支付已**自动全额退还**到鱼罐：
+  此时 `amount` 为 `0`、`cost` 为空串，前端必须显示「已退还」而不是「已购买 ×0」。
 - 业务失败（钱不够 / 商品不存在 / 商店打烊）→ `400 fishshop_error`，`message` 为上游原文，
   前端直接展示（如「钱不够」）。
 - 错误码与 §5.5 相同；超出限流 → `429 rate_limited`。
@@ -738,8 +789,8 @@ export interface BackendTransport {
   playerExport(name: string): Promise<{ filename: string; blob: Blob }> // 见第 5.3 节
 
   fishCapabilities(): Promise<FishCapabilities>                        // 见第 5.5 节
-  fishList(): Promise<FishShop>                                        // 见第 5.6 节
-  fishAsk(serial: number): Promise<FishGood>                            // 见第 5.7 节
+  fishList(opts?: { self?: boolean }): Promise<FishShop>               // 见第 5.6 节
+  fishAsk(serial: number, opts?: { self?: boolean }): Promise<FishGood> // 见第 5.7 节
   fishBuy(serial: number, amount: number, args?: string): Promise<FishBuyResult> // 见第 5.8 节
 
   requestCapabilities(): Promise<RequestCapabilities>                    // 见第 6.4 节

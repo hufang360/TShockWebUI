@@ -121,7 +121,6 @@ export const playerStubs = {
     cost: '',
     unlock: '',
     comment: '',
-    refund: false,
   }),
   fishBuy: async (serial: number, amount: number): Promise<FishBuyResult> => ({
     serial,
