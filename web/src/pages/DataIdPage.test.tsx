@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { resetDataIdState } from '@/lib/dataIdState'
 import { I18nProvider } from '@/lib/i18n'
@@ -369,15 +369,14 @@ describe('DataIdPage', () => {
     expect(within(detail).getByText('多格')).toBeTruthy()
   })
 
-  it('NPC 详情：有两条权限才显示 /spawnboss 与 /spawnmob，并带属性名', async () => {
-    const transport = permsTransport(['tshock.npc.spawnboss', 'tshock.npc.spawnmob'])
-    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
-
+  it('NPC 详情：召唤指令不判权限，始终显示（Boss 完整写法 + 简写合并成一块两行）', async () => {
+    // 未登录、也拿不到任何权限：照样显示。
+    renderPage()
     fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
     const detail = await screen.findByTestId('dataid-detail')
     expect(await within(detail).findByText('Boss召唤指令')).toBeTruthy()
+    // 两行：完整写法 + 单字简写；「（简写）」不再单独占一个属性名。
     expect(within(detail).getByText('/spawnboss "eye of cthulhu"')).toBeTruthy()
-    // 部分 Boss 还有单字简写（别名），单独一行。
     expect(within(detail).getByText('/sb eoc')).toBeTruthy()
     expect(within(detail).getByText('NPC召唤指令')).toBeTruthy()
     expect(within(detail).getByText('/spawnmob 4')).toBeTruthy()
@@ -385,26 +384,47 @@ describe('DataIdPage', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByTestId('dataid-detail')).toBeNull())
 
-    // 普通怪：没有 `sb`，即使有 Boss 权限也不显示 /spawnboss。
+    // 普通怪：没有 `sb`，就没有 Boss 那一块，但 NPC 召唤照旧有。
     fireEvent.click(screen.getByTitle('蓝史莱姆 #1'))
     const detail2 = await screen.findByTestId('dataid-detail')
     expect(within(detail2).queryByText('Boss召唤指令')).toBeNull()
     expect(within(detail2).getByText('/spawnmob 1')).toBeTruthy()
   })
 
-  it('NPC / Buff 详情：通配权限（*、tshock.*）也算有权限', async () => {
-    for (const wildcard of ['*', 'tshock.*', 'tshock.npc.*']) {
+  it('召唤指令：属性名在灰框外，每条指令各占一行且整行可复制', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderPage()
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+
+    // 属性名本身不是按钮、也不在灰底框里：它是行外的一个纯文本。
+    const label = within(detail).getByText('Boss召唤指令')
+    expect(label.closest('button')).toBeNull()
+    expect(label.className).not.toContain('bg-accent')
+
+    // 两条指令各是一行（各带复制按钮），点行即复制该行文本。
+    const rows = within(detail).getAllByRole('button', { name: /^复制 / })
+    expect(rows).toHaveLength(3) // Boss 两行 + NPC 召唤一行
+    fireEvent.click(rows[1])
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('/sb eoc'))
+    fireEvent.click(rows[2])
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('/spawnmob 4'))
+  })
+
+  it('Buff 详情：通配权限（*、tshock.*）也算有权限（/gbuff 仍需知道玩家名）', async () => {
+    for (const wildcard of ['*', 'tshock.*', 'tshock.buff.*']) {
       const transport = permsTransport([wildcard])
       const view = renderPage(makeDataset(), 'zh', { authenticated: true, transport })
-      fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
+      fireEvent.click(await screen.findByTitle('再生 #2'))
       const detail = await screen.findByTestId('dataid-detail')
-      expect(await within(detail).findByText('/spawnboss "eye of cthulhu"')).toBeTruthy()
-      expect(within(detail).getByText('/spawnmob 4')).toBeTruthy()
+      expect(await within(detail).findByText('/gbuff Alice 2')).toBeTruthy()
       view.unmount()
     }
   })
 
-  it('拿不到权限（/api/me 失败）时仍然显示，不隐藏', async () => {
+  it('拿不到权限（/api/me 失败）时召唤指令照样显示', async () => {
     const transport = {
       mock: false,
       label: 'test',
@@ -416,25 +436,8 @@ describe('DataIdPage', () => {
 
     fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
     const detail = await screen.findByTestId('dataid-detail')
-    expect(await within(detail).findByText('/spawnmob 4')).toBeTruthy()
-  })
-
-  it('NPC 详情：只有 spawnmob 权限时不显示 /spawnboss', async () => {
-    const transport = permsTransport(['tshock.npc.spawnmob'])
-    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
-
-    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
-    const detail = await screen.findByTestId('dataid-detail')
-    expect(await within(detail).findByText('/spawnmob 4')).toBeTruthy()
-    expect(within(detail).queryByText('Boss召唤指令')).toBeNull()
-  })
-
-  it('NPC 详情：未登录不显示召唤指令', async () => {
-    renderPage()
-    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
-    const detail = await screen.findByTestId('dataid-detail')
-    expect(within(detail).getByText('内部名')).toBeTruthy()
-    expect(within(detail).queryByText(/\/spawn(boss|mob)/)).toBeNull()
+    expect(await within(detail).findByText('/spawnboss "eye of cthulhu"')).toBeTruthy()
+    expect(within(detail).getByText('/spawnmob 4')).toBeTruthy()
   })
 
   it('Buff 详情：有 tshock.buff.others 才显示 /gbuff <玩家> <buffID>', async () => {

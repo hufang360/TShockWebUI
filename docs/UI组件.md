@@ -67,6 +67,10 @@
 - **弹框底部操作区用 `DialogFooter`**：底色 `bg-background` + `border-t`；用负外边距抵消 `DialogContent` 的 `p-5` 做成通栏；物品详情 / 商品详情 的操作按钮都放在这里。
   （亮色下 `--background` 已改为与卡片同为白，靠顶部 `border-t` 区分；暗色下仍比卡片深。）
 - **图标进组件用 `data-icon`**（`Button` / `TabsTrigger` / `ToggleGroupItem` / `CardTitle` 已统一兜底尺寸）。
+- **覆盖 `Button` / `SidebarMenuButton` 的高度（或 `icon` 尺寸）时要带 `md:`  counterparts**：
+  尺寸变体写的是 `h-10 md:h-9` / `size-10 md:size-9`，媒体查询变体在 CSS 里排在后面，
+  所以 `className="h-auto"` 在 ≥768px 会被 `md:h-9` 盖回去（内容溢出、互相重叠）。
+  要写 `h-auto md:h-auto`（鱼店商品格子踩过这个坑，见 `docs/插件-鱼店.md` §4）。
 - **详情优先用右侧抽屉**（鱼店商品详情、数据ID的 NPC / 图格 / 墙 / Buff 详情用 `Sheet`；物品详情用可堆叠的 `Drawer`）：
   标题栏固定、中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框。
 - **抽屉里可以再开抽屉时用 `Drawer`（Base UI）**：像物品详情那样「点配方材料 → 看材料详情 → 返回」的钻取，
@@ -94,6 +98,39 @@
 | `components/ui/Card.tsx` | `Card` / `CardHeader` / `CardTitle` / `CardBody`，没有 `CardContent` / `CardFooter` | 项目自有命名（见组件清单）；布局语义一致，`CardFooter` 由 `DialogFooter` / `SheetFooter` 承担 |
 | `components/ui/Drawer.tsx` | 依赖 **Base UI**（`@base-ui/react/drawer`），项目其余组件都是 radix；类名与 CSS 变量取自 shadcn 官方 Base UI 版 | `components.json` 的 base 仍是 `radix`。选它唯一原因是**可堆叠嵌套**：radix 侧（`Sheet` / vaul）没有「父抽屉缩小留在后面」的实现，且 vaul 已停止维护。只有物品详情用它，其它浮层继续走 radix，不要混用；Drawer 的替换元素用 Base UI 的 `render`（不是 `asChild`）|
 
+## 字号角色（不要临时加字号）
+
+界面字号是**角色**，不是数值。改字号前先找角色，找不到再讨论是否新增角色
+（一眼能读出来的层次靠这五档，不靠 `text-[13px]` 这类任意值）：
+
+| 角色 | 规格 | 用在哪 |
+| --- | --- | --- |
+| 页面标题 | `text-base`（16px）/ `font-semibold` | **只在内容区顶栏出现一次**（`AppShell` 的 `BreadcrumbPage`）。内容区里不要再重复同一句话当标题 |
+| 卡片 / 分区标题 | `text-sm font-semibold tracking-wide` | `CardTitle`、分区标题 |
+| 正文 / 值 | `text-sm`（14px） | 表单值、说明、`dd` 值 |
+| 密排数据 | `text-xs`（12px） | 世界信息列表（配 `leading-5`）、表格、标签 |
+| 元数据 | `text-2xs`（11px） | 时间戳、数量、脚注；行高由令牌 `--text-2xs--line-height: 1.5` 统一，不要在调用处再写 `leading-4/5` |
+
+- 11px 元数据**不能**再用 `/70`、`/60` 这类透明度压暗（暗色下对比度会掉到 3.5:1 以下）：
+  次要文字用完整的 `text-muted-foreground`，让字号承担「次要」。
+- **会变化或需要纵向对齐的数字用 `tabular-nums`**：玩家数、运行时长、时钟、ID、计数。
+  等宽像素数字（`font-pixel` + `leading-none`）用于图标角标，属于数据角色，不受上面行高规则约束。
+- **时间格式化跟界面语言走**，不跟系统语言走：统一用 `lib/clock.ts` 的 `formatClock(lang, ts)` /
+  `formatClockWithDate(lang, ts)`，不要直接 `new Date().toLocaleTimeString()`
+  （否则中文界面会显示 `10:29:04 AM`，装中文系统的英文用户又会看到「下午10:29」）。
+- 例外：Terraria 物品提示复刻游戏内 15px 字号（见「已核实的例外」与 `功能-合成表与物品提示.md`）。
+
+### 「只在 hover 时出现」的元数据
+
+卡片表头里的**次要操作与元数据**默认隐藏，hover / 聚焦卡片时一起淡入，避免一行里堆着时间和按钮：
+
+- 规则：`touch-visible opacity-0 transition-opacity group-hover/<name>:opacity-100 group-focus-within/<name>:opacity-100`
+  （`<name>` 是卡片自己的 group，如 `result` / `header` / `recipe` / `rich`）。
+- **必须带 `touch-visible`**：触屏没有 hover，少了它手机上永远看不到（`index.css` 里用
+  `@media (hover: none), (pointer: coarse)` 强制 `opacity: 1`）。
+- 目前这么做的：指令结果卡片的**执行时间**、收藏 / 删除按钮、折叠箭头、富文本复制按钮、合成表条目复制按钮。
+  时间与按钮同一时间淡入（隐藏时仍占位，hover 不会导致文字左右跳动）。
+
 ## 卡片的「主 / 次」层次
 
 - 亮色下 `--background` 是**纯白 `#ffffff`**（v1.50 起），`--sidebar` 为 `#fafafa` 用来区分侧栏；卡片靠 `border` 与画布区分。
@@ -106,9 +143,12 @@
   - 左栏（指令）：其余指令卡片 + 自定义卡片。
   - 移动端先渲染概览列，再渲染指令列；`xl` 起恢复左右两栏。
   - 两栏各自保持 `tswui:homeCards` 里的相对顺序（`RIGHT_COLUMN_IDS` 分栏）。
-- 指令页空态直接给出「浏览指令 / 收藏 / 最近执行」入口，不再只显示大块空白。
-  空态下编辑器位于引导卡中央并自动聚焦；产生结果后编辑器回到结果区底部并固定。
-- 指令页右侧面板改名「工具面板」；移动端点击「打开指令库」会自动滚到面板。
+- 指令页空态**不画虚线框**：工作区本身就是画布，引导块（图标 + 「开始一条指令」+ 「打开指令库」/
+  收藏 / 最近执行芯片）在工作区垂直居中；输入框始终贴底，空态与有结果时位置不变（不跳动）。
+  空态只有一句标题，不再补一行「直接输入，或从最近…」的说明——按钮已经说了去哪。
+- 指令页的「清空结果」是页面级操作，**有结果时出现在内容区顶栏右侧**（与首页刷新 / 管理同类），
+  不再占一条只放按钮的表头；没有结果时这个入口整个不渲染。
+- 指令页右侧面板改名「工具面板」；开关改成输入框左下角的四个按钮（见「指令页」），空态的「打开指令库」也直达该 tab。
 - 鱼店右侧只保留「钓鱼信息」卡片（`/fish info`），常显、无收起开关；其余 `/fish ...` 卡片已移除。
 - 需要边框的特殊卡片（如鱼店头部卡片）由调用方单独加 `border`。
 
@@ -249,7 +289,7 @@
 | `IconAction` | `components/IconAction.tsx` | 顶栏 / 工具条图标按钮：`ghost` + `icon-sm` + `Tooltip`，支持 `loading`（Spinner）与 `pressed`；手机 `…` 菜单里通过 `data-action-label` 同一份 DOM 显示文字标签 |
 | `InfoPopover` | `components/InfoPopover.tsx` | 「页面说明」info 图标 + Popover，收纳原先铺在正文里的小字说明 |
 | `FullscreenDock` | `components/FullscreenDock.tsx` | 全屏结果页**右上角**操作坞：先露出，随后收成贴右边的竖条（左侧上下圆角、宽 12px）；悬停 / 聚焦 / 点击展开，展开后 4 秒无操作再收起 |
-| `CommandLine` | `components/CommandLine.tsx` | 可复制指令：第一行标签、第二行等宽指令 + 复制按钮（数据 ID 召唤指令、物品给予指令共用） |
+| `CommandLine` | `components/CommandLine.tsx` | 可复制指令块：**属性名在灰框外**，下面每条指令各自一行（点整行即复制，右侧图标只是提示），一条属性名可带多条指令（数据 ID 召唤指令、物品给予指令共用） |
 | `CommandTerminal` / `TerminalTopBarButton` | `components/CommandTerminal.tsx` / `components/TerminalTopBarButton.tsx` | 浮动终端（桌面非模态浮窗 / 窄屏底部抽屉）与顶栏入口（除「指令」「设置」外所有页面，登录后显示；手机在 `…` 菜单里）；开关状态在 `lib/terminalContext.tsx`。见 [`功能-浮动终端.md`](功能-浮动终端.md) |
 
 ## 未登录的页面门控
@@ -303,8 +343,12 @@
 
 - 格宽 **72**、图标 **64**；列间距 **手机 8px / 桌面 16px**，行距 16px；格子默认**无底色**，hover 时只有 72×72 图标区铺 `bg-primary/10`，文字无背景，整格一起上浮。
 - 物品 ID：虚拟滚动，格宽 72 / 高 106（隐藏 ID 和名称后 72），列间距随视口切换 8/16。
+- **鱼店商品格子沿用同一套尺寸**（`components/fishshop/GoodCells.tsx` 的 `CELL_WIDTH` / `GOOD_GRID`）：
+  列宽固定 72（`grid-cols-[repeat(auto-fill,4.5rem)]`，不拉伸）、`gap-2`（行 / 列都 8px，比物品 ID 更紧）；
+  格子里从上到下是 **图标区 72×72 → `#编号` → 名称**，hover 底色只在图标区。
 - 数据 ID：Boss 分类贴图 128、格子/图标区 144（2×）；页面设置提供「隐藏 ID 和名称」；
-  召唤指令为两行（标签 + 指令 + 复制），Boss 额外给单字简写（`/sb king`、`/sb eoc`）。
+  召唤指令不按权限隐藏；「Boss召唤指令」一块内列两行（`/spawnboss "<sb>"` + 单字简写 `/sb eoc`），
+  下面再一行「NPC召唤指令」；属性名在灰框外，每行自带复制。
 
 ## 查看存档（`pages/PlrPage.tsx`）
 
@@ -333,13 +377,25 @@
 ## 指令页
 
 - 顶部下划线 tab：**指令 / 聊天**（记忆到 `tswui:commandPageTab`）；聊天 = 服务器动态 + 发言框。
-- 底部输入框右侧按钮与顶部 tab 双向联动；工具面板开关在顶栏右侧，面板无标题栏（**物品 / 收藏 / 历史**）。
-- 指令库已移到独立的「小抄」页；空态里的「打开指令库」按钮跳到该页。
+- **输入框是聊天式卡片**（`components/Composer.tsx`，指令输入框与网页发言共用）：
+  **输入在上、工具行在下** —— 左下角四个工具按钮（**指令库 / 物品 / 收藏 / 历史**，`Library/Package/Star/History`），
+  右下角是「指令 ⇄ 聊天」切换 + 主色圆发送键。顶栏不再有工具面板开关（清空结果仍在顶栏右侧）。
+  - 输入保持**单行横滚**（Enter 直接执行），`compact`（浮动终端）只是内边距/字号更小；
+  - 点工具按钮：桌面切右侧面板 tab、手机开底部抽屉；**点已打开的那个再点一次＝收起**；当前 tab 高亮；
+  - 聊天模式左侧四个按钮隐藏（只对指令有意义），卡片高度不变，切模式不跳。
+  - 右侧面板无标题栏，tab 记忆到 `tswui:commandTab`；指令库在最左。
+- 指令库在指令页的工具面板里（`CommandPickerPanel`，点一条填进页面输入框）；空态里的「打开指令库」按钮直接切到该 tab。
+- 补全下拉框里的指令候选压成一行：**指令 / 说明 / 权限**横排（不需要权限的指令不写字、不占位），
+  小屏或装不下时说明换行；同一屏能多看几条。下拉框有描边（`border-border/60`）。
+- 下拉框**只在输入框有内容时才弹**（空着点一下 / 聚焦都不弹）；别名排在说明**前面**且不带「别名：」前缀，
+  如 `/accountinfo /ai · 显示一个用户的信息。`。
+- 结果区**自动贴底**：执行后新结果直接出现在可见区底部；富文本（服务器返回后才有的内容）变高也继续跟随，
+  用户手动往上翻看旧结果时不打扰。
 
 ## 小抄（`pages/CommandTipsPage.tsx`）
 
 - 侧边栏「常用」分组，**排在「指令」下方**，图标 `ScrollText`，地址 `#/commands`。
-- 页面 tab：**默认 / NPC管理 / 指令库**；默认与 NPC管理是原小抄内容，指令库是原指令页工具面板的指令列表（点一条填进浮动终端）。
+- 页面 tab：**默认 / NPC管理**；指令库已移回指令页工具面板，这里不再重复一份。
 - 页面公开：不需要登录，也不依赖插件。
 - 工具面板内容内部滚动，输入框固定在可见区域。
 - 执行失败原因显示在**富文本下方的 `Alert`**（指令不存在 = warning，权限/执行错误 = destructive）。

@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import type { CommandDef } from '@/types'
 import { CommandEditor } from './CommandEditor'
 
 describe('CommandEditor 外部插入', () => {
@@ -109,6 +111,142 @@ describe('CommandEditor 输入组与拦截提示', () => {
     ta.dispatchEvent(ev)
     expect(onExecute).toHaveBeenCalledTimes(1)
     expect(ev.defaultPrevented).toBe(true)
+  })
+})
+
+describe('CommandEditor 指令候选', () => {
+  const cmd = (patch: Partial<CommandDef> & { name: string }): CommandDef => ({
+    aliases: [],
+    permission: null,
+    help: 'help',
+    allowServer: true,
+    doLog: true,
+    ...patch,
+  })
+
+  const items = [
+    {
+      id: 'cmd:user',
+      kind: 'command' as const,
+      label: '/user',
+      detail: '管理用户账号。',
+      insert: '/user',
+      command: cmd({ name: 'user', permission: 'tshock.superadmin.user' }),
+    },
+    {
+      id: 'cmd:help',
+      kind: 'command' as const,
+      label: '/help',
+      detail: '列出指令或显示指令的帮助信息。',
+      insert: '/help',
+      command: cmd({ name: 'help' }),
+    },
+  ]
+
+  /** 受控 harness：空输入不弹，输入 `/` 后才弹（组件按 value 内容决定）。 */
+  function ListHarness() {
+    const [value, setValue] = useState('')
+    return (
+      <I18nProvider lang="zh">
+        <CommandEditor
+          value={value}
+          onChange={setValue}
+          computeCompletions={() => items}
+          onExecute={() => {}}
+          busy={false}
+          atlas={undefined}
+        />
+      </I18nProvider>
+    )
+  }
+
+  const renderList = () => {
+    const view = render(<ListHarness />)
+    fireEvent.change(view.container.querySelector('textarea') as HTMLTextAreaElement, {
+      target: { value: '/' },
+    })
+    return view
+  }
+
+  it('有权限需求的指令显示权限节点，没有权限需求的不显示「无需权限」', () => {
+    const { container } = renderList()
+    const options = screen.getAllByRole('option')
+    expect(options).toHaveLength(2)
+    expect(within(options[0]).getByText('tshock.superadmin.user')).toBeTruthy()
+    expect(within(options[1]).queryByText(/无需权限/)).toBeNull()
+    expect(container.textContent).not.toContain('无需权限')
+  })
+
+  it('指令 / 说明 / 权限 收在同一行（一行一条，不写三行）', () => {
+    renderList()
+    const row = screen.getAllByRole('option')[0]
+    // 三端文本同属一个横向容器，行高由一条文字决定。
+    const line = row.querySelector('.flex-wrap')
+    expect(line).toBeTruthy()
+    expect(within(line as HTMLElement).getByText('/user')).toBeTruthy()
+    expect(within(line as HTMLElement).getByText('管理用户账号。')).toBeTruthy()
+    expect(within(line as HTMLElement).getByText('tshock.superadmin.user')).toBeTruthy()
+  })
+})
+
+describe('CommandEditor 下拉框出现时机与外观', () => {
+  const items = [
+    {
+      id: 'cmd:give',
+      kind: 'command' as const,
+      label: '/give',
+      detail: '/g · 给玩家物品。',
+      insert: '/give',
+      command: {
+        name: 'give',
+        aliases: ['g'],
+        permission: 'tshock.item.give',
+        help: 'Gives another player an item.',
+        allowServer: true,
+        doLog: true,
+      },
+    },
+  ]
+
+  function Harness() {
+    const [value, setValue] = useState('')
+    return (
+      <I18nProvider lang="zh">
+        <CommandEditor
+          value={value}
+          onChange={setValue}
+          computeCompletions={() => items}
+          onExecute={() => {}}
+          busy={false}
+          atlas={undefined}
+        />
+      </I18nProvider>
+    )
+  }
+
+  it('输入框为空时不弹下拉框（聚焦 / 点击也不弹），输入 `/` 才弹', () => {
+    const { container } = render(<Harness />)
+    const ta = container.querySelector('textarea') as HTMLTextAreaElement
+
+    fireEvent.click(ta)
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
+
+    fireEvent.change(ta, { target: { value: '/' } })
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+
+    // 清空后自己收起来
+    fireEvent.change(ta, { target: { value: '' } })
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
+  })
+
+  it('下拉框有描边', () => {
+    const { container } = render(<Harness />)
+    fireEvent.change(container.querySelector('textarea') as HTMLTextAreaElement, {
+      target: { value: '/' },
+    })
+    const panel = screen.getByRole('listbox').parentElement as HTMLElement
+    expect(panel.className).toContain('border')
+    expect(panel.className).toContain('border-border/60')
   })
 })
 

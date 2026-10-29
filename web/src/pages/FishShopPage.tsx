@@ -7,7 +7,7 @@ import { Notice } from '@/components/Notice'
 import { CommandOutput } from '@/components/ResultPanel'
 import { FishCommandCards } from '@/components/FishCommandCards'
 import { TopBarActions } from '@/components/TopBar'
-import { CELL_ICON_SIZE, GoodCell, GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
+import { CELL_ICON_SIZE, GOOD_GRID, GoodCell, GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
 import { cn } from '@/lib/cn'
 import { splitFishArgs } from '@/lib/fishArgs'
 import { isDegradedGood } from '@/lib/fishGood'
@@ -41,6 +41,8 @@ import {
 import { useModuleState } from '@/hooks/useModuleState'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
+import { formatClock } from '@/lib/clock'
+
 import { TshockRequestError } from '@/lib/tshock'
 import type { BackendTransport, FishBuyResult, FishCapabilities, FishGood, FishShop } from '@/lib/tshock'
 
@@ -77,7 +79,7 @@ const DEFAULT_STATE: FishUiState = { query: '' }
 
 /** 网格图标尺寸：与「物品图鉴」一致（64px）。 */
 export function FishShopPage({ serverId, transport, authenticated, refreshInterval, onTokenInvalid, onLogin }: FishShopPageProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const dataset = useDataset()
   const [ui, setUi] = useModuleState<FishUiState>(serverId, 'store', DEFAULT_STATE)
   const [capability, setCapability] = useState<FishCapabilities | null>(null)
@@ -470,100 +472,89 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       )}
 
       {canUse && (
-        <>
-          {/* 头部：唯一一块白底区域（输入框 + 一行件数） */}
-          <Card className="flex min-w-0 flex-col">
-            <CardBody className="flex flex-col gap-2 py-3">
-              <InputGroup>
-                <InputGroupInput
-                  value={ui.query}
-                  onChange={(e) => setUi({ query: e.target.value })}
-                  placeholder={t('fish.search')}
-                  aria-label={t('fish.search')}
-                />
-                <InputGroupAddon align="inline-end">
-                  <TooltipProvider delayDuration={150}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          disabled={loading}
-                          aria-label={t('home.refresh')}
-                          onClick={() => void loadShop()}
-                        >
-                          {loading ? (
-                            <Spinner aria-hidden />
-                          ) : (
-                            <RefreshCw aria-hidden />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {lastShopLoadedAt
-                          ? t('home.lastRefresh', {
-                              time: new Date(lastShopLoadedAt).toLocaleTimeString(),
-                            })
-                          : t('home.neverRefreshed')}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </InputGroupAddon>
+        // 搜索行与货架一起铺在页面背景上、放在同一个滚动区域内：输入框不再是单独一张卡片，
+        // 往下滚看商品时它会随内容一起滚走（避免「白卡 + 网格」两段式观感）。
+        <div className="min-w-0 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain">
+          <div className="flex min-w-0 flex-col gap-2 pb-2">
+            <div className="flex min-w-0 items-center gap-3">
+                <InputGroup className="max-w-sm">
+                    <InputGroupInput
+                      value={ui.query}
+                      onChange={(e) => setUi({ query: e.target.value })}
+                      placeholder={t('fish.search')}
+                      aria-label={t('fish.search')}
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon-sm"
+                              variant="ghost"
+                              disabled={loading}
+                              aria-label={t('home.refresh')}
+                              onClick={() => void loadShop()}
+                            >
+                              {loading ? (
+                                <Spinner aria-hidden />
+                              ) : (
+                                <RefreshCw aria-hidden />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {lastShopLoadedAt
+                              ? t('home.lastRefresh', {
+                                  time: formatClock(lang, lastShopLoadedAt),
+                                })
+                              : t('home.neverRefreshed')}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </InputGroupAddon>
               </InputGroup>
-              <span className="text-2xs text-muted-foreground">
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                 {t('fish.total', { n: goods.length })}
               </span>
-              {error && !selected && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-            </CardBody>
-          </Card>
-
-          {/* 商品区：铺在页面背景上、无左右边距；自身是滚动区域（在 row2 内 flex-1 填满），滚轮不传递给右列 */}
-          <div className="min-w-0 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain">
-            {loading && !shop ? (
-              <div
-                className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${CELL_ICON_SIZE + 24}px, 1fr))` }}
-                role="status"
-                aria-busy="true"
-                aria-label={t('fish.loading')}
-              >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <div key={i} className="grid place-items-center gap-2 rounded-xl p-2">
-                    <Skeleton className="size-16 rounded-xl" />
-                    <Skeleton className="h-3 w-20" />
-                    <Skeleton className="h-2.5 w-10" />
-                  </div>
-                ))}
-              </div>
-            ) : goods.length === 0 ? (
-              // 拉货架失败（如「商店打烊」）时错误已在工具条提示，这里不再说「没有匹配的商品」（会让人以为搜错了）。
-              error ? null : (
-                <Empty className="min-h-40 border border-dashed">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <Fish />
-                    </EmptyMedia>
-                    <EmptyTitle>{t('fish.empty')}</EmptyTitle>
-                    <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              )
-            ) : (
-              <div
-                className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${CELL_ICON_SIZE + 24}px, 1fr))` }}
-              >
-                {goods.map((good) => (
-                  <GoodCell key={good.serial} good={good} dataset={dataset} onSelect={openDetail} />
-                ))}
-              </div>
+            </div>
+            {error && !selected && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
           </div>
-        </>
+
+          {loading && !shop ? (
+            <div className={GOOD_GRID} role="status" aria-busy="true" aria-label={t('fish.loading')}>
+              {Array.from({ length: 12 }, (_, i) => (
+                <div key={i} className="grid place-items-center gap-1">
+                  <Skeleton className="size-18 rounded-lg" />
+                  <Skeleton className="h-2.5 w-8" />
+                  <Skeleton className="h-3 w-12" />
+                </div>
+              ))}
+            </div>
+          ) : goods.length === 0 ? (
+            // 拉货架失败（如「商店打烊」）时错误已在工具条提示，这里不再说「没有匹配的商品」（会让人以为搜错了）。
+            error ? null : (
+              <Empty className="min-h-40 border border-dashed">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Fish />
+                  </EmptyMedia>
+                  <EmptyTitle>{t('fish.empty')}</EmptyTitle>
+                  <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )
+          ) : (
+            <div className={GOOD_GRID}>
+              {goods.map((good) => (
+                <GoodCell key={good.serial} good={good} dataset={dataset} onSelect={openDetail} />
+              ))}
+            </div>
+          )}
+        </div>
       )}
         </div>
 

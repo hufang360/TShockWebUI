@@ -90,7 +90,7 @@ export function ItemDropsPanel({
           })}
         </div>
         {Number.isFinite(trials) && (trials ?? 0) > 0 && (
-          <p className={cn('mt-1 text-xs text-muted-foreground/70')}>
+          <p className={cn('mt-1 text-xs text-muted-foreground')}>
             {t('drops.note', { n: trials as number })}
           </p>
         )}

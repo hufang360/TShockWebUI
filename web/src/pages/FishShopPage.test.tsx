@@ -94,6 +94,39 @@ describe('FishShopPage', () => {
     expect(screen.getByText('#1')).toBeTruthy()
   })
 
+  it('格子高度跟随内容：`h-auto` 必须同时写 `md:h-auto`', async () => {
+    // 尺寸变体自带 `md:h-9`（媒体查询变体在后，会盖掉无断点的 `h-auto`）：只写 `h-auto` 时
+    // ≥768px 的格子被锁成 36px，图标 / 名称溢出压到下一行，整片商品重叠。
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+
+    const cell = await screen.findByRole('button', { name: '生命水晶' })
+    expect(cell.className).toContain('h-auto')
+    expect(cell.className).toContain('md:h-auto')
+  })
+
+  it('商品格子和「物品 ID」同尺寸同排版：72 宽 / 图标 64、编号在名称上面、hover 底色只在图标区', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+
+    const cell = await screen.findByRole('button', { name: '生命水晶' })
+    // 宽度上限 72（w-18），不随窗口拉伸；整格 hover 不铺底色。
+    expect(cell.className).toContain('w-18')
+    expect(cell.className).toContain('hover:bg-transparent')
+    // 子节点顺序：图标区 → #编号 → 名称（编号在名称**上面**一行）。
+    const parts = [...cell.children].map((el) => el.textContent?.trim() ?? '')
+    expect(parts).toHaveLength(3)
+    expect(parts[0]).toBe('')
+    expect(parts[1]).toBe('#1')
+    expect(parts[2]).toBe('生命水晶')
+    // 底色只挂在 72×72 的图标区上。
+    const surface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
+    expect(surface.className).toContain('size-18')
+    expect(surface.className).toContain('group-hover/cell:bg-primary/10')
+    // 网格：列宽固定 72、行列间距都是 8px。
+    const grid = cell.parentElement as HTMLElement
+    expect(grid.className).toContain('grid-cols-[repeat(auto-fill,4.5rem)]')
+    expect(grid.className).toContain('gap-2')
+  })
+
   it('右侧只保留「钓鱼信息」卡片，且不再有「游戏内指令」开关', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
@@ -118,11 +151,23 @@ describe('FishShopPage', () => {
     expect(within(cell).getByRole('img').parentElement?.className ?? '').not.toContain('opacity-80')
   })
 
-  it('件数在头部文字行；刷新图标 tooltip 显示上次刷新时间', async () => {
+  it('件数与输入框在同一行（输入框宽度收窄），且不在卡片里、属于滚动区域', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
-    expect(await screen.findByText('1 件商品')).toBeTruthy()
+    const count = await screen.findByText('1 件商品')
     const group = document.querySelector('[data-slot="input-group"]') as HTMLElement
+    // 件数不再是输入框下面的一行：与输入框同一个 row 容器，且输入框宽度有上限。
+    const row = group.parentElement as HTMLElement
+    expect(row.contains(count)).toBe(true)
+    expect(row.className).toContain('items-center')
+    expect(group.className).toContain('max-w-sm')
+    expect(count.className).toContain('shrink-0')
+    // 头部白卡已移除：输入框直接铺在页面背景上，和货架同处一个滚动区域（往下滚会一起滚走）。
+    expect(group.closest('[data-slot="card"]')).toBeNull()
+    const scroller = group.closest('[class*="xl:overflow-y-auto"]') as HTMLElement | null
+    expect(scroller).toBeTruthy()
+    expect(scroller?.contains(screen.getByText('#1'))).toBe(true)
+
     fireEvent.focus(within(group).getByRole('button', { name: '刷新' }))
     const tip = await screen.findByRole('tooltip')
     expect(within(tip).getByText(/上次刷新/)).toBeTruthy()

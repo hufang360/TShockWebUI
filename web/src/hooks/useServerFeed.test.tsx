@@ -220,6 +220,92 @@ it('SSE 收到 reset 帧后清空列表并重新连接', async () => {
 })
 
 /**
+ * 回归：SSE 已连接时点「刷新」以前什么都不拉（只把「刷新于」改成当前时间，安慰剂）。
+ * 现在必须强制重新同步：断开长连接、重拉尾部事件、重连。
+ */
+it('手动刷新在 SSE 连接中也会真的重新拉取并重连', async () => {
+  let emit: ((e: ServerEvent) => void) | null = null
+  const close = vi.fn()
+  let call = 0
+  const eventsTail = vi.fn(async () => {
+    call += 1
+    return { events: [], lastSeq: 0, instance: 'X' }
+  })
+  const eventsStream = vi.fn(
+    (handlers: { onEvent: (e: ServerEvent) => void; onWorld?: (i: ServerInfoExtra) => void }) => {
+      emit = handlers.onEvent
+      return close
+    },
+  )
+  const transport = fakeTransport({
+    serverInfoExtra: async () => ({}) as ServerInfoExtra,
+    eventsTail,
+    eventsStream,
+  })
+
+  const { result } = renderHook(() =>
+    useServerFeed({ transport, authenticated: true, serverId: 'default', refreshInterval: 60000 }),
+  )
+
+  await waitFor(() => expect(eventsStream).toHaveBeenCalledTimes(1))
+  expect(eventsTail).toHaveBeenCalledTimes(1)
+  expect(result.current.refreshing).toBe(false)
+
+  // 流里的实时事件不应被手动刷新清掉。
+  act(() => {
+    emit?.({ seq: 3, type: 'chat', text: 'hf: hi', time: '' })
+  })
+  await waitFor(() => expect(result.current.events).toHaveLength(1))
+
+  act(() => result.current.refresh())
+  // 手动刷新期间按钮转圈。
+  await waitFor(() => expect(result.current.refreshing).toBe(true))
+  // 真的重新拉了尾部事件、断过流、又重新连上了。
+  await waitFor(() => expect(eventsTail).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(close).toHaveBeenCalled())
+  await waitFor(() => expect(eventsStream).toHaveBeenCalledTimes(2))
+  // 拉完转圈停止，已有事件保留。
+  await waitFor(() => expect(result.current.refreshing).toBe(false))
+  expect(result.current.events.map((e) => e.seq)).toEqual([3])
+})
+
+/** 自动刷新令牌（页面刷新间隔 / 发言成功后）只需补拉一次，不该把 SSE 断掉重连。 */
+it('自动刷新令牌只补拉一次，不断开 SSE', async () => {
+  const close = vi.fn()
+  const eventsTail = vi.fn(async () => ({ events: [], lastSeq: 0, instance: 'X' }))
+  const eventsStream = vi.fn(() => close)
+  const transport = fakeTransport({
+    serverInfoExtra: async () => ({}) as ServerInfoExtra,
+    eventsTail,
+    eventsStream,
+  })
+
+  const { rerender } = renderHook(
+    ({ token }: { token: number }) =>
+      useServerFeed({
+        transport,
+        authenticated: true,
+        serverId: 'default',
+        refreshInterval: 60000,
+        refreshToken: token,
+      }),
+    { initialProps: { token: 0 } },
+  )
+
+  await waitFor(() => expect(eventsStream).toHaveBeenCalledTimes(1))
+  expect(eventsTail).toHaveBeenCalledTimes(1)
+
+  rerender({ token: 1 })
+  await act(async () => {
+    await Promise.resolve()
+  })
+  // 流活跃时数据本来就实时到达：自动刷新不必补拉、不能重连（重连是手动刷新的事）。
+  expect(eventsTail).toHaveBeenCalledTimes(1)
+  expect(close).not.toHaveBeenCalled()
+  expect(eventsStream).toHaveBeenCalledTimes(1)
+})
+
+/**
  * 登录态失效（换服后旧 token 通常失效 / 后端重启）：走统一的重新登录流程，
  * 而不是把 403 当成瞬时错误按刷新间隔反复重试。
  */

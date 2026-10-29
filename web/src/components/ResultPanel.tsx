@@ -21,6 +21,8 @@ import {
 import { useBottomList } from '@/hooks/useBottomList'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { formatClock } from '@/lib/clock'
+
 import { hasTextSelection } from '@/lib/selection'
 import type { Atlas, CommandResult, CommandStatus, Item, Prefix } from '@/types'
 
@@ -163,7 +165,7 @@ function ResultItem({
   /** 切换折叠状态（传入后会持久化，切换模块回来仍保持）。 */
   onToggleCollapse?: (seq: number, collapsed: boolean) => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { result, command } = entry
   // 未提供持久化回调时退化为组件内 state。
   const [localCollapsed, setLocalCollapsed] = useState(false)
@@ -204,9 +206,10 @@ function ResultItem({
             >
               {command}
             </span>
-            {/* 执行时间紧挨操作区（收藏 / 删除）左侧。 */}
-            <span className="shrink-0 text-2xs text-muted-foreground tabular-nums">
-              {new Date(entry.ts).toLocaleTimeString()}
+            {/* 执行时间紧挨操作区（收藏 / 删除）左侧；与按钮一样**只在 hover / focus 时出现**
+                （触屏没有 hover，`touch-visible` 保持常显，否则看不到时间）。 */}
+            <span className="touch-visible shrink-0 text-2xs text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover/result:opacity-100 group-focus-within/result:opacity-100">
+              {formatClock(lang, entry.ts)}
             </span>
             {/* 收藏 / 删除：hover 卡片才出现；点击不触发展开 / 折叠。 */}
             <div
@@ -299,7 +302,7 @@ export function ResultPanel({
 }) {
   const { t } = useI18n()
   // 默认停在最新一条（贴底），旧结果按批懒加载（jsdom 下赋值无副作用）。
-  const { ref, onScroll, start, hidden, loadEarlier, step } = useBottomList(entries.length, {
+  const { ref, contentRef, onScroll, start, hidden, loadEarlier, step } = useBottomList(entries.length, {
     initial: RESULT_WINDOW,
   })
   const shown = entries.slice(start)
@@ -321,28 +324,32 @@ export function ResultPanel({
     <div
       ref={ref}
       onScroll={onScroll}
-      className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
     >
-      <LoadEarlier hidden={hidden} step={step} onLoad={loadEarlier} />
-      {shown.map((entry) => (
-        <ResultItem
-          key={entry.seq}
-          entry={entry}
-          itemsById={itemsById}
-          prefixesById={prefixesById}
-          atlas={atlas}
-          onRemove={onRemove}
-          isFavorite={isFavorite}
-          onToggleFavorite={onToggleFavorite}
-          onToggleCollapse={onToggleCollapse}
-        />
-      ))}
-      {running && (
-        <div className="flex items-center gap-2 pt-3 text-sm text-foreground">
-          <Spinner className="size-3.5" />
-          {t('result.running')}
-        </div>
-      )}
+      {/* 内层容器由 useBottomList 观察：富文本结果在服务器返回后才长出内容，
+          容器本身的尺寸不变，只观察容器抓不到这次高度变化。 */}
+      <div ref={contentRef} className="flex flex-col gap-2">
+        <LoadEarlier hidden={hidden} step={step} onLoad={loadEarlier} />
+        {shown.map((entry) => (
+          <ResultItem
+            key={entry.seq}
+            entry={entry}
+            itemsById={itemsById}
+            prefixesById={prefixesById}
+            atlas={atlas}
+            onRemove={onRemove}
+            isFavorite={isFavorite}
+            onToggleFavorite={onToggleFavorite}
+            onToggleCollapse={onToggleCollapse}
+          />
+        ))}
+        {running && (
+          <div className="flex items-center gap-2 pt-3 text-sm text-foreground">
+            <Spinner className="size-3.5" />
+            {t('result.running')}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

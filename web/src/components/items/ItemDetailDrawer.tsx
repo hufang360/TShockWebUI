@@ -303,7 +303,9 @@ function ItemDetailPanel({
           </div>
         </div>
 
-        {giveCommand && <CommandLine label={t('dex.giveCommand')} command={giveCommand} />}
+        {giveCommand && (
+          <CommandLine label={t('dex.giveCommand')} commands={[giveCommand]} />
+        )}
 
         {/* 物品级标签：可丢微光分解（数据见 gamedump 的 canDecraft）
             已融入到「合成表」的每条记录里（见 RecipePanel），这里不再单独占一行。 */}

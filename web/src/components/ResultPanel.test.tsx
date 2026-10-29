@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { formatClock } from '@/lib/clock'
 import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
 import { ResultPanel, type ResultEntry } from './ResultPanel'
@@ -146,6 +147,24 @@ describe('ResultPanel', () => {
     )
     expect(screen.getByText('/time')).toBeTruthy()
     expect(screen.queryByText('上午 8:30')).toBeNull()
+  })
+
+  it('执行时间默认隐藏：和收藏 / 删除图标一样，hover 或聚焦卡片才出现', () => {
+    const ts = new Date('2026-10-29T03:05:00Z').getTime()
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[{ seq: 1, ts, command: '/time', result: { status: 'ok', output: ['上午 8:30'] } }]}
+          running={false}
+        />
+      </I18nProvider>,
+    )
+    const time = screen.getByText(formatClock('zh', ts))
+    expect(time.className).toContain('opacity-0')
+    expect(time.className).toContain('group-hover/result:opacity-100')
+    expect(time.className).toContain('group-focus-within/result:opacity-100')
+    // 触屏没有 hover：保持常显，否则永远看不到时间。
+    expect(time.className).toContain('touch-visible')
   })
 
   it('折叠状态变化时回调（供本机记忆）', () => {

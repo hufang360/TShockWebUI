@@ -19,6 +19,8 @@ import {
 import { useCollapsed } from '@/hooks/useCollapsed'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { formatClock } from '@/lib/clock'
+
 import { hasTextSelection } from '@/lib/selection'
 import type { Atlas, CommandResult, Item, Prefix } from '@/types'
 
@@ -74,7 +76,7 @@ export function CommandCard({
   atlas,
   className,
 }: CommandCardProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   // 展开 / 折叠状态按卡片记忆（切换模块回来仍保持）。
   const [open, setOpen] = useCollapsed(collapseKey)
   const lastRun = result?.ts ? new Date(result.ts) : null
@@ -101,7 +103,7 @@ export function CommandCard({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            {lastRun ? t('home.lastRun', { time: lastRun.toLocaleTimeString() }) : t('home.neverRun')}
+            {lastRun ? t('home.lastRun', { time: formatClock(lang, lastRun) }) : t('home.neverRun')}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

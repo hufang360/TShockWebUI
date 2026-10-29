@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import type { BackendTransport } from '@/lib/tshock'
@@ -224,6 +224,45 @@ function renderTab(transport: BackendTransport) {
     </I18nProvider>,
   )
 }
+
+describe('ServerFeedTab 手动刷新', () => {
+  it('刷新时按钮转圈并禁用，跑完恢复；期间会真的重新拉取', async () => {
+    let resolveTail: (() => void) | null = null
+    let calls = 0
+    const eventsTail = vi.fn(async () => {
+      calls += 1
+      if (calls > 1) {
+        // 第二次（手动刷新）先挂住，好观察转圈状态。
+        await new Promise<void>((resolve) => {
+          resolveTail = resolve
+        })
+      }
+      return { events: [{ seq: 1, type: 'join', text: 'Alice 加入了服务器', time: '' }], lastSeq: 1 }
+    })
+    const transport = makeTransport({
+      serverInfoExtra: async () => ({}) as never,
+      eventsTail,
+    } as never)
+    renderTab(transport)
+
+    expect(await screen.findByText('Alice 加入了服务器')).toBeTruthy()
+    const button = screen.getByRole('button', { name: /重新同步服务器动态/ })
+    expect(button.hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(button)
+    // 转圈中：禁用 + aria-busy，并且确实发起了第二次拉取。
+    await waitFor(() => expect(button.getAttribute('aria-busy')).toBe('true'))
+    expect(button.hasAttribute('disabled')).toBe(true)
+    expect(eventsTail).toHaveBeenCalledTimes(2)
+    expect(button.querySelector('.animate-spin')).toBeTruthy()
+
+    act(() => resolveTail?.())
+    await waitFor(() => expect(button.getAttribute('aria-busy')).toBe('false'))
+    expect(button.hasAttribute('disabled')).toBe(false)
+    // 事件没被清空
+    expect(screen.getByText('Alice 加入了服务器')).toBeTruthy()
+  })
+})
 
 describe('ServerFeedTab 类型筛选', () => {
   it('「进出服」筛选同时显示进服和退服事件', async () => {

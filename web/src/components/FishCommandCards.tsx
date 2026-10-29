@@ -10,6 +10,8 @@ import { DEFAULT_AUTO_EXEC, isManual, sanitizeAutoExec, setManual } from '@/lib/
 import { useCommandResults } from '@/lib/commandResults'
 import { useExecutionQueue } from '@/lib/executionQueue'
 import { useI18n } from '@/lib/i18n'
+import { formatClock, formatClockWithDate } from '@/lib/clock'
+
 import { isRefreshDue, lastRefreshedAt, markRefreshed, refreshScope } from '@/lib/refreshGate'
 import { StorageKeys } from '@/lib/storage'
 import { resultFromError, TshockRequestError, type BackendTransport } from '@/lib/tshock'
@@ -57,7 +59,7 @@ export function FishCommandCards({
   refreshInterval,
   onTokenInvalid,
 }: FishCommandCardsProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { enqueue, busy, busyPrefix } = useExecutionQueue()
   const { results, setResult } = useCommandResults()
   const [batchMode] = useLocalState(StorageKeys.homeBatch, false)
@@ -225,9 +227,9 @@ export function FishCommandCards({
       {lastRefreshAt && (
         <span
           className="hidden text-2xs text-muted-foreground sm:inline"
-          title={new Date(lastRefreshAt).toLocaleString()}
+          title={formatClockWithDate(lang, lastRefreshAt)}
         >
-          {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
+          {t('home.lastRefresh', { time: formatClock(lang, lastRefreshAt) })}
         </span>
       )}
       <IconAction

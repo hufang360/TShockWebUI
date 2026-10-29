@@ -1,13 +1,8 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Send } from 'lucide-react'
-import {
-  Button,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  Spinner,
-} from '@/components/ui'
+import { Composer } from '@/components/Composer'
+import { Button, Spinner } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { TshockRequestError, type BackendTransport } from '@/lib/tshock'
@@ -95,36 +90,38 @@ export function WebChatInput({
           void send()
         }}
       >
-        <InputGroup
-          className={cn(
-            'h-11 rounded-full border border-border bg-card pr-1 pl-4 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring',
-            compact && 'h-8',
-          )}
+        <Composer
+          compact={compact}
+          trailing={
+            <>
+              {beforeSend}
+              <Button
+                type="submit"
+                size="icon"
+                variant="primary"
+                className={cn('shrink-0 rounded-full', compact ? 'size-7' : 'size-9')}
+                disabled={sending || disabled || text.trim().length === 0}
+                aria-label={t('feed.chatSend')}
+                title={t('feed.chatSend')}
+              >
+                {sending ? <Spinner aria-hidden /> : <Send data-icon="inline-start" />}
+              </Button>
+            </>
+          }
         >
-          <InputGroupInput
+          <input
             value={text}
             maxLength={200}
             disabled={sending || disabled}
             placeholder={disabled ? t('feed.chatPluginMissing') : t('feed.chatPlaceholder')}
             aria-label={t('feed.chatPlaceholder')}
-            className={compact ? 'text-xs' : undefined}
+            className={cn(
+              'h-9 w-full min-w-0 bg-transparent px-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none',
+              compact && 'h-7 text-xs',
+            )}
             onChange={(e) => setText(e.target.value)}
           />
-          <InputGroupAddon align="inline-end" className="[&_button]:size-9">
-            {beforeSend}
-            <Button
-              type="submit"
-              size="icon-sm"
-              variant="primary"
-              className="rounded-full"
-              disabled={sending || disabled || text.trim().length === 0}
-              aria-label={t('feed.chatSend')}
-              title={t('feed.chatSend')}
-            >
-              {sending ? <Spinner aria-hidden /> : <Send />}
-            </Button>
-          </InputGroupAddon>
-        </InputGroup>
+        </Composer>
       </form>
       {error ? (
         <p className={cn('flex flex-wrap items-center gap-2 text-destructive', compact ? 'text-2xs' : 'text-2xs')}>

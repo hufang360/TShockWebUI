@@ -9,6 +9,8 @@ import { Badge, Button, Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/com
 import { useBatchSelect } from '@/hooks/useBatchSelect'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { formatClock } from '@/lib/clock'
+
 import { HISTORY_LIMIT } from '@/lib/history'
 import type { HistoryEntry } from '@/types'
 
@@ -29,7 +31,7 @@ export function HistoryPanel({
   onDedupe: () => void
   onClear: () => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [query, setQuery] = useState('')
   const batch = useBatchSelect()
   const keyword = query.trim().toLowerCase()
@@ -129,7 +131,7 @@ export function HistoryPanel({
                     </span>
                     {!h.ok && <Badge tone={STATUS_TONE[status]}>{t(`status.${status}`)}</Badge>}
                     <span className="shrink-0 font-sans text-2xs text-muted-foreground">
-                      {new Date(h.ts).toLocaleTimeString()}
+                      {formatClock(lang, h.ts)}
                     </span>
                   </Button>
                 </li>

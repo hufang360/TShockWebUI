@@ -1,15 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
-  BookOpen,
   History,
+  Library,
   MessageCircle,
   Package,
-  PanelRight,
   Star,
   Terminal,
 } from 'lucide-react'
 import { HistoryPanel } from '@/components/command/HistoryPanel'
-import { IconAction } from '@/components/IconAction'
 import { CommandEditor } from '@/components/CommandEditor'
 import { CommandPickerPanel } from '@/components/CommandPickerPanel'
 import { ConfirmButton } from '@/components/ConfirmButton'
@@ -24,12 +22,10 @@ import {
   Button,
   Card,
   CardBody,
-  CardHeader,
   Empty,
   EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
   EmptyMedia,
+  EmptyHeader,
   EmptyTitle,
   Separator,
   Sheet,
@@ -60,7 +56,6 @@ import type {
   FavoriteEntry,
   ItemFavorite,
   Settings,
-  TabId,
 } from '@/types'
 
 interface CommandPageProps {
@@ -81,13 +76,14 @@ interface CommandPageProps {
   onLogin: () => void
   /** 前往物品图鉴并显示该物品。 */
   onOpenInDex?: (itemId: number) => void
-  /** 前往其它页面（小抄 tab 里的「数据 ID → NPC」入口）。 */
-  onNavigate?: (tab: TabId) => void
 }
 
-type SidebarTab = 'items' | 'favorites' | 'history'
+type SidebarTab = 'commands' | 'items' | 'favorites' | 'history'
 
-/** 页面顶部三个 tab：指令 / 聊天 / 小抄。 */
+/** 工具面板 tab 顺序：指令库在最左，其次是物品 / 收藏 / 历史。 */
+const SIDEBAR_TABS: readonly SidebarTab[] = ['commands', 'items', 'favorites', 'history']
+
+/** 页面顶部两个 tab：指令 / 聊天。 */
 type PageTab = 'command' | 'chat'
 
 export function CommandPage({
@@ -102,7 +98,6 @@ export function CommandPage({
   onTokenInvalid,
   onLogin,
   onOpenInDex,
-  onNavigate,
 }: CommandPageProps) {
   const { t } = useI18n()
   const [text, setText] = useLocalState(StorageKeys.draft, '')
@@ -132,11 +127,13 @@ export function CommandPage({
     pushHistory,
   })
   // 记忆右侧当前 tab（刷新 / 切页后保持）。
-  const [tab, setTab] = useLocalState<SidebarTab>(StorageKeys.commandTab, 'items')
+  const [storedTab, setTab] = useLocalState<SidebarTab>(StorageKeys.commandTab, 'items')
+  // 旧版本存过的 tab（如已移除的「动态」）回落到「物品」。
+  const tab: SidebarTab = SIDEBAR_TABS.includes(storedTab) ? storedTab : 'items'
   // 右栏整列可折叠。
   const [panelOpen, setPanelOpen] = useState(true)
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false)
-  // 页面顶部 tab（指令 / 聊天 / 小抄）与底部输入框右侧的切换按钮双向联动。
+  // 页面顶部 tab（指令 / 聊天）与底部输入框右侧的切换按钮双向联动。
   const [storedPageTab, setPageTab] = useLocalState<PageTab>(StorageKeys.commandPageTab, 'command')
   // 旧版本可能存了已移除的 `tips`：回落到「指令」。
   const pageTab: PageTab = storedPageTab === 'chat' ? 'chat' : 'command'
@@ -162,7 +159,6 @@ export function CommandPage({
   // 页面始终占满主内容区：结果区自己滚动，输入框固定在页面底部。
   const rootRef = useRef<HTMLDivElement>(null)
   const fillHeight = usePageHeight(rootRef, authenticated)
-
 
   // 收藏指令（tswui:favorites）：收藏 tab 展示、结果卡片星标增删。
   const [rawFavorites, setRawFavorites] = useLocalState<FavoriteEntry[]>(StorageKeys.favorites, [])
@@ -288,6 +284,55 @@ export function CommandPage({
     </Button>
   )
 
+  /** 切换工具面板：点已打开的那个 tab 再点一下＝收起面板。 */
+  const toggleTools = useCallback(
+    (next: SidebarTab) => {
+      const visible = wideLayout ? panelOpen : mobileToolsOpen
+      if (visible && tab === next) {
+        if (wideLayout) setPanelOpen(false)
+        else setMobileToolsOpen(false)
+        return
+      }
+      openTools(next)
+    },
+    [wideLayout, panelOpen, mobileToolsOpen, tab, openTools],
+  )
+
+  const toolsVisible = wideLayout ? panelOpen : mobileToolsOpen
+
+  /** 输入框左下角的工具按钮（指令库 / 物品 / 收藏 / 历史）。 */
+  const toolButtons = (
+    <div className="flex min-w-0 items-center gap-1 overflow-x-auto" role="group" aria-label={t('editor.panel')}>
+      {(
+        [
+          ['commands', Library, t('editor.tab.commands')],
+          ['items', Package, t('editor.tab.items')],
+          ['favorites', Star, t('editor.tab.favorites')],
+          ['history', History, t('editor.tab.history')],
+        ] as const
+      ).map(([value, Icon, label]) => {
+        const active = toolsVisible && tab === value
+        return (
+          <Button
+            key={value}
+            size="icon"
+            variant="ghost"
+            className={cn(
+              'size-8 shrink-0 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground',
+              active && 'bg-accent text-foreground',
+            )}
+            aria-label={label}
+            aria-pressed={active}
+            title={label}
+            onClick={() => toggleTools(value)}
+          >
+            <Icon />
+          </Button>
+        )
+      })}
+    </div>
+  )
+
   const commandComposer = (
     <>
       <CommandEditor
@@ -304,6 +349,7 @@ export function CommandPage({
         onInsertHandled={() => setInsertRequest(null)}
         focusRequest={focusSeq}
         history={history.map((h) => h.cmd)}
+        leading={toolButtons}
         beforeSend={modeToggle}
       />
       <TagAssist dataset={dataset} text={text} />
@@ -324,6 +370,10 @@ export function CommandPage({
     <div className="flex h-full min-h-0 flex-col gap-2">
       <Tabs value={tab} onValueChange={(v) => setTab(v as SidebarTab)} className="w-full gap-0">
         <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
+          <TabsTrigger value="commands" className="min-w-14 shrink-0">
+            <Library data-icon="inline-start" />
+            {t('editor.tab.commands')}
+          </TabsTrigger>
           <TabsTrigger value="items" className="min-w-14 shrink-0">
             <Package data-icon="inline-start" />
             {t('editor.tab.items')}
@@ -339,6 +389,9 @@ export function CommandPage({
         </TabsList>
       </Tabs>
       <div className="min-h-0 flex-1 overflow-hidden">
+        {tab === 'commands' && (
+          <CommandPickerPanel view="commands" dataset={dataset} onLoad={loadText} />
+        )}
         {tab === 'items' && (
           <ItemSearchPanel
             dataset={dataset}
@@ -382,18 +435,13 @@ export function CommandPage({
         className="flex h-full min-h-[360px] min-w-0 flex-col gap-3"
         style={fillHeight ? { height: fillHeight } : undefined}
       >
-        {/* 工具面板开关收到顶栏右侧；聊天 / 小抄 tab 不需要它。 */}
+        {/* 清空结果是页面级操作：有结果才出现，位置在顶栏右侧（与首页刷新 / 管理一致）。
+            工具面板的开关不在这里——它现在是输入框左侧的四个按钮。 */}
         <TopBarActions>
-          {authenticated && pageTab === 'command' && (
-            <IconAction
-              label={t('editor.panel')}
-              icon={PanelRight}
-              pressed={wideLayout ? panelOpen : undefined}
-              onClick={() => {
-                if (wideLayout) setPanelOpen((value) => !value)
-                else setMobileToolsOpen(true)
-              }}
-            />
+          {authenticated && pageTab === 'command' && results.length > 0 && (
+            <ConfirmButton onConfirm={clearResults} confirmLabel={t('action.clearConfirm')}>
+              {t('result.clear')}
+            </ConfirmButton>
           )}
         </TopBarActions>
 
@@ -424,33 +472,27 @@ export function CommandPage({
               )}
             >
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <CardHeader className="shrink-0 justify-end">
-                  <ConfirmButton
-                    onConfirm={clearResults}
-                    disabled={results.length === 0}
-                    confirmLabel={t('action.clearConfirm')}
-                  >
-                    {t('result.clear')}
-                  </ConfirmButton>
-                </CardHeader>
-                <CardBody className="flex min-h-0 flex-1 flex-col overflow-hidden pt-0">
+                <CardBody className="flex min-h-0 flex-1 flex-col overflow-hidden pt-2">
                   {emptyState ? (
-                    <Empty className="h-full min-h-0 w-full self-center border border-dashed p-5 sm:p-8">
-                      <EmptyHeader>
-                        <EmptyMedia variant="icon">
-                          <Terminal />
-                        </EmptyMedia>
-                        <EmptyTitle>{t('editor.emptyTitle')}</EmptyTitle>
-                        <EmptyDescription>{t('editor.emptyHint')}</EmptyDescription>
-                      </EmptyHeader>
-                      <EmptyContent className="max-w-xl">
+                    /* 空态不画框：工作区本身就是画布，引导块居中，输入框照旧贴底。 */
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                      <Empty className="py-2">
+                        <EmptyHeader className="max-w-xl">
+                          {/* 主工作区的空态与右侧面板同构（图标 + 标题），但多出主操作，
+                              层次上仍然是「主角」。 */}
+                          <EmptyMedia variant="icon">
+                            <Terminal />
+                          </EmptyMedia>
+                          <EmptyTitle>{t('editor.emptyTitle')}</EmptyTitle>
+                        </EmptyHeader>
+                        <EmptyContent className="max-w-xl">
                         <div className="flex flex-wrap justify-center gap-2">
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => onNavigate?.('commands')}
+                            onClick={() => openTools('commands')}
                           >
-                            <BookOpen data-icon="inline-start" />
+                            <Library data-icon="inline-start" />
                             {t('editor.browseCommands')}
                           </Button>
                           {favorites.length > 0 && (
@@ -485,22 +527,21 @@ export function CommandPage({
                             </div>
                           </div>
                         )}
-                      </EmptyContent>
-                    </Empty>
-                  ) : (
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                      <ResultPanel
-                        entries={results}
-                        running={running}
-                        itemsById={dataset.itemsById}
-                        prefixesById={dataset.prefixesById}
-                        atlas={dataset.atlas}
-                        onRemove={removeResult}
-                        isFavorite={isFavorite}
-                        onToggleFavorite={toggleFavoriteCommand}
-                        onToggleCollapse={toggleResultCollapse}
-                      />
+                        </EmptyContent>
+                      </Empty>
                     </div>
+                  ) : (
+                    <ResultPanel
+                      entries={results}
+                      running={running}
+                      itemsById={dataset.itemsById}
+                      prefixesById={dataset.prefixesById}
+                      atlas={dataset.atlas}
+                      onRemove={removeResult}
+                      isFavorite={isFavorite}
+                      onToggleFavorite={toggleFavoriteCommand}
+                      onToggleCollapse={toggleResultCollapse}
+                    />
                   )}
                 </CardBody>
                 <Separator />
@@ -509,7 +550,7 @@ export function CommandPage({
                 </div>
               </div>
 
-              {/* 桌面右侧工具列（无标题栏，开关在顶栏）。手机端改为 Sheet。 */}
+              {/* 桌面右侧工具列（无标题栏，开关是输入框左侧那四个按钮）。手机端改为 Sheet。 */}
               {panelOpen && (
                 <div
                   id="command-tools"

@@ -535,20 +535,16 @@ function bossShortAlias(npc: Npc): string | null {
   return short && short !== npc.sb ? short : null
 }
 
-export function NpcDetail({
-  npc,
-  large = false,
-  canSpawnBoss = false,
-  canSpawnMob = false,
-}: {
-  npc: Npc
-  large?: boolean
-  /** 当前玩家有 `tshock.npc.spawnboss`（未登录 / 无权限 = false，不显示）。 */
-  canSpawnBoss?: boolean
-  /** 当前玩家有 `tshock.npc.spawnmob`。 */
-  canSpawnMob?: boolean
-}) {
+export function NpcDetail({ npc, large = false }: { npc: Npc; large?: boolean }) {
   const { t } = useI18n()
+  // 召唤指令**不按权限隐藏**：玩家照常能看到 / 复制（能不能执行由 TShock 判定，
+  // 与「小抄」页一致：不把权限当展示门槛）。
+  const shortAlias = bossShortAlias(npc)
+  const bossCommands = npc.sb
+    ? [spawnBossCommand(npc.sb), shortAlias ? `/sb ${shortAlias}` : null].filter(
+        (c): c is string => c !== null,
+      )
+    : []
   return (
     <div className={cn('flex flex-col gap-2', large && 'gap-4')}>
       <div className={cn(large ? 'flex flex-col items-center gap-3' : 'flex items-center gap-2.5')}>
@@ -566,26 +562,13 @@ export function NpcDetail({
         </div>
       </div>
       <DetailRow label={t('dataId.field.internal')} value={npc.key} mono />
-      {/* 召唤指令：要**对应权限**才显示；`/spawnboss` 还要求该 NPC 是 Boss（有 `sb`）。 */}
-      {(canSpawnBoss || canSpawnMob) && (
-        <div className="flex flex-col gap-1">
-          {canSpawnBoss && npc.sb && (
-            <>
-              <CommandLine label={t('dataId.cmd.spawnboss')} command={spawnBossCommand(npc.sb)} />
-              {/* 部分 Boss 有单字简写（如 king slime → /sb king）：单独一行，方便手输。 */}
-              {bossShortAlias(npc) && (
-                <CommandLine
-                  label={t('dataId.cmd.spawnbossShort')}
-                  command={`/sb ${bossShortAlias(npc)}`}
-                />
-              )}
-            </>
-          )}
-          {canSpawnMob && (
-            <CommandLine label={t('dataId.cmd.spawnmob')} command={spawnMobCommand(npc.id)} />
-          )}
-        </div>
-      )}
+      {/* 召唤指令：Boss 的完整写法与单字简写合并成一块（一行一条），下面再一条 NPC 召唤。 */}
+      <div className="flex flex-col gap-2">
+        {bossCommands.length > 0 && (
+          <CommandLine label={t('dataId.cmd.spawnboss')} commands={bossCommands} />
+        )}
+        <CommandLine label={t('dataId.cmd.spawnmob')} commands={[spawnMobCommand(npc.id)]} />
+      </div>
     </div>
   )
 }
@@ -741,7 +724,10 @@ export function BuffDetail({
       </div>
       <DetailRow label={t('dataId.field.internal')} value={buff.key} mono />
       {gbuffPlayer && (
-        <CommandLine label={t('dataId.cmd.gbuff')} command={gbuffCommand(gbuffPlayer, buff.id)} />
+        <CommandLine
+          label={t('dataId.cmd.gbuff')}
+          commands={[gbuffCommand(gbuffPlayer, buff.id)]}
+        />
       )}
     </div>
   )

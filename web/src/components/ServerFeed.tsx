@@ -2,12 +2,14 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ArrowDown, RefreshCw } from 'lucide-react'
 import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
-import { Badge, Button, Empty, EmptyDescription } from '@/components/ui'
+import { Badge, Button, Empty, EmptyDescription, Spinner } from '@/components/ui'
 import { useBottomList } from '@/hooks/useBottomList'
 import { useNow } from '@/hooks/useNow'
 import { useServerFeed } from '@/hooks/useServerFeed'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { formatClock } from '@/lib/clock'
+import type { Lang } from '@/lib/i18n'
 import type { BackendTransport, ServerEvent, ServerInfoExtra } from '@/lib/tshock'
 import type { Atlas, Item, Prefix } from '@/types'
 
@@ -106,13 +108,14 @@ export function feedRefreshLabel(
   t: (key: string, vars?: Record<string, string | number>) => string,
   refreshedAt: number | null,
   extra: ServerInfoExtra | null,
+  lang: Lang = 'zh',
 ): string | null {
   if (refreshedAt == null && !extra) return null
   const parts: string[] = []
   const world = extra?.name?.trim()
   if (world) parts.push(world)
   if (refreshedAt != null) {
-    parts.push(t('home.feedRefreshedAt', { time: new Date(refreshedAt).toLocaleTimeString() }))
+    parts.push(t('home.feedRefreshedAt', { time: formatClock(lang, refreshedAt) }))
   }
   const gt = formatGameTime(extra)
   if (gt) parts.push(t('home.feedGameTime', { time: gt }))
@@ -216,7 +219,7 @@ export function ServerFeedList({
   // 首页卡片只显示最近 `limit` 条；「动态」tab 显示窗口内的全部（可加载更早）。
   const shown = limit != null ? events.slice(-limit) : events.slice(start)
   const canLoadEarlier = limit == null && hidden > 0
-  const refreshLabel = feedRefreshLabel(t, refreshedAt ?? null, extra)
+  const refreshLabel = feedRefreshLabel(t, refreshedAt ?? null, extra, lang)
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <ServerFeedFlags extra={extra} />
@@ -244,7 +247,7 @@ export function ServerFeedList({
               return (
                 <Fragment key={e.seq}>
                   {showDay && (
-                    <li className="my-1 flex items-center gap-2 text-2xs text-muted-foreground/70">
+                    <li className="my-1 flex items-center gap-2 text-2xs text-muted-foreground">
                       <span className="h-px flex-1 bg-border" />
                       <span className="shrink-0">{formatEventDay(lang, t, e.time, now)}</span>
                       <span className="h-px flex-1 bg-border" />
@@ -261,7 +264,7 @@ export function ServerFeedList({
                       <time
                         dateTime={e.time}
                         title={new Date(e.time).toLocaleString()}
-                        className="shrink-0 pt-0.5 text-2xs tabular-nums text-muted-foreground/70"
+                        className="shrink-0 pt-0.5 text-2xs tabular-nums text-muted-foreground"
                       >
                         {label}
                       </time>
@@ -286,7 +289,7 @@ export function ServerFeedList({
       {(refreshLabel || showSwitched) && (
         <div className="flex min-w-0 items-center gap-2 text-2xs text-muted-foreground">
           {refreshLabel && (
-            <span className="min-w-0 truncate" title={refreshLabel}>
+            <span className="min-w-0 truncate tabular-nums" title={refreshLabel}>
               {refreshLabel}
             </span>
           )}
@@ -330,7 +333,7 @@ export function ServerFeedTab({
 }) {
   const { t } = useI18n()
   const [filter, setFilter] = useState<FeedFilter>('all')
-  const { events, extra, available, refreshedAt, switchedAt, refresh } = useServerFeed({
+  const { events, extra, available, refreshedAt, switchedAt, refresh, refreshing } = useServerFeed({
     transport,
     authenticated,
     serverId,
@@ -359,15 +362,22 @@ export function ServerFeedTab({
             {t(FEED_FILTER_LABEL[f])}
           </Button>
         ))}
+        {/* 强制重新同步：SSE 连接中也能点（会断开重连并重拉尾部事件），跑的时候转圈 + 禁用。 */}
         <Button
           size="icon-sm"
           variant="ghost"
           className="ml-auto text-muted-foreground"
           onClick={refresh}
-          aria-label={t('home.refresh')}
-          title={t('home.refresh')}
+          disabled={refreshing}
+          aria-busy={refreshing}
+          aria-label={t('home.feedResync')}
+          title={t('home.feedResync')}
         >
-          <RefreshCw data-icon="inline-start" />
+          {refreshing ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <RefreshCw data-icon="inline-start" />
+          )}
         </Button>
       </div>
       <ServerFeedList

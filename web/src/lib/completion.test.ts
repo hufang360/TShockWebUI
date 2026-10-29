@@ -63,6 +63,15 @@ describe('computeCompletions', () => {
     expect(items.some((c) => c.insert === 'Alice')).toBe(true)
   })
 
+  it('别名放在说明前面，且不写「别名：」前缀', () => {
+    const items = computeCompletions({ dataset, text: '/giv', caret: 4, players: [] })
+    const give = items.find((c) => c.id === 'cmd:give')
+    // `give` 的别名是 `/g`：说明里直接以 `/g · ` 开头，后面才是帮助文本。
+    expect(give?.detail.startsWith('/g · ')).toBe(true)
+    expect(give?.detail).not.toContain('别名')
+    expect(give?.detail).not.toContain('Aliases')
+  })
+
   it('指令帮助文本按语言取中文/英文', () => {
     const zh = computeCompletions({ dataset, text: '/ti', caret: 3, players: [], lang: 'zh' })
     expect(zh.find((c) => c.id === 'cmd:time')?.detail).toContain('设置世界时间')

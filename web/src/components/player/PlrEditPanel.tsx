@@ -466,7 +466,7 @@ export function PlrEditPanel({
                       const count = group === 'armor' ? 20 : 10
                       return (
                         <div key={group} className="flex flex-col gap-1">
-                          <span className="text-2xs text-muted-foreground/70">
+                          <span className="text-2xs text-muted-foreground">
                             {group === 'armor'
                               ? `${t('players.group.armor')} / ${t('players.group.vanity')}`
                               : t('players.group.dye')}

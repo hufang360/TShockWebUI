@@ -376,10 +376,8 @@ export function SettingsPage({
   if (!authenticated) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
-          <p className="text-xs text-muted-foreground">{t('settings.note')}</p>
-        </div>
+        {/* 页面名只在顶栏出现一次，这里不再重复同一句话。 */}
+        <p className="text-sm text-muted-foreground">{t('settings.note')}</p>
         <LoginGate onLogin={onLogin} />
         <p className="pt-1 text-center text-2xs text-muted-foreground">TShockWebUI {APP_VERSION}</p>
       </div>
@@ -388,10 +386,7 @@ export function SettingsPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
-        <p className="text-xs text-muted-foreground">{t('settings.note')}</p>
-      </div>
+      <p className="text-sm text-muted-foreground">{t('settings.note')}</p>
 
       {/* 两栏：左 = 界面偏好 / 激活模块；右 = 执行与数据刷新 / 在线授权 / 账户 */}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">

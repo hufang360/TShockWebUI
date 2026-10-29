@@ -141,6 +141,10 @@
   /* 微字号刻度：辅助文字统一用 text-2xs（11px），正文用 text-xs（12px）。
      不要再用 text-[10px] / text-[11px] 任意值（例外：Terraria 物品提示的 15px 游戏字号）。 */
   --text-2xs: 0.6875rem;
+  /* 11px 配套行高：行高跟着**字号角色**走，不再继承父级的 text-xs / text-sm leading。
+     不加这一行，同一个 11px 角色在列表里是 1.33、在注释里是 1.45、在卡片里是 1.5。
+     需要更紧的地方（像素数字角标、胶囊徽标）继续用 leading-none / leading-5 显式覆盖。 */
+  --text-2xs--line-height: 1.5;
 }
 
 @layer base {

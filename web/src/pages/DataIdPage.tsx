@@ -126,8 +126,8 @@ export function DataIdPage({
   const removeSearchHistory =
     kind === 'npc' ? npcHistory.remove : kind === 'buff' ? buffHistory.remove : dataHistory.remove
 
-  // 当前玩家的权限节点：决定详情里是否显示 `/sb`、`/sm`、`/gbuff`。
-  // 只有「已登录 + 明确知道权限 + 确实没有该节点」才隐藏；拿不到权限时宁可显示（否则看起来像功能坏了）。
+  // 当前玩家的权限节点：只用来决定 Buff 详情的 `/gbuff`（要填「你的玩家名」，未登录 / 无权限时先不给）。
+  // NPC 的召唤指令不按权限隐藏（照常显示 / 复制，能不能执行由 TShock 判定）。
   const { username, known, has } = useMyPermissions(transport, authenticated, serverId)
   const canSee = (permission: string) => authenticated && (!known || has(permission))
 
@@ -468,7 +468,7 @@ export function DataIdPage({
                 {t('dataId.styles.expand')}
               </FieldLabel>
             </Field>
-            <p className="pl-6 text-2xs leading-4 text-muted-foreground">
+            <p className="pl-6 text-2xs text-muted-foreground">
               {t('dataId.styles.expandNote')}
             </p>
           </div>
@@ -724,12 +724,7 @@ export function DataIdPage({
               </SheetHeader>
               <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
                 {selectedNpc ? (
-                  <NpcDetail
-                    npc={selectedNpc}
-                    large
-                    canSpawnBoss={canSee('tshock.npc.spawnboss')}
-                    canSpawnMob={canSee('tshock.npc.spawnmob')}
-                  />
+                  <NpcDetail npc={selectedNpc} large />
                 ) : selectedBuff ? (
                   <BuffDetail
                     buff={selectedBuff}

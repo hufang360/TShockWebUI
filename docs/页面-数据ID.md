@@ -19,9 +19,9 @@
 玩家侧的**只读浏览工具**：在同一个页面里切换 NPC / 图格 / 墙 / Buff，按网格 / 表格浏览，点开看详情。
 
 - **不是**生成 / 管理后台；本页**不执行任何指令**（只读浏览），唯一请求是登录后拉一次 `GET /api/me`
-  （拿当前玩家的权限节点，决定详情里显示哪几条指令）。
+  （只用于 Buff 详情的 `/gbuff`：那条要填「你的玩家名」，未登录时填不出来）。
 - `/sb`（`spawnboss`）与 `/sm`（`spawnmob`）在 TShock 里是 `allowServer=false` 的指令，
-  经 REST 无法执行（`docs/REST_API限制.md`）→ 详情里只**显示 + 复制**；
+  经 REST 无法执行（`docs/REST_API限制.md`）→ 详情里只**显示 + 复制**（**不按权限隐藏**，能不能执行由 TShock 判）；
   `/gbuff`（给 buff）是 `allowServer=true`，可以复制到「指令」浮窗里直接执行。
 - 图格 / 墙是 `TileID` / `WallID` 速查：ID、代表物品（图标 + 名称）、摆放尺寸、内部名。
 - Buff 是 `BuffID` 速查：ID、图标、本地化名称、内部名（图标取自游戏 `Content/Images/Buff_<id>.png`，见 §2）。
@@ -167,20 +167,21 @@
 
 ## 6. 召唤 / 增益指令：详情里显示 + 补全里可读
 
-**详情底部**按「左属性名 / 右指令 + 复制」的左右布局显示（`components/dataid/DataIdViews.tsx` 的 `CommandRow`）：
+**详情底部**用 `components/CommandLine.tsx`：**属性名在灰框外**，下面每条指令占一行、**整行点击即复制**（右侧图标仅作提示）。
+一条属性名可以带多条指令（Boss 的完整写法 + 单字简写就在同一块里）：
 
 | 详情 | 行 | 指令 | 显示条件 |
 | --- | --- | --- | --- |
-| NPC | `Boss召唤指令` | `/spawnboss "<sb>"` | 该 NPC 是 Boss（有 `sb`）**且**有 `tshock.npc.spawnboss` |
-| NPC | `NPC召唤指令` | `/spawnmob <id>` | 有 `tshock.npc.spawnmob` |
-| Buff | `增益指令` | `/gbuff <你的玩家名> <buffID>` | 有 `tshock.buff.others` |
+| NPC | `Boss召唤指令` | 第 1 行 `/spawnboss "<sb>"`；第 2 行 `/sb <单字简写>`（有别名时） | 该 NPC 是 Boss（有 `sb`）；**不判权限** |
+| NPC | `NPC召唤指令` | `/spawnmob <id>` | 总是显示；**不判权限** |
+| Buff | `增益指令` | `/gbuff <你的玩家名> <buffID>` | 已登录且知道玩家名、有 `tshock.buff.others` |
 
-- **未登录不显示**任何指令行；权限来自 `GET /api/me`（`hooks/useMyPermissions.ts`，按上游缓存，退出登录即失效）。
-- 权限匹配遵循 TShock 的通配规则：`*`、`tshock.*`、`tshock.npc.*` 都算拥有子节点（与 `Group.HasPermission()` 一致）。
-- **拿不到权限时仍然显示**（老版本信使插件没有 `/webui/me`、或请求失败）：
-  只有「已登录 + 明确拿到权限列表 + 确实没有该节点」才隐藏，避免看起来像功能坏了。
-  也就是说这层过滤是「少显示确定用不了的」，不是权限边界。
-- 权限只决定**是否展示**；真正的执行判定始终在 TShock（`/gbuff` 走 rawcmd，`/sb` / `/sm` 根本不能经 REST 执行）。
+- **NPC 的召唤指令不按权限隐藏**（照常显示 / 复制）：这与「小抄」页一致——展示不是权限边界，
+  真正能不能执行始终由 TShock 判（`/sb` / `/sm` 甚至根本不能经 REST 执行）。
+- Buff 的 `/gbuff` 需要拼进「你的玩家名」，所以未登录 / 拿不到玩家名时先不给。
+- 权限匹配遵循 TShock 的通配规则：`*`、`tshock.*`、`tshock.npc.*` 都算拥有子节点（与 `Group.HasPermission()` 一致）；
+  **拿不到权限时仍然显示**。
+- 执行判定始终在 TShock（`/gbuff` 走 rawcmd，`/sb` / `/sm` 根本不能经 REST 执行）；NPC 召唤那两行连展示都不看权限。
 - 「指令」页的补全下拉框仍会给出可读名称（`web/src/lib/commandMeta.ts`）：
 
 | 指令 | 语法 | 说明 |

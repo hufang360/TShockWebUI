@@ -1,6 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
 import { ExternalLink, Terminal } from 'lucide-react'
-import { CommandPickerPanel } from '@/components/CommandPickerPanel'
 import {
   Alert,
   AlertDescription,
@@ -202,7 +201,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
   const { t, lang } = useI18n()
   const { open } = useTerminal()
   const pick = onPick ?? open
-  const [tab, setTab] = useState<'default' | 'npc' | 'library'>('default')
+  const [tab, setTab] = useState<'default' | 'npc'>('default')
 
   // `sb` → NPC：用于取本地化名称（`/spawnboss` 的规范参数已在生成数据里）。
   const bySb = useMemo(() => {
@@ -263,9 +262,6 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
         </TabsTrigger>
         <TabsTrigger value="npc" variant="line" className="flex-none">
           {t('commands.tab.npc')}
-        </TabsTrigger>
-        <TabsTrigger value="library" variant="line" className="flex-none">
-          {t('editor.tab.commands')}
         </TabsTrigger>
       </TabsList>
 
@@ -390,13 +386,6 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
             footnote={t('commands.card.godmode.footnote')}
             onPick={pick}
           />
-        </div>
-      </TabsContent>
-
-      {/* 指令库（原在指令页右侧工具面板）：点一条把指令填进浮动终端。 */}
-      <TabsContent value="library" className="flex flex-col gap-3">
-        <div className="h-[70vh] min-h-80">
-          <CommandPickerPanel view="commands" dataset={dataset} onLoad={open} />
         </div>
       </TabsContent>
     </Tabs>

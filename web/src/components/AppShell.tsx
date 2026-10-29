@@ -243,7 +243,10 @@ export function AppShell({
               <Breadcrumb className="min-w-0">
                 <BreadcrumbList className="flex-nowrap">
                   <BreadcrumbItem className="min-w-0">
-                    <BreadcrumbPage className="truncate">{activeLabel}</BreadcrumbPage>
+                    {/* 页面标题：全站唯一的一处页面名（16/1.4/600），标题层级靠它立起来。 */}
+                    <BreadcrumbPage className="truncate text-base font-semibold">
+                      {activeLabel}
+                    </BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>

@@ -103,12 +103,13 @@ describe('CommandTipsPage', () => {
     expect(within(alert).getByText(/不会自动执行/)).toBeTruthy()
   })
 
-  it('三个 tab：默认 / NPC管理 / 指令库（下划线样式）', () => {
+  it('两个 tab：默认 / NPC管理（下划线样式）', () => {
     renderPage()
     const tabs = screen.getByRole('tablist')
     expect(within(tabs).getByRole('tab', { name: '默认' })).toBeTruthy()
     expect(within(tabs).getByRole('tab', { name: 'NPC管理' })).toBeTruthy()
-    expect(within(tabs).getByRole('tab', { name: '指令库' })).toBeTruthy()
+    // 指令库已移回「指令」页的工具面板，这里不再重复一份。
+    expect(within(tabs).queryByRole('tab', { name: '指令库' })).toBeNull()
     // 默认 tab 是事件 / 世界模式 / 时间三张卡
     expect(screen.getByText('/worldevent <事件>')).toBeTruthy()
     expect(screen.getByText('入侵（/worldevent invasion <类型>）')).toBeTruthy()
@@ -162,15 +163,6 @@ describe('CommandTipsPage', () => {
     expect(screen.getByText('/spawnboss <Boss> [数量]')).toBeTruthy()
     expect(screen.getByText('/spawnmob <NPC 名称或 ID> [数量]')).toBeTruthy()
     expect(screen.getByText('/tpnpc <NPC 名称>')).toBeTruthy()
-  })
-
-  it('指令库 tab：列出全部指令，点一条填进浮窗', async () => {
-    renderPage()
-    fireEvent.mouseDown(screen.getByRole('tab', { name: '指令库' }))
-    const row = await screen.findByTitle('Shows command help.')
-    fireEvent.click(row)
-    const input = screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
-    expect(input.value).toBe('/help ')
   })
 
   it('点 Boss 记录 → 打开浮窗并填入 /spawnboss <参数>', () => {

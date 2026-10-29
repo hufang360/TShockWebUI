@@ -24,6 +24,15 @@ function Harness({ total }: { total: number }) {
   return <div ref={ref} data-testid="list" onScroll={onScroll} />
 }
 
+function ContentHarness({ total }: { total: number }) {
+  const { ref, contentRef, onScroll } = useBottomList(total, { initial: 5 })
+  return (
+    <div ref={ref} data-testid="list" onScroll={onScroll}>
+      <div ref={contentRef} data-testid="content" />
+    </div>
+  )
+}
+
 function size(el: HTMLElement, scrollHeight: number, clientHeight: number) {
   Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, configurable: true })
   Object.defineProperty(el, 'clientHeight', { value: clientHeight, configurable: true })
@@ -57,5 +66,19 @@ describe('useBottomList 容器尺寸变化时贴底', () => {
     fireEvent.scroll(el)
     resizeCallbacks[0]()
     expect(el.scrollTop).toBe(100)
+  })
+
+  it('内容自己变高（富文本晚到 / 换行）也贴底', () => {
+    render(<ContentHarness total={5} />)
+    const el = screen.getByTestId('list')
+    const content = screen.getByTestId('content')
+    size(el, 1000, 300)
+    el.scrollTop = 1000
+    fireEvent.scroll(el)
+    // 内层内容变高（最后一个观察对象是内容）：仍要贴底。
+    size(el, 1400, 300)
+    resizeCallbacks[resizeCallbacks.length - 1]()
+    expect(content).toBeTruthy()
+    expect(el.scrollTop).toBe(1400)
   })
 })

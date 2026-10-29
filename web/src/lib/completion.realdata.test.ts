@@ -154,9 +154,12 @@ describe('真实命令数据（data/commands.json）', () => {
     expect(computeCompletions(at('/clear item 50')).every((c) => c.kind !== 'player')).toBe(true)
   })
 
-  it('/help：参数是指令名', () => {
-    const items = computeCompletions(at('/help gi'))
-    expect(items.some((c) => c.kind === 'command' && c.insert === 'give')).toBe(true)
+  it('/help：参数是指令名 → 不再弹一级指令列表', () => {
+    // 一级指令前面已经敲过了，空格后不再弹一屏命令名；`/help user add` 也是语法错。
+    expect(computeCompletions(at('/help '))).toHaveLength(0)
+    expect(computeCompletions(at('/help gi'))).toHaveLength(0)
+    // 也不能退化成玩家名补全
+    expect(computeCompletions(at('/aliases A'))).toHaveLength(0)
   })
 
   it('/region allow：<name> 按源码实为账号名 → 玩家补全', () => {

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { formatClock } from '@/lib/clock'
 import { isModuleEnabled, type ModulesPrefs } from '@/lib/modules'
 import { StorageKeys, writeJson } from '@/lib/storage'
 import type { ServerStatus } from '@/lib/tshock'
@@ -42,7 +43,7 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 truncate text-right text-sm text-foreground">{value}</dd>
+      <dd className="min-w-0 truncate text-right text-sm text-foreground tabular-nums">{value}</dd>
     </div>
   )
 }
@@ -55,7 +56,7 @@ export function ServerStatusCard({
   status: ServerStatus | null
   lastStatusAt: number | null
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const reachable = status?.reachable === true
   return (
     <Card className="flex flex-col">
@@ -105,8 +106,8 @@ export function ServerStatusCard({
           </dl>
         )}
         {lastStatusAt && (
-          <p className="mt-2 text-2xs text-muted-foreground">
-            {t('home.lastRefresh', { time: new Date(lastStatusAt).toLocaleTimeString() })}
+          <p className="mt-2 text-2xs text-muted-foreground tabular-nums">
+            {t('home.lastRefresh', { time: formatClock(lang, lastStatusAt) })}
           </p>
         )}
       </CardBody>
@@ -161,8 +162,8 @@ export function EventsCard({
               variant="ghost"
               className="text-muted-foreground"
               onClick={() => {
-                // 直接落到「指令 → 动态」tab（该 tab 装在 CommandPage 挂载时从本机读取）。
-                writeJson(StorageKeys.commandTab, 'events')
+                // 直接落到「指令」页的「聊天」tab（服务器动态在那里）。
+                writeJson(StorageKeys.commandPageTab, 'chat')
                 onNavigate('editor')
               }}
             >

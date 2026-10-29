@@ -105,7 +105,9 @@ describe('CommandTerminal', () => {
     const win = openTerminal()
     expect(screen.getByRole('dialog', { name: '指令' })).toBe(win)
     const input = within(win).getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
-    expect(input.className).toContain('h-8')
+    expect(input.className).toContain('h-7')
+    // 紧凑外壳：内边距也更小（桌面是 py-2，终端是 py-1.5）
+    expect((win.querySelector('.rounded-2xl') as HTMLElement).className).toContain('py-1.5')
   })
 
   it('Ctrl + ` 可开关终端', () => {

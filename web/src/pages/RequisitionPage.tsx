@@ -40,6 +40,8 @@ import {
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
+import { formatClock } from '@/lib/clock'
+
 import { searchItems } from '@/lib/items'
 import type {
   BackendTransport,
@@ -80,7 +82,7 @@ export function RequisitionPage({
   onTokenInvalid,
   onLogin,
 }: RequisitionPageProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const dataset = useDataset()
   const items = useMemo(() => dataset?.items ?? [], [dataset])
   const itemsById = useMemo(() => dataset?.itemsById ?? new Map<number, Item>(), [dataset])
@@ -631,7 +633,7 @@ export function RequisitionPage({
             <div className="flex items-center gap-2">
               {lastLoadedAt && (
                 <span className="hidden text-2xs text-muted-foreground sm:inline">
-                  {t('requests.lastUpdated', { time: new Date(lastLoadedAt).toLocaleTimeString() })}
+                  {t('requests.lastUpdated', { time: formatClock(lang, lastLoadedAt) })}
                 </span>
               )}
               <Button

@@ -84,11 +84,11 @@ export function PrefixPicker({
                     {isBest && <Star className="size-3 shrink-0 fill-current text-warning" />}
                     {pf.name}
                     {mods?.benefit ? (
-                      <span className="text-muted-foreground/70">
+                      <span className="text-muted-foreground">
                         {formatBenefit(mods.benefit, t)}
                       </span>
                     ) : val > 0 ? (
-                      <span className="text-muted-foreground/70">{val.toFixed(3)}</span>
+                      <span className="text-muted-foreground tabular-nums">{val.toFixed(3)}</span>
                     ) : null}
                   </span>
                 </SelectItem>

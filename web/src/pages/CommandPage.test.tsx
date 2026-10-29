@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import type { BackendTransport } from '@/lib/tshock'
@@ -110,16 +110,17 @@ describe('CommandPage 未登录', () => {
 })
 
 describe('CommandPage 输入模式', () => {
-  it('工具 tabs 使用标准胶囊样式且不换行，空态虚线铺满结果区', () => {
+  it('工具 tabs 使用标准胶囊样式且不换行；空态不描边、引导块居中', () => {
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
     const tabs = screen.getByRole('tab', { name: '物品' }).closest('[data-slot="tabs-list"]')
     expect(tabs?.className).toContain('bg-accent')
     expect(tabs?.className).toContain('flex-nowrap')
     expect(tabs?.className).not.toContain('border-b')
 
-    const dashed = screen.getByText('开始一条指令').closest('.border-dashed')
-    expect(dashed?.className).toContain('w-full')
-    expect(dashed?.className).not.toContain('max-w-2xl')
+    // 空态不再是一整块虚线占位：工作区就是画布，引导块居中，输入框在底部。
+    const empty = screen.getByText('开始一条指令').closest('[data-slot="empty"]')
+    expect(empty?.className).not.toContain('border-dashed')
+    expect(empty?.parentElement?.className).toContain('justify-center')
   })
 
   it('底部输入框可切换为聊天模式，并保留指令草稿', async () => {
@@ -161,6 +162,120 @@ describe('CommandPage 输入模式', () => {
 
     fireEvent.click(chatModeToggle)
     expect((screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement).value).toBe('/time')
+  })
+})
+
+describe('CommandPage 工具面板', () => {
+  const toolsTabs = () =>
+    within(screen.getByRole('tab', { name: '物品' }).closest('[data-slot="tabs-list"]') as HTMLElement)
+
+  it('指令库在工具栏最左侧（指令库 / 物品 / 收藏 / 历史）', () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    expect(toolsTabs().getAllByRole('tab').map((el) => el.textContent)).toEqual([
+      '指令库',
+      '物品',
+      '收藏',
+      '历史',
+    ])
+  })
+
+  it('指令库 tab：列出全部指令，点一条填进输入框', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    fireEvent.mouseDown(toolsTabs().getByRole('tab', { name: '指令库' }))
+    fireEvent.click(await screen.findByTitle('Shows command help.'))
+    expect((screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement).value).toBe('/help ')
+  })
+
+  it('旧版本存过的工具 tab（已移除的「动态」）回落到物品', () => {
+    localStorage.setItem('tswui:commandTab', JSON.stringify('events'))
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    expect(toolsTabs().getByRole('tab', { name: '物品' }).getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('空态的「打开指令库」直接切到指令库 tab 并展开工具面板', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    fireEvent.click(screen.getByRole('button', { name: /打开指令库/ }))
+    expect((await screen.findAllByPlaceholderText(/搜索指令/)).length).toBeGreaterThan(0)
+    expect(toolsTabs().getByRole('tab', { name: '指令库' }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
+  })
+})
+
+describe('CommandPage 输入框（聊天式外壳）', () => {
+  /** 输入框所在的那张卡片（rounded-2xl 外壳）。 */
+  const composer = () =>
+    (screen.getByPlaceholderText(/输入指令/) as HTMLElement).closest('.rounded-2xl') as HTMLElement
+
+  it('工具按钮在左下角、发送与模式切换在右下角', () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    const card = composer()
+    const tools = within(card).getByRole('group', { name: '工具面板' })
+    const send = within(card).getByRole('button', { name: '执行' })
+    const group = tools.parentElement as HTMLElement
+
+    // 顺序：工具按钮组在前，右侧（modeToggle + 发送）在后且靠右。
+    expect(group.firstElementChild).toBe(tools)
+    expect(group.lastElementChild?.className).toContain('ml-auto')
+    expect(within(group.lastElementChild as HTMLElement).getByRole('button', { name: '执行' })).toBe(
+      send,
+    )
+    // 四个按钮按「指令库 / 物品 / 收藏 / 历史」排
+    expect(
+      within(tools)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['指令库', '物品', '收藏', '历史'])
+  })
+
+  it('点工具按钮切到对应面板 tab；再点一次收起面板', () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    const tools = within(composer()).getByRole('group', { name: '工具面板' })
+    const favorites = within(tools).getByRole('button', { name: '收藏' })
+
+    fireEvent.click(favorites)
+    expect(favorites.getAttribute('aria-pressed')).toBe('true')
+    // 桌面宽屏下右侧面板可见
+    expect(screen.getByTestId('command-workspace')).toBeTruthy()
+
+    fireEvent.click(favorites)
+    expect(favorites.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('聊天模式下不显示这四个工具按钮', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    fireEvent.click(screen.getByRole('button', { name: '切换到聊天输入' }))
+    const chat = screen.getByPlaceholderText(/发消息给游戏内的玩家/)
+    const card = chat.closest('.rounded-2xl') as HTMLElement
+    expect(within(card).queryByRole('group', { name: '工具面板' })).toBeNull()
+    // 发送键仍在右下
+    expect(within(card).getByRole('button', { name: '发送发言' })).toBeTruthy()
+  })
+})
+
+describe('CommandPage 结果区跟随最新一条', () => {
+  it('新结果返回后自动滚到最底（滚动容器就是结果面板自己）', async () => {
+    localStorage.setItem('tswui:draft', JSON.stringify('/time day'))
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: ['已设置为白天'] })
+    renderEditor(fakeTransport(runCommand), vi.fn().mockResolvedValue(true))
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    expect(await screen.findByText('已设置为白天')).toBeTruthy()
+
+    // jsdom 不做布局：手动给滚动容器一个可滚高度，再发一条看是否贴底。
+    const scroller = (screen.getByText('/time day').closest('.group\\/result') as HTMLElement)
+      .parentElement?.parentElement as HTMLElement
+    expect(scroller.className).toContain('overflow-y-auto')
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1000, configurable: true })
+    Object.defineProperty(scroller, 'clientHeight', { value: 300, configurable: true })
+
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(1))
+
+    // 执行后会清空输入，再敲一条。
+    fireEvent.change(screen.getByPlaceholderText(/输入指令/), { target: { value: '/time day' } })
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(scroller.scrollTop).toBe(1000))
   })
 })
 

@@ -328,15 +328,13 @@ export function computeCompletions({
 
     return matches.map((cmd) => {
       const help = (lang === 'en' ? (cmd.helpEn ?? cmd.help) : (cmd.helpZh ?? cmd.help)) || ''
-      const aliasText =
-        cmd.aliases.length > 0
-          ? `${lang === 'en' ? 'Aliases' : '别名'}：${cmd.aliases.map((a) => `/${a}`).join(' ')}`
-          : ''
+      // 别名放在说明**前面**，且不写「别名：」前缀——直接列 `/ai /?`，一眼就知道能怎么敲。
+      const aliases = cmd.aliases.map((a) => `/${a}`).join(' ')
       return {
         id: `cmd:${cmd.name}`,
         kind: 'command',
         label: `/${cmd.name}`,
-        detail: [help, aliasText].filter(Boolean).join(' · '),
+        detail: [aliases, help].filter(Boolean).join(' · '),
         insert: `/${cmd.name}`,
         command: cmd,
         inGameOnly: !cmd.allowServer,
@@ -545,18 +543,9 @@ export function computeParamCompletions({
       break
     }
     case 'command':
-      for (const cmd of filter(dataset.commands, (c) => [c.name, ...c.aliases]).slice(0, limit)) {
-        out.push({
-          id: `param:command:${cmd.name}`,
-          kind: 'command',
-          label: cmd.name,
-          detail: (zh ? cmd.helpZh : cmd.helpEn) ?? cmd.help ?? '',
-          // 参数里的指令名不带斜杠（TShock 自己解析时也无所谓）
-          insert: cmd.name,
-          range,
-          suffix: ' ',
-        })
-      }
+      // 参数是「指令名」时（`/help`、`/aliases`）**不给候选**：一级指令玩家前面已经敲过了，
+      // 空格后再弹一屏命令名只会白占屏幕；而且 TShock 的 `/help` 只收**一个**参数
+      // （Commands.cs:5351，`/help user add` 直接报语法错），后面没有下一级可补。
       break
     default:
       break

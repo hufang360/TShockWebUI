@@ -44,6 +44,8 @@ import {
   type HomeCardsPrefs,
 } from '@/lib/homeCards'
 import { useI18n } from '@/lib/i18n'
+import { formatClock, formatClockWithDate } from '@/lib/clock'
+
 import { readJson, StorageKeys, writeJson } from '@/lib/storage'
 import { resultFromError, TshockRequestError, type BackendTransport, type ServerStatus } from '@/lib/tshock'
 import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
@@ -95,7 +97,7 @@ export function HomePage({
   onLogin,
   onNavigate,
 }: HomePageProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [status, setStatus] = useState<ServerStatus | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(false)
   /** 服务器状态上次刷新时间（卡片底部展示）。 */
@@ -516,7 +518,7 @@ export function HomePage({
       unavailable: !authenticated || !cmd,
       onRefresh: cmd ? () => queueCommand(id, cmd) : undefined,
       footerNote: def.noteKey ? (
-        <span className="text-2xs leading-4 text-muted-foreground">{t(def.noteKey)}</span>
+        <span className="text-2xs text-muted-foreground">{t(def.noteKey)}</span>
       ) : undefined,
     })
   }
@@ -618,9 +620,9 @@ export function HomePage({
         {lastRefreshAt && (
           <span
             className="hidden text-2xs text-muted-foreground sm:inline"
-            title={new Date(lastRefreshAt).toLocaleString()}
+            title={formatClockWithDate(lang, lastRefreshAt)}
           >
-            {t('home.lastRefresh', { time: new Date(lastRefreshAt).toLocaleTimeString() })}
+            {t('home.lastRefresh', { time: formatClock(lang, lastRefreshAt) })}
           </span>
         )}
         <IconAction

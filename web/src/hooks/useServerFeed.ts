@@ -29,8 +29,13 @@ export interface ServerFeedState {
    * 没发生过为 null。界面据此显示一小会儿提示，然后自行消失。
    */
   switchedAt: number | null
-  /** 手动立即刷新一次（如发言成功后）。 */
+  /**
+   * 手动**强制重新同步**：关掉 SSE、忘掉 lastSeq，按「首次打开」重拉尾部事件并重连。
+   * 已有事件按 seq 去重合并，不会重复或清空。
+   */
   refresh: () => void
+  /** 手动刷新进行中（用于按钮转圈）；自动轮询不会置 true。 */
+  refreshing: boolean
 }
 
 /**
@@ -74,12 +79,17 @@ export function useServerFeed(opts: {
   const [available, setAvailable] = useState<boolean | null>(null)
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null)
   const [switchedAt, setSwitchedAt] = useState<number | null>(null)
+  // 手动刷新是否在跑：只有用户点按钮才置 true，自动轮询不算。
+  const [refreshing, setRefreshing] = useState(false)
   const lastSeqRef = useRef(0)
   // 是否已经拉过一次「最近 N 条」历史；避免 lastSeq=0 时每次都重新 tail。
   const historyLoadedRef = useRef(false)
   // 上游事件库的实例标识（同一个地址 / 端口后面可能换了另一个服）。
   const instanceRef = useRef('')
+  /** 普通「立刻跑一次 tick」：内部自动补拉用（实例切换 / 流断开 / 自动刷新令牌）。 */
   const refreshRef = useRef<() => void>(() => {})
+  /** 用户点按钮的**强制重新同步**（会断开并重连 SSE）。 */
+  const resyncRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     // 用同一套「清空」逻辑处理登出与切换服务器；用函数式更新保持空引用不变，避免无谓重渲染。
@@ -104,6 +114,8 @@ export function useServerFeed(opts: {
     let closeStream: (() => void) | null = null
     // SSE 失败后的冷却：避免后端不支持流式时每次 tick 都重试造成紧凑循环。
     let streamCooldownUntil = 0
+    // 本次 tick 是否由用户点「刷新」触发（决定转圈什么时候停）。
+    let manualSpin = false
     // 本次挂载是否已经拉起过重新登录（避免登录框被反复顶掉）。
     let authRequested = false
     const isAuthError = (err: unknown) =>
@@ -244,9 +256,11 @@ export function useServerFeed(opts: {
             lastSeqRef.current = page.lastSeq
             mergeEvents(page.events)
           }
+          // 「刷新于 …」只标记**真的拉取过**：SSE 活跃时数据由流推送（onEvent / onWorld 各自更新时间），
+          // 这里再写一次就只是把时间戳改成当前时间——那正是「点了刷新却没拉」的假象来源。
+          setAvailable(true)
+          setRefreshedAt(Date.now())
         }
-        setAvailable(true)
-        setRefreshedAt(Date.now())
         openStream()
         schedule(refreshInterval)
       } catch (err) {
@@ -265,8 +279,12 @@ export function useServerFeed(opts: {
       } finally {
         running = false
         if (pending) {
+          // 还有一次手动刷新在排队：交给那一轮收尾，转圈别提前停。
           pending = false
           void tick()
+        } else if (manualSpin) {
+          manualSpin = false
+          setRefreshing(false)
         }
       }
     }
@@ -283,10 +301,31 @@ export function useServerFeed(opts: {
     }
     document.addEventListener('visibilitychange', onVisibility)
 
+    // 内部自动补拉：直接排队一次 tick（不碰 SSE 连接，避免自动刷新把长连接反复断掉）。
     refreshRef.current = () => void tick()
+
+    /**
+     * 手动刷新 = **强制重新同步**，而不是「等下一次轮询」：
+     * 之前 SSE 已连接时 tick() 会整体跳过拉取（只改「刷新于」的时间戳），按钮等于安慰剂。
+     * 这里先断开长连接、忘掉 lastSeq / 已加载历史、清掉流冷却，再按「首次打开」重拉尾部并重连。
+     * 已有事件不会被清空（mergeEvents 按 seq 去重）。
+     */
+    resyncRef.current = () => {
+      if (cancelled) return
+      manualSpin = true
+      setRefreshing(true)
+      closeStream?.()
+      closeStream = null
+      lastSeqRef.current = 0
+      historyLoadedRef.current = false
+      streamCooldownUntil = 0
+      void tick()
+    }
     void tick()
     return () => {
       cancelled = true
+      manualSpin = false
+      setRefreshing(false)
       document.removeEventListener('visibilitychange', onVisibility)
       if (timer) window.clearTimeout(timer)
       closeStream?.()
@@ -303,5 +342,13 @@ export function useServerFeed(opts: {
     refreshRef.current()
   }, [refreshToken])
 
-  return { events, extra, available, refreshedAt, switchedAt, refresh: () => refreshRef.current() }
+  return {
+    events,
+    extra,
+    available,
+    refreshedAt,
+    switchedAt,
+    refreshing,
+    refresh: () => resyncRef.current(),
+  }
 }

@@ -86,7 +86,10 @@ it('未登录时首页 / 指令 / 设置只显示登录提示与登录按钮', a
   // 设置页：隐藏设置内容，同样只显示登录提示。
   fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
   // 设置页是懒加载路由，等页面标题出现后再断言，避免命中上一页尚未卸载的登录提示。
-  expect(await screen.findByRole('heading', { name: '设置' })).toBeTruthy()
+  // 页面标题现在只在顶栏出现（内容区不再重复「设置」）。
+  expect(await screen.findByText('设置', { selector: '[data-slot="breadcrumb-page"]' })).toBeTruthy()
+  // 顶栏标题跟随导航立即更新，所以还要等设置页专有文案，确认懒加载页面已挂载。
+  expect(await screen.findByText('偏好仅保存在本机，不会上传。')).toBeTruthy()
   expect(screen.queryByRole('switch', { name: '紧凑视图' })).toBeNull()
 
   // 提示里的登录按钮能打开登录框（侧栏还有一条登录按钮，这里限定正文）。
@@ -100,7 +103,8 @@ it('页签同步到 URL hash，并可从 hash 直接打开', async () => {
   window.history.replaceState(null, '', '#/settings')
   render(<App transport={new MockTransport()} />)
 
-  expect(await screen.findByRole('heading', { name: '设置' })).toBeTruthy()
+  // 页面标题现在只在顶栏出现（内容区不再重复「设置」）。
+  expect(await screen.findByText('设置', { selector: '[data-slot="breadcrumb-page"]' })).toBeTruthy()
   fireEvent.click(screen.getAllByRole('button', { name: '物品 ID' })[0])
   expect(await screen.findByLabelText('物品 ID')).toBeTruthy()
   expect(window.location.hash).toBe('#/items')
@@ -570,7 +574,8 @@ it('顶栏「指令」入口：未登录不显示，登录后除指令 / 设置�
 
   // 设置页：隐藏。
   fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
-  expect(await screen.findByRole('heading', { name: '设置' })).toBeTruthy()
+  // 页面标题现在只在顶栏出现（内容区不再重复「设置」）。
+  expect(await screen.findByText('设置', { selector: '[data-slot="breadcrumb-page"]' })).toBeTruthy()
   await waitFor(() => expect(screen.queryByTestId('terminal-topbar')).toBeNull())
 })
 

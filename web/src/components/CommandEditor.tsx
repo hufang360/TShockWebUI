@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { Send, User } from 'lucide-react'
+import { Composer } from '@/components/Composer'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Badge, Button, Kbd, Spinner } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -28,6 +29,8 @@ export interface CommandEditorProps {
   history?: string[]
   /** 只能在游戏内执行（allowServer=false）：输入文本标红提示。 */
   invalid?: boolean
+  /** 工具行左侧（如指令库 / 物品 / 收藏 / 历史按钮）。 */
+  leading?: ReactNode
   /** 发送按钮左侧的附加操作（如指令 / 聊天模式切换）。 */
   beforeSend?: ReactNode
   /** 紧凑尺寸（浮动终端用）：降低输入框高度与字号，节省纵向空间。 */
@@ -48,6 +51,7 @@ export function CommandEditor({
   focusRequest,
   history,
   invalid = false,
+  leading,
   beforeSend,
   compact = false,
 }: CommandEditorProps) {
@@ -89,7 +93,8 @@ export function CommandEditor({
   }, [focusRequest])
 
   const items = useMemo(
-    () => (open ? computeCompletions(value, caret) : []),
+    // 输入框为空时不弹候选（点一下、聚焦也不会弹）：有内容（如 `/`）才出下拉框。
+    () => (open && value.trim() ? computeCompletions(value, caret) : []),
     [open, value, caret, computeCompletions],
   )
   const paramHint = useMemo(
@@ -246,13 +251,26 @@ export function CommandEditor({
           /{paramHint}
         </p>
       )}
-      <div
-        className={cn(
-          'flex items-center gap-2 rounded-full border border-border bg-card pl-4',
-          compact ? 'pr-1' : 'pr-1.5',
-          'focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-ring',
-          invalid && 'ring-1 ring-destructive/60',
-        )}
+      <Composer
+        leading={leading}
+        invalid={invalid}
+        compact={compact}
+        trailing={
+          <>
+            {beforeSend}
+            <Button
+              size="icon"
+              variant="primary"
+              className={cn('shrink-0 rounded-full', compact ? 'size-7' : 'size-9')}
+              onClick={onExecute}
+              disabled={busy}
+              aria-label={busy ? t('editor.running') : t('editor.execute')}
+              title={busy ? t('editor.running') : t('editor.execute')}
+            >
+              {busy ? <Spinner aria-hidden /> : <Send data-icon="inline-start" />}
+            </Button>
+          </>
+        }
       >
         <textarea
           ref={taRef}
@@ -261,8 +279,8 @@ export function CommandEditor({
           rows={1}
           wrap="off"
           className={cn(
-            'editor min-w-0 flex-1 resize-none overflow-x-auto overflow-y-hidden bg-transparent',
-            compact ? 'h-8 py-1' : 'h-11 py-2',
+            'editor w-full min-w-0 resize-none overflow-x-auto overflow-y-hidden bg-transparent px-1',
+            compact ? 'h-7' : 'h-9',
             'text-foreground placeholder:text-muted-foreground focus:outline-none',
             invalid && 'text-destructive caret-destructive',
           )}
@@ -306,24 +324,10 @@ export function CommandEditor({
             window.setTimeout(() => setOpen(false), 150)
           }}
         />
-        <div className="my-1 flex shrink-0 items-center gap-1">
-          {beforeSend}
-          <Button
-            size="icon"
-            variant="primary"
-            className={cn('shrink-0 rounded-full', compact ? 'size-7' : 'size-9')}
-            onClick={onExecute}
-            disabled={busy}
-            aria-label={busy ? t('editor.running') : t('editor.execute')}
-            title={busy ? t('editor.running') : t('editor.execute')}
-          >
-            {busy ? <Spinner aria-hidden /> : <Send data-icon="inline-start" />}
-          </Button>
-        </div>
-      </div>
+      </Composer>
 
       {open && items.length > 0 && (
-        <div className="absolute bottom-full left-0 z-30 mb-1 flex max-h-72 w-full flex-col overflow-hidden rounded-xl bg-popover shadow-xl">
+        <div className="absolute bottom-full left-0 z-30 mb-1 flex max-h-[min(20rem,45vh)] w-full flex-col overflow-hidden rounded-xl border border-border/60 bg-popover shadow-xl">
           <ul className="min-h-0 flex-1 overflow-y-auto" role="listbox">
             {items.map((item, idx) => (
               <li key={item.id}>
@@ -338,7 +342,8 @@ export function CommandEditor({
                   onMouseEnter={() => setHighlight(idx)}
                   onClick={() => accept(item)}
                   className={cn(
-                    'flex w-full items-center gap-3 px-3 py-2 text-left text-sm focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                    'flex w-full items-center gap-2 px-3 text-left text-sm focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                    item.kind === 'command' ? 'py-1.5' : 'py-2',
                     idx === highlight ? 'bg-accent' : 'hover:bg-accent',
                   )}
                 >
@@ -347,8 +352,8 @@ export function CommandEditor({
                   ) : (
                     <span
                       className={cn(
-                        'grid size-[26px] shrink-0 place-items-center rounded-md font-pixel text-2xs',
-                        item.kind === 'command' ? 'bg-accent text-foreground' : 'bg-warning/25 text-foreground',
+                        'grid shrink-0 place-items-center rounded-md font-pixel text-2xs',
+                        item.kind === 'command' ? 'size-5 bg-accent text-foreground' : 'size-[26px] bg-warning/25 text-foreground',
                       )}
                     >
                       {item.kind === 'command' ? '/' : item.kind === 'player' ? (
@@ -362,27 +367,38 @@ export function CommandEditor({
                       )}
                     </span>
                   )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-foreground">{item.label}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{item.detail}</span>
-                    {item.kind === 'command' && (
-                      <span
-                        className={cn(
-                          'mt-0.5 block truncate font-pixel text-2xs',
-                          item.command?.permission ? 'text-warning' : 'text-muted-foreground',
-                        )}
-                      >
-                        {item.command?.permission
-                          ? t('editor.permission', { perm: item.command.permission })
-                          : t('editor.permissionNone')}
-                      </span>
-                    )}
-                  </span>
-                  {item.inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
-                  {item.kind === 'item' && (
-                    <span className="font-pixel text-2xs text-muted-foreground">
-                      ID {(item.item?.id ?? 0)}
+                  {item.kind === 'command' ? (
+                    /* 指令候选：指令 / 说明 / 权限 一行排开（小屏或装不下时说明换行），
+                       每行只占一条高度，一屏能看更多；不需要权限的指令不占位。 */
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="shrink-0 font-pixel text-xs text-foreground">{item.label}</span>
+                      {item.detail && (
+                        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground max-sm:order-last max-sm:basis-full max-sm:overflow-visible max-sm:whitespace-normal">
+                          {item.detail}
+                        </span>
+                      )}
+                      {item.command?.permission && (
+                        <span className="shrink-0 font-pixel text-2xs text-warning">
+                          {item.command.permission}
+                        </span>
+                      )}
+                      {item.inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
                     </span>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-foreground">{item.label}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {item.detail}
+                        </span>
+                      </span>
+                      {item.inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
+                      {item.kind === 'item' && (
+                        <span className="font-pixel text-2xs text-muted-foreground">
+                          ID {(item.item?.id ?? 0)}
+                        </span>
+                      )}
+                    </>
                   )}
                 </button>
               </li>
