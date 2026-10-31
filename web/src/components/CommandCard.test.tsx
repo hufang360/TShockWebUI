@@ -24,10 +24,12 @@ function renderCard(result?: CommandResult, onRefresh = vi.fn(), showLastRunAt =
 
 describe('CommandCard 刷新按钮提示', () => {
   it('有结果时 tooltip 显示最后的执行时间', async () => {
-    const ts = new Date(2026, 0, 2, 3, 4, 5).getTime()
+    // 断言**字面量**而不是 `toLocaleTimeString()`：时间跟界面语言走（中文 24 小时制），
+    // 用系统 locale 的期望值会让这条测试在英文 locale 的机器（如 CI runner）上假失败。
+    const ts = new Date(2026, 0, 2, 13, 32, 50).getTime()
     renderCard({ status: 'ok', output: ['ok'], ts })
     fireEvent.focus(screen.getByRole('button', { name: '刷新' }))
-    expect(await screen.findByText(`执行于 ${new Date(ts).toLocaleTimeString()}`)).toBeTruthy()
+    expect(await screen.findByText('执行于 13:32:50')).toBeTruthy()
   })
 
   it('没有结果时 tooltip 显示「尚未执行」', async () => {

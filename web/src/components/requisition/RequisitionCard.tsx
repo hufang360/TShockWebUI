@@ -2,7 +2,9 @@ import { Check, PackageCheck, Trash2, X } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import { Badge, Button, Card, CardBody } from '@/components/ui'
+import { formatClockWithDate } from '@/lib/clock'
 import { useI18n } from '@/lib/i18n'
+import type { Lang } from '@/lib/i18n'
 import type { Requisition, RequisitionStatus } from '@/lib/transport'
 import type { Atlas, Item } from '@/types'
 
@@ -26,11 +28,12 @@ const STATUS_TONE: Record<RequisitionStatus, 'neutral' | 'warn' | 'mock' | 'succ
   cancelled: 'neutral',
 }
 
-function formatTime(iso: string): string {
+/** 申请 / 审核时间：跟界面语言走（中文 24 小时制，英文当地习惯），不跟操作系统语言走。 */
+function formatTime(lang: Lang, iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString()
+  return formatClockWithDate(lang, d)
 }
 
 /** 一条物资申请：物品图标行 + 用途 / 备注 + 状态与操作。 */
@@ -45,7 +48,7 @@ export function RequisitionCard({
   onDeny,
   onDeliver,
 }: RequisitionCardProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const actions =
     mode === 'review' && (record.status === 'pending' || record.status === 'approved')
 
@@ -63,7 +66,7 @@ export function RequisitionCard({
           {record.deliveryError && (
             <Badge tone="danger">{t('requests.deliveryError', { msg: record.deliveryError })}</Badge>
           )}
-          <span className="ml-auto text-2xs text-muted-foreground">{formatTime(record.createdAt)}</span>
+          <span className="ml-auto text-2xs text-muted-foreground">{formatTime(lang, record.createdAt)}</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -92,7 +95,7 @@ export function RequisitionCard({
               <span>
                 {t('requests.reviewedBy', {
                   name: record.reviewedBy,
-                  time: formatTime(record.reviewedAt),
+                  time: formatTime(lang, record.reviewedAt),
                 })}
               </span>
             )}

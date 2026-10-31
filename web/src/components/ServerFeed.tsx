@@ -345,7 +345,7 @@ export function ServerFeedList({
                     {label && (
                       <time
                         dateTime={e.time}
-                        title={new Date(e.time).toLocaleString()}
+                        title={formatClockWithDate(lang, new Date(e.time))}
                         className="shrink-0 pt-0.5 text-2xs tabular-nums text-muted-foreground"
                       >
                         {label}
