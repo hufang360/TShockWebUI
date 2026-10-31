@@ -598,6 +598,17 @@ export interface ItemFavorite {
 }
 
 /**
+ * 收藏的合成记录（localStorage `tswui:recipeFavorites`）。
+ * `key` 由配方内容算出（见 `lib/recipeFavorites.ts` 的 `recipeFavoriteKey`），
+ * 不存下标：数据重新生成后下标会整体错位，内容键则能继续对上同一条配方。
+ * 在合成表条目 hover 时点 ⭐ 收藏，出现在「指令」模块的「收藏 → 合成表」tab。
+ */
+export interface RecipeFavorite {
+  key: string
+  ts: number
+}
+
+/**
  * 仅用于渲染缓存的本地用户信息（设计原则与约束 §4.6）。
  * 绝不含 token；真实登录态以 `GET /api/session` 为准。
  */
@@ -651,11 +662,13 @@ export interface UiState {
 export type TabId =
   | 'home'
   | 'editor'
+  | 'chat'
   | 'commands'
   | 'items'
   | 'dataid'
   | 'save'
   | 'worldview'
+  | 'spritesheet'
   | 'players'
   | 'store'
   | 'requisition'

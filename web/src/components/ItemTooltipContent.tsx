@@ -185,7 +185,7 @@ export function ItemTooltipContent({
       aria-pressed={favorited}
       title={favorited ? t('tooltip.unfavorite') : t('tooltip.favorite')}
       className={cn(
-        'ml-auto grid size-6 shrink-0 cursor-pointer place-items-center rounded-md transition-colors',
+        'ml-auto grid size-6 shrink-0 cursor-pointer place-items-center rounded-control transition-colors',
         'text-zinc-500 hover:bg-white/10 hover:text-amber-300',
         'focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none',
       )}
@@ -199,7 +199,7 @@ export function ItemTooltipContent({
       data-testid="item-tooltip"
       className={cn(
         // 半透明黑（**不加模糊**：与游戏一样是纯半透明，紧跟在物品旁边时不会把背景完全挖掉）
-        'max-w-96 rounded-md border border-white/15 bg-black/85 px-3 py-2.5 text-[15px] font-medium text-zinc-100 shadow-xl select-text',
+        'max-w-96 rounded-control border border-white/15 bg-black/85 px-3 py-2.5 text-[15px] font-medium text-zinc-100 shadow-xl select-text',
         className,
       )}
       style={style}

@@ -226,6 +226,23 @@ function renderTab(transport: BackendTransport) {
 }
 
 describe('ServerFeedTab 手动刷新', () => {
+  it('刷新按钮在顶栏：左边显示上次刷新时间', async () => {
+    const transport = makeTransport({
+      serverInfoExtra: async () => ({}) as never,
+      eventsTail: async () => ({
+        events: [{ seq: 1, type: 'join', text: 'Alice 加入了服务器', time: '' }],
+        lastSeq: 1,
+      }),
+    } as never)
+    renderTab(transport)
+
+    expect(await screen.findByText('Alice 加入了服务器')).toBeTruthy()
+    // 与首页 / 鱼店等模块同规：刷新按钮在顶栏，时间文案在它左边。
+    const label = await screen.findByText(/^上次刷新 /)
+    expect(label.className).toContain('text-2xs')
+    expect(screen.getByRole('button', { name: /刷新服务器动态/ })).toBeTruthy()
+  })
+
   it('刷新时按钮转圈并禁用，跑完恢复；期间会真的重新拉取', async () => {
     let resolveTail: (() => void) | null = null
     let calls = 0
@@ -246,26 +263,24 @@ describe('ServerFeedTab 手动刷新', () => {
     renderTab(transport)
 
     expect(await screen.findByText('Alice 加入了服务器')).toBeTruthy()
-    const button = screen.getByRole('button', { name: /重新同步服务器动态/ })
+    const button = screen.getByRole('button', { name: /刷新服务器动态/ })
     expect(button.hasAttribute('disabled')).toBe(false)
 
     fireEvent.click(button)
-    // 转圈中：禁用 + aria-busy，并且确实发起了第二次拉取。
-    await waitFor(() => expect(button.getAttribute('aria-busy')).toBe('true'))
-    expect(button.hasAttribute('disabled')).toBe(true)
+    // 转圈中：禁用 + 转圈图标，并且确实发起了第二次拉取。
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(true))
     expect(eventsTail).toHaveBeenCalledTimes(2)
     expect(button.querySelector('.animate-spin')).toBeTruthy()
 
     act(() => resolveTail?.())
-    await waitFor(() => expect(button.getAttribute('aria-busy')).toBe('false'))
-    expect(button.hasAttribute('disabled')).toBe(false)
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false))
     // 事件没被清空
     expect(screen.getByText('Alice 加入了服务器')).toBeTruthy()
   })
 })
 
 describe('ServerFeedTab 类型筛选', () => {
-  it('「进出服」筛选同时显示进服和退服事件', async () => {
+  it('「进服」筛选仍同时显示进服和退服事件（只是改了文字）', async () => {
     const transport = makeTransport({
       events: async () => ({
         events: [
@@ -279,7 +294,7 @@ describe('ServerFeedTab 类型筛选', () => {
     renderTab(transport)
 
     expect(await screen.findByText('Alice 加入了服务器')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '进出服' }))
+    fireEvent.click(screen.getByRole('button', { name: '进服' }))
     expect(screen.getByText('Alice 加入了服务器')).toBeTruthy()
     expect(screen.getByText('Carol 离开了服务器')).toBeTruthy()
     expect(screen.queryByText('Bob: 你好')).toBeNull()
@@ -319,5 +334,133 @@ describe('ServerFeedTab 类型筛选', () => {
     fireEvent.click(screen.getByRole('button', { name: '事件' }))
     expect(screen.queryByText('Alice 加入了服务器')).toBeNull()
     expect(screen.getByText('光之女皇已苏醒！')).toBeTruthy()
+  })
+})
+
+describe('ServerFeedList 新事件贴底', () => {
+  const events = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      seq: i + 1,
+      type: 'chat' as const,
+      text: `msg ${i + 1}`,
+      time: new Date(2026, 0, 2, 12, i).toISOString(),
+    }))
+
+  /** 给 jsdom 的滚动容器一套「可滚动」尺寸。 */
+  function makeScrollable(el: HTMLElement) {
+    Object.defineProperty(el, 'scrollHeight', { value: 1000, configurable: true })
+    Object.defineProperty(el, 'clientHeight', { value: 300, configurable: true })
+  }
+
+  it('followNewest：刷新出新事件后停在最新一条（即使之前翻到了上面）', async () => {
+    const list = (list_events: ReturnType<typeof events>) => (
+      <I18nProvider lang="zh">
+        <ServerFeedList events={list_events} extra={null} followNewest />
+      </I18nProvider>
+    )
+    const { rerender } = render(list(events(5)))
+    const ul = screen.getByText('msg 5').closest('ul') as HTMLElement
+    makeScrollable(ul)
+    // 用户翻到最上面看旧消息
+    ul.scrollTop = 0
+    fireEvent.scroll(ul)
+
+    rerender(list(events(7)))
+    await waitFor(() => expect(ul.scrollTop).toBe(1000))
+    expect(screen.getByText('msg 7')).toBeTruthy()
+  })
+
+  it('不传 followNewest（首页卡片）：翻旧记录时新事件不把视图拉走', async () => {
+    const list = (list_events: ReturnType<typeof events>) => (
+      <I18nProvider lang="zh">
+        <ServerFeedList events={list_events} extra={null} />
+      </I18nProvider>
+    )
+    const { rerender } = render(list(events(5)))
+    const ul = screen.getByText('msg 5').closest('ul') as HTMLElement
+    makeScrollable(ul)
+    ul.scrollTop = 0
+    fireEvent.scroll(ul)
+
+    rerender(list(events(7)))
+    expect(ul.scrollTop).toBe(0)
+  })
+})
+
+describe('ServerFeedList 页面级滚动（聊天页）', () => {
+  const events = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      seq: i + 1,
+      type: 'chat' as const,
+      text: `msg ${i + 1}`,
+      time: new Date(2026, 0, 2, 12, i).toISOString(),
+    }))
+
+  /** 给 jsdom 的滚动容器一套「可滚动」尺寸。 */
+  function makeScrollable(el: HTMLElement) {
+    Object.defineProperty(el, 'scrollHeight', { value: 1000, configurable: true })
+    Object.defineProperty(el, 'clientHeight', { value: 300, configurable: true })
+  }
+
+  /** AppShell 里真正在滚的是 `<main>`：用它包住列表。 */
+  const list = (list_events: ReturnType<typeof events>, slot?: HTMLElement) => (
+    <I18nProvider lang="zh">
+      <main data-testid="main">
+        <ServerFeedList
+          events={list_events}
+          extra={null}
+          followNewest
+          pageScroll
+          jumpSlot={slot ?? null}
+        />
+      </main>
+    </I18nProvider>
+  )
+
+  it('列表自己不再滚动，贴底跟随时滚的是 <main>', async () => {
+    const { rerender } = render(list(events(5)))
+    const main = screen.getByTestId('main')
+    const ul = screen.getByText('msg 5').closest('ul') as HTMLElement
+    makeScrollable(ul)
+    makeScrollable(main)
+    // 列表不是滚动容器（没有 overflow-y-auto）
+    expect(ul.className).not.toContain('overflow-y-auto')
+
+    // 贴底状态下来新事件 → 页面滚到底
+    rerender(list(events(7)))
+    await waitFor(() => expect(main.scrollTop).toBe(1000))
+  })
+
+  it('用户往上翻看时「回到底部」按钮投到宿主里，点它把页面滚到底', async () => {
+    const slot = document.createElement('div')
+    document.body.appendChild(slot)
+    const { rerender } = render(
+      <I18nProvider lang="zh">
+        <main data-testid="main">
+          <ServerFeedList events={events(5)} extra={null} pageScroll jumpSlot={slot} />
+        </main>
+      </I18nProvider>,
+    )
+    const main = screen.getByTestId('main')
+    makeScrollable(main)
+    // 用户向上翻：离底部很远
+    main.scrollTop = 0
+    fireEvent.scroll(main)
+
+    // 不跟随的首页式行为：新事件不把页面拉走
+    rerender(
+      <I18nProvider lang="zh">
+        <main data-testid="main">
+          <ServerFeedList events={events(7)} extra={null} pageScroll jumpSlot={slot} />
+        </main>
+      </I18nProvider>,
+    )
+    expect(main.scrollTop).toBe(0)
+    // 浮按钮进到吸底区域的宿主里（页面上才看得到）
+    const jump = await screen.findByRole('button', { name: /最新/ })
+    expect(slot.contains(jump)).toBe(true)
+    fireEvent.click(jump)
+    expect(main.scrollTop).toBe(1000)
+    slot.remove()
   })
 })

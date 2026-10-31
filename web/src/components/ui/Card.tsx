@@ -6,7 +6,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     <div
       data-slot="card"
       // shadcn 标准卡片表面：圆角 + 语义色边框 + 背景色，不使用投影。
-      className={cn('rounded-xl border bg-card text-card-foreground', className)}
+      className={cn('rounded-container border bg-card text-card-foreground', className)}
       {...props}
     />
   )
@@ -16,13 +16,17 @@ export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElemen
   return (
     <div
       data-slot="card-header"
-      className={cn('flex items-center justify-between gap-1.5 px-2 py-1.5', className)}
+      className={cn('flex items-center justify-between gap-2 px-2 py-2', className)}
       {...props}
     />
   )
 }
 
-export function CardTitle({ className, children }: { className?: string; children: ReactNode }) {
+export function CardTitle({
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLHeadingElement> & { children: ReactNode }) {
   return (
     <h2
       data-slot="card-title"
@@ -31,6 +35,7 @@ export function CardTitle({ className, children }: { className?: string; childre
         '[&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
         className,
       )}
+      {...props}
     >
       {children}
     </h2>

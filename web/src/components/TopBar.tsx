@@ -72,8 +72,8 @@ export function TopBarSlot({ extra }: { extra?: ReactNode }) {
   if (!api) return null
   if (!isMobile) {
     return (
-      <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-        <div ref={api.setSlot} className="flex min-w-0 items-center gap-1.5" />
+      <div className="flex min-w-0 shrink-0 items-center gap-2">
+        <div ref={api.setSlot} className="flex min-w-0 items-center gap-2" />
         {extra}
       </div>
     )
@@ -95,13 +95,13 @@ export function TopBarSlot({ extra }: { extra?: ReactNode }) {
       <DropdownMenuContent
         align="end"
         sideOffset={6}
-        className="w-auto min-w-44 max-w-[calc(100vw-1rem)] rounded-lg p-1"
+        className="w-auto min-w-44 max-w-[calc(100vw-1rem)] rounded-control p-1"
       >
         <div
           className={
             'flex flex-col gap-0.5 [&_[data-action-label]]:inline ' +
             '[&_button]:h-8 [&_button]:w-full [&_button]:justify-start [&_button]:gap-2 ' +
-            '[&_button]:rounded-md [&_button]:px-2 [&_button]:text-sm [&_button]:font-normal ' +
+            '[&_button]:rounded-control [&_button]:px-2 [&_button]:text-sm [&_button]:font-normal ' +
             '[&_svg]:size-4 [&_svg]:text-muted-foreground'
           }
         >

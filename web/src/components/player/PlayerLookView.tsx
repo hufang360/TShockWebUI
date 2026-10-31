@@ -124,7 +124,7 @@ function CollapsibleTitle({
     <CollapsibleTrigger asChild>
       <button
         type="button"
-        className="group/title flex w-full cursor-pointer items-center gap-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group/title flex w-full cursor-pointer items-center gap-1 rounded-control text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {titleIconId != null && (
           <ItemIcon
@@ -160,7 +160,7 @@ export function Group({
   const kind = labelKindOf(group.key)
   const n = countItems(items)
   return (
-    <Collapsible open={open} onOpenChange={onToggle} className="flex flex-col gap-1.5">
+    <Collapsible open={open} onOpenChange={onToggle} className="flex flex-col gap-2">
       <CollapsibleTitle
         label={n > 0 ? `${t(group.key)}（${n}）` : t(group.key)}
         titleIconId={titleIconId}
@@ -201,7 +201,7 @@ function ArrowColumn({
   if (items.length === 0) return null
   const kind = labelKindOf(groupKey)
   return (
-    <section className="flex flex-col gap-1.5">
+    <section className="flex flex-col gap-2">
       {!hideLabel && (
         <h3 className="text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
           {t(groupKey)}
@@ -239,7 +239,7 @@ export function BackpackCluster({ look }: { look: PlayerLook }) {
   return (
     // 与右侧配装块顶部对齐；不额外留空行。
     <div className="flex flex-wrap items-start gap-x-2 gap-y-3">
-      <section className="flex flex-col gap-1.5">
+      <section className="flex flex-col gap-2">
         <h3 className="text-xs font-medium text-muted-foreground">
           {t('players.group.inventory')}
         </h3>
@@ -324,13 +324,13 @@ export function LoadoutBlock({
   if (!hasAny) return null
   const total = cols.reduce((n, c) => n + countItems(sliceGroup(look, c)), 0)
   return (
-    <Collapsible open={open} onOpenChange={onToggle} className="flex flex-col gap-1.5">
+    <Collapsible open={open} onOpenChange={onToggle} className="flex flex-col gap-2">
       <CollapsibleTitle
         label={total > 0 ? `${t(groupKey)}（${total}）` : t(groupKey)}
         open={open}
       />
       <CollapsibleContent>
-        <div className="flex items-start gap-x-1.5">
+        <div className="flex items-start gap-x-2">
           {cols.map((c) => (
             <ArrowColumn
               key={`${c.key}:${c.start}`}
@@ -467,7 +467,7 @@ export function PlayerInfoPanel({ look }: { look: PlayerLook }) {
       </div>
       {/* 恶魔之心 / 火把神 / 矿车升级 + 7 个消耗品：都归到「永久增强」下；
           容器只有半宽，图标多时自动换行（`flex-wrap`）。 */}
-      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="mr-0.5 text-muted-foreground">{t('players.boost.title')}</span>
         {PERMANENT_BOOSTS.map((b) => itemIcon(b.itemId, look[b.field] === true))}
       </div>

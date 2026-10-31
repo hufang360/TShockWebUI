@@ -45,7 +45,7 @@ interface PlrPageProps {
 }
 
 /**
- * 「查看存档」：上传本地 `.plr`，看人物 / 属性 / 背包 / 装备，可导出图片。
+ * 「玩家存档」：上传本地 `.plr`，看人物 / 属性 / 背包 / 装备，可导出图片。
  *
  * **公开工具**：不读 TShock、不需要登录与任何权限，**也完全不上传服务器** ——
  * `.plr` 的 AES-128-CBC 解密与字段解析都在浏览器里做（`lib/save/plr.ts`），文件不离开本机。
@@ -247,70 +247,76 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
       )}
 
       <Card>
-        <CardBody className="flex flex-wrap items-center gap-3 pt-2">
-          {edit ? (
-            <>
-              <Button variant="primary" disabled={!canSave} onClick={saveEdit}>
-                <Download data-icon="inline-start" />
-                {t('save.edit.save')}
-              </Button>
-              {dirty ? (
-                <ConfirmButton
-                  size="md"
-                  variant="outline"
-                  confirmLabel={t('save.edit.discardConfirm')}
-                  confirmVariant="danger"
-                  onConfirm={() => {
-                    setEdit(null)
-                    setNotice(null)
-                  }}
-                >
-                  {t('save.edit.discard')}
-                </ConfirmButton>
-              ) : (
-                <Button variant="outline" onClick={() => setEdit(null)}>
-                  {t('save.edit.discard')}
-                </Button>
-              )}
-              <p className="min-w-0 flex-1 text-2xs text-muted-foreground">
-                {issues.length > 0
-                  ? t('save.edit.err.int')
-                  : limitsFailed
-                    ? t('save.edit.err.noLimits')
-                    : t('save.edit.notice')}
-              </p>
-            </>
-          ) : (
-            <>
-              <Button variant="primary" disabled={busy} onClick={pickImport}>
-                {importing ? (
-                  <Spinner aria-hidden data-icon="inline-start" />
-                ) : (
-                  <Upload data-icon="inline-start" />
-                )}
-                {t('players.import')}
-              </Button>
-              <Button variant="outline" disabled={busy} onClick={() => void runDemo()}>
-                <Sparkles data-icon="inline-start" />
-                {t('players.demo')}
-              </Button>
-              {saveFile && (
-                <Button variant="outline" disabled={busy} onClick={exportPlr}>
+        <CardBody className="flex flex-col gap-2 pt-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {edit ? (
+              <>
+                <Button size="sm" variant="primary" disabled={!canSave} onClick={saveEdit}>
                   <Download data-icon="inline-start" />
-                  {t('players.exportPlr')}
+                  {t('save.edit.save')}
                 </Button>
-              )}
-              {saveFile && saveLook && dataset && (
-                <Button variant="outline" disabled={busy} onClick={() => void startEdit()}>
-                  <Pencil data-icon="inline-start" />
-                  {t('save.edit')}
+                {dirty ? (
+                  <ConfirmButton
+                    size="sm"
+                    variant="outline"
+                    confirmLabel={t('save.edit.discardConfirm')}
+                    confirmVariant="danger"
+                    onConfirm={() => {
+                      setEdit(null)
+                      setNotice(null)
+                    }}
+                  >
+                    {t('save.edit.discard')}
+                  </ConfirmButton>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setEdit(null)}>
+                    {t('save.edit.discard')}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Button size="sm" variant="primary" disabled={busy} onClick={pickImport}>
+                  {importing ? (
+                    <Spinner aria-hidden data-icon="inline-start" />
+                  ) : (
+                    <Upload data-icon="inline-start" />
+                  )}
+                  {t('players.import')}
                 </Button>
-              )}
-              <p className="min-w-0 flex-1 text-2xs text-muted-foreground">
-                {t('players.saveHint')}
-              </p>
-            </>
-          )}
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => void runDemo()}>
+                  <Sparkles data-icon="inline-start" />
+                  {t('players.demo')}
+                </Button>
+                {saveFile && (
+                  <Button size="sm" variant="outline" disabled={busy} onClick={exportPlr}>
+                    <Download data-icon="inline-start" />
+                    {t('players.exportPlr')}
+                  </Button>
+                )}
+                {saveFile && saveLook && dataset && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void startEdit()}
+                  >
+                    <Pencil data-icon="inline-start" />
+                    {t('save.edit')}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+          <p className="min-w-0 text-2xs text-muted-foreground">
+            {edit
+              ? issues.length > 0
+                ? t('save.edit.err.int')
+                : limitsFailed
+                  ? t('save.edit.err.noLimits')
+                  : t('save.edit.notice')
+              : t('players.saveHint')}
+          </p>
           {fileInput}
         </CardBody>
       </Card>

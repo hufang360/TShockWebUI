@@ -1,99 +1,22 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowRight, Check, Copy } from 'lucide-react'
+import { ArrowRight, Check, Copy, Star } from 'lucide-react'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Badge, Button, Collapsible, CollapsibleContent, CollapsibleTrigger} from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
-import { formatItemTag } from '@/lib/items'
 import { locText } from '@/lib/loc'
 import { cn } from '@/lib/cn'
+import { recipeFavoriteKey } from '@/lib/recipeFavorites'
+import { useRecipeFavorites } from '@/lib/recipeFavoritesContext'
+import {
+  ENV_ICON,
+  ENV_LABEL,
+  FLAG_ICON,
+  FLAG_LABEL,
+  recipeToText,
+  reverseRecipeToText,
+} from '@/lib/recipeText'
 import type { Dataset, Recipe, RecipeIngredient } from '@/types'
-
-type T = (key: string, vars?: Record<string, string | number>) => string
-
-const ENV_LABEL: Record<string, string> = {
-  water: 'recipe.env.water',
-  honey: 'recipe.env.honey',
-  lava: 'recipe.env.lava',
-  snow: 'recipe.env.snow',
-  mechdusa: 'recipe.env.mechdusa',
-  graveyard: 'recipe.env.graveyard',
-  torchGod: 'recipe.env.torchGod',
-}
-/** 环境条件用**物品图标**代替文字（用户指定）。 */
-const ENV_ICON: Record<string, number> = {
-  graveyard: 4358, // MusicBoxGraveyard（墓地的八音盒）
-  torchGod: 5043, // TorchGodsFavor（火把神祝福）
-  water: 206, // WaterBucket（水桶）
-  honey: 1128, // HoneyBucket（蜂蜜桶）
-  lava: 207, // LavaBucket（岩浆桶）
-  snow: 593, // SnowBlock（雪块）
-}
-const FLAG_LABEL: Record<string, string> = {
-  crimson: 'recipe.flag.crimson',
-  corruption: 'recipe.flag.corruption',
-}
-/** 阵营条件用**物品图标**代替文字。 */
-const FLAG_ICON: Record<string, number> = {
-  crimson: 5533, // CrimsonAltar（猩红祭坛）
-  corruption: 5532, // DemonAltar（恶魔祭坛）
-}
-
-/** 合成条目 → 描述性文本；`tags` 为 true 时用 `[i:ID]` 标签代替名称。
- *
- * 格式与界面一致：`材料1 + 材料2 @ 制作站[ 条件] → 产物`（制作站在箭头前面）；
- * **徒手制作不写制作站**（有条件时只写条件，如「(水中)」）。
- */
-export function recipeToText(recipe: Recipe, dataset: Dataset, t: T, tags: boolean): string {
-  const label = (id: number) =>
-    tags ? formatItemTag(id) : (dataset.itemsById.get(id)?.name ?? `#${id}`)
-  const withStack = (s: string, n: number) => (n > 1 ? `${s} x${n}` : s)
-  const ingredients = recipe.ingredients
-    .map((i) => {
-      const group = i.group ? dataset.recipes.groups[i.group] : undefined
-      const groupName = group ? locText(dataset.loc, group.key) ?? group.key : undefined
-      const base = group ? t('recipe.groupAny', { name: groupName ?? group.key }) : label(i.id)
-      return withStack(base, i.stack)
-    })
-    .join(' + ')
-  const result = withStack(label(recipe.result.id), recipe.result.stack)
-  const stationId = recipe.stationItems[0]
-  const station =
-    stationId != null ? label(stationId) : t('recipe.station', { id: recipe.station })
-  const conds = [...(recipe.env ?? []), ...(recipe.flags ?? [])]
-    .filter((c) => c !== 'notDecraftable')
-    .map((c) =>
-      ENV_LABEL[c] ? t(ENV_LABEL[c]) : FLAG_LABEL[c] ? t(FLAG_LABEL[c]) : c,
-    )
-    .join(' ')
-  const head = [recipe.station < 0 ? null : `@ ${station}`, conds ? `(${conds})` : null]
-    .filter((s): s is string => !!s)
-    .join(' ')
-  return `${ingredients}${head ? ` ${head}` : ''} → ${result}`
-}
-
-/** 反向记录（可微光分解）的复制文本：`产物 @ 制作站 → 原材料的反向组合`。 */
-export function reverseRecipeToText(
-  recipe: Recipe,
-  itemId: number,
-  dataset: Dataset,
-  t: T,
-  tags: boolean,
-): string {
-  const label = (id: number) =>
-    tags ? formatItemTag(id) : (dataset.itemsById.get(id)?.name ?? `#${id}`)
-  const withStack = (s: string, n: number) => (n > 1 ? `${s} x${n}` : s)
-  const outputs = recipe.ingredients
-    .map((i) => {
-      const group = i.group ? dataset.recipes.groups[i.group] : undefined
-      const groupName = group ? locText(dataset.loc, group.key) ?? group.key : undefined
-      const base = group ? t('recipe.groupAny', { name: groupName ?? group.key }) : label(i.id)
-      return withStack(base, i.stack)
-    })
-    .join(' + ')
-  // 第二条是微光分解：制作站固定写作「微光」，不再沿用原配方的制作站 / 条件。
-  return `${label(itemId)} @ ${t('recipe.shimmerName')} → ${outputs}`
-}
 
 /**
  * 图标 + 名称 + 数量角标（数量直接显示在图标右下角，**不再有外框 / `×N` 文字**）。
@@ -122,7 +45,7 @@ function ItemChip({
   const name = label ?? item?.name ?? `#${id}`
   // **小图标本身不可点**（避免误触弹抽屉）：要看详情就悬停出提示，点提示底部的「合成表」。
   return (
-    <span className={cn('inline-flex min-w-0 items-center gap-1.5', className)}>
+    <span className={cn('inline-flex min-w-0 items-center gap-2', className)}>
       <ItemIcon item={item} atlas={dataset.atlas} size={24} stack={stack} tooltip={tooltip} />
       {/* 仅图标模式下一律不显示名称，**包括配方组的「任何XX」**（用图标的代表物品识别类型）；
           名称仍保留在复制文本里。 */}
@@ -174,7 +97,7 @@ function Station({
     return <span className="text-sm text-muted-foreground">{t('recipe.station', { id: recipe.station })}</span>
   }
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
+    <span className="inline-flex min-w-0 items-center gap-2">
       <ItemIcon item={items[0]} atlas={dataset.atlas} size={24} />
       {!iconOnly && <span className="truncate text-sm text-foreground/90">{items[0].name}</span>}
     </span>
@@ -228,16 +151,87 @@ export function Conditions({ recipe, dataset }: { recipe: Recipe; dataset: Datas
   )
 }
 
+/**
+ * 合成条目右上角的 hover 操作区：⭐ 收藏这条合成记录 + 复制文本。
+ * 绝对定位、不占位（否则会把内容挤到第二行）；没有收藏 Provider 时不渲染 ⭐
+ * （与物品提示的降级方式一致）；触屏上常显（`.touch-visible`）。
+ */
+function RecipeRowActions({
+  recipe,
+  reverse,
+  copy,
+  copied,
+}: {
+  recipe: Recipe
+  /** 反向记录（微光分解）：收藏键带 `rev:` 前缀，与正向分开记。 */
+  reverse?: boolean
+  copy: () => void
+  copied: boolean
+}) {
+  const { t } = useI18n()
+  const favorites = useRecipeFavorites()
+  const key = recipeFavoriteKey(recipe, reverse)
+  const favorited = favorites ? favorites.isFavorited(key) : false
+  const favoriteLabel = favorited ? t('recipe.unfavorite') : t('recipe.favorite')
+  return (
+    <span className="touch-visible absolute top-0.5 right-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/recipe:opacity-100 focus-within:opacity-100">
+      {favorites && (
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label={favoriteLabel}
+          aria-pressed={favorited}
+          title={favoriteLabel}
+          onClick={(e) => {
+            e.stopPropagation()
+            favorites.toggle(key)
+          }}
+        >
+          <Star className={cn(favorited && 'fill-current text-warning')} data-icon="inline-start" />
+        </Button>
+      )}
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        aria-label={t('action.copy')}
+        title={copied ? t('action.copied') : t('action.copy')}
+        onClick={(e) => {
+          e.stopPropagation()
+          copy()
+        }}
+      >
+        {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+      </Button>
+    </span>
+  )
+}
+
+/** 可点整行的键盘操作：Enter / 空格等同点一下（行内 ⭐ / 复制按钮已 `stopPropagation`）。 */
+function pickKeyDown(onPick?: () => void) {
+  if (!onPick) return undefined
+  return (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    onPick()
+  }
+}
+
 export function RecipeRow({
   recipe,
   dataset,
   iconOnly,
   copyTags,
+  onPick,
+  pickLabel,
 }: {
   recipe: Recipe
   dataset: Dataset
   iconOnly: boolean
   copyTags: boolean
+  /** 点整行时调用（把它填进聊天输入框）；不传则行不可点。 */
+  onPick?: () => void
+  /** 可点时给读屏用的说明（如「填充到输入框」）。 */
+  pickLabel?: string
 }) {
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
@@ -259,16 +253,24 @@ export function RecipeRow({
   return (
     <div
       data-testid="recipe-row"
-      className="group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-border/60 px-2.5 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
+      role={onPick ? 'button' : undefined}
+      tabIndex={onPick ? 0 : undefined}
+      aria-label={onPick ? pickLabel : undefined}
+      onClick={onPick}
+      onKeyDown={pickKeyDown(onPick)}
+      className={cn(
+        'group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 rounded-control border border-border/60 px-3 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10',
+        onPick && 'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+      )}
     >
-      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
         {recipe.ingredients.map((ing, i) => (
           <IngredientChip key={i} ingredient={ing} dataset={dataset} iconOnly={iconOnly} />
         ))}
       </span>
       {/* 制作站在箭头**前面**：`材料 @ 制作站(+条件) → 产物`；徒手制作不写制作站 */}
       {(showStation || hasConditions) && (
-        <span className="inline-flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex flex-wrap items-center gap-2">
           {showStation && (
             <>
               <span className="shrink-0 font-pixel text-sm text-muted-foreground">@</span>
@@ -286,20 +288,8 @@ export function RecipeRow({
         stack={recipe.result.stack}
         className="text-foreground"
       />
-      {/* hover 时右上角出现复制按钮（绝对定位、不占位，避免把内容挤到第二行）。 */}
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        className="touch-visible absolute top-0.5 right-0.5 shrink-0 opacity-0 transition-opacity group-hover/recipe:opacity-100 focus-visible:opacity-100"
-        aria-label={t('action.copy')}
-        title={copied ? t('action.copied') : t('action.copy')}
-        onClick={(e) => {
-          e.stopPropagation()
-          void copy()
-        }}
-      >
-        {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-      </Button>
+      {/* hover 时右上角出现 ⭐ 收藏 + 复制（绝对定位、不占位，避免把内容挤到第二行）。 */}
+      <RecipeRowActions recipe={recipe} copy={copy} copied={copied} />
     </div>
   )
 }
@@ -308,18 +298,24 @@ export function RecipeRow({
  * 可微光分解时的**反向记录**：`产物 @ 制作站 → 原材料`。
  * 与正向行同一套排版，只是材料 / 产物对调；可分解的物品才会有这一行。
  */
-function ReverseRecipeRow({
+export function ReverseRecipeRow({
   recipe,
   itemId,
   dataset,
   iconOnly,
   copyTags,
+  onPick,
+  pickLabel,
 }: {
   recipe: Recipe
   itemId: number
   dataset: Dataset
   iconOnly: boolean
   copyTags: boolean
+  /** 点整行时调用（把它填进聊天输入框）；不传则行不可点。 */
+  onPick?: () => void
+  /** 可点时给读屏用的说明。 */
+  pickLabel?: string
 }) {
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
@@ -335,11 +331,19 @@ function ReverseRecipeRow({
   return (
     <div
       data-testid="reverse-recipe-row"
-      className="group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-dashed border-border/60 px-2.5 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
+      role={onPick ? 'button' : undefined}
+      tabIndex={onPick ? 0 : undefined}
+      aria-label={onPick ? pickLabel : undefined}
+      onClick={onPick}
+      onKeyDown={pickKeyDown(onPick)}
+      className={cn(
+        'group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 rounded-control border border-dashed border-border/60 px-3 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10',
+        onPick && 'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+      )}
     >
       <ItemChip id={itemId} dataset={dataset} iconOnly={iconOnly} className="text-foreground" />
       {/* 微光分解：`产物 @ 微光 → 原材料` */}
-      <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span className="inline-flex flex-wrap items-center gap-2">
         <span className="shrink-0 font-pixel text-sm text-muted-foreground">@</span>
         {/* 5362 只是微光的标记图标：文字固定「微光」，也不挂物品提示 */}
         <ItemChip
@@ -351,24 +355,12 @@ function ReverseRecipeRow({
         />
       </span>
       <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
         {recipe.ingredients.map((ing, i) => (
           <IngredientChip key={i} ingredient={ing} dataset={dataset} iconOnly={iconOnly} />
         ))}
       </span>
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        className="touch-visible absolute top-0.5 right-0.5 shrink-0 opacity-0 transition-opacity group-hover/recipe:opacity-100 focus-visible:opacity-100"
-        aria-label={t('action.copy')}
-        title={copied ? t('action.copied') : t('action.copy')}
-        onClick={(e) => {
-          e.stopPropagation()
-          void copy()
-        }}
-      >
-        {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-      </Button>
+      <RecipeRowActions recipe={recipe} reverse copy={copy} copied={copied} />
     </div>
   )
 }
@@ -388,7 +380,7 @@ export function ShimmerRow({
   return (
     <div
       data-testid="shimmer-row"
-      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-border/60 px-2.5 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
+      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 rounded-control border border-border/60 px-3 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
     >
       <ItemChip id={fromId} dataset={dataset} iconOnly={iconOnly} />
       <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
@@ -418,7 +410,7 @@ function RecipeSection({
   const [open, setOpen] = useState(true)
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-1">
-      <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-1.5 text-sm font-medium">
+      <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-sm font-medium">
         {iconId != null && (
           <ItemIcon
             item={dataset.itemsById.get(iconId)}

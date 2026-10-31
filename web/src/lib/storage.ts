@@ -29,14 +29,14 @@ export const StorageKeys = {
   terminal: 'terminal',
   /** 浮动终端的输入草稿。与指令页草稿分开：终端执行后清空输入，不应抹掉页面里的草稿。 */
   terminalDraft: 'terminal:draft',
-  /** 指令页右侧工具面板当前选中的 tab。 */
-  commandTab: 'commandTab',
-  /** 指令页顶部 tab（指令 / 聊天 / 小抄）。 */
-  commandPageTab: 'commandPageTab',
+  /** 聊天页未发送的草稿（与指令草稿分开，切页不会丢）。 */
+  chatDraft: 'chat:draft',
   /** 可折叠卡片（指令结果 / 首页与模块卡片）的展开状态 { key: open }。 */
   collapsedCards: 'collapsedCards',
   /** 物品图鉴里收藏的物品 id（在「指令」模块的收藏 tab 展示）。 */
   itemFavorites: 'itemFavorites',
+  /** 合成表里收藏的合成记录（内容键，在「指令」模块的收藏 → 合成表 tab 展示）。 */
+  recipeFavorites: 'recipeFavorites',
   /** 物品图鉴是否隐藏格子中的 ID 与名称（默认关闭，即默认显示）。 */
   dexHideItemMeta: 'dex:hideItemMeta',
   /** 数据 ID 是否隐藏图标格中的 ID 与名称（默认关闭，即默认显示）。 */
@@ -47,8 +47,10 @@ export const StorageKeys = {
   dexTableTwoCols: 'dex:tableTwoCols',
   /** 物品图鉴合成表「显示物品名称」开关（默认不勾选 = 仅图标；跨刷新记忆）。 */
   dexRecipeShowNames: 'dex:recipeShowNames',
-  /** 物品图鉴合成表「两列视图」开关（默认不勾选 = 自适应多列）。 */
+  /** 物品图鉴合成表「两列视图-详情页」开关（详情抽屉里的合成表；默认不勾选）。 */
   dexRecipeTwoColumn: 'dex:recipeTwoColumn',
+  /** 物品图鉴合成表「两列视图-收藏页」开关（收藏 → 合成表 / 常用；默认勾选 = 两列）。 */
+  dexRecipeTwoColumnFavorites: 'dex:recipeTwoColumnFavorites',
   /** 物品图鉴「最近搜索」（统一规则：最多 10 条，见 lib/searchHistory.ts）。 */
   dexSearchHistory: 'dex:searchHistory',
   /** 物品图鉴「最近使用的分组 / 制作页签」（最多 3 条）。 */
@@ -83,6 +85,10 @@ export const StorageKeys = {
   customModules: 'customModules',
   /** 模块内用户添加的指令卡片。 */
   moduleCards: 'moduleCards',
+  /** 鱼店内置卡片的显示 / 隐藏（`{ [cardId]: true = 隐藏 }`；没记过的按卡片的 `defaultHidden`）。 */
+  fishHiddenCards: 'fishCards:hidden',
+  /** 鱼店记事本内容（`{ [serverId]: string }`，按服务器分开存在本机）。 */
+  fishNote: 'fishNote',
   /** 指令卡片「是否手动执行」偏好（key -> true）。 */
   autoExec: 'autoExec',
   /** 各模块界面状态记忆（如玩家管理的玩家名、鱼店的筛选）。 */
@@ -91,6 +97,10 @@ export const StorageKeys = {
   playersCompact: 'playersCompact',
   /** 玩家管理各分区（银行 / 配装）的折叠状态 { [key]: collapsed }。 */
   playersCollapsed: 'playersCollapsed',
+  /** 精灵图上次用的切分参数 / GIF 参数（图片本身不存）。 */
+  spriteSheet: 'spriteSheet',
+  /** 精灵图页面上次打开的 tab（split / merge / gif）。 */
+  spriteSheetTab: 'spriteSheetTab',
 } as const
 
 type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys]

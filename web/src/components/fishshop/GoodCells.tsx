@@ -1,6 +1,7 @@
 import { ItemIcon } from '@/components/ItemIcon'
 import { Button } from '@/components/ui'
 import { parseRichText } from '@/lib/richtext'
+import { cn } from '@/lib/cn'
 import type { FishGood } from '@/lib/tshock'
 import type { Dataset, Item } from '@/types'
 
@@ -27,11 +28,11 @@ export const GOOD_GRID = 'grid grid-cols-[repeat(auto-fill,4.5rem)] gap-2'
  * 格子被锁成 36px 高、图标与名称溢出压到下一行（整片商品互相重叠）。所以 `h-auto` 要连 `md:h-auto` 一起写。
  */
 const CELL_CLASS =
-  'group/cell grid h-auto w-18 cursor-pointer place-items-center gap-1 rounded-xl px-0 py-0 font-normal transition duration-150 hover:-translate-y-0.5 hover:bg-transparent hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-auto'
+  'group/cell grid h-auto w-18 cursor-pointer place-items-center gap-1 rounded-container px-0 py-0 font-normal transition duration-150 hover:-translate-y-0.5 hover:bg-transparent hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-auto'
 
 /** 图标区：默认无底色，72×72（内置 64px 图标）；hover / 键盘聚焦时才铺 `bg-primary/10`（与物品 / NPC 格子一致）。 */
 const ICON_SURFACE_CLASS =
-  'relative flex size-18 items-center justify-center rounded-lg transition-colors group-hover/cell:bg-primary/10 group-focus-visible/cell:bg-primary/10'
+  'relative flex size-18 items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10 group-focus-visible/cell:bg-primary/10'
 
 interface GoodItemTag {
   itemId: number
@@ -76,10 +77,13 @@ export function GoodCell({
   good,
   dataset,
   onSelect,
+  hideMeta = false,
 }: {
   good: FishGood
   dataset: Dataset | null
   onSelect: (good: FishGood) => void
+  /** 只显示图标（「页面设置 → 隐藏编号和名称」，与物品 ID 的同一开关同义）。 */
+  hideMeta?: boolean
 }) {
   const prefixName = goodPrefixName(good, dataset)
   return (
@@ -87,18 +91,22 @@ export function GoodCell({
       variant="ghost"
       onClick={() => onSelect(good)}
       aria-label={good.name}
-      className={CELL_CLASS}
+      className={cn(CELL_CLASS, hideMeta && 'w-12')}
     >
       <span data-testid="good-icon-surface" className={ICON_SURFACE_CLASS}>
         <GoodThumb good={good} dataset={dataset} size={CELL_ICON_SIZE} />
       </span>
-      <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
-        #{good.serial}
-      </span>
-      <span className="w-full truncate text-center text-xs leading-4 text-foreground">
-        {prefixName ? <span className="text-warning">{prefixName} </span> : null}
-        {good.name}
-      </span>
+      {!hideMeta && (
+        <>
+          <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+            #{good.serial}
+          </span>
+          <span className="w-full truncate text-center text-xs leading-4 text-foreground">
+            {prefixName ? <span className="text-warning">{prefixName} </span> : null}
+            {good.name}
+          </span>
+        </>
+      )}
     </Button>
   )
 }
@@ -132,7 +140,7 @@ export function GoodThumb({
   }
   return (
     <span
-      className="grid shrink-0 place-items-center rounded-lg bg-accent/60 text-sm text-foreground"
+      className="grid shrink-0 place-items-center rounded-control bg-accent/60 text-sm text-foreground"
       style={{ width: size, height: size }}
     >
       {good.name.slice(0, 1) || '?'}

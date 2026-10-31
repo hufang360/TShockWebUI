@@ -42,7 +42,7 @@ export function playerInfoLines(
 /**
  * 「导出图片」：把角色（人物全身图 + 属性 + 背包 / 装备）画成 PNG。
  *
- * 「查看存档」与「玩家管理」两个页面共用：`playerShot` 是 canvas 合成（见 `lib/playerShot.ts`），
+ * 「玩家存档」与「玩家管理」两个页面共用：`playerShot` 是 canvas 合成（见 `lib/playerShot.ts`），
  * 不能直接截 DOM，所以逻辑只能放在这里，两边只负责渲染按钮。
  */
 export function usePlayerShot(

@@ -213,7 +213,7 @@ export function WorldPanel({ world, thumb, markers, focus, onFocusClear, bytes, 
           onClick={() => setZoomed(true)}
           aria-label={t('wld.zoomHint')}
           title={t('wld.zoomHint')}
-          className="group relative w-full cursor-zoom-in overflow-hidden rounded-lg border border-border"
+          className="group relative w-full cursor-zoom-in overflow-hidden rounded-control border border-border"
           data-testid="world-thumb-button"
           onMouseMove={(e) => {
             const el = e.currentTarget
@@ -259,7 +259,7 @@ export function WorldPanel({ world, thumb, markers, focus, onFocusClear, bytes, 
           {hover && (
             <span
               data-testid="world-hover-tip"
-              className="pointer-events-none absolute z-10 max-w-[70%] truncate rounded bg-black/75 px-1.5 py-0.5 text-2xs text-white tabular-nums"
+              className="pointer-events-none absolute z-10 max-w-[70%] truncate rounded bg-black/75 px-2 py-0.5 text-2xs text-white tabular-nums"
               style={{ left: `${hover.left}%`, top: `${hover.top}%` }}
             >
               {[
@@ -279,12 +279,12 @@ export function WorldPanel({ world, thumb, markers, focus, onFocusClear, bytes, 
             </span>
           )}
           {markers && markers.hits.length > 0 && (
-            <span className="absolute top-1.5 left-1.5 rounded bg-black/60 px-1.5 py-0.5 text-2xs text-white">
+            <span className="absolute top-1.5 left-1.5 rounded bg-black/60 px-2 py-0.5 text-2xs text-white">
               {markers.label}
             </span>
           )}
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-            <ZoomIn className="mr-1.5 size-4" />
+            <ZoomIn className="mr-2 size-4" />
             {t('wld.zoomHint')}
           </span>
         </button>
@@ -305,7 +305,7 @@ export function WorldPanel({ world, thumb, markers, focus, onFocusClear, bytes, 
             <div
               ref={scrollRef}
               data-testid="world-zoom-scroll"
-              className="max-h-[72vh] overflow-auto rounded-lg border border-border bg-muted"
+              className="max-h-[72vh] overflow-auto rounded-control border border-border bg-muted"
             >
               <canvas
                 ref={(el) => {
@@ -331,7 +331,7 @@ export function WorldPanel({ world, thumb, markers, focus, onFocusClear, bytes, 
               <li key={id} className="flex items-center gap-1 text-2xs text-muted-foreground">
                 <span
                   aria-hidden
-                  className="size-2.5 rounded-sm ring-1 ring-border"
+                  className="size-2.5 rounded-chip ring-1 ring-border"
                   style={{ backgroundColor: tileColorHex(id) }}
                 />
                 <span className="max-w-32 truncate text-foreground">
@@ -357,7 +357,7 @@ export function WorldPanel({ world, thumb, markers, focus, onFocusClear, bytes, 
         </div>
 
         {seedBadges.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             {seedBadges.map((label) => (
               <Badge key={label} tone="accent">
                 {label}
@@ -389,10 +389,10 @@ export function WorldPanel({ world, thumb, markers, focus, onFocusClear, bytes, 
 
         <Separator />
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
           <p className="text-2xs text-muted-foreground">{t('wld.progress')}</p>
           {bosses.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {bosses.map((name) => (
                 <Badge key={name} tone="success">
                   {name}

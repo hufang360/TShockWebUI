@@ -47,7 +47,7 @@ describe('AppShell 顶栏', () => {
           onTabChange={vi.fn()}
           nav={[
             { id: 'home', label: '首页', icon: Home },
-            { id: 'players', label: '玩家管理', icon: Users, group: 'players' },
+            { id: 'players', label: '玩家管理', icon: Users, group: 'extension' },
           ]}
           headerRight={<div>账号</div>}
           sidebarCollapsed={false}
@@ -62,7 +62,7 @@ describe('AppShell 顶栏', () => {
     expect(screen.getByRole('button', { name: '隐藏侧栏' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '显示侧栏' })).toBeNull()
     const crumb = screen.getByRole('navigation', { name: 'breadcrumb' })
-    expect(within(crumb).queryByText('玩家')).toBeNull()
+    expect(within(crumb).queryByText('扩展')).toBeNull()
     expect(within(crumb).getByRole('link', { name: '玩家管理' }).getAttribute('aria-current')).toBe(
       'page',
     )
@@ -93,7 +93,7 @@ describe('AppShell 顶栏', () => {
 })
 
 describe('AppShell 侧栏模块分类', () => {
-  it('按玩家 / 世界 / 商店 / 服务 / 自定义分组渲染入口', () => {
+  it('首组不带标题；工具 / 扩展分组按顺序渲染入口', () => {
     render(
       <I18nProvider lang="zh">
         <AppShell
@@ -101,11 +101,13 @@ describe('AppShell 侧栏模块分类', () => {
           onTabChange={vi.fn()}
           nav={[
             { id: 'home', label: '首页', icon: Home },
-            { id: 'players', label: '玩家管理', icon: Users, group: 'players' },
-            { id: 'world', label: '世界管理', icon: Globe2, group: 'world' },
-            { id: 'store', label: '鱼店', icon: Fish, group: 'store' },
-            { id: 'requisition', label: '物资申请', icon: ClipboardList, group: 'services' },
-            { id: 'm:test', label: '测试模块', icon: Plug, group: 'custom' },
+            { id: 'requisition', label: '物资申请', icon: ClipboardList },
+            { id: 'items', label: '物品 ID', icon: Home, group: 'tools' },
+            { id: 'save', label: '玩家存档', icon: Home, group: 'tools' },
+            { id: 'store', label: '鱼店', icon: Fish, group: 'extension' },
+            { id: 'players', label: '玩家管理', icon: Users, group: 'extension' },
+            { id: 'world', label: '世界管理', icon: Globe2, group: 'extension' },
+            { id: 'm:test', label: '测试模块', icon: Plug, group: 'extension' },
           ]}
           headerRight={<div>账号</div>}
           sidebarCollapsed={false}
@@ -116,13 +118,57 @@ describe('AppShell 侧栏模块分类', () => {
       </I18nProvider>,
     )
 
-    for (const label of ['玩家', '世界', '商店', '服务', '自定义']) {
-      expect(screen.getByText(label)).toBeTruthy()
-    }
-    expect(screen.getByRole('button', { name: '玩家管理' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '世界管理' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '鱼店' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '物资申请' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '测试模块' })).toBeTruthy()
+    // 分组标题只有「工具 / 扩展」两项：首组（首页 / 物资申请）不带标题。
+    const labels = [...document.querySelectorAll('[data-slot="sidebar-group-label"]')].map(
+      (el) => el.textContent,
+    )
+    expect(labels).toEqual(['工具', '扩展'])
+
+    // 组内顺序：首组「首页 → 物资申请」，工具组「物品 ID → 玩家存档」，扩展组按给定顺序。
+    const navButtons = within(document.querySelector('[data-slot="sidebar-content"]') as HTMLElement)
+      .getAllByRole('button')
+      .map((el) => el.textContent)
+    expect(navButtons).toEqual([
+      '首页',
+      '物资申请',
+      '物品 ID',
+      '玩家存档',
+      '鱼店',
+      '玩家管理',
+      '世界管理',
+      '测试模块',
+    ])
+  })
+})
+
+describe('AppShell 滚动条槽（聊天页整页滚动）', () => {
+  const renderShell = (activeTab: 'home' | 'chat') =>
+    render(
+      <I18nProvider lang="zh">
+        <AppShell
+          activeTab={activeTab}
+          onTabChange={vi.fn()}
+          nav={[{ id: 'home', label: '首页', icon: Home }]}
+          headerRight={<span>账号</span>}
+          sidebarCollapsed={false}
+          onToggleSidebar={vi.fn()}
+        >
+          <p>content</p>
+        </AppShell>
+      </I18nProvider>,
+    )
+
+  it('「聊天」页给主内容区常驻预留滚动条槽，避免切筛选时整列左右跳', () => {
+    renderShell('chat')
+    const main = document.querySelector('main') as HTMLElement
+    expect(main.className).toContain('[scrollbar-gutter:stable]')
+    main.remove()
+  })
+
+  it('其它页面不预留（保持原有宽度，不被空槽占位）', () => {
+    renderShell('home')
+    const main = document.querySelector('main') as HTMLElement
+    expect(main.className).not.toContain('scrollbar-gutter')
+    main.remove()
   })
 })

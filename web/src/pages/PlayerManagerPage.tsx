@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Download, Camera, RefreshCw, Rows3, Search, ShieldAlert } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { LoginGate } from '@/components/LoginGate'
 import { Notice } from '@/components/Notice'
 import { PlayerLookPanel } from '@/components/player/PlayerLookPanel'
 import { SearchInput } from '@/components/SearchInput'
+import { TopBarActions } from '@/components/TopBar'
 import {
   Alert,
   AlertDescription,
@@ -36,7 +38,7 @@ import type { BackendTransport, PlayerCapabilities, PlayerLook } from '@/lib/tsh
  *   - 未安装插件 → 404 → 界面提示「未安装」
  *   - 无 playermanager 权限 → 403 → 界面提示「无权限」
  *
- * 「查看存档」（上传本地 .plr）是**公开工具**，已独立为侧边栏菜单
+ * 「玩家存档」（上传本地 .plr）是**公开工具**，已独立为侧边栏菜单
  * （`pages/PlrPage.tsx`），不受本模块开关影响。
  * 两个页面都能把角色「导出图片」（`hooks/usePlayerShot.ts`）。
  * 浏览器不持有 token，所有请求经后端同源 `/api/*` 转发。
@@ -243,49 +245,30 @@ export function PlayerManagerPage({
     }
   }, [name, transport, onTokenInvalid, t])
 
-  const shotButton = (target: PlayerLook) => (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="secondary"
-            disabled={busyNow != null}
-            onClick={() => void runShot(target, false)}
-          >
-            {shooting ? (
-              <Spinner aria-hidden data-icon="inline-start" />
-            ) : (
-              <Camera data-icon="inline-start" />
-            )}
-            {t('players.shot')}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{t('players.shotHint')}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-
-  const compactToggle = (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon-sm"
-            variant={compact ? 'secondary' : 'ghost'}
-            aria-label={t('players.compactView')}
-            aria-pressed={compact}
-            onClick={() => setCompact(!compact)}
-          >
-            <Rows3 data-icon="inline-start" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{t('players.compactView')}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-
   return (
     <div className="flex flex-col gap-4">
+      {moduleEnabled && authenticated && (
+        <TopBarActions>
+          {canUse && (
+            <IconAction
+              label={t('players.compactView')}
+              icon={Rows3}
+              pressed={compact}
+              onClick={() => setCompact(!compact)}
+            />
+          )}
+          {look && (
+            <IconAction
+              label={t('players.shot')}
+              icon={Camera}
+              loading={shooting}
+              disabled={busyNow != null}
+              onClick={() => void runShot(look, false)}
+            />
+          )}
+        </TopBarActions>
+      )}
+
       {!moduleEnabled && (
         <Notice icon={<AlertTriangle />} title={t('players.moduleOff')}>
           {t('players.moduleOffHint')}
@@ -327,16 +310,17 @@ export function PlayerManagerPage({
 
       {moduleEnabled && authenticated && canUse && (
         <Card>
-          {/* 顶部多留一点边距：用户名（输入框）上方不贴卡边 */}
-          <CardBody className="flex flex-col gap-3 pt-6">
+          <CardBody className="flex flex-col gap-2 pt-2">
             {/* 查询行：输入 + 带文字按钮（下载 / 刷新 / 查看） */}
             <TooltipProvider delayDuration={150}>
               <div className="flex flex-wrap items-center gap-2">
                 <SearchInput
-                  className="h-9 max-w-xs"
-                  inputClassName="text-sm"
+                  className="h-8 max-w-xs md:h-7"
+                  inputClassName="text-xs"
                   value={name}
                   placeholder={t('players.namePlaceholder')}
+                  leadingIcon={<Search className="size-4 text-muted-foreground" />}
+                  shortcut
                   history={suggestions}
                   historyHeader={t('players.nameSuggest')}
                   onValueChange={(v) => {
@@ -355,6 +339,7 @@ export function PlayerManagerPage({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
+                      size="sm"
                       variant="secondary"
                       disabled={busyNow != null}
                       onClick={() => void runExport()}
@@ -372,6 +357,7 @@ export function PlayerManagerPage({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
+                      size="sm"
                       variant="secondary"
                       disabled={busyNow != null}
                       onClick={() => void runLook(look?.name || name)}
@@ -388,7 +374,7 @@ export function PlayerManagerPage({
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="primary" disabled={busyNow != null} onClick={() => void runLook()}>
+                    <Button size="sm" variant="primary" disabled={busyNow != null} onClick={() => void runLook()}>
                       {busyNow === 'look' ? (
                         <Spinner aria-hidden data-icon="inline-start" />
                       ) : (
@@ -399,7 +385,6 @@ export function PlayerManagerPage({
                   </TooltipTrigger>
                   <TooltipContent>{t('players.look')}</TooltipContent>
                 </Tooltip>
-                {capability?.plugin === true && <div className="ml-auto">{compactToggle}</div>}
               </div>
             </TooltipProvider>
 
@@ -415,10 +400,10 @@ export function PlayerManagerPage({
       {moduleEnabled && authenticated && busyNow === 'look' && !look && (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]" role="status" aria-busy="true">
           <span className="sr-only">{t('app.pageLoading')}</span>
-          <Skeleton className="h-80 rounded-xl" />
+          <Skeleton className="h-80 rounded-container" />
           <div className="flex flex-col gap-3">
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-72 rounded-xl" />
+            <Skeleton className="h-32 rounded-container" />
+            <Skeleton className="h-72 rounded-container" />
           </div>
         </div>
       )}
@@ -430,7 +415,6 @@ export function PlayerManagerPage({
           compact={compact}
           collapsed={collapsed}
           onToggleCollapse={toggleCollapsed}
-          actions={shotButton(look)}
         />
       )}
     </div>

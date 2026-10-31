@@ -36,7 +36,6 @@ export { Checkbox } from './Checkbox'
 export { Slider } from './Slider'
 export { ToggleGroup, ToggleGroupItem } from './ToggleGroup'
 export type { ToggleGroupProps, ToggleGroupItemProps } from './ToggleGroup'
-export { NativeSelect, NativeSelectOption, NativeSelectOptGroup } from './NativeSelect'
 export {
   Select,
   SelectGroup,
@@ -101,7 +100,13 @@ export {
   BreadcrumbEllipsis,
 } from './Breadcrumb'
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './Tooltip'
-export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent } from './Popover'
+export {
+  PANEL_POPOVER_WIDTH,
+  Popover,
+  PopoverTrigger,
+  PopoverAnchor,
+  PopoverContent,
+} from './Popover'
 export {
   Pagination,
   PaginationContent,
@@ -135,3 +140,6 @@ export {
   DropdownMenuShortcut,
 } from './DropdownMenu'
 export { Skeleton } from './Skeleton'
+export { Toaster } from './Sonner'
+// sonner 的 `toast()` 直接对外（不在 Sonner.tsx 里再导出，避免 fast-refresh 警告）。
+export { toast } from 'sonner'

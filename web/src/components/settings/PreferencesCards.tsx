@@ -3,8 +3,11 @@ import { CollapsibleCard } from '@/components/CollapsibleCard'
 import {
   Field,
   FieldTitle,
-  NativeSelect,
-  NativeSelectOption,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Separator,
   Slider,
   Spinner,
@@ -114,23 +117,26 @@ export function PreferencesCards({
       <>
       <CollapsibleCard title={t('settings.execution')} bodyClassName="flex flex-col gap-0 pt-0">
         <SettingRow label={t('settings.commandInterval')}>
-          <NativeSelect
-            size="sm"
-            value={settings.commandInterval}
-            onChange={(e) => onChange({ commandInterval: Number(e.target.value) })}
-            aria-label={t('settings.commandInterval')}
+          <Select
+            value={String(settings.commandInterval)}
+            onValueChange={(next) => onChange({ commandInterval: Number(next) })}
           >
-            <NativeSelectOption value={0}>{t('settings.commandIntervalOff')}</NativeSelectOption>
-            <NativeSelectOption value={1000}>
-              {t('settings.commandIntervalSeconds', { n: 1 })}
-            </NativeSelectOption>
-            <NativeSelectOption value={2000}>
-              {t('settings.commandIntervalSeconds', { n: 2 })}
-            </NativeSelectOption>
-            <NativeSelectOption value={5000}>
-              {t('settings.commandIntervalSeconds', { n: 5 })}
-            </NativeSelectOption>
-          </NativeSelect>
+            <SelectTrigger size="sm" className="min-w-28" aria-label={t('settings.commandInterval')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">{t('settings.commandIntervalOff')}</SelectItem>
+              <SelectItem value="1000">
+                {t('settings.commandIntervalSeconds', { n: 1 })}
+              </SelectItem>
+              <SelectItem value="2000">
+                {t('settings.commandIntervalSeconds', { n: 2 })}
+              </SelectItem>
+              <SelectItem value="5000">
+                {t('settings.commandIntervalSeconds', { n: 5 })}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </SettingRow>
         <Separator />
         <Field
@@ -160,25 +166,28 @@ export function PreferencesCards({
         <div className="flex flex-col gap-1 py-2">
           <Field orientation="horizontal" className="flex-nowrap justify-between gap-3">
             <FieldTitle>{t('settings.eventsInterval')}</FieldTitle>
-            <NativeSelect
-              size="sm"
-              value={settings.eventsRefreshInterval}
-              onChange={(e) => onChange({ eventsRefreshInterval: Number(e.target.value) })}
-              aria-label={t('settings.eventsInterval')}
+            <Select
+              value={String(settings.eventsRefreshInterval)}
+              onValueChange={(next) => onChange({ eventsRefreshInterval: Number(next) })}
             >
-              <NativeSelectOption value={60000} disabled={!canFastEvents}>
-                {t('settings.refreshIntervalMinutes', { n: 1 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={180000}>
-                {t('settings.refreshIntervalMinutes', { n: 3 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={300000}>
-                {t('settings.refreshIntervalMinutes', { n: 5 })}
-              </NativeSelectOption>
-              <NativeSelectOption value={900000}>
-                {t('settings.refreshIntervalMinutes', { n: 15 })}
-              </NativeSelectOption>
-            </NativeSelect>
+              <SelectTrigger size="sm" className="min-w-28" aria-label={t('settings.eventsInterval')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="60000" disabled={!canFastEvents}>
+                  {t('settings.refreshIntervalMinutes', { n: 1 })}
+                </SelectItem>
+                <SelectItem value="180000">
+                  {t('settings.refreshIntervalMinutes', { n: 3 })}
+                </SelectItem>
+                <SelectItem value="300000">
+                  {t('settings.refreshIntervalMinutes', { n: 5 })}
+                </SelectItem>
+                <SelectItem value="900000">
+                  {t('settings.refreshIntervalMinutes', { n: 15 })}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
           {!canFastEvents && (
             <p className="text-xs leading-5 text-muted-foreground">
@@ -188,26 +197,29 @@ export function PreferencesCards({
         </div>
         <Separator />
         <SettingRow label={t('settings.refreshInterval')}>
-          <NativeSelect
-            size="sm"
-            value={settings.refreshInterval}
-            onChange={(e) => onChange({ refreshInterval: Number(e.target.value) })}
-            aria-label={t('settings.refreshInterval')}
+          <Select
+            value={String(settings.refreshInterval)}
+            onValueChange={(next) => onChange({ refreshInterval: Number(next) })}
           >
-            <NativeSelectOption value={0}>{t('settings.refreshIntervalOff')}</NativeSelectOption>
-            <NativeSelectOption value={60000}>
-              {t('settings.refreshIntervalMinutes', { n: 1 })}
-            </NativeSelectOption>
-            <NativeSelectOption value={120000}>
-              {t('settings.refreshIntervalMinutes', { n: 2 })}
-            </NativeSelectOption>
-            <NativeSelectOption value={300000}>
-              {t('settings.refreshIntervalMinutes', { n: 5 })}
-            </NativeSelectOption>
-            <NativeSelectOption value={600000}>
-              {t('settings.refreshIntervalMinutes', { n: 10 })}
-            </NativeSelectOption>
-          </NativeSelect>
+            <SelectTrigger size="sm" className="min-w-28" aria-label={t('settings.refreshInterval')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">{t('settings.refreshIntervalOff')}</SelectItem>
+              <SelectItem value="60000">
+                {t('settings.refreshIntervalMinutes', { n: 1 })}
+              </SelectItem>
+              <SelectItem value="120000">
+                {t('settings.refreshIntervalMinutes', { n: 2 })}
+              </SelectItem>
+              <SelectItem value="300000">
+                {t('settings.refreshIntervalMinutes', { n: 5 })}
+              </SelectItem>
+              <SelectItem value="600000">
+                {t('settings.refreshIntervalMinutes', { n: 10 })}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </SettingRow>
       </CollapsibleCard>
       </>

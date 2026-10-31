@@ -24,7 +24,7 @@ export function TabsList({
         'inline-flex h-9 items-center justify-center',
         variant === 'line'
           ? 'gap-2 rounded-none border-b border-border/60 bg-transparent p-0'
-          : 'rounded-lg bg-accent p-1',
+          : 'rounded-menu bg-accent p-1',
         className,
       )}
       {...props}
@@ -41,12 +41,12 @@ export function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors',
+        'inline-flex flex-1 cursor-pointer items-center justify-center gap-2 px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors',
         'text-muted-foreground hover:text-foreground',
         '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-3.5',
         variant === 'line'
           ? 'rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:text-foreground'
-          : 'rounded-md data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+          : 'rounded-control data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50',
         className,
       )}

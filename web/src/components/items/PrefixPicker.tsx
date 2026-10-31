@@ -64,7 +64,7 @@ export function PrefixPicker({
   }
 
   return (
-    <div className="flex w-40 shrink-0 flex-col gap-1.5 rounded-lg bg-accent/50 p-2 text-xs text-muted-foreground">
+    <div className="flex w-40 shrink-0 flex-col gap-2 rounded-control bg-accent/50 p-2 text-xs text-muted-foreground">
       <span className="shrink-0">{t('prefix.label')}</span>
       <Select value={String(prefixId)} onValueChange={(v) => onPrefixChange(Number(v))}>
         <SelectTrigger size="sm" aria-label={t('prefix.label')} className="max-w-full">
@@ -101,7 +101,7 @@ export function PrefixPicker({
       {bestPrefixIds.size > 0 && !accessory && (
         <button
           type="button"
-          className="shrink-0 cursor-pointer rounded-sm text-left underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 cursor-pointer rounded-chip text-left underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title={t('prefix.bestHint')}
           onClick={() => onPrefixChange([...bestPrefixIds][0]!)}
         >
@@ -110,7 +110,7 @@ export function PrefixPicker({
       )}
       {prefix && (
         <div className="flex min-w-0 items-center gap-1">
-          <code className="min-w-0 flex-1 truncate rounded bg-accent px-1.5 py-0.5 font-pixel text-2xs text-foreground">
+          <code className="min-w-0 flex-1 truncate rounded bg-accent px-2 py-0.5 font-pixel text-2xs text-foreground">
             {tag}
           </code>
           <Button

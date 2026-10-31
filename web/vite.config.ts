@@ -63,6 +63,11 @@ export default defineConfig({
     },
   },
   server: {
+    // 开发期端口：默认 5173（make dev-web 会传 VITE_PORT）；后端在 18080，
+    // 端口分工见 Makefile 的 WEB_PORT / API_PORT。
+    port: Number(process.env.VITE_PORT) || 5173,
+    // 端口被占时直接报错，而不是静默换到下一个（否则你会对着旧页面调半天）。
+    strictPort: true,
     // 开发期把 /api/* 代理到本机 Go 后端（server/，默认 :8080）。
     proxy: {
       '/api': {
@@ -76,5 +81,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // 默认 5s 对「渲染整个 App + 打开懒加载页面」这类集成用例太紧：并行跑时 jsdom 一慢就假红。
+    // 放宽到 20s 只是去掉噪音，逻辑卡死仍会因为超时暴露出来。
+    testTimeout: 20000,
   },
 })

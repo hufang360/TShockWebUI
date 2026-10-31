@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Fish, RefreshCw, Settings2, Terminal } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Amphora, Fish, PlayingCardsFan, RefreshCw, ShoppingBasket, Terminal, Trophy } from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
 import { IconAction } from '@/components/IconAction'
+import { FishNotepad } from '@/components/fishshop/FishNotepad'
 import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
 import { TopBarActions } from '@/components/TopBar'
 import { useLocalState } from '@/hooks/useLocalState'
@@ -22,16 +23,44 @@ interface FishCardDef {
   titleKey: string
   command: string
   icon: ReactNode
+  /** 默认**不显示**：玩家在「管理卡片」里打开「显示」才出现。 */
+  defaultHidden?: boolean
+  /** 默认**不自动执行**：只能点卡片自己的按钮执行（「自动执行」开关默认关）。 */
+  defaultManual?: boolean
 }
 
 /**
- * 鱼店指令卡片：只保留「钓鱼信息」（`/fish info`）。
+ * 鱼店指令卡片。它们的输出都没有 REST 端点，只能靠 rawcmd 取回（不依赖鱼店 REST，老插件也能用）。
  *
- * 它的数据没有 REST 端点，只能靠 rawcmd 取回（且不依赖鱼店 REST，老插件也能用）。
- * 货架 / 鱼罐 / 消费榜 / 鱼篓榜的卡片已移除：货架走 REST，其余不再作为网页入口。
+ * 「钓鱼信息」常显；「鱼罐 / 消费榜 / 鱼篓榜」默认**不显示、也不自动执行** —— 这三张的输出较长、
+ * 多数人只在想排行榜时才看，所以交给玩家自己在「管理卡片」里开「显示 / 自动执行」。
  */
 const CARDS: FishCardDef[] = [
   { id: 'info', titleKey: 'fish.card.info', command: '/fish info', icon: <Fish /> },
+  {
+    id: 'jar',
+    titleKey: 'fish.card.jar',
+    command: '/fish jar',
+    icon: <Amphora />,
+    defaultHidden: true,
+    defaultManual: true,
+  },
+  {
+    id: 'rank',
+    titleKey: 'fish.card.rank',
+    command: '/fish rank',
+    icon: <Trophy />,
+    defaultHidden: true,
+    defaultManual: true,
+  },
+  {
+    id: 'basket',
+    titleKey: 'fish.card.basket',
+    command: '/fish basket',
+    icon: <ShoppingBasket />,
+    defaultHidden: true,
+    defaultManual: true,
+  },
 ]
 
 interface FishCommandCardsProps {
@@ -44,6 +73,12 @@ interface FishCommandCardsProps {
   refreshInterval: number
   /** token 失效 → 弹出登录框；返回是否重登成功。 */
   onTokenInvalid: () => Promise<boolean>
+  /**
+   * 「刷新全部」被**手动**点下时额外要做的事（鱼店页用它同时刷新货架）。
+   *
+   * 只在 `force`（人手点击）时调用，自动刷新不会触发 —— 否则进页面会重复拉一次货架。
+   */
+  onManualRefresh?: () => void
 }
 
 /**
@@ -58,6 +93,7 @@ export function FishCommandCards({
   serverId,
   refreshInterval,
   onTokenInvalid,
+  onManualRefresh,
 }: FishCommandCardsProps) {
   const { t, lang } = useI18n()
   const { enqueue, busy, busyPrefix } = useExecutionQueue()
@@ -154,6 +190,41 @@ export function FishCommandCards({
     [autoExec],
   )
 
+  // 内置卡片的显示 / 隐藏：`{ [id]: true = 隐藏 }`；没记过的按卡片的 defaultHidden。
+  const [rawHidden, setRawHidden] = useLocalState<Record<string, boolean>>(
+    StorageKeys.fishHiddenCards,
+    {},
+  )
+  const hiddenMap = useMemo(() => {
+    const out: Record<string, boolean> = {}
+    for (const [id, value] of Object.entries(rawHidden ?? {})) {
+      if (typeof value === 'boolean') out[id] = value
+    }
+    return out
+  }, [rawHidden])
+  /** 某张内置卡片当前是否隐藏（自定义卡片不看这个）。 */
+  const isHidden = useCallback(
+    (id: string) => {
+      const def = CARDS.find((c) => c.id === id)
+      if (!def) return false
+      return hiddenMap[id] ?? def.defaultHidden === true
+    },
+    [hiddenMap],
+  )
+  const toggleHidden = useCallback(
+    (id: string) => {
+      setRawHidden((prev) => {
+        const next: Record<string, boolean> = {}
+        for (const [key, value] of Object.entries(prev ?? {})) {
+          if (typeof value === 'boolean') next[key] = value
+        }
+        next[id] = !(next[id] ?? CARDS.find((c) => c.id === id)?.defaultHidden === true)
+        return next
+      })
+    },
+    [setRawHidden],
+  )
+
   const entries = useMemo(
     () => [
       ...CARDS.map((c) => ({
@@ -162,6 +233,8 @@ export function FishCommandCards({
         icon: c.icon as ReactNode,
         command: c.command,
         custom: false,
+        defaultManual: c.defaultManual === true,
+        hidden: isHidden(c.id),
       })),
       ...customCards.map((c) => ({
         key: c.id,
@@ -169,9 +242,11 @@ export function FishCommandCards({
         icon: <Terminal /> as ReactNode,
         command: c.command,
         custom: true,
+        defaultManual: false,
+        hidden: false,
       })),
     ],
-    [customCards, t],
+    [customCards, t, isHidden],
   )
 
   const refreshAll = useCallback(
@@ -180,8 +255,12 @@ export function FishCommandCards({
       const scope = refreshScope(serverId, 'fish')
       if (!force && !isRefreshDue(scope, refreshInterval)) return
       setLastRefreshAt(markRefreshed(scope))
-      // 只刷新「自动执行」的卡片（手动卡片只能点自己的按钮）。
-      const runnable = entries.filter((e) => !isManual(autoExec, `fish:${e.key}`))
+      // 手动刷新连货架一起刷（顶栏只有一个刷新按钮 —— 输入框那边不再重复放一个）。
+      if (force) onManualRefresh?.()
+      // 只刷新「显示着的 + 自动执行」的卡片（隐藏的 / 手动的只能点卡片自己的按钮）。
+      const runnable = entries.filter(
+        (e) => !e.hidden && !isManual(autoExec, `fish:${e.key}`),
+      )
       if (batchMode && batchPlugin === true) {
         enqueue({
           key: 'fish:__batch__',
@@ -201,7 +280,18 @@ export function FishCommandCards({
         })
       }
     },
-    [autoExec, batchMode, batchPlugin, entries, enqueue, runBatchEntries, runOne, serverId, refreshInterval],
+    [
+      autoExec,
+      batchMode,
+      batchPlugin,
+      entries,
+      enqueue,
+      runBatchEntries,
+      runOne,
+      serverId,
+      refreshInterval,
+      onManualRefresh,
+    ],
   )
 
   // 进入鱼店页自动刷新一次（受 2 分钟闸门限制）；批量插件可用性未探测完先等一等。
@@ -213,13 +303,17 @@ export function FishCommandCards({
 
   const refreshing = busyPrefix('fish:')
 
+  /** 显示着的卡片（隐藏的不渲染）：记事本固定贴在第一张卡（默认 = 钓鱼信息）下面。 */
+  const shownCards = useMemo(() => entries.filter((card) => !card.hidden), [entries])
+
   const manageable: ManageableCard[] = entries.map((e) => ({
     id: e.key,
     name: e.label,
     command: e.command,
     custom: e.custom,
     manualKey: `fish:${e.key}`,
-    defaultManual: false,
+    defaultManual: e.defaultManual,
+    hidden: e.hidden,
   }))
 
   const headerContent = (
@@ -236,12 +330,12 @@ export function FishCommandCards({
         label={refreshing ? t('home.refreshing') : t('home.refreshAll')}
         icon={RefreshCw}
         loading={refreshing}
-        disabled={!authenticated || entries.length === 0}
+        disabled={!authenticated || shownCards.length === 0}
         onClick={() => refreshAll(true)}
       />
       <IconAction
         label={t('modules.cards.manage')}
-        icon={Settings2}
+        icon={PlayingCardsFan}
         onClick={() => setManageOpen(true)}
       />
     </TopBarActions>
@@ -251,23 +345,27 @@ export function FishCommandCards({
     <div className="flex h-full min-h-0 flex-col gap-4">
       {headerContent}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
-        {entries.map((card) => (
-          <div key={card.key} className="relative">
-          <CommandCard
-            title={card.label}
-            icon={card.icon}
-            command={card.command}
-            result={results[`fish:${card.key}`]}
-            loading={busy(`fish:${card.key}`)}
-            unavailable={!authenticated}
-            collapseKey={`fish:${card.key}`}
-            onRefresh={authenticated ? () => runOne(card.key, card.command) : undefined}
-            itemsById={dataset?.itemsById}
-            prefixesById={dataset?.prefixesById}
-            atlas={dataset?.atlas}
-          />
-          </div>
+        {shownCards.map((card, index) => (
+          <Fragment key={card.key}>
+            <CommandCard
+              title={card.label}
+              icon={card.icon}
+              command={card.command}
+              result={results[`fish:${card.key}`]}
+              loading={busy(`fish:${card.key}`)}
+              unavailable={!authenticated}
+              collapseKey={`fish:${card.key}`}
+              onRefresh={authenticated ? () => runOne(card.key, card.command) : undefined}
+              itemsById={dataset?.itemsById}
+              prefixesById={dataset?.prefixesById}
+              atlas={dataset?.atlas}
+            />
+            {/* 记事本固定贴在第一张卡（默认就是「钓鱼信息」）下面一行。 */}
+            {index === 0 && <FishNotepad serverId={serverId} />}
+          </Fragment>
         ))}
+        {/* 一张卡都没显示（玩家把「钓鱼信息」也隐藏了）时记事本仍然在。 */}
+        {shownCards.length === 0 && <FishNotepad serverId={serverId} />}
       </div>
 
       <ModuleCardManagerDialog
@@ -281,6 +379,8 @@ export function FishCommandCards({
         onAdd={(name, cmd) => addCard(name, cmd)}
         onUpdate={(id, patch) => updateCard(id, patch)}
         onRemove={(id) => removeCard(id)}
+        // 鱼罐 / 消费榜 / 鱼篓榜默认隐藏，玩家在这里打开「显示」才出现。
+        visibility={{ isHidden, onToggle: toggleHidden }}
       />
     </div>
   )

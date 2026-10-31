@@ -10,6 +10,7 @@ import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset, Settings, TabId } from '@/types'
 
 // 首屏只保留首页与指令页；重数据页 / 插件页按导航需求加载。
+const loadChatPage = () => import('@/pages/ChatPage')
 const loadCommandModulePage = () => import('@/pages/CommandModulePage')
 const loadCommandTipsPage = () => import('@/pages/CommandTipsPage')
 const loadDataIdPage = () => import('@/pages/DataIdPage')
@@ -19,8 +20,10 @@ const loadPlayerManagerPage = () => import('@/pages/PlayerManagerPage')
 const loadPlrPage = () => import('@/pages/PlrPage')
 const loadRequisitionPage = () => import('@/pages/RequisitionPage')
 const loadSettingsPage = () => import('@/pages/SettingsPage')
+const loadSpriteSheetPage = () => import('@/pages/SpriteSheetPage')
 const loadWorldPage = () => import('@/pages/WorldPage')
 
+const ChatPage = lazy(() => loadChatPage().then((m) => ({ default: m.ChatPage })))
 const CommandModulePage = lazy(() =>
   loadCommandModulePage().then((m) => ({ default: m.CommandModulePage })),
 )
@@ -38,13 +41,18 @@ const RequisitionPage = lazy(() =>
   loadRequisitionPage().then((m) => ({ default: m.RequisitionPage })),
 )
 const SettingsPage = lazy(() => loadSettingsPage().then((m) => ({ default: m.SettingsPage })))
+const SpriteSheetPage = lazy(() =>
+  loadSpriteSheetPage().then((m) => ({ default: m.SpriteSheetPage })),
+)
 const WorldPage = lazy(() => loadWorldPage().then((m) => ({ default: m.WorldPage })))
 
 const routeLoaders: Partial<Record<TabId, () => Promise<unknown>>> = {
+  chat: loadChatPage,
   items: loadItemsPage,
   dataid: loadDataIdPage,
   save: loadPlrPage,
   worldview: loadWorldPage,
+  spritesheet: loadSpriteSheetPage,
   players: loadPlayerManagerPage,
   store: loadFishShopPage,
   requisition: loadRequisitionPage,
@@ -70,13 +78,13 @@ function RouteLoadingSkeleton() {
       </div>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-4">
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-container" />
+          <Skeleton className="h-36 rounded-container" />
+          <Skeleton className="h-36 rounded-container" />
         </div>
         <div className="flex flex-col gap-4">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-48 rounded-container" />
+          <Skeleton className="h-36 rounded-container" />
         </div>
       </div>
     </div>
@@ -175,6 +183,17 @@ export function AppRoutes({
           onOpenInDex={onOpenInDex}
         />
       )}
+      {activeTab === 'chat' && (
+        <ChatPage
+          dataset={dataset}
+          transport={transport}
+          authenticated={authenticated}
+          serverId={serverId}
+          refreshInterval={settings.eventsRefreshInterval}
+          onTokenInvalid={onTokenInvalid}
+          onLogin={openLogin}
+        />
+      )}
       {activeTab === 'items' && (
         <ItemsPage
           dataset={dataset}
@@ -188,6 +207,7 @@ export function AppRoutes({
       )}
       {activeTab === 'save' && <PlrPage serverId={serverId} transport={transport} />}
       {activeTab === 'worldview' && <WorldPage serverId={serverId} />}
+      {activeTab === 'spritesheet' && <SpriteSheetPage />}
       {activeTab === 'players' && (
         <PlayerManagerPage
           key={serverId}

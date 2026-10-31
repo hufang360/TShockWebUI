@@ -27,6 +27,8 @@ export interface CompletionItem {
   kind: CompletionKind
   label: string
   detail: string
+  /** 指令候选的语法（只取参数部分，如 `<username>`）：下拉框顶部的帮助条拼完整用法用。 */
+  syntax?: string
   /** 确认后插入编辑器的文本 */
   insert: string
   item?: Item
@@ -238,17 +240,72 @@ export function matchParamSlot(dataset: Dataset, text: string, caret: number): P
   }
 }
 
-/** 指令的参数用法串（用于编辑器下方的参数提示）；有 `noteZh` / `noteEn` 时拼在后面。 */
-export function paramHintFor(
+/** 用法串去掉开头的指令名，只留参数部分（`accountinfo <username>` → `<username>`）。 */
+function syntaxArgs(syntax: string): string {
+  const m = syntax.trim().match(/^\S+\s*([\s\S]*)$/)
+  return (m?.[1] ?? '').trim()
+}
+
+/**
+ * 指令候选行上显示的语法（只取参数部分，指令名已经在行首）：
+ * 无参数返回 null；多形态（如 `/group` 有 10 条）只取第一条并加 `…`。
+ */
+export function commandSyntaxArgs(cmd: CommandDef): string | null {
+  const sets = cmd.paramSets
+  if (!sets || sets.length === 0) return null
+  const args = syntaxArgs(sets[0]?.syntax ?? '')
+  if (!args) return null
+  return sets.length > 1 ? `${args} …` : args
+}
+
+/**
+ * 当前光标所在的「指令帮助」：完整用法串（带前导 `/`）+ 说明。
+ *
+ * 下拉框顶部用它显示一行 `指令帮助`，这样即使参数位没有值候选（无人在线 / 自由文本参数），
+ * 下拉框也不会空着，玩家至少能看到这条指令该怎么写。
+ *
+ * 说明优先用该形态自己的备注（`noteZh` / `noteEn`，如「分页，默认第 1 页」），
+ * 没有就退回指令的帮助文本（`accountinfo` 这类只有一句说明的指令不至于只剩个语法串）。
+ */
+export function commandHelpLine(
   dataset: Dataset,
   text: string,
   caret: number,
   lang: Lang = 'zh',
-): string | null {
+): { syntax: string; note: string; argName?: string; argRequired?: boolean } | null {
   const slot = matchParamSlot(dataset, text, caret)
   if (!slot) return null
-  const note = lang === 'en' ? slot.set.noteEn : slot.set.noteZh
-  return note ? `${slot.set.syntax}　${note}` : slot.set.syntax
+  const syntax = slot.set.syntax?.trim()
+  if (!syntax) return null
+  const more = (slot.command.paramSets?.length ?? 0) > 1 ? ' …' : ''
+  const setNote = (lang === 'en' ? slot.set.noteEn : slot.set.noteZh) ?? ''
+  const help = (lang === 'en' ? slot.command.helpEn : slot.command.helpZh) ?? slot.command.help ?? ''
+  return {
+    syntax: `/${syntax}${more}`,
+    note: setNote || help,
+    argName: slot.arg?.name,
+    argRequired: slot.arg?.required,
+  }
+}
+
+/**
+ * 把用法串切成「前 / 当前参数 / 后」三段，供界面把**正在填的那个参数**高亮出来。
+ * 参数在用法串里的写法是 `<name>` / `[name]`（可变参数是 `<name...>`）。
+ * 找不到（名字对不上、自由追加的参数）返回 null，调用方原样显示整串。
+ */
+export function splitSyntaxArg(
+  syntax: string,
+  argName?: string,
+): { before: string; arg: string; after: string } | null {
+  if (!argName) return null
+  const escaped = argName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = new RegExp(String.raw`(?:<|\[)${escaped}(?:\.\.\.)?(?:>|\])`).exec(syntax)
+  if (!m || m.index < 0) return null
+  return {
+    before: syntax.slice(0, m.index),
+    arg: m[0],
+    after: syntax.slice(m.index + m[0].length),
+  }
 }
 
 /**
@@ -334,6 +391,7 @@ export function computeCompletions({
         id: `cmd:${cmd.name}`,
         kind: 'command',
         label: `/${cmd.name}`,
+        syntax: commandSyntaxArgs(cmd) ?? undefined,
         detail: [aliases, help].filter(Boolean).join(' · '),
         insert: `/${cmd.name}`,
         command: cmd,

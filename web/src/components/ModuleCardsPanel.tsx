@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, RefreshCw, Settings2 } from 'lucide-react'
+import { AlertTriangle, PlayingCardsFan, RefreshCw } from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
 import { IconAction } from '@/components/IconAction'
 import { InfoPopover } from '@/components/InfoPopover'
@@ -307,7 +307,7 @@ export function ModuleCardsPanel({
         {onAddCard && (
           <IconAction
             label={t('modules.cards.manage')}
-            icon={Settings2}
+            icon={PlayingCardsFan}
             onClick={() => setManageOpen(true)}
           />
         )}

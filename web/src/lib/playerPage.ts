@@ -2,9 +2,9 @@ import { EQUIP_GROUP_A, EQUIP_GROUP_B } from '@/lib/playerSlots'
 import { TshockRequestError, type BackendTransport, type PlayerCapabilities, type PlayerLook } from '@/lib/tshock'
 
 /**
- * 「查看存档」与「玩家管理」两个页面共用的小工具。
+ * 「玩家存档」与「玩家管理」两个页面共用的小工具。
  *
- * 两个页面在侧边栏是**独立菜单**（查看存档是公开工具，玩家管理依赖 PlayerManager 插件），
+ * 两个页面在侧边栏是**独立菜单**（玩家存档是公开工具，玩家管理依赖 PlayerManager 插件），
  * 但都需要：按上游缓存上次结果、触发下载、把后端错误翻成给玩家看的文案。
  */
 
@@ -14,7 +14,7 @@ export interface PlayerCache {
   /** 上次查看的玩家名（用于判断缓存是否对应输入的玩家）。 */
   name?: string
   look?: PlayerLook
-  /** 上次导入的本地存档（「查看存档」页）。 */
+  /** 上次导入的本地存档（「玩家存档」页）。 */
   saveLook?: PlayerLook
 }
 
@@ -39,7 +39,7 @@ export function cacheFor(transport: BackendTransport): Map<string, PlayerCache> 
 /**
  * 自带 Demo 角色存档的静态资源路径（`web/public/demo/Joy.plr`，构建后随前端一起发布）。
  *
- * 用途与「查看世界」的 `demo/world.wld` 相同：手边没有存档也能看到这一页长什么样，
+ * 用途与「世界存档」的 `demo/world.wld` 相同：手边没有存档也能看到这一页长什么样，
  * 且和用户自己选的文件走完全一样的本地解析路径（不上传、不需要登录）。
  */
 export const DEMO_PLR_URL = `${import.meta.env.BASE_URL}demo/Joy.plr`

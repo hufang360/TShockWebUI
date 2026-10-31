@@ -11,8 +11,11 @@ import {
   Checkbox,
   Input,
   Label,
-  NativeSelect,
-  NativeSelectOption,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
@@ -76,7 +79,7 @@ interface PlrEditPanelProps {
 }
 
 /**
- * 「查看存档」的编辑态：角色属性 + 永久增强 + 背包（点格子编辑数量 / 词缀）。
+ * 「玩家存档」的编辑态：角色属性 + 永久增强 + 背包（点格子编辑数量 / 词缀）。
  *
  * 纯受控组件：草稿与校验都在父组件的 `lib/save/plrEdit.ts` 里，这里只负责渲染与收集输入。
  */
@@ -113,7 +116,7 @@ export function PlrEditPanel({
   const num = (field: keyof PlrEditDraft, label: string, extra?: string) => {
     const message = err(field)
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <Label htmlFor={`plr-edit-${field}`}>{label}</Label>
         <Input
           id={`plr-edit-${field}`}
@@ -159,19 +162,23 @@ export function PlrEditPanel({
             {num('anglerQuests', t('players.quests'))}
             {num('golferScore', t('players.golf'))}
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="plr-edit-difficulty">{t('players.difficulty')}</Label>
-              <NativeSelect
-                id="plr-edit-difficulty"
+              <Select
                 value={String(draft.difficulty)}
-                onChange={(e) => onChange({ ...draft, difficulty: Number(e.target.value) })}
+                onValueChange={(next) => onChange({ ...draft, difficulty: Number(next) })}
               >
-                {['softcore', 'mediumcore', 'hardcore', 'journey'].map((key, index) => (
-                  <NativeSelectOption key={key} value={String(index)}>
-                    {t(`players.difficulty.${key}`)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="plr-edit-difficulty" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['softcore', 'mediumcore', 'hardcore', 'journey'].map((key, index) => (
+                    <SelectItem key={key} value={String(index)}>
+                      {t(`players.difficulty.${key}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {err('difficulty') ? (
                 <p className="text-2xs text-destructive">{err('difficulty')}</p>
               ) : (
@@ -182,24 +189,28 @@ export function PlrEditPanel({
               )}
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="plr-edit-version">{t('players.version')}</Label>
-              <NativeSelect
-                id="plr-edit-version"
+              <Select
                 value={String(draft.release)}
-                onChange={(e) => onChange({ ...draft, release: Number(e.target.value) })}
+                onValueChange={(next) => onChange({ ...draft, release: Number(next) })}
               >
-                {versionOptions.map((v) => (
-                  <NativeSelectOption key={v.release} value={String(v.release)}>
-                    {v.gameVersion}（{v.release}）
-                  </NativeSelectOption>
-                ))}
-                {versionOptions.every((v) => v.release !== player.release) && (
-                  <NativeSelectOption value={String(player.release)}>
-                    {playerGameVersion(player.release) ?? '?'}（{player.release}）
-                  </NativeSelectOption>
-                )}
-              </NativeSelect>
+                <SelectTrigger id="plr-edit-version" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {versionOptions.map((v) => (
+                    <SelectItem key={v.release} value={String(v.release)}>
+                      {v.gameVersion}（{v.release}）
+                    </SelectItem>
+                  ))}
+                  {versionOptions.every((v) => v.release !== player.release) && (
+                    <SelectItem value={String(player.release)}>
+                      {playerGameVersion(player.release) ?? '?'}（{player.release}）
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
               {releaseIssue ? (
                 <p className="text-2xs text-destructive">{releaseIssue}</p>
               ) : (
@@ -238,7 +249,7 @@ export function PlrEditPanel({
                   <label
                     key={field}
                     className={cn(
-                      'flex items-center gap-1.5 text-sm',
+                      'flex items-center gap-2 text-sm',
                       !supported && 'text-muted-foreground/50',
                     )}
                     title={
@@ -311,7 +322,7 @@ export function PlrEditPanel({
                       )}
                     </>
                   ) : (
-                    <span className="text-xs text-muted-foreground/40 tabular-nums">{slot + 1}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{slot + 1}</span>
                   )}
                 </button>
               )
@@ -358,7 +369,7 @@ export function PlrEditPanel({
                         {def ? (
                           <ItemIcon item={def} atlas={dataset.atlas} size={30} />
                         ) : (
-                          <span className="text-xs text-muted-foreground/40 tabular-nums">{i + 1}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums">{i + 1}</span>
                         )}
                       </button>
                     )
@@ -424,7 +435,7 @@ export function PlrEditPanel({
                             )}
                           </>
                         ) : (
-                          <span className="text-xs text-muted-foreground/40 tabular-nums">{index + 1}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums">{index + 1}</span>
                         )}
                       </button>
                     )
@@ -502,7 +513,7 @@ export function PlrEditPanel({
                                       )}
                                     </>
                                   ) : (
-                                    <span className="text-xs text-muted-foreground/40 tabular-nums">{index + 1}</span>
+                                    <span className="text-xs text-muted-foreground tabular-nums">{index + 1}</span>
                                   )}
                                 </button>
                               )

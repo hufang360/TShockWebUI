@@ -1,5 +1,5 @@
 /**
- * 「查看世界 → 编辑」里的**箱子与招牌**卡片（W4）。
+ * 「世界存档 → 编辑」里的**箱子与招牌**卡片（W4）。
  *
  * 只改内容、不改结构：箱子数量 / 坐标、招牌数量 / 坐标都不变；改的是
  * 箱子名（≤20 字符，游戏加载时会 `TrimUserString(name, 20)`）、箱子里的物品、招牌文本。
@@ -100,7 +100,7 @@ export function WorldContentEditor({ chests, signs, issues, limits, onChange }: 
                   <button
                     type="button"
                     onClick={() => setOpenChest(index)}
-                    className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-sm hover:bg-accent"
+                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-accent"
                   >
                     <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
                       [{item.x}, {item.y}]
@@ -127,7 +127,7 @@ export function WorldContentEditor({ chests, signs, issues, limits, onChange }: 
                   <button
                     type="button"
                     onClick={() => setOpenSign(index)}
-                    className="flex w-full items-start gap-2 rounded px-1.5 py-1 text-left text-sm hover:bg-accent"
+                    className="flex w-full items-start gap-2 rounded px-2 py-1 text-left text-sm hover:bg-accent"
                   >
                     <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
                       [{sign.x}, {sign.y}]
@@ -152,7 +152,7 @@ export function WorldContentEditor({ chests, signs, issues, limits, onChange }: 
             </DialogHeader>
             {chest && openChest != null && (
               <>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="wld-chest-name">{t('wld.content.chestName')}</Label>
                   <Input
                     id="wld-chest-name"
@@ -194,7 +194,7 @@ export function WorldContentEditor({ chests, signs, issues, limits, onChange }: 
                             )}
                           </>
                         ) : (
-                          <span className="text-xs text-muted-foreground/40 tabular-nums">{slot + 1}</span>
+                          <span className="text-xs text-muted-foreground tabular-nums">{slot + 1}</span>
                         )}
                       </button>
                     )
@@ -215,7 +215,7 @@ export function WorldContentEditor({ chests, signs, issues, limits, onChange }: 
               <DialogDescription>{t('wld.content.signText')}</DialogDescription>
             </DialogHeader>
             {openSign != null && signs[openSign] && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <Textarea
                   value={signs[openSign].text}
                   rows={8}

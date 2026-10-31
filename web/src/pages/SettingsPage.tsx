@@ -372,13 +372,26 @@ export function SettingsPage({
     [t],
   )
 
-  // 未登录：隐藏设置内容（模块探测 / 激活 / 自定义模块都要登录），只留标题 + 登录提示。
+  // 未登录：界面偏好是纯本地设置（字号 / 紧凑 / 语言 / 主题），照常可用；
+  // 其余（激活模块 / 数据刷新 / 在线账户）要 token，所以只把「需登录」提在下面一行，不整页挡掉。
   if (!authenticated) {
     return (
       <div className="flex flex-col gap-4">
         {/* 页面名只在顶栏出现一次，这里不再重复同一句话。 */}
         <p className="text-sm text-muted-foreground">{t('settings.note')}</p>
-        <LoginGate onLogin={onLogin} />
+        <PreferencesCards
+          section="interface"
+          settings={settings}
+          onChange={onChange}
+          canFastEvents={canFastEvents}
+          batchPlugin={batchPlugin}
+          batchMode={batchMode}
+          onBatchModeChange={(v) => {
+            setBatchMode(v)
+            setBatchModeSet(true)
+          }}
+        />
+        <LoginGate onLogin={onLogin} hint={t('settings.loginNeeded')} />
         <p className="pt-1 text-center text-2xs text-muted-foreground">TShockWebUI {APP_VERSION}</p>
       </div>
     )
@@ -549,7 +562,7 @@ function ModuleRow({
 }) {
   const { t } = useI18n()
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-xl bg-accent/40 p-3">
+    <li className="flex flex-wrap items-center gap-3 rounded-container bg-accent/40 p-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm text-foreground">{t(def.titleKey)}</span>

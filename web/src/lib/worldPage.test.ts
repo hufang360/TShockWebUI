@@ -24,7 +24,7 @@ function view(name: string): WorldView {
   }
 }
 
-describe('查看世界的每服缓存（LRU）', () => {
+describe('世界存档的每服缓存（LRU）', () => {
   it('只保留最近 N 个世界，最久没用的被淘汰', () => {
     clearWorldCache()
     for (let i = 0; i < WORLD_CACHE_LIMIT + 2; i++) cacheWorld(`s${i}`, view(`w${i}`))

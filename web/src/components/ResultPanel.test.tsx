@@ -119,7 +119,7 @@ describe('ResultPanel', () => {
     expect(screen.getByText('在线玩家 (1): hf')).toBeTruthy()
   })
 
-  it('点击整个表头折叠 / 展开结果卡片', () => {
+  it('每条结果是 Card；表头本身不折叠（点指令文字不会收起），折叠靠右上角的箭头按钮', () => {
     render(
       <I18nProvider lang="zh">
         <ResultPanel
@@ -128,15 +128,24 @@ describe('ResultPanel', () => {
         />
       </I18nProvider>,
     )
-    // 默认展开，输出可见；点表头的指令文本即折叠。
+    const title = screen.getByText('/time')
+    expect(title.closest('[data-slot="card"]')).toBeTruthy()
+    expect(title.className).toContain('select-text')
+    fireEvent.click(title)
     expect(screen.getByText('上午 8:30')).toBeTruthy()
-    fireEvent.click(screen.getByText('/time'))
+
+    // 箭头按钮：展开态叫「折叠」，点一下只剩标题行，再点回来。
+    const collapse = screen.getByRole('button', { name: '折叠' })
+    expect(collapse.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(collapse)
     expect(screen.queryByText('上午 8:30')).toBeNull()
-    fireEvent.click(screen.getByText('/time'))
+    const expand = screen.getByRole('button', { name: '展开' })
+    expect(expand.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(expand)
     expect(screen.getByText('上午 8:30')).toBeTruthy()
   })
 
-  it('按 entry.collapsed 初始渲染为折叠状态', () => {
+  it('折叠时箭头常显（不用先 hover 才能展开回来），展开时跟其它操作一起淡入', () => {
     render(
       <I18nProvider lang="zh">
         <ResultPanel
@@ -145,8 +154,62 @@ describe('ResultPanel', () => {
         />
       </I18nProvider>,
     )
-    expect(screen.getByText('/time')).toBeTruthy()
     expect(screen.queryByText('上午 8:30')).toBeNull()
+    const expand = screen.getByRole('button', { name: '展开' })
+    expect(expand.className).not.toContain('opacity-0')
+  })
+
+  it('折叠状态变化时回调（供本机持久化）', () => {
+    const onToggleCollapse = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[entry('/time', { status: 'ok', output: ['上午 8:30'] }, 7)]}
+          running={false}
+          onToggleCollapse={onToggleCollapse}
+        />
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '折叠' }))
+    expect(onToggleCollapse).toHaveBeenCalledWith(7, true)
+  })
+
+  it('右上角「填充指令」：把指令交给回调（只填不执行）', () => {
+    const onFillCommand = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel
+          entries={[entry('/time 12:00', { status: 'ok', output: ['上午 8:30'] })]}
+          running={false}
+          onFillCommand={onFillCommand}
+        />
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '填充指令' }))
+    expect(onFillCommand).toHaveBeenCalledWith('/time 12:00')
+  })
+
+  it('右上角三个图标都带 Tooltip（填充指令 / 收藏 / 删除）', async () => {
+    // 文案就是动作本身（不带「这条结果」这类补语）。
+    for (const label of ['填充指令', '收藏', '删除']) {
+      const { unmount } = render(
+        <I18nProvider lang="zh">
+          <ResultPanel
+            entries={[entry('/time', { status: 'ok', output: ['上午 8:30'] })]}
+            running={false}
+            onRemove={vi.fn()}
+            isFavorite={() => false}
+            onToggleFavorite={vi.fn()}
+            onFillCommand={vi.fn()}
+          />
+        </I18nProvider>,
+      )
+      const button = screen.getByRole('button', { name: label })
+      fireEvent.pointerMove(button, { pointerType: 'mouse' })
+      fireEvent.pointerEnter(button, { pointerType: 'mouse' })
+      expect((await screen.findByRole('tooltip')).textContent).toContain(label)
+      unmount()
+    }
   })
 
   it('执行时间默认隐藏：和收藏 / 删除图标一样，hover 或聚焦卡片才出现', () => {
@@ -167,38 +230,15 @@ describe('ResultPanel', () => {
     expect(time.className).toContain('touch-visible')
   })
 
-  it('折叠状态变化时回调（供本机记忆）', () => {
-    const onToggleCollapse = vi.fn()
-    render(
-      <I18nProvider lang="zh">
-        <ResultPanel
-          entries={[entry('/time', { status: 'ok', output: ['上午 8:30'] }, 7)]}
-          running={false}
-          onToggleCollapse={onToggleCollapse}
-        />
-      </I18nProvider>,
-    )
-    fireEvent.click(screen.getByText('/time'))
-    expect(onToggleCollapse).toHaveBeenCalledWith(7, true)
-  })
-
-  it('鼠标选中指令文本时点击不折叠（方便复制）', () => {
-    const onToggleCollapse = vi.fn()
-    const getSelection = vi
-      .spyOn(window, 'getSelection')
-      .mockReturnValue({ toString: () => '/time' } as unknown as Selection)
-    render(
+  it('鼠标选中指令文本不影响任何操作（文字可复制）', () => {    render(
       <I18nProvider lang="zh">
         <ResultPanel
           entries={[entry('/time', { status: 'ok', output: ['上午 8:30'] })]}
           running={false}
-          onToggleCollapse={onToggleCollapse}
         />
       </I18nProvider>,
     )
-    fireEvent.click(screen.getByText('/time'))
-    expect(onToggleCollapse).not.toHaveBeenCalled()
-    getSelection.mockRestore()
+    expect(screen.getByText('/time').className).toContain('select-text')
   })
 
   it('物品标签 stack>1 时在图标右下角显示数量', () => {

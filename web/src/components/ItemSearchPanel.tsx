@@ -2,7 +2,19 @@ import { useMemo, useRef, useState } from 'react'
 import { ExternalLink, Plus, Star } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { SearchInput } from '@/components/SearchInput'
-import { Button, Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle, NativeSelect, NativeSelectOption } from '@/components/ui'
+import {
+  Button,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
@@ -19,13 +31,18 @@ interface ItemSearchPanelProps {
   onOpenInDex?: (itemId: number) => void
   /** 收藏物品：搜索为空时展示（默认视图）。 */
   favorites?: ItemFavorite[]
-  /** 点收藏物品：把 ID 追加到指令，并把该物品从收藏移除。 */
+  /** 点收藏物品：把 ID 追加到指令（**保留**收藏记录，下次还能点）。 */
   onInsertFavorite?: (id: number) => void
+  /**
+   * 只插入 `[i:ID]` 标签（「聊天」页的物品弹框用）：
+   * 点一条即插入，不再展示「ID / 名称 / 标签」选择与详情确认区。
+   */
+  tagOnly?: boolean
 }
 
 /**
  * 指令页右侧「物品」tab：
- * - 搜索为空时默认展示收藏物品，点击即为「追加 ID 并从收藏移除」；
+ * - 搜索为空时默认展示收藏物品，点击即为「追加 ID 到指令」（收藏保留）；
  * - 有搜索词时展示搜索结果，选中后可插入 ID / 名称 / 标签或前往图鉴。
  * 输入框 ↓/Enter 把焦点交给列表；列表内 ↑↓ 移动并高亮。
  */
@@ -35,6 +52,7 @@ export function ItemSearchPanel({
   onOpenInDex,
   favorites = [],
   onInsertFavorite,
+  tagOnly = false,
 }: ItemSearchPanelProps) {
   const { t } = useI18n()
   const [query, setQuery] = useState('')
@@ -79,8 +97,13 @@ export function ItemSearchPanel({
   }
 
   const activate = (item: Item, index: number) => {
+    if (tagOnly) {
+      // 聊天里只需要标签本身：一下点完，不再走「选中 → 选插入方式 → 点插入」。
+      onInsert(formatItemTag(item.id))
+      return
+    }
     if (showFavorites) {
-      // 收藏：追加 ID 并从收藏移除（父级处理）。
+      // 收藏：只把 ID 追到指令里，**不**动收藏记录（父级处理）。
       onInsertFavorite?.(item.id)
       return
     }
@@ -103,6 +126,7 @@ export function ItemSearchPanel({
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (showFavorites) onInsertFavorite?.(item.id)
+      else if (tagOnly) onInsert(formatItemTag(item.id))
       else onInsert(` ${item.id} `)
     }
   }
@@ -124,7 +148,7 @@ export function ItemSearchPanel({
         aria-label={t('items.title')}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-accent/40">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-container bg-accent/40">
         {rows.length === 0 ? (
           showFavorites ? (
             <Empty className="py-6">
@@ -154,8 +178,12 @@ export function ItemSearchPanel({
                   onKeyDown={(e) => onResultKeyDown(e, index, item)}
                   title={showFavorites ? t('items.insertFavoriteHint') : undefined}
                   className={cn(
-                    'h-auto w-full cursor-pointer justify-start gap-2 rounded-none px-2 py-1.5 font-normal',
-                    (selected?.id === item.id || activeIndex === index) && 'bg-accent',
+                    'h-auto w-full cursor-pointer justify-start gap-2 rounded-none px-2 py-2 font-normal',
+                    // 选中 / 键盘高亮只用**更深的底色**表示：不要描边（默认聚焦光圈会画出一圈深色框）。
+                    'focus-visible:ring-0 focus-visible:ring-offset-0',
+                    selected?.id === item.id || activeIndex === index
+                      ? 'bg-foreground/10'
+                      : 'hover:bg-foreground/5',
                   )}
                 >
                   <ItemIcon item={item} atlas={dataset.atlas} size={24} />
@@ -173,8 +201,8 @@ export function ItemSearchPanel({
         )}
       </div>
 
-      {selected && !showFavorites && (
-        <div className="shrink-0 rounded-lg bg-accent/50 p-2.5">
+      {selected && !showFavorites && !tagOnly && (
+        <div className="shrink-0 rounded-control bg-accent/50 p-3">
           <div className="flex items-center gap-3">
             <ItemIcon item={selected} atlas={dataset.atlas} size={40} />
             <div className="min-w-0 flex-1">
@@ -186,16 +214,19 @@ export function ItemSearchPanel({
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
-              <NativeSelect
-                size="sm"
+              <Select
                 value={insertKind}
-                onChange={(e) => setInsertKind(e.target.value as InsertKind)}
-                aria-label={t('items.insert')}
+                onValueChange={(next) => setInsertKind(next as InsertKind)}
               >
-                <NativeSelectOption value="id">{t('items.insertId')}</NativeSelectOption>
-                <NativeSelectOption value="name">{t('items.insertName')}</NativeSelectOption>
-                <NativeSelectOption value="tag">{t('items.insertTag')}</NativeSelectOption>
-              </NativeSelect>
+                <SelectTrigger size="sm" aria-label={t('items.insert')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="id">{t('items.insertId')}</SelectItem>
+                  <SelectItem value="name">{t('items.insertName')}</SelectItem>
+                  <SelectItem value="tag">{t('items.insertTag')}</SelectItem>
+                </SelectContent>
+              </Select>
               <Button size="sm" variant="primary" onClick={() => insertValue(selected)}>
                 <Plus data-icon="inline-start" />
                 {t('items.insert')}

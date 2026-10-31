@@ -26,23 +26,16 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { PAGE_SCROLL_TABS } from '@/lib/pageScroll'
 import type { TabId } from '@/types'
 
-export type NavGroup =
-  | 'primary'
-  | 'library'
-  | 'players'
-  | 'world'
-  | 'store'
-  | 'services'
-  | 'custom'
-  | 'system'
+export type NavGroup = 'primary' | 'tools' | 'extension' | 'system'
 
 export interface NavItem {
   id: TabId
   label: string
   icon: LucideIcon
-  /** 侧栏分组；省略时归入“常用”。 */
+  /** 侧栏分组；省略时归入不带标题的首组（首页 / 指令 / 聊天 / 物资申请）。 */
   group?: NavGroup
   /** 悬停 / 聚焦导航项时预取目标页面。 */
   onPrefetch?: () => void
@@ -70,26 +63,15 @@ interface AppShellProps {
 }
 
 /** 侧栏分组的渲染顺序（空分组不渲染）。 */
-const GROUP_ORDER: NavGroup[] = [
-  'primary',
-  'library',
-  'players',
-  'world',
-  'store',
-  'services',
-  'custom',
-  'system',
-]
+const GROUP_ORDER: NavGroup[] = ['primary', 'tools', 'extension', 'system']
 
-/** 分组标题；没有条目的分组不渲染标题，`system` 只有一项且不带标题。 */
+/**
+ * 分组标题；没有条目的分组不渲染标题。
+ * `primary`（首页 / 指令 / 聊天 / 物资申请）不带标题，`system`（设置）只有一项也不带。
+ */
 const GROUP_LABEL_KEY: Partial<Record<NavGroup, string>> = {
-  primary: 'nav.group.primary',
-  library: 'nav.group.library',
-  players: 'nav.group.players',
-  world: 'nav.group.world',
-  store: 'nav.group.store',
-  services: 'nav.group.services',
-  custom: 'nav.group.custom',
+  tools: 'nav.group.tools',
+  extension: 'nav.group.extension',
 }
 
 /** 侧栏导航菜单：独立组件，便于在移动端点选后关闭抽屉。 */
@@ -179,7 +161,7 @@ export function AppShell({
     >
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-control focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-lg"
       >
         {t('nav.skipToContent')}
       </a>
@@ -219,7 +201,13 @@ export function AppShell({
           <SidebarInset
             id="main-content"
             tabIndex={-1}
-            className="min-h-0 flex-1 overflow-y-auto"
+            className={cn(
+              'min-h-0 flex-1 overflow-y-auto',
+              // 整页滚动的页面（聊天 / 指令 / 指令小抄 / 物品 ID / 数据 ID）滚动条在浏览器右侧。
+              // 切筛选后内容变短 → 滚动条消失 → 内容区宽度多出 8px → 整列（含吸底输入框）右跳一下。
+              // 常驻预留滚动条槽（`scrollbar-gutter: stable`）就不跟着内容高低跳了。
+              PAGE_SCROLL_TABS.has(activeTab) && '[scrollbar-gutter:stable]',
+            )}
           >
             {/* 内容区顶栏：收起 / 展开侧栏 + 当前位置；滚动时吸附在页面顶部。 */}
             <header className="relative sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/95 px-2 backdrop-blur md:px-3">
@@ -253,12 +241,12 @@ export function AppShell({
               <TopBarInfoSlot />
               {/* 右侧：页面操作在前（上次刷新 / 刷新最左），全局入口（浮动指令）最后；
                   手机端全部收进 `…` 菜单。 */}
-              <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
+              <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">
                 <TopBarSlot extra={headerActions} />
               </div>
             </header>
             {banner}
-            <div className="px-3 py-4 md:px-6">
+            <div className="p-2">
               {/* 紧凑视图 = Bootstrap container：居中 + 随断点的最大宽度；关闭 = container-fluid（100%）。 */}
               {/* `@container`：页面用容器查询（而不是视口断点）决定列数，
                   这样侧栏展开/收起、以及 compact 最大宽度都能被正确考虑。 */}

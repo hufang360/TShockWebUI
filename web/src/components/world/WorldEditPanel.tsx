@@ -1,4 +1,15 @@
-import { Card, CardBody, Checkbox, Input, Label, NativeSelect, NativeSelectOption } from '@/components/ui'
+import {
+  Card,
+  CardBody,
+  Checkbox,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 import { WORLD_NAME_MAX, type WorldEditDraft, type WorldEditIssue } from '@/lib/save/worldEdit'
 import { WORLD_BOSS_KEYS, type WorldInfo, type WorldTrack } from '@/lib/save/worldFile'
@@ -13,7 +24,7 @@ interface WorldEditPanelProps {
 }
 
 /**
- * 「查看世界」的编辑态：世界名 / 种子 / 难度 / 出生点 / 时间 / 月相 / 困难模式 / Boss 进度。
+ * 「世界存档」的编辑态：世界名 / 种子 / 难度 / 出生点 / 时间 / 月相 / 困难模式 / Boss 进度。
  *
  * 纯受控组件：草稿与校验在 `lib/save/worldEdit.ts`，写回在 `lib/save/worldWrite.ts`。
  * （图格绘制不在这里 —— 见 `docs/计划-wld编辑.md` §3 C 级。）
@@ -29,7 +40,7 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
   const num = (field: 'spawnX' | 'spawnY' | 'time' | 'moonPhase', label: string, hint?: string) => {
     const message = err(field)
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <Label htmlFor={`wld-edit-${field}`}>{label}</Label>
         <Input
           id={`wld-edit-${field}`}
@@ -55,7 +66,7 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
       <Card>
         <CardBody className="flex flex-col gap-4 pt-4">
           <div className="grid gap-4 @[720px]:grid-cols-[repeat(2,minmax(0,1fr))]">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="wld-edit-name">{t('wld.name')}</Label>
               <Input
                 id="wld-edit-name"
@@ -72,7 +83,7 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
               )}
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="wld-edit-seed">{t('wld.seed')}</Label>
               <Input
                 id="wld-edit-seed"
@@ -90,22 +101,26 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
               )}
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="wld-edit-mode">{t('wld.mode')}</Label>
-              <NativeSelect
-                id="wld-edit-mode"
+              <Select
                 value={String(draft.gameMode)}
-                onChange={(e) => onChange({ ...draft, gameMode: Number(e.target.value) })}
+                onValueChange={(next) => onChange({ ...draft, gameMode: Number(next) })}
               >
-                {/* release < 209 只有 bool（普通 / 专家）：大师 / 旅途在那种存档里存不下 */}
-                {['classic', 'expert', 'master', 'journey']
-                  .slice(0, track.gameModeIsInt === false ? 2 : 4)
-                  .map((key, index) => (
-                    <NativeSelectOption key={key} value={String(index)}>
-                      {t(`wld.mode.${key}`)}
-                    </NativeSelectOption>
-                  ))}
-              </NativeSelect>
+                <SelectTrigger id="wld-edit-mode" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* release < 209 只有 bool（普通 / 专家）：大师 / 旅途在那种存档里存不下 */}
+                  {['classic', 'expert', 'master', 'journey']
+                    .slice(0, track.gameModeIsInt === false ? 2 : 4)
+                    .map((key, index) => (
+                      <SelectItem key={key} value={String(index)}>
+                        {t(`wld.mode.${key}`)}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
               {err('gameMode') ? (
                 <p className="text-2xs text-destructive">{err('gameMode')}</p>
               ) : (
@@ -116,19 +131,23 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
               )}
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="wld-edit-moon">{t('wld.edit.moonPhase')}</Label>
-              <NativeSelect
-                id="wld-edit-moon"
+              <Select
                 value={String(draft.moonPhase)}
-                onChange={(e) => onChange({ ...draft, moonPhase: Number(e.target.value) })}
+                onValueChange={(next) => onChange({ ...draft, moonPhase: Number(next) })}
               >
-                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((phase) => (
-                  <NativeSelectOption key={phase} value={String(phase)}>
-                    {t('wld.edit.moonPhaseValue', { n: phase })}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="wld-edit-moon" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((phase) => (
+                    <SelectItem key={phase} value={String(phase)}>
+                      {t('wld.edit.moonPhaseValue', { n: phase })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {err('moonPhase') ? (
                 <p className="text-2xs text-destructive">{err('moonPhase')}</p>
               ) : (
@@ -147,21 +166,21 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">{t('wld.edit.flags')}</span>
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                <label className="flex items-center gap-1.5">
+                <label className="flex items-center gap-2">
                   <Checkbox
                     checked={draft.dayTime}
                     onCheckedChange={(next) => onChange({ ...draft, dayTime: next === true })}
                   />
                   {t('wld.edit.dayTime')}
                 </label>
-                <label className="flex items-center gap-1.5">
+                <label className="flex items-center gap-2">
                   <Checkbox
                     checked={draft.bloodMoon}
                     onCheckedChange={(next) => onChange({ ...draft, bloodMoon: next === true })}
                   />
                   {t('wld.edit.bloodMoon')}
                 </label>
-                <label className="flex items-center gap-1.5">
+                <label className="flex items-center gap-2">
                   <Checkbox
                     checked={draft.eclipse}
                     onCheckedChange={(next) => onChange({ ...draft, eclipse: next === true })}
@@ -169,7 +188,7 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
                   {t('wld.edit.eclipse')}
                 </label>
                 <label
-                  className="flex items-center gap-1.5"
+                  className="flex items-center gap-2"
                   title={t('wld.edit.hardmodeHint')}
                 >
                   <Checkbox
@@ -194,7 +213,7 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
             {WORLD_BOSS_KEYS.map((key) => {
               const label = t(`wld.boss.${bossKey(key, info.evil)}`)
               return (
-                <label key={key} className="flex items-center gap-1.5">
+                <label key={key} className="flex items-center gap-2">
                   <Checkbox
                     checked={draft.bosses[key] === true}
                     onCheckedChange={(next) =>

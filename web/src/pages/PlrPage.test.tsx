@@ -82,7 +82,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('PlrPage（查看存档）', () => {
+describe('PlrPage（玩家存档）', () => {
   it('不需要登录、也不经过服务器：本地解析 .plr 后显示角色与两个导出按钮', async () => {
     const transport = makeTransport()
     renderPage(transport)
@@ -251,11 +251,16 @@ describe('PlrPage（查看存档）', () => {
       expect(await screen.findByText('Joy')).toBeTruthy()
       fireEvent.click(screen.getByRole('button', { name: /编辑$/ }))
 
-      const version = (await screen.findByLabelText('版本')) as HTMLSelectElement
-      const options = Array.from(version.options).map((o) => Number(o.value))
+      // Radix Select：点开触发器，选项是 role=option（文本形如「1.4.4.9（226）」）。
+      fireEvent.click(await screen.findByLabelText('版本'))
+      const labels = (await screen.findAllByRole('option')).map((o) => o.textContent ?? '')
+      const releases = labels
+        .map((text) => Number(/（(\d+)）/.exec(text)?.[1]))
+        .filter((n) => Number.isFinite(n))
       // Joy 是 release 226，同段是 [220,228]
-      expect(options.every((v) => v >= 220 && v <= 228)).toBe(true)
-      expect(options).toContain(226)
+      expect(releases.length).toBeGreaterThan(0)
+      expect(releases.every((v) => v >= 220 && v <= 228)).toBe(true)
+      expect(releases).toContain(226)
     } finally {
       vi.unstubAllGlobals()
     }
@@ -282,8 +287,9 @@ describe('PlrPage（查看存档）', () => {
 
       const stack = (await screen.findByLabelText('数量')) as HTMLInputElement
       fireEvent.change(stack, { target: { value: '3' } })
-      const prefix = (await screen.findByLabelText('词缀')) as HTMLSelectElement
-      fireEvent.change(prefix, { target: { value: '81' } })
+      // Radix Select：点开「词缀」再点选项。
+      fireEvent.click(await screen.findByLabelText('词缀'))
+      fireEvent.click(await screen.findByRole('option', { name: /传奇/ }))
       fireEvent.click(screen.getByRole('button', { name: /放进去/ }))
 
       const save = screen.getByRole('button', { name: /保存并下载/ }) as HTMLButtonElement
@@ -376,7 +382,7 @@ describe('PlrPage（查看存档）', () => {
   })
 })
 
-describe('查看存档：研究进度与多世界重生点', () => {
+describe('玩家存档：研究进度与多世界重生点', () => {
   it('本地存档显示「已研究 N 种」（Joy = 705），没有床重生点时不显示列表', async () => {
     vi.stubGlobal('fetch', itemLimitsFetch())
     try {
@@ -427,7 +433,7 @@ describe('查看存档：研究进度与多世界重生点', () => {
   })
 })
 
-describe('查看存档：三套配装', () => {
+describe('玩家存档：三套配装', () => {
   it('`.plr` 的配装物品会渲染出「配装 1（2）」，空配装不显示', () => {
     // 用真实的槽位映射（plrSlots）铺 350 格，再往第 1 套配装塞两件
     const fake = {
@@ -464,7 +470,7 @@ describe('查看存档：三套配装', () => {
   })
 })
 
-describe('查看存档：装备区编辑', () => {
+describe('玩家存档：装备区编辑', () => {
   it('点装备格 → 编辑器以「装备模式」打开（数量禁用），换物品后保存生效', async () => {
     vi.stubGlobal('fetch', itemLimitsFetch())
     try {
@@ -505,7 +511,7 @@ describe('查看存档：装备区编辑', () => {
   })
 })
 
-describe('查看存档：随身仓储编辑', () => {
+describe('玩家存档：随身仓储编辑', () => {
   it('点猪猪第 1 格 → 编辑器带分组名与数量（仓储有 stack）→ 保存后生效', async () => {
     vi.stubGlobal('fetch', itemLimitsFetch())
     try {
@@ -541,7 +547,7 @@ describe('查看存档：随身仓储编辑', () => {
   })
 })
 
-describe('查看存档：三套配装编辑', () => {
+describe('玩家存档：三套配装编辑', () => {
   it('点第 1 套配装的装备第 1 格 → 编辑器带「配装 1 装备 1」→ 保存后生效', async () => {
     vi.stubGlobal('fetch', itemLimitsFetch())
     try {
@@ -579,7 +585,7 @@ describe('查看存档：三套配装编辑', () => {
   })
 })
 
-describe('查看存档：编辑面板的折叠', () => {
+describe('玩家存档：编辑面板的折叠', () => {
   it('「随身仓储」「配装」默认收起，点标题展开/收起；背包与装备区不折叠', async () => {
     vi.stubGlobal('fetch', itemLimitsFetch())
     try {

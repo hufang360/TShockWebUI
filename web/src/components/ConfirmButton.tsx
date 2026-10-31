@@ -16,6 +16,12 @@ interface ConfirmButtonProps {
   /** 确认按钮的变体，默认 `danger`。 */
   confirmVariant?: ButtonProps['variant']
   className?: string
+  /**
+   * 确认态的容器类名（默认沿用 `className`）。
+   * 图标按钮若用固定尺寸（如 `size-8`）对齐同排的发送键，确认态要传 `''`：
+   * 否则 32px 的方框会把「确认 / 取消」两个文字按钮挤出去。
+   */
+  confirmClassName?: string
   disabled?: boolean
   title?: string
   'aria-label'?: string
@@ -34,12 +40,15 @@ export function ConfirmButton({
   variant = 'ghost',
   confirmVariant = 'danger',
   className,
+  confirmClassName,
   disabled,
   title,
   'aria-label': ariaLabel,
 }: ConfirmButtonProps) {
   const { t } = useI18n()
   const [confirming, setConfirming] = useState(false)
+  // 图标按钮（`icon` / `icon-sm`）宽度是固定的，确认态的文字按钮退回 `sm`，否则「确认清空」会被挤爆。
+  const confirmSize = size === 'icon' || size === 'icon-sm' ? 'sm' : size
 
   if (!confirming) {
     return (
@@ -59,9 +68,9 @@ export function ConfirmButton({
   }
 
   return (
-    <span className={cn('inline-flex shrink-0 items-center gap-1', className)}>
+    <span className={cn('inline-flex shrink-0 items-center gap-1', confirmClassName ?? className)}>
       <Button
-        size={size}
+        size={confirmSize}
         variant={confirmVariant}
         onClick={() => {
           setConfirming(false)
@@ -70,7 +79,7 @@ export function ConfirmButton({
       >
         {confirmLabel}
       </Button>
-      <Button size={size} variant="ghost" onClick={() => setConfirming(false)}>
+      <Button size={confirmSize} variant="ghost" onClick={() => setConfirming(false)}>
         {t('action.cancel')}
       </Button>
     </span>

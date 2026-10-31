@@ -27,7 +27,7 @@ let cache: Promise<ItemLimits> | null = null
 /**
  * 懒加载物品数量规则（`data/item-limits.json`，约 70 KB）。
  *
- * 只在「查看存档 → 编辑」时用，不进首屏 dataset；失败时清缓存，下次重试
+ * 只在「玩家存档 → 编辑」时用，不进首屏 dataset；失败时清缓存，下次重试
  * （与 `loadBuffAtlas` 同策略）。
  */
 export function loadItemLimits(): Promise<ItemLimits> {

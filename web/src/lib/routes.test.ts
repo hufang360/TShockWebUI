@@ -23,12 +23,14 @@ const mods = [clip, chest]
 describe('routes', () => {
   it('内置页面使用短名 hash', () => {
     expect(tabHash('editor')).toBe('#/cmd')
+    expect(tabHash('chat')).toBe('#/chat')
     expect(tabHash('save')).toBe('#/plr')
     expect(tabHash('players')).toBe('#/pm')
     expect(tabHash('world')).toBe('#/wm')
     expect(tabHash('store')).toBe('#/fish')
     expect(tabHash('items')).toBe('#/items')
     expect(tabHash('dataid')).toBe('#/dataid')
+    expect(tabHash('spritesheet')).toBe('#/slice')
     expect(tabHash('settings')).toBe('#/settings')
   })
 
@@ -38,6 +40,8 @@ describe('routes', () => {
   })
 
   it('短名 / ext 路由能解析回 tab', () => {
+    withHash('#/chat')
+    expect(readTabFromHash([])).toBe('chat')
     withHash('#/plr')
     expect(readTabFromHash([])).toBe('save')
     withHash('#/pm')
@@ -46,6 +50,8 @@ describe('routes', () => {
     expect(readTabFromHash([])).toBe('world')
     withHash('#/fish')
     expect(readTabFromHash([])).toBe('store')
+    withHash('#/slice')
+    expect(readTabFromHash([])).toBe('spritesheet')
     withHash('#/ext-clip')
     expect(readTabFromHash(mods)).toBe(clip.id)
     withHash('#/ext-chest')

@@ -7,7 +7,7 @@
 `data/buff-atlas.json` / `.png`
 相关代码：`web/src/components/NpcSprite.tsx`、`web/src/components/ItemIcon.tsx`、`web/src/components/BuffIcon.tsx`、
 `web/src/lib/npcAtlas.ts`、`web/src/lib/buffAtlas.ts`、`web/src/lib/npcCollections.ts`、`web/src/components/SearchInput.tsx`、
-`web/src/lib/pagination.ts`、`web/src/hooks/usePageHeight.ts`、`web/src/hooks/useSearchHistory.ts`
+`web/src/lib/pagination.ts`、`web/src/hooks/usePageScroll.ts`、`web/src/hooks/useSearchHistory.ts`
 
 > 本文件描述「数据 ID」（代码页 `DataIdPage`）的定位、布局、数据来源与验收方式。它是原「NPC 图鉴」（`NpcDexPage`）与
 > 「数据 ID」（`TileWallPage`）**合并后的单页**：**同一套网格组件，只是数据源不同**。
@@ -92,13 +92,14 @@
 │ 参考数据：展开子 ID                                             │
 │ NPC ID / 数据 ID / 图格 ID / 墙 ID / 增益 ID                    │
 └──────────────────────────────────────────────────────────────────┘
-┌ 列表（可滚动区域，不套白色卡片；无翻页，一次展示全部）──────────┐
+┌ 列表（整页滚动，不套白色卡片；无翻页，一次展示全部）────────────┐
 │ ┌──┐┌──┐┌──┐…  NPC / 图格 / Buff 默认图标网格                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- 布局**沿用物品 ID**：工具行不套卡片、中间列表是可滚动区域（**不套白色卡片**），**无翻页器**；
-  页面整体高度由 `hooks/usePageHeight.ts` 撑满，自身不滚动。
+- 布局**沿用物品 ID**：工具行不套卡片、列表**不套白色卡片**、**无翻页器**；
+  页面**不固定高度、整页滚动**（滚动条是浏览器右侧那条），工具条（数据源 Tab + 搜索 / 筛选）`sticky top-12` 吸在顶栏下面，
+  表头再吸在工具条下面（`--page-sticky-top`）。规则见 `docs/UI组件.md` 的「整页滚动」。
 - 数据源 tablist 独立放在页面顶部，**不包在 Card 内**（shadcn `Tabs` 的 **line 变体**）。
 - NPC 分类由下拉框改为胶囊 Tabs，位于工具行右侧；**「页面设置」与「全屏」按钮在内容区顶栏右侧**（`TopBarActions`），不再占工具行。
 - **NPC / 图格 / 墙 / Buff 都支持两种视图**：默认**图标网格**；在同一个「页面设置」Popover 中勾选「表格视图」后切为表格。
@@ -176,7 +177,7 @@
 | NPC | `NPC召唤指令` | `/spawnmob <id>` | 总是显示；**不判权限** |
 | Buff | `增益指令` | `/gbuff <你的玩家名> <buffID>` | 已登录且知道玩家名、有 `tshock.buff.others` |
 
-- **NPC 的召唤指令不按权限隐藏**（照常显示 / 复制）：这与「小抄」页一致——展示不是权限边界，
+- **NPC 的召唤指令不按权限隐藏**（照常显示 / 复制）：这与「指令小抄」页一致——展示不是权限边界，
   真正能不能执行始终由 TShock 判（`/sb` / `/sm` 甚至根本不能经 REST 执行）。
 - Buff 的 `/gbuff` 需要拼进「你的玩家名」，所以未登录 / 拿不到玩家名时先不给。
 - 权限匹配遵循 TShock 的通配规则：`*`、`tshock.*`、`tshock.npc.*` 都算拥有子节点（与 `Group.HasPermission()` 一致）；

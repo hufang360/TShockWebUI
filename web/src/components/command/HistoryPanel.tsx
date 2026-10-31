@@ -116,7 +116,7 @@ export function HistoryPanel({
                       onLoad(h.cmd)
                     }}
                     className={cn(
-                      'h-auto w-full cursor-pointer justify-start gap-2 rounded-lg bg-accent/40 px-1.5 py-1 font-pixel text-2xs font-normal hover:bg-accent',
+                      'h-auto w-full cursor-pointer justify-start gap-2 rounded-control bg-accent/40 px-2 py-1 font-pixel text-2xs font-normal hover:bg-accent',
                       checked && 'bg-accent',
                     )}
                   >

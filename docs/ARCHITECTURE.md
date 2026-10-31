@@ -254,7 +254,7 @@ docker compose -f deploy/docker-compose.example.yml up -d
 ### 6.4 GitHub Pages（仅静态演示）
 
 前端单独部署到 GitHub Pages 时没有同源 `/api/*`，因此构建固定使用 `VITE_TRANSPORT=mock`，
-页面顶部会明确显示「演示模式，未连接真实服务器」。纯本地功能（物品 ID / 数据 ID / 查看存档 / 查看世界）正常；
+页面顶部会明确显示「演示模式，未连接真实服务器」。纯本地功能（物品 ID / 数据 ID / 玩家存档 / 世界存档）正常；
 **不能执行真实指令、不能登录真实 TShock**。
 
 - 部署后地址：<https://hufang360.github.io/TShockWebUI/>
@@ -271,15 +271,29 @@ docker compose -f deploy/docker-compose.example.yml up -d
 # 1) 生成数据（版本变化时）
 node tools/gen-data.mjs && python3 tools/gen-atlas.py
 
-# 2) 后端（先跑，监听 :8080；指向本机 TShock）
-cd server && TSHOCK_URL=http://127.0.0.1:7878 go run .
+# 2) 后端（先跑）：二选一
+#    a. 宿主直跑 :8080（连宿主可访问的 TShock）
+scripts/dev-native.sh                     # = make dev
+#    b. 挂载式容器 :18080（连宿主机 7878 上的 TShock，宿主构建、不 build 镜像）
+scripts/dev-container.sh                  # = make dev-container（默认 18080，浏览器直接开就是完整应用）
 
-# 3) 前端开发服务器（:5173，/api 代理到 :8080）
-cd web && npm run dev
+# 3) 前端开发服务器（带 HMR；:5173，/api 代理到后端 :18080）
+make dev-web                              # 浏览器开 http://localhost:5173
 ```
-- `web/vite.config.ts` 增加 `server.proxy`：`/api` → `http://localhost:8080`。
+- 端口分工：`API_PORT=18080`（后端，也是「完整应用」地址，可当书签）+ `WEB_PORT=5173`（vite HMR 页面）。
+  一个端口只能一个进程；想让 HMR 也落在 18080：`make dev-all WEB_PORT=18080 API_PORT=18081`。
+- `make image` / `run-container.sh` 默认也是 18080，与开发容器不能同时跑。
+- 嫌开两个终端麻烦：`make dev-all` = 容器后端 + vite 页面（后台起后端，前台跑 vite；Ctrl+C 只停 vite）。
+  它先跑 `dev-container-backend`（web/dist 已存在时只重建 Go，~2s；缺了才完整构一次），再进 `dev-web`；
+  容器名固定为 `tswui-dev`，换 API_PORT 会 rm -f 旧容器——同一时间只保留一个。
+- 改 UI 只跑第 3 步即可反复迭代（秒级 HMR）；`make dev-web` 前会探 `$(API_TARGET)/healthz`，后端没起会提示。
+- `web/vite.config.ts`：`server.port` 取 `VITE_PORT`（默认 5173）、`strictPort: true`
+  （端口被占直接报错，不静默换口）；`server.proxy`：`/api` → `VITE_API_TARGET`（`make dev-web` 传 18080）。
+- 改 Go 才需要重启后端：宿主 `make dev`；容器 `make dev-container-backend`。只想验证容器形态的前端改动：`make dev-container-frontend`（重建 dist，无 HMR，刷 18080）。
+- Cookie 与端口无关（同 host 的 host-only `tswui_session`），所以 5173 登录后直接开 18080 也是已登录——**但两个后端实例不能同时跑**，同名 cookie 会互相覆盖导致 401 踢回登录。
+- 纯静态页面（物品图鉴 / 存档解析）不依赖后端：`cd web && VITE_TRANSPORT=mock npm run dev`（界面会标注演示模式）。
 - 生产构建时前端 `base=/`；开发时也用 `/`。GitHub Pages 演示构建用 `VITE_BASE=/<repo>/` + `VITE_TRANSPORT=mock`，见 `.github/workflows/pages.yml`。
-- Go 本地运行需要 `server/internal/webdist/` 有内容（或回退到从 `web/dist` 读盘，见 `记录-实现与验收.md`）。推荐：本地用 `WEB_DIST_DIR=../web/dist` 覆盖内嵌资源，避免每次 rebuild。
+- Go 后端启动时需要一份前端产物：`make dev` 注入 `WEB_DIST_DIR=web/dist`、`make dev-container` 注入 `/webdist`（挂载 `web/dist`），都不需要每次都 `npm run build`。裸跑 `cd server && go run .` 则需要 `server/internal/webdist/` 有内容（或自带 `WEB_DIST_DIR`），否则直接报错退出。
 
 ### 前端传输层（现状）
 

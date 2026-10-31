@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { toast } from '@/components/ui'
 import App from './App'
 import { HttpTransport, MockTransport } from '@/lib/tshock'
 
@@ -69,7 +70,26 @@ it('应用可启动并加载真实数据（Mock 传输标识存在）', async ()
   expect(screen.getByText(/未连接真实服务器/)).toBeTruthy()
 })
 
-it('未登录时首页 / 指令 / 设置只显示登录提示与登录按钮', async () => {
+it('全局挂了 sonner 的 Toaster（主题跟随界面设置）', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  // Toaster 本身是空的，发一条提示才会挂出 `<ol data-sonner-toaster>`。
+  act(() => {
+    toast.success('已发送（显示为 [WebUI] hf）')
+  })
+  const container = await waitFor(() => {
+    const el = document.querySelector('[data-sonner-toaster]')
+    if (!el) throw new Error('toaster 还没挂载')
+    return el as HTMLElement
+  })
+  // 默认设置是深色主题。
+  expect(container.getAttribute('data-sonner-theme')).toBe('dark')
+  toast.dismiss()
+})
+
+it('未登录时首页 / 指令只显示登录提示，设置页仍可改界面偏好', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
@@ -83,14 +103,16 @@ it('未登录时首页 / 指令 / 设置只显示登录提示与登录按钮', a
   expect(await screen.findByText('请先登录！')).toBeTruthy()
   expect(screen.queryByRole('button', { name: '执行' })).toBeNull()
 
-  // 设置页：隐藏设置内容，同样只显示登录提示。
+  // 设置页：界面偏好是纯本地设置，不登录也能改；要 token 的部分才用登录提示代替。
   fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
   // 设置页是懒加载路由，等页面标题出现后再断言，避免命中上一页尚未卸载的登录提示。
   // 页面标题现在只在顶栏出现（内容区不再重复「设置」）。
   expect(await screen.findByText('设置', { selector: '[data-slot="breadcrumb-page"]' })).toBeTruthy()
   // 顶栏标题跟随导航立即更新，所以还要等设置页专有文案，确认懒加载页面已挂载。
   expect(await screen.findByText('偏好仅保存在本机，不会上传。')).toBeTruthy()
-  expect(screen.queryByRole('switch', { name: '紧凑视图' })).toBeNull()
+  expect(screen.getByRole('switch', { name: '紧凑视图' })).toBeTruthy()
+  expect(screen.queryByText('激活模块')).toBeNull()
+  expect(screen.getByText('请先登录！')).toBeTruthy()
 
   // 提示里的登录按钮能打开登录框（侧栏还有一条登录按钮，这里限定正文）。
   fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: '登录' }))
@@ -115,7 +137,7 @@ it('指令页使用 #/cmd，并兼容旧 #/editor', async () => {
   window.history.replaceState(null, '', '#/editor')
   render(<App transport={new MockTransport()} />)
 
-  expect(await screen.findByRole('tab', { name: '指令' })).toBeTruthy()
+  expect(await screen.findByTestId('command-workspace')).toBeTruthy()
   await waitFor(() => expect(window.location.hash).toBe('#/cmd'))
 })
 
@@ -401,7 +423,8 @@ it('收藏是独立 tab（侧栏「指令」页 → 「收藏」）', async () =
   await loginAsAlice()
 
   fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
-  fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
+  // 工具是弹框：先点输入框左下角的「收藏」按钮。
+  fireEvent.click(await screen.findByRole('button', { name: '收藏' }))
   expect(await screen.findByPlaceholderText(/搜索收藏/)).toBeTruthy()
 })
 
@@ -413,7 +436,8 @@ it('历史并入指令编辑器（侧栏「历史」页）', async () => {
 
   // 默认打开首页，先切到指令页
   fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
-  fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
+  // 工具是弹框：先点输入框左下角的「历史」按钮。
+  fireEvent.click(await screen.findByRole('button', { name: '历史' }))
   expect(await screen.findByText('暂无历史')).toBeTruthy()
 })
 
@@ -530,14 +554,15 @@ it('登录失败时提示服主赋权命令（addperm tshock.rest.useapi）', as
   ).toBeTruthy()
 })
 
-it('首页「终端」打开浮动终端，执行结果与指令页共享', async () => {
+it('「终端」打开浮动终端，执行结果与指令页共享', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
   await loginAsAlice()
 
-  // 顶栏右侧的终端入口（未登录时不渲染）。
-  fireEvent.click(screen.getByTestId('terminal-topbar'))
+  // 顶栏右侧的终端入口（首页不放、未登录不渲染）：先进「物品图鉴」。
+  fireEvent.click(screen.getAllByRole('button', { name: '物品 ID' })[0])
+  fireEvent.click(await screen.findByTestId('terminal-topbar'))
   const win = await screen.findByTestId('terminal-window')
   const input = within(win).getByPlaceholderText(/输入指令/)
   fireEvent.change(input, { target: { value: '/time day' } })
@@ -552,7 +577,7 @@ it('首页「终端」打开浮动终端，执行结果与指令页共享', asyn
   expect(await within(screen.getByRole('main')).findByText(/世界时间/)).toBeTruthy()
 })
 
-it('顶栏「指令」入口：未登录不显示，登录后除指令 / 设置外都显示', async () => {
+it('顶栏「指令」入口：未登录 / 首页不显示，登录后除首页、指令、设置外都显示', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
@@ -561,11 +586,13 @@ it('顶栏「指令」入口：未登录不显示，登录后除指令 / 设置�
   expect(screen.queryByTestId('terminal-topbar')).toBeNull()
 
   await loginAsAlice()
-  expect(await screen.findByTestId('terminal-topbar')).toBeTruthy()
+  // 首页：右侧顶栏只留刷新 / 管理卡片，不放终端图标。
+  expect(await screen.findByText('服务器状态')).toBeTruthy()
+  expect(screen.queryByTestId('terminal-topbar')).toBeNull()
 
   // 指令页：隐藏。
   fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
-  expect(await screen.findByRole('tab', { name: '指令' })).toBeTruthy()
+  expect(await screen.findByPlaceholderText(/输入指令/)).toBeTruthy()
   await waitFor(() => expect(screen.queryByTestId('terminal-topbar')).toBeNull())
 
   // 物品 ID：显示。
@@ -579,13 +606,13 @@ it('顶栏「指令」入口：未登录不显示，登录后除指令 / 设置�
   await waitFor(() => expect(screen.queryByTestId('terminal-topbar')).toBeNull())
 })
 
-it('「查看存档」是独立侧边栏菜单：未登录也能用，不依赖玩家管理模块', async () => {
+it('「玩家存档」是独立侧边栏菜单：未登录也能用，不依赖玩家管理模块', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
 
-  // 侧栏「查看存档」入口（公开工具；玩家管理模块此时未启用）。
-  fireEvent.click(screen.getAllByRole('button', { name: '查看存档' })[0])
+  // 侧栏「玩家存档」入口（公开工具；玩家管理模块此时未启用）。
+  fireEvent.click(screen.getAllByRole('button', { name: '玩家存档' })[0])
 
   expect(await screen.findByTestId('players-save-drop')).toBeTruthy()
   expect(window.location.hash).toBe('#/plr')
@@ -594,51 +621,94 @@ it('「查看存档」是独立侧边栏菜单：未登录也能用，不依赖�
   expect(screen.getByRole('button', { name: /导入 \.plr/ })).toBeTruthy()
 })
 
-it('侧边栏「小抄」：NPC管理列出 Boss，点击填进浮动终端', async () => {
+it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 Boss，点终端填进浮窗', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
   await loginAsAlice()
 
-  fireEvent.click(screen.getAllByRole('button', { name: '小抄' })[0])
-  expect(await screen.findByRole('tab', { name: '默认' })).toBeTruthy()
+  fireEvent.click(screen.getAllByRole('button', { name: '指令小抄' })[0])
+  // 没有顶部 tab 了：左边搜索框，右边分组栏。
+  expect(await screen.findByPlaceholderText('搜索指令或名称')).toBeTruthy()
+  expect(screen.queryByRole('tablist')).toBeNull()
   expect(window.location.hash).toBe('#/commands')
+  expect(
+    within(screen.getByRole('complementary')).getByRole('button', { name: /召唤 Boss/ }),
+  ).toBeTruthy()
+  // 侧栏顺序：指令小抄紧跟「数据 ID」。
+  const sidebar = screen.getByTestId('sidebar')
+  const labels = Array.from(sidebar.querySelectorAll('[data-slot="sidebar-menu"] button')).map((b) =>
+    b.textContent?.trim(),
+  )
+  expect(labels.indexOf('指令小抄')).toBe(labels.indexOf('数据 ID') + 1)
 
-  fireEvent.mouseDown(screen.getByRole('tab', { name: 'NPC管理' }))
-  fireEvent.click(await screen.findByRole('button', { name: /\/spawnboss "king slime"/ }))
+  // 行本身不再响应单击：点「操作」列的终端按钮才填进浮窗。
+  fireEvent.click(
+    await screen.findByRole('button', { name: '填入指令浮窗：/spawnboss "king slime"' }),
+  )
   const win = await screen.findByTestId('terminal-window')
   const input = within(win).getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
   expect(input.value).toBe('/spawnboss "king slime"')
 
   // 传送 NPC 用英文名（真实数据里的 `en` 字段）；点新记录会覆盖输入框。
-  fireEvent.click(screen.getByRole('button', { name: /渔夫\s*#369/ }))
+  fireEvent.click(screen.getByRole('button', { name: '填入指令浮窗：/tpnpc Angler' }))
   expect(input.value).toBe('/tpnpc Angler')
 })
-it('旧的「召唤NPC」地址回落到「小抄」', async () => {
+it('「聊天」是独立页面：侧栏紧跟「指令」，地址 #/chat', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+  await loginAsAlice()
+
+  const sidebar = screen.getByTestId('sidebar')
+  const labels = Array.from(sidebar.querySelectorAll('[data-slot="sidebar-menu"] button')).map((b) =>
+    b.textContent?.trim(),
+  )
+  expect(labels.indexOf('聊天')).toBe(labels.indexOf('指令') + 1)
+
+  fireEvent.click(within(sidebar).getByRole('button', { name: '聊天' }))
+  expect(await screen.findByTestId('chat-workspace')).toBeTruthy()
+  expect(screen.getByPlaceholderText('发消息给游戏内的玩家（会显示你是谁）')).toBeTruthy()
+  expect(window.location.hash).toBe('#/chat')
+})
+
+it('旧的「召唤NPC」地址回落到「指令小抄」', async () => {
   mockFetch()
   window.history.replaceState(null, '', '#/spawn')
   render(<App transport={new MockTransport()} />)
-  expect(await screen.findByRole('tab', { name: '默认' })).toBeTruthy()
+  expect(await screen.findByPlaceholderText('搜索指令或名称')).toBeTruthy()
   await waitFor(() => expect(window.location.hash).toBe('#/commands'))
 })
 
-it('「查看世界」是独立侧边栏菜单：未登录也能用，排在「世界管理」之前', async () => {
+it('「世界存档」是独立侧边栏菜单：未登录也能用，排在「世界管理」之前', async () => {
   mockFetch()
   localStorage.setItem('tswui:modules', JSON.stringify({ byServer: { default: ['world'] } }))
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
 
-  // 侧栏顺序：查看世界（公开工具）在世界管理（WorldModify 模块）之前。
+  // 侧栏顺序：世界存档（公开工具）在世界管理（WorldModify 模块）之前。
   const sidebar = screen.getByTestId('sidebar')
   const labels = Array.from(sidebar.querySelectorAll('[data-slot="sidebar-menu"] button')).map((b) =>
     b.textContent?.trim(),
   )
-  expect(labels.indexOf('查看世界')).toBeGreaterThan(-1)
-  expect(labels.indexOf('查看世界')).toBeLessThan(labels.indexOf('世界管理'))
+  expect(labels.indexOf('世界存档')).toBeGreaterThan(-1)
+  expect(labels.indexOf('世界存档')).toBeLessThan(labels.indexOf('世界管理'))
 
   // 点进去：不需要登录，直接是本地导入界面。
-  fireEvent.click(screen.getAllByRole('button', { name: '查看世界' })[0])
+  fireEvent.click(screen.getAllByRole('button', { name: '世界存档' })[0])
   expect(await screen.findByTestId('world-drop')).toBeTruthy()
   expect(window.location.hash).toBe('#/wld')
+  expect(screen.queryByText('请先登录！')).toBeNull()
+})
+
+it('「精灵图」是独立侧边栏菜单：未登录也能用，地址 #/slice', async () => {
+  mockFetch()
+  render(<App transport={new MockTransport()} />)
+  await screen.findByText('WebUI')
+
+  fireEvent.click(screen.getAllByRole('button', { name: '精灵图' })[0])
+  expect(await screen.findByTestId('slice-drop')).toBeTruthy()
+  expect(window.location.hash).toBe('#/slice')
+  expect(screen.getByText('还没有选择精灵图')).toBeTruthy()
   expect(screen.queryByText('请先登录！')).toBeNull()
 })

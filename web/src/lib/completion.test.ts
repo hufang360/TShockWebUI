@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyCompletion,
+  commandHelpLine,
+  commandSyntaxArgs,
   computeCompletions,
-  paramHintFor,
+  splitSyntaxArg,
   type CompletionItem,
 } from './completion'
 import { makeDataset } from '@/test/fixtures'
@@ -149,10 +151,65 @@ describe('参数补全（来自 TShock 源码用法串）', () => {
     expect(applied.text).toBe('/time night ')
   })
 
-  it('paramHintFor 给出源码用法串', () => {
-    expect(paramHintFor(dataset, '/give 29 ', 9)).toBe('give <item type/id> <player> [item amount] [prefix id/name]')
-    expect(paramHintFor(dataset, '/give', 5)).toBeNull()
-    expect(paramHintFor(dataset, '/time ', 6)).toBe('time <day|night|noon|midnight|hh:mm>')
+  it('指令候选带上参数语法（只取参数部分，指令名已在行首）', () => {
+    const time = computeCompletions({ dataset, text: '/ti', caret: 3, players: [] }).find(
+      (c) => c.command?.name === 'time',
+    )
+    expect(time?.syntax).toBe('<day|night|noon|midnight|hh:mm>')
+
+    // 无参数的指令没有语法（不硬造 `<args>`）。
+    const help = computeCompletions({ dataset, text: '/help', caret: 5, players: [] }).find(
+      (c) => c.command?.name === 'help',
+    )
+    expect(help?.syntax).toBeUndefined()
+  })
+
+  it('多形态指令只取第一条语法并加省略号', () => {
+    expect(commandSyntaxArgs(dataset.commandsByToken.get('group')!)).toBe(
+      'addperm <group name> <permissions...> …',
+    )
+  })
+
+  it('参数区给出「指令帮助」：完整用法 + 备注', () => {
+    // 该形态没有专属备注时退回指令自己的帮助文本（不让帮助行只剩一串语法）；
+    // `argName` 用于在用法串里把「正在填的那个参数」标出来。
+    expect(commandHelpLine(dataset, '/time ', 6)).toEqual({
+      syntax: '/time <day|night|noon|midnight|hh:mm>',
+      note: '设置世界时间。',
+      argName: 'time',
+      argRequired: true,
+    })
+    // 多形态指令也标注还有其它写法。
+    expect(commandHelpLine(dataset, '/group ', 7)?.syntax).toBe(
+      '/group addperm <group name> <permissions...> …',
+    )
+    // 还没进参数区（只敲了指令名）不显示帮助行。
+    expect(commandHelpLine(dataset, '/time', 5)).toBeNull()
+  })
+
+  it('splitSyntaxArg 切出当前参数，便于界面高亮', () => {
+    expect(
+      splitSyntaxArg('/give <item type/id> <player> [item amount] [prefix id/name]', 'player'),
+    ).toEqual({
+      before: '/give <item type/id> ',
+      arg: '<player>',
+      after: ' [item amount] [prefix id/name]',
+    })
+    // 可选参数是方括号；可变参数带 `...`。
+    expect(splitSyntaxArg('/give 29 Alice [item amount]', 'item amount')?.arg).toBe('[item amount]')
+    expect(splitSyntaxArg('/group add <group name> <permissions...>', 'permissions')?.arg).toBe(
+      '<permissions...>',
+    )
+    // 名字对不上 / 没给名字：不切，调用方原样显示。
+    expect(splitSyntaxArg('/give <item>', 'player')).toBeNull()
+    expect(splitSyntaxArg('/give <item>')).toBeNull()
+  })
+
+  it('指令候选的说明留在行内（帮助条只说用法，不重复说明）', () => {
+    const time = computeCompletions({ dataset, text: '/ti', caret: 3, players: [] }).find(
+      (c) => c.command?.name === 'time',
+    )
+    expect(time?.detail).toContain('设置世界时间。')
   })
 })
 

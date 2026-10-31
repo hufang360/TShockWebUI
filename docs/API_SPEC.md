@@ -342,12 +342,12 @@ TShock 可用性与版本探测（对应 `v2/server/status`）。
 
 ## 5.4 本地存档解析（不在后端）
 
-「查看存档」（`.plr`）与「查看世界」（`.wld`）都**完全在浏览器里解析**，后端不提供导入接口：
+「玩家存档」（`.plr`）与「世界存档」（`.wld`）都**完全在浏览器里解析**，后端不提供导入接口：
 
 | 功能 | 实现 | 说明 |
 | --- | --- | --- |
-| 查看存档 | `web/src/lib/save/plr.ts`（AES-128-CBC 解密 + 字段解析） | 文件不离开浏览器；不需要登录 / 权限，也没有上传体积与限流问题 |
-| 查看世界 | `web/src/lib/save/worldFile.ts` + `worldThumb.ts`（头部解析 + 图格 RLE + 缩略图） | 同上，缩略图在 `<canvas>` 上本地渲染，可导出 PNG |
+| 玩家存档 | `web/src/lib/save/plr.ts`（AES-128-CBC 解密 + 字段解析） | 文件不离开浏览器；不需要登录 / 权限，也没有上传体积与限流问题 |
+| 世界存档 | `web/src/lib/save/worldFile.ts` + `worldThumb.ts`（头部解析 + 图格 RLE + 缩略图） | 同上，缩略图在 `<canvas>` 上本地渲染，可导出 PNG |
 
 > 早期版本曾有 `POST /api/player/import` 与 `POST /api/world/import`（后端解析）。现已删除：
 > 后端不再接触玩家 / 世界存档，公网部署也就不存在「公开解析接口」的滥用面。
@@ -643,7 +643,7 @@ invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosse
   前端据此清空本地事件重拉而不是把两个服的事件混排；旧插件不返回，前端退回「`lastSeq` 回退」判定。
 
 ### `GET /api/events/stream?since=`（SSE）
-以 `text/event-stream` 持续推送（网页打开「动态」时用）：
+以 `text/event-stream` 持续推送（网页打开「聊天」页时用）：
 - `event: message` + `data: <ServerEvent>`：一条事件；
 - `event: world` + `data: <ServerInfoExtra>`：世界状态（约 20s 一帧；前端用它更新徽标 / 游戏内时间）；
 - `event: reset` + `data: {"instance":"..."}`：上游换了实例（同一地址下换了另一个服）。

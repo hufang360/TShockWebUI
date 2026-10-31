@@ -67,7 +67,10 @@ export interface CommandResultsApi {
   results: ResultEntry[]
   append: (command: string, result: CommandResult) => void
   remove: (seq: number) => void
+  /** 折叠 / 展开单条结果（随结果持久化）。 */
   toggleCollapse: (seq: number, collapsed: boolean) => void
+  /** 一次折叠 / 展开全部结果卡片。 */
+  setAllCollapsed: (collapsed: boolean) => void
   clear: () => void
 }
 
@@ -107,6 +110,8 @@ export function useCommandResultsList(serverId: string): CommandResultsApi {
     [setResults],
   )
 
+  const clear = useCallback(() => setResults(() => []), [setResults])
+
   const toggleCollapse = useCallback(
     (seq: number, collapsed: boolean) => {
       setResults((prev) => prev.map((e) => (e.seq === seq ? { ...e, collapsed } : e)))
@@ -114,10 +119,15 @@ export function useCommandResultsList(serverId: string): CommandResultsApi {
     [setResults],
   )
 
-  const clear = useCallback(() => setResults(() => []), [setResults])
+  const setAllCollapsed = useCallback(
+    (collapsed: boolean) => {
+      setResults((prev) => prev.map((e) => ({ ...e, collapsed })))
+    },
+    [setResults],
+  )
 
   return useMemo(
-    () => ({ results, append, remove, toggleCollapse, clear }),
-    [results, append, remove, toggleCollapse, clear],
+    () => ({ results, append, remove, toggleCollapse, setAllCollapsed, clear }),
+    [results, append, remove, toggleCollapse, setAllCollapsed, clear],
   )
 }

@@ -122,6 +122,7 @@ docker compose -f deploy/docker-compose.example.yml up -d
    - `tshock.rest.useapi`：允许创建 token（登录）
    - `tshock.rest.command`：允许执行指令
    - 带 `*` 的组（GM / newadmin / trustedadmin…）无需配置。
+   - WebUI 的「指令小抄 → 权限配置」里有同一份配置（连同 `/home`、常用插件权限），点一条就填进指令浮窗。
 3. 经反代后 TShock 只看到网关 IP，所有玩家共用一个限流桶；建议调大
    `RESTMaximumRequestsPerInterval`（如 `60`）。
 4. `7878` 尽量只对 WebUI 容器网络开放，不要暴露到公网。
@@ -198,10 +199,15 @@ go vet ./... && go test -race ./...
 ```bash
 cd web
 npm install
-npm run dev          # http://localhost:5173，/api 代理到 :8080（VITE_API_TARGET 可改）
+npm run dev          # http://localhost:5173，/api 代理到 VITE_API_TARGET（默认 :8080）
 npm run build        # 产物 web/dist/
 npm run typecheck && npm run lint && npm run test:run
 ```
+
+改 UI 推荐在仓库根用 `make dev-web`：vite 带 HMR 跑在 `:5173`，/api 转发给后端 `:18080`；
+不想开两个终端就用 **`make dev-all`**（自动起容器后端 + vite）。容器后端自己就守着 `:18080`，
+浏览器直接开 `http://localhost:18080` 是完整应用（旧 dist，无 HMR）。
+详见 [`docs/开发速查.md`](docs/开发速查.md)。
 
 无后端时可看纯前端演示（界面会显式标注 **Mock**）：
 

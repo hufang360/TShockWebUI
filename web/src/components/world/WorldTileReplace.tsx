@@ -1,5 +1,5 @@
 /**
- * 「查看世界 → 编辑」里的**图格替换**卡片（W3 安全子集）。
+ * 「世界存档 → 编辑」里的**图格替换**卡片（W3 安全子集）。
  *
  * 交互刻意做得保守：
  * 1. 只填两个图格 id（旁边实时显示名字与将替换多少格，数量取自缩略图同一次解码的统计）；
@@ -55,7 +55,7 @@ export function WorldTileReplace({ world, stats, onReplace, disabled }: WorldTil
         </div>
 
         <div className="grid gap-3 @[520px]:grid-cols-[1fr_auto_1fr]">
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="wld-replace-from">{t('wld.replace.from')}</Label>
             <Input
               id="wld-replace-from"
@@ -71,7 +71,7 @@ export function WorldTileReplace({ world, stats, onReplace, disabled }: WorldTil
             </p>
           </div>
           <Replace className="mt-6 hidden size-4 text-muted-foreground @[520px]:block" aria-hidden />
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="wld-replace-to">{t('wld.replace.to')}</Label>
             <Input
               id="wld-replace-to"
@@ -89,7 +89,7 @@ export function WorldTileReplace({ world, stats, onReplace, disabled }: WorldTil
         </div>
 
         {reason && (
-          <p className="flex items-start gap-1.5 text-2xs text-muted-foreground">
+          <p className="flex items-start gap-2 text-2xs text-muted-foreground">
             <AlertTriangle className="mt-px size-3 shrink-0" aria-hidden />
             {reason}
           </p>

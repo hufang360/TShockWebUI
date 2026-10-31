@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { ItemDetailProvider } from '@/lib/itemDetailContext'
-import { ItemFavoritesProvider } from '@/lib/itemFavoritesContext'
+import { ItemFavoritesProvider, ItemFavoritesStoreProvider } from '@/lib/itemFavoritesContext'
 import { rarityColor } from '@/lib/items'
 import { ItemTooltipContent } from './ItemTooltipContent'
 
@@ -87,6 +87,26 @@ describe('ItemTooltipContent', () => {
     expect(screen.getByRole('button', { name: '取消收藏' }).getAttribute('aria-pressed')).toBe(
       'true',
     )
+  })
+
+  it('全局收藏 Provider：写本机 tswui:itemFavorites，再点一次取消（未登录任何页面也能收藏）', () => {
+    localStorage.clear()
+    render(
+      <I18nProvider lang="zh">
+        <ItemFavoritesStoreProvider>
+          <ItemTooltipContent item={item} />
+        </ItemFavoritesStoreProvider>
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '收藏物品' }))
+    expect(
+      JSON.parse(localStorage.getItem('tswui:itemFavorites') ?? '[]').map(
+        (f: { id: number }) => f.id,
+      ),
+    ).toEqual([4956])
+
+    fireEvent.click(screen.getByRole('button', { name: '取消收藏' }))
+    expect(JSON.parse(localStorage.getItem('tswui:itemFavorites') ?? '[]')).toEqual([])
   })
 
   it('含玩家加成会重算的属性行（伤害/蓝耗）时，补一句「基础值」说明', () => {

@@ -39,7 +39,7 @@ export function ItemDropsPanel({
   const trials = dataset.itemDrops?.meta?.trials
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mt-3 flex flex-col gap-1">
-      <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-1.5 text-sm font-medium">
+      <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-sm font-medium">
         <ItemIcon
           item={dataset.itemsById.get(itemId)}
           atlas={dataset.atlas}
@@ -62,7 +62,7 @@ export function ItemDropsPanel({
             const stack =
               drop.minStack === drop.maxStack ? String(drop.minStack) : `${drop.minStack}~${drop.maxStack}`
             const rowClass =
-              'flex min-w-0 items-center gap-2 rounded-lg bg-accent/40 px-2.5 py-2'
+              'flex min-w-0 items-center gap-2 rounded-control bg-accent/40 px-3 py-2'
             const body = (
               <>
                 <ItemIcon item={item} atlas={dataset.atlas} size={24} />

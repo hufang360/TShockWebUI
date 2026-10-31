@@ -147,7 +147,7 @@ export function WorldFind({ bytes, parsed, onMarkersChange, onFocusHit }: WorldF
                 <button
                   type="button"
                   onClick={() => void run(hit)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  className="flex w-full items-center gap-2 rounded-control px-2 py-2 text-left text-sm hover:bg-accent"
                 >
                   <Search className="size-3.5 text-muted-foreground" aria-hidden />
                   <span className="truncate">{hit.name}</span>
@@ -168,7 +168,7 @@ export function WorldFind({ bytes, parsed, onMarkersChange, onFocusHit }: WorldF
               <span className="font-medium">{target.name}</span>
               <span className="text-2xs text-muted-foreground tabular-nums">#{target.id}</span>
               {running ? (
-                <span className="ml-auto flex items-center gap-1.5 text-2xs text-muted-foreground">
+                <span className="ml-auto flex items-center gap-2 text-2xs text-muted-foreground">
                   <Spinner aria-hidden /> {t('wld.find.scanning', { percent: Math.round(progress * 100) })}
                 </span>
               ) : (
@@ -179,7 +179,7 @@ export function WorldFind({ bytes, parsed, onMarkersChange, onFocusHit }: WorldF
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-1.5"
+                className="h-6 px-2"
                 onClick={clear}
                 aria-label={t('wld.find.clear')}
               >

@@ -6,7 +6,7 @@ describe('Card', () => {
   it('使用 shadcn 标准卡片表面且不投影', () => {
     render(<Card data-testid="card" />)
     const className = screen.getByTestId('card').className
-    expect(className).toContain('rounded-xl')
+    expect(className).toContain('rounded-container')
     expect(className).toContain('border')
     expect(className).toContain('bg-card')
     expect(className).not.toContain('shadow-sm')

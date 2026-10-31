@@ -115,11 +115,11 @@ function QueueItem({
 }) {
   const { t } = useI18n()
   return (
-    <li className="flex items-start gap-2 rounded-xl bg-accent/40 p-2.5">
+    <li className="flex items-start gap-2 rounded-control bg-accent/40 p-3">
       {running ? (
         <Spinner className="mt-0.5 size-3.5 text-primary" />
       ) : (
-        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
+        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-2xs text-foreground">{label}</div>

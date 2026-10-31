@@ -4,6 +4,7 @@ import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
 import type { Item } from '@/types'
 import { resetDexState } from '@/lib/dexState'
+import { recipeFavoriteKey } from '@/lib/recipeFavorites'
 import { ItemsPage } from './ItemsPage'
 
 function makeItem(id: number): Item {
@@ -25,13 +26,19 @@ function renderPage(items: Item[] | ReturnType<typeof makeDataset>, opts: { keep
   const dataset = Array.isArray(items) ? makeDataset({ items }) : items
   const utils = render(
     <I18nProvider lang="zh">
-      <ItemsPage dataset={dataset} username="Alice" />
+      {/* 整页滚动：滚动宿主就是 AppShell 的 `<main>`（网格自己不再溢出滚动）。 */}
+      <main data-testid="page-scroll-host">
+        <ItemsPage dataset={dataset} username="Alice" />
+      </main>
     </I18nProvider>,
   )
   // 默认就是「全部物品」；显式点一次，顺便清掉上一次测试可能留下的筛选。
   if (!opts.keepMode) fireEvent.click(screen.getByTestId('dex-mode-all'))
   return utils
 }
+
+/** 整页滚动的宿主：网格的滚动位置就是它的滚动位置。 */
+const pageHost = () => screen.getByTestId('page-scroll-host')
 
 /** 格子里的图标按钮（用 aria-label = 物品名定位）。 */
 const cell = (name: string) => screen.getByRole('button', { name })
@@ -114,7 +121,9 @@ describe('ItemsPage 图鉴', () => {
     const onFocusConsumed = vi.fn()
     render(
       <I18nProvider lang="zh">
-        <ItemsPage dataset={dataset} focusItemId={3} onFocusConsumed={onFocusConsumed} />
+        <main>
+          <ItemsPage dataset={dataset} focusItemId={3} onFocusConsumed={onFocusConsumed} />
+        </main>
       </I18nProvider>,
     )
     const dialog = await screen.findByTestId('dex-detail')
@@ -128,13 +137,26 @@ describe('ItemsPage 图鉴', () => {
     expect(group).toBeTruthy()
     expect(group?.querySelector('.lucide-search')).toBeTruthy()
     expect(group?.parentElement?.parentElement?.className).toContain('max-w-sm')
-    // 工具条不再套卡片；手机分两行：搜索行在上，筛选 / 分组 / 设置行在下。
+    // 放大镜在左、结果数在输入框右侧（不再单独摆在框外面）。
+    const addons = group?.querySelectorAll('[data-slot="input-group-addon"]')
+    expect(addons?.[0]?.getAttribute('data-align')).toBe('inline-start')
+    expect(addons?.[0]?.querySelector('.lucide-search')).toBeTruthy()
+    // 聚焦后结果数就在输入框右侧（不再单独摆在框外面）。
+    fireEvent.focus(input)
+    const count = screen.getByText('3 个结果')
+    expect(group?.contains(count)).toBe(true)
+
+    // 工具条不再套卡片，吸在顶栏下面；手机分两行：搜索行在上，筛选 / 分组 / 设置行在下。
     expect(document.querySelector('[data-slot="card-body"]')).toBeNull()
-    const toolbar = group?.closest('.shrink-0')
+    const toolbar = group?.closest('.sticky')
+    expect(toolbar?.className).toContain('top-12')
     expect(toolbar?.className).toContain('flex-col')
     expect(toolbar?.className).toContain('sm:flex-row')
-    const count = screen.getByText('3 个结果')
-    expect(count.className).not.toContain('ml-auto')
+
+    // 失焦且框里没内容：结果数让位给 `/` 快捷键提示。
+    fireEvent.blur(input)
+    expect(screen.getByTestId('search-shortcut').textContent).toBe('/')
+    expect(screen.queryByText('3 个结果')).toBeNull()
   })
 
   it('最近搜索只在点按钮时展开，回车收起', () => {
@@ -186,14 +208,15 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(screen.getByRole('button', { name: '全屏查看结果' }))
     expect(page.className).toContain('fixed')
     expect(page.className).toContain('inset-0')
-    expect(page.style.height).toBe('100dvh')
+    // 全屏时页面自己就是滚动区（不再借 `<main>`）。
+    expect(page.className).toContain('overflow-y-auto')
     expect(screen.queryByLabelText('物品 ID')).toBeNull()
     expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy()
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(page.dataset.fullscreen).toBeUndefined()
-    expect(page.style.height).not.toBe('100dvh')
+    expect(page.className).not.toContain('overflow-y-auto')
   })
 
   it('结果个数随筛选更新', () => {
@@ -215,8 +238,9 @@ describe('ItemsPage 图鉴', () => {
     expect(first.length).toBe(60)
     expect(first.length).toBeLessThan(1000)
 
-    Object.defineProperty(list, 'scrollTop', { value: 99999, writable: true, configurable: true })
-    fireEvent.scroll(list)
+    const host = pageHost()
+    Object.defineProperty(host, 'scrollTop', { value: 99999, writable: true, configurable: true })
+    fireEvent.scroll(host)
     // 滚动更新经 rAF 合并（同一帧只处理一次）
     await waitFor(() => expect(names().length).toBe(10))
     const last = names()
@@ -649,6 +673,98 @@ describe('ItemsPage 图鉴', () => {
     expect(names().sort()).toEqual(['物品1', '物品29', '物品4956', '物品75'])
   })
 
+  it('「收藏 → 常用」：把常用清单的合成记录平铺出来（不分物品分组）', async () => {
+    const recipe = (resultId: number, ingredientId: number) => ({
+      result: { id: resultId, stack: 1 },
+      ingredients: [{ id: ingredientId, stack: 1 }],
+      station: 114,
+      stationItems: [] as number[],
+      env: [] as string[],
+      flags: [] as string[],
+    })
+    const dataset = makeDataset({
+      items: [makeItem(395), makeItem(5000), makeItem(3096)],
+      recipes: {
+        meta: { gameVersion: '1.4.5.8', count: 4, groupCount: 0, source: 'test', generatedBy: 'test' },
+        // 395 有两条「怎么造它」→ 只留第一条；「用于合成」里 3123 属于下一层 → 剔掉。
+        groups: {},
+        recipes: [recipe(395, 5000), recipe(395, 3096), recipe(5000, 395), recipe(3123, 395)],
+        byResult: { '395': [0, 1], '5000': [2] },
+        byIngredient: { '5000': [0], '3096': [1], '395': [2, 3] },
+      },
+    })
+    renderPage(dataset)
+    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.click(screen.getByTestId('dex-favorites-kind-common'))
+
+    // 平铺：没有分组标题 / 小标题，只有合成记录行。
+    // 395：造 1（两条只留一条）+ 用 1（3123 那条被剔掉）；5000：造 1 + 用 1；3096：用 1。
+    expect(screen.queryByTestId('common-recipe-group')).toBeNull()
+    const rows = within(screen.getByTestId('common-recipes')).getAllByTestId('recipe-row')
+    expect(rows).toHaveLength(5)
+    expect(screen.queryByText('用于合成')).toBeNull()
+
+    // 搜索只按物品名过滤这份清单（搜索框有 180ms 防抖）。
+    fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: 'Item5000' } })
+    await waitFor(() =>
+      expect(within(screen.getByTestId('common-recipes')).getAllByTestId('recipe-row')).toHaveLength(2),
+    )
+  })
+
+  it('⭐ 收藏左上角可切「物品 / 合成表」：合成表里是收藏的合成记录', () => {
+    const recipe = {
+      result: { id: 22, stack: 1 },
+      ingredients: [{ id: 11, stack: 3 }],
+      station: 17,
+      stationItems: [] as number[],
+      env: [] as string[],
+      flags: [] as string[],
+    }
+    const dataset = makeDataset({
+      items: [makeItem(11), makeItem(22)],
+      recipes: {
+        meta: { gameVersion: '1.4.5.8', count: 1, groupCount: 0, source: 'test', generatedBy: 'test' },
+        groups: {},
+        recipes: [recipe],
+        byResult: { '22': [0] },
+        byIngredient: { '11': [0] },
+      },
+    })
+    localStorage.setItem(
+      'tswui:recipeFavorites',
+      JSON.stringify([{ key: recipeFavoriteKey(recipe), ts: 1 }]),
+    )
+    renderPage(dataset)
+    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+
+    // 默认看物品（这里没收藏物品 → 空态），切换按钮带数量。
+    expect(screen.getByTestId('dex-favorites-kind-items').textContent).toBe('物品（0）')
+    expect(screen.getByTestId('dex-favorites-kind-recipes').textContent).toBe('合成表（1）')
+    expect(screen.getByText('收藏夹是空的')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('dex-favorites-kind-recipes'))
+    const row = screen.getByTestId('recipe-row')
+    // 图鉴默认「显示物品名称」不勾 → 条目只有图标（名称在图标的提示里）。
+    const icons = within(row)
+      .getAllByRole('img')
+      .map((el) => el.getAttribute('aria-label'))
+    expect(icons).toContain('物品11')
+    expect(icons).toContain('物品22')
+    expect(row.textContent).toContain('图格 17')
+
+    // 退出收藏模式再回来：回到「物品」，不会停在合成表。
+    fireEvent.click(screen.getByTestId('dex-mode-all'))
+    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    expect(screen.getByTestId('dex-favorites-kind-items').getAttribute('data-state')).toBe('on')
+  })
+
+  it('收藏模式没有合成记录时，合成表里是空态提示', () => {
+    renderPage(makeItems(3))
+    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.click(screen.getByTestId('dex-favorites-kind-recipes'))
+    expect(screen.getByText('还没有收藏合成记录')).toBeTruthy()
+  })
+
   it('收藏夹为空时提示「收藏夹是空的」（不是「没有匹配的物品」）', () => {
     renderPage(makeItems(5))
     fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
@@ -679,18 +795,18 @@ describe('ItemsPage 图鉴', () => {
 
   it('搜索与切换筛选都会把网格滚动复位到顶部', () => {
     renderPage(makeItems(500))
-    const list = screen.getByTestId('dex-list')
-    Object.defineProperty(list, 'scrollTop', { value: 800, writable: true, configurable: true })
+    const host = pageHost()
+    Object.defineProperty(host, 'scrollTop', { value: 800, writable: true, configurable: true })
 
-    fireEvent.scroll(list)
-    expect(list.scrollTop).toBe(800)
+    fireEvent.scroll(host)
+    expect(host.scrollTop).toBe(800)
     fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: '物品1' } })
-    expect(list.scrollTop).toBe(0)
+    expect(host.scrollTop).toBe(0)
 
-    list.scrollTop = 800
-    fireEvent.scroll(list)
+    host.scrollTop = 800
+    fireEvent.scroll(host)
     chooseCollection(/^1~1000/, 'ID 范围')
-    expect(list.scrollTop).toBe(0)
+    expect(host.scrollTop).toBe(0)
   })
 
   it('词缀下拉按评分排序、展示并套用最佳词缀，选中后显示 [i/pXX:ID] 标签', () => {
@@ -715,7 +831,7 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.getByText(/最佳词缀：传奇/)).toBeTruthy()
   })
 
-  it('合成表「两列视图」：默认不勾选，勾选后固定两列', () => {
+  it('合成表「两列视图-详情页」：默认不勾选，勾选后固定两列', () => {
     renderPage(
       makeDataset({
         items: makeItems(3),
@@ -738,7 +854,7 @@ describe('ItemsPage 图鉴', () => {
       }),
     )
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
-    const cb = screen.getByLabelText('两列视图')
+    const cb = screen.getByLabelText('两列视图-详情页')
     expect(cb.getAttribute('data-state')).toBe('unchecked')
     fireEvent.click(cb)
     expect(cb.getAttribute('data-state')).toBe('checked')
@@ -754,7 +870,8 @@ describe('ItemsPage 图鉴', () => {
     expect(within(popover).getByLabelText('隐藏 ID 和名称').getAttribute('data-state')).toBe('unchecked')
     expect(within(popover).getByText('合成记录')).toBeTruthy()
     expect(within(popover).getByLabelText('显示物品名称')).toBeTruthy()
-    expect(within(popover).getByLabelText('两列视图')).toBeTruthy()
+    expect(within(popover).getByLabelText('两列视图-收藏页').getAttribute('data-state')).toBe('checked')
+    expect(within(popover).getByLabelText('两列视图-详情页')).toBeTruthy()
 
     fireEvent.focus(within(popover).getByRole('button', { name: /隐藏 ID 和名称：/ }))
     const info = await screen.findByRole('tooltip')
@@ -763,7 +880,8 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(cell('物品1'))
     const dialog = detail()
     expect(within(dialog).queryByLabelText('显示物品名称')).toBeNull()
-    expect(within(dialog).queryByLabelText('两列视图')).toBeNull()
+    expect(within(dialog).queryByLabelText('两列视图-详情页')).toBeNull()
+    expect(within(dialog).queryByLabelText('两列视图-收藏页')).toBeNull()
   })
 
   it('饰品不显示「最佳词缀」行（下拉里已带 ⭐ 与效果）', () => {

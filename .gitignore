@@ -7,9 +7,10 @@ build/
 # 开发用交叉编译产物（scripts/dev-container.sh）
 .dev/
 
-# 本机 Agent 技能（不入版本管理）
+# 本机 Agent 技能与产物（不入版本管理；机器可读设计令牌以 DESIGN.md 头部的 YAML 为准）
 .agents/
 .pi/
+.impeccable/
 
 # 单文件构建时前端产物被拷入此处（server/main.go 用 //go:embed 内嵌），不入库
 server/internal/webdist/*

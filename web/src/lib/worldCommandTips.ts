@@ -1,5 +1,5 @@
 /**
- * 「小抄」页用的指令清单（**手工维护**）。
+ * 「指令小抄」页用的指令清单（**手工维护**）。
  *
  * 全部按 TShock 6.2.1 源码核实（`TShockAPI/Commands.cs`），这些指令都是 `allowServer=true`，
  * 所以能经 `/api/command`（rawcmd）执行；权限仍由 TShock 判定。
@@ -13,9 +13,9 @@
  * | `/worldmode <mode>` | `tshock.world.toggleexpert` | `_worldModes`（normal / expert / master / journey，creative 同 journey） |
  * | `/hardmode` | `tshock.world.hardmode` | 无参数，切换（`DisableHardmode` 时无法打开） |
  * | `/evil` | `tshock.world.switchevil` | 无参数，腐化 ⇄ 猩红切换 |
+ * | `/worldinfo` | `tshock.world.info` | 无参数 |
  * | `/time <…>` | `tshock.world.time.set` | `day / night / noon / midnight / hh:mm` |
  * | `/wind <mph>` | `tshock.world.wind` | -40 ~ 40 mph |
- * | `/worldinfo` | `tshock.world.info` | 无参数 |
  * | `/maxspawns [n\|default]` | `tshock.npc.maxspawns` | 无参数 = 查询；`default` = 5 |
  * | `/spawnrate [n\|default]` | `tshock.npc.spawnrate` | 无参数 = 查询；`default` = 600（越小刷得越快） |
  * | `/godmode [玩家]` | `tshock.godmode`（别人另需 `godmodeother`） | 无参数 = 自己 |
@@ -25,6 +25,8 @@ export interface CommandTip {
   /** 点击后填进浮窗的**完整**指令（都是可执行的具体写法）。 */
   command: string
   label: { zh: string; en: string }
+  /** 备注列的一句话（可选；不给就不占位）。 */
+  note?: { zh: string; en: string }
 }
 
 /** `/worldevent` 的事件（不含入侵，入侵见下）。 */
@@ -57,7 +59,11 @@ export const HOLIDAY_COMMANDS: CommandTip[] = [
   { command: '/forcexmas', label: { zh: '圣诞节模式（再执行关闭）', en: 'Christmas mode (toggle)' } },
 ]
 
-/** 世界模式 / 困难模式 / 世界邪恶。 */
+/**
+ * 世界模式 / 困难模式 / 世界邪恶 / 世界信息。
+ *
+ * `/worldinfo` 只读、无参数，和世界属性关系最近，所以排在 `/evil` 之后（而不是时间 / 风里）。
+ */
 export const WORLD_MODE_COMMANDS: CommandTip[] = [
   { command: '/worldmode normal', label: { zh: '普通', en: 'Normal' } },
   { command: '/worldmode expert', label: { zh: '专家', en: 'Expert' } },
@@ -65,19 +71,23 @@ export const WORLD_MODE_COMMANDS: CommandTip[] = [
   { command: '/worldmode journey', label: { zh: '旅途（creative 同义）', en: 'Journey (creative alias)' } },
   { command: '/hardmode', label: { zh: '切换困难模式', en: 'Toggle hardmode' } },
   { command: '/evil', label: { zh: '切换腐化 / 猩红', en: 'Toggle corruption / crimson' } },
+  { command: '/worldinfo', label: { zh: '查看世界信息', en: 'World info' } },
 ]
 
-/** 时间 / 风 / 世界信息。 */
-export const TIME_WIND_COMMANDS: CommandTip[] = [
+/** 时间（`/time`）。 */
+export const TIME_COMMANDS: CommandTip[] = [
   { command: '/time day', label: { zh: '白天', en: 'Day' } },
   { command: '/time night', label: { zh: '夜晚', en: 'Night' } },
   { command: '/time noon', label: { zh: '正午', en: 'Noon' } },
   { command: '/time midnight', label: { zh: '午夜', en: 'Midnight' } },
   { command: '/time 12:00', label: { zh: '指定时间（hh:mm）', en: 'Exact time (hh:mm)' } },
+]
+
+/** 风（`/wind`）：-40 ~ 40 mph，负数是反向。 */
+export const WIND_COMMANDS: CommandTip[] = [
   { command: '/wind 20', label: { zh: '风 20 mph（范围 -40 ~ 40）', en: 'Wind 20 mph (range -40…40)' } },
   { command: '/wind 0', label: { zh: '无风', en: 'No wind' } },
   { command: '/wind -20', label: { zh: '反向风 20 mph', en: 'Reverse wind 20 mph' } },
-  { command: '/worldinfo', label: { zh: '查看世界信息', en: 'World info' } },
 ]
 
 /** 刷怪率（越大刷得越慢）。 */

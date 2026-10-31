@@ -162,7 +162,7 @@ export function CommandTerminal({
 
   // ---- 执行 ----
   // 前端执行策略 / 补全 / 参数提示：与指令页共用一份实现。
-  const { check, getCompletions, getParamHint } = useCommandEditing({
+  const { check, getCompletions, getHelp } = useCommandEditing({
     dataset,
     text,
     players,
@@ -337,6 +337,11 @@ export function CommandTerminal({
           atlas={dataset.atlas}
           onRemove={remove}
           onToggleCollapse={toggleCollapse}
+          onFillCommand={(cmd) => {
+            // 只填进终端输入框（不执行），并让输入框重新聚焦。
+            setText(cmd)
+            setFocusToken((n) => n + 1)
+          }}
         />
       </div>
       <Separator />
@@ -346,7 +351,7 @@ export function CommandTerminal({
             value={text}
             onChange={setText}
             computeCompletions={getCompletions}
-            getParamHint={getParamHint}
+            getHelp={getHelp}
             onExecute={submit}
             busy={running}
             atlas={dataset.atlas}
@@ -393,7 +398,7 @@ export function CommandTerminal({
       aria-modal="false"
       aria-label={t('terminal.title')}
       data-testid="terminal-window"
-      className="fixed z-40 flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card text-card-foreground shadow-2xl"
+      className="fixed z-40 flex flex-col overflow-hidden rounded-container border border-border/60 bg-card text-card-foreground shadow-2xl"
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
     >
       <div
@@ -417,7 +422,7 @@ export function CommandTerminal({
         onPointerUp={onResizeEnd}
         onPointerCancel={onResizeEnd}
       >
-        <span className="pointer-events-none absolute right-1 bottom-1 size-2 rounded-sm border-r-2 border-b-2 border-muted-foreground/40" />
+        <span className="pointer-events-none absolute right-1 bottom-1 size-2 rounded-chip border-r-2 border-b-2 border-muted-foreground/40" />
       </div>
     </div>
   )

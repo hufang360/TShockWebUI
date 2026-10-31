@@ -68,11 +68,11 @@ export function SidebarAccountMenu({
   const loggedIn = Boolean(username)
 
   const avatar = look ? (
-    <span className="grid h-10 w-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-sidebar-accent">
+    <span className="grid h-10 w-8 shrink-0 place-items-center overflow-hidden rounded-control bg-sidebar-accent">
       <PlayerAvatar look={look} scale={1} fill className="[image-rendering:pixelated]" />
     </span>
   ) : (
-    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/15 text-muted-foreground">
+    <span className="grid size-9 shrink-0 place-items-center rounded-control bg-primary/15 text-muted-foreground">
       <UserRound className="size-4" />
     </span>
   )
@@ -91,17 +91,17 @@ export function SidebarAccountMenu({
           <button
             type="button"
             aria-label={t('account.menu')}
-            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-2 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent"
           >
             {avatar}
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="flex min-w-0 items-center gap-1.5">
+              <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-xs text-foreground">
                   {username ?? t('account.notLoggedIn')}
                 </span>
                 {mock && <Badge tone="mock">Mock</Badge>}
               </span>
-              <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
+              <span className="mt-0.5 flex min-w-0 items-center gap-2 text-2xs text-muted-foreground">
                 <span
                   className={cn(
                     'size-1.5 shrink-0 rounded-full',

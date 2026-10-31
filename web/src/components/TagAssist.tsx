@@ -18,7 +18,7 @@ export function TagAssist({ dataset, text }: { dataset: Dataset; text: string })
   if (tags.length === 0) return null
 
   return (
-    <div className="rounded-xl bg-accent/50 p-3">
+    <div className="rounded-container bg-accent/50 p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-2xs tracking-wide text-muted-foreground uppercase">
           {t('tag.title')}
@@ -32,7 +32,7 @@ export function TagAssist({ dataset, text }: { dataset: Dataset; text: string })
           return (
             <li
               key={`${tag.start}-${tag.raw}`}
-              className="flex items-center gap-2 rounded-lg bg-card px-2 py-1.5"
+              className="flex items-center gap-2 rounded-control bg-card px-2 py-2"
             >
               <ItemIcon
                 item={item}

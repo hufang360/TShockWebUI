@@ -20,7 +20,7 @@ export function SheetOverlay({ className, ...props }: ComponentProps<typeof Shee
 }
 
 const sheetVariants = cva(
-  'fixed z-50 flex flex-col gap-4 bg-card p-5 text-card-foreground shadow-2xl transition ease-in-out',
+  'fixed z-50 flex flex-col gap-4 bg-card p-4 text-card-foreground shadow-2xl transition ease-in-out',
   {
     variants: {
       side: {
@@ -49,7 +49,7 @@ export function SheetContent({ side = 'right', className, children, ...props }: 
         {children}
         <SheetPrimitive.Close
           className={cn(
-            'absolute top-3 right-3 cursor-pointer rounded-md p-1 text-muted-foreground transition-colors',
+            'absolute top-3 right-3 cursor-pointer rounded-control p-1 text-muted-foreground transition-colors',
             'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
           )}
           aria-label="Close"

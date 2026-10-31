@@ -64,7 +64,7 @@ interface WorldPageProps {
 }
 
 /**
- * 「查看世界」：选择本地 `.wld`（`.wld.bak` / `.wld.bak2` 同格式），看世界缩略图与基本信息，
+ * 「世界存档」：选择本地 `.wld`（`.wld.bak` / `.wld.bak2` 同格式），看世界缩略图与基本信息，
  * 可导出原文件，也可把缩略图导出成图片。
  *
  * **全程在浏览器本地完成**：文件不上传服务器（解析见 `lib/save/worldFile.ts`，
@@ -173,7 +173,7 @@ export function WorldPage({ serverId }: WorldPageProps) {
         try {
           setLimits(await loadItemLimits())
         } catch {
-          // 拿不到物品规则时：箱子物品仍可改，但保存会由 limitsFailed 拦（与「查看存档」一致）
+          // 拿不到物品规则时：箱子物品仍可改，但保存会由 limitsFailed 拦（与「玩家存档」一致）
           setLimitsFailed(true)
         }
       }
@@ -303,7 +303,7 @@ export function WorldPage({ serverId }: WorldPageProps) {
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
-  /** 导出图片：把渲染好的缩略图编码成 PNG 下载（与「查看存档」的导出图片同款）。 */
+  /** 导出图片：把渲染好的缩略图编码成 PNG 下载（与「玩家存档」的导出图片同款）。 */
   const exportImage = useCallback(async () => {
     if (!view) return
     setShooting(true)
@@ -372,76 +372,76 @@ export function WorldPage({ serverId }: WorldPageProps) {
       )}
 
       <Card>
-        <CardBody className="flex flex-wrap items-center gap-3 pt-4">
-          {edit ? (
-            <>
-              <Button variant="primary" disabled={!canSave} onClick={() => void saveEdit()}>
-                <Download data-icon="inline-start" />
-                {t('wld.edit.save')}
-              </Button>
-              {dirty ? (
-                <ConfirmButton
-                  size="md"
-                  variant="outline"
-                  confirmLabel={t('wld.edit.discardConfirm')}
-                  confirmVariant="danger"
-                  onConfirm={() => {
-                    setEdit(null)
-                    setNotice(null)
-                  }}
-                >
-                  {t('wld.edit.discard')}
-                </ConfirmButton>
-              ) : (
-                <Button variant="outline" onClick={() => setEdit(null)}>
-                  {t('wld.edit.discard')}
-                </Button>
-              )}
-              <p
-                className="min-w-0 flex-1 text-2xs text-muted-foreground"
-                role="status"
-                aria-live="polite"
-              >
-                {issues.length > 0 ? t('wld.edit.err.fixIssues') : t('wld.edit.notice')}
-              </p>
-            </>
-          ) : (
-            <>
-              <Button variant="primary" disabled={importing} onClick={pickImport}>
-                {importing ? (
-                  <Spinner aria-hidden data-icon="inline-start" />
-                ) : (
-                  <Upload data-icon="inline-start" />
-                )}
-                {t('wld.import')}
-              </Button>
-              <Button variant="outline" disabled={importing} onClick={() => void runDemo()}>
-                <Sparkles data-icon="inline-start" />
-                {t('wld.demo')}
-              </Button>
-              {file && (
-                <Button variant="outline" disabled={importing} onClick={exportWorld}>
+        <CardBody className="flex flex-col gap-2 pt-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {edit ? (
+              <>
+                <Button size="sm" variant="primary" disabled={!canSave} onClick={() => void saveEdit()}>
                   <Download data-icon="inline-start" />
-                  {t('wld.export')}
+                  {t('wld.edit.save')}
                 </Button>
-              )}
-              {file && view && (
-                <Button variant="outline" disabled={importing} onClick={() => void startEdit()}>
-                  <Pencil data-icon="inline-start" />
-                  {t('wld.edit')}
+                {dirty ? (
+                  <ConfirmButton
+                    size="sm"
+                    variant="outline"
+                    confirmLabel={t('wld.edit.discardConfirm')}
+                    confirmVariant="danger"
+                    onConfirm={() => {
+                      setEdit(null)
+                      setNotice(null)
+                    }}
+                  >
+                    {t('wld.edit.discard')}
+                  </ConfirmButton>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setEdit(null)}>
+                    {t('wld.edit.discard')}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Button size="sm" variant="primary" disabled={importing} onClick={pickImport}>
+                  {importing ? (
+                    <Spinner aria-hidden data-icon="inline-start" />
+                  ) : (
+                    <Upload data-icon="inline-start" />
+                  )}
+                  {t('wld.import')}
                 </Button>
-              )}
-              <p
-                className="min-w-0 flex-1 text-2xs text-muted-foreground"
-                role="status"
-                aria-live="polite"
-              >
-                {importing && progress > 0
-                  ? t('wld.rendering', { percent: Math.round(progress * 100) })
-                  : t('wld.hint')}
-              </p>
-            </>
-          )}
+                <Button size="sm" variant="outline" disabled={importing} onClick={() => void runDemo()}>
+                  <Sparkles data-icon="inline-start" />
+                  {t('wld.demo')}
+                </Button>
+                {file && (
+                  <Button size="sm" variant="outline" disabled={importing} onClick={exportWorld}>
+                    <Download data-icon="inline-start" />
+                    {t('wld.export')}
+                  </Button>
+                )}
+                {file && view && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={importing}
+                    onClick={() => void startEdit()}
+                  >
+                    <Pencil data-icon="inline-start" />
+                    {t('wld.edit')}
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+          <p className="min-w-0 text-2xs text-muted-foreground" role="status" aria-live="polite">
+            {edit
+              ? issues.length > 0
+                ? t('wld.edit.err.fixIssues')
+                : t('wld.edit.notice')
+              : importing && progress > 0
+                ? t('wld.rendering', { percent: Math.round(progress * 100) })
+                : t('wld.hint')}
+          </p>
           <input
             ref={importRef}
             id="world-wld-input"

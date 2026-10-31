@@ -39,11 +39,24 @@ export interface BottomList<T extends HTMLElement = HTMLDivElement> {
  */
 export function useBottomList<T extends HTMLElement = HTMLDivElement>(
   total: number,
-  opts?: { initial?: number; step?: number },
+  opts?: {
+    initial?: number
+    step?: number
+    /**
+     * 自定滚动容器（不传则用 `ref` 那个元素）。
+     *
+     * 「聊天」页把滚动交给页面级滚动区（浏览器右侧那条滚动条），列表本身不溢出：
+     * 此时需要告诉这里「真正在滚的是 `<main>`」，否则贴底 / 回到底部 / 加载更早都会作用在错的元素上。
+     * 传 null / 不传时退回 `ref`。
+     */
+    scroller?: HTMLElement | null
+  },
 ): BottomList<T> {
   const initial = Math.max(1, opts?.initial ?? 10)
   const step = Math.max(1, opts?.step ?? initial)
   const ref = useRef<T>(null)
+  const scroller = opts?.scroller ?? null
+  const getScroller = useCallback(() => scroller ?? ref.current, [scroller])
   // 内容元素（用 state 存，元素换了 / 晚挂载时才能重新决定观察谁）。
   const [contentEl, setContentEl] = useState<HTMLElement | null>(null)
   const contentRef = useCallback((node: HTMLElement | null) => setContentEl(node), [])
@@ -56,31 +69,31 @@ export function useBottomList<T extends HTMLElement = HTMLDivElement>(
   const [atBottom, setAtBottom] = useState(true)
 
   const onScroll = useCallback(() => {
-    const el = ref.current
+    const el = getScroller()
     if (!el) return
     const near = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
     stickRef.current = near
     setAtBottom((prev) => (prev === near ? prev : near))
-  }, [])
+  }, [getScroller])
 
   const scrollToBottom = useCallback(() => {
-    const el = ref.current
+    const el = getScroller()
     if (el) el.scrollTop = el.scrollHeight
     stickRef.current = true
     setAtBottom(true)
-  }, [])
+  }, [getScroller])
 
   // 新内容到达：贴着底部才跟随（用户正在回看历史时不打扰）。
   useLayoutEffect(() => {
-    const el = ref.current
+    const el = getScroller()
     if (el && stickRef.current) el.scrollTop = el.scrollHeight
-  }, [total])
+  }, [total, getScroller])
 
   // 容器尺寸变化也要贴底：首次渲染时容器可能还没有可滚动高度（如页面量高前是自适应高度、
   // 或内容比容器矮），此时单靠 `[total]` 那次贴底会失效、停留在顶部；切到固定高度后需再贴一次。
   // 同时观察内层内容：富文本结果在服务器返回后才有内容、行高会变，容器本身尺寸不变。
   useLayoutEffect(() => {
-    const el = ref.current
+    const el = getScroller()
     if (!el) return
     const stick = () => {
       if (stickRef.current) el.scrollTop = el.scrollHeight
@@ -91,16 +104,16 @@ export function useBottomList<T extends HTMLElement = HTMLDivElement>(
     ro.observe(el)
     if (contentEl && contentEl !== el) ro.observe(contentEl)
     return () => ro.disconnect()
-  }, [contentEl])
+  }, [contentEl, getScroller])
 
   // 加载更早：补回新增内容的高度，视觉上停在原来那条记录。
   useLayoutEffect(() => {
-    const el = ref.current
+    const el = getScroller()
     if (el && keepDistanceRef.current != null) {
       el.scrollTop = el.scrollHeight - keepDistanceRef.current
       keepDistanceRef.current = null
     }
-  }, [visible])
+  }, [visible, getScroller])
 
   // 列表清空 / 切换数据源：重新贴底（窗口自然由 slice(start) 回落，不必重置 state）。
   useLayoutEffect(() => {
@@ -108,10 +121,10 @@ export function useBottomList<T extends HTMLElement = HTMLDivElement>(
   }, [total])
 
   const loadEarlier = useCallback(() => {
-    const el = ref.current
+    const el = getScroller()
     if (el) keepDistanceRef.current = el.scrollHeight - el.scrollTop
     setVisible((v) => v + step)
-  }, [step])
+  }, [step, getScroller])
 
   const start = Math.max(0, total - visible)
   return {

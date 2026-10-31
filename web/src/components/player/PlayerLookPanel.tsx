@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { PlayerAvatar } from '@/components/PlayerAvatar'
 import {
   BackpackCluster,
@@ -16,8 +15,8 @@ import type { PlayerLook } from '@/lib/tshock'
 /**
  * 一个角色存档的只读视图：**人物全身图 + 属性 + 背包 / 装备 / 银行 / 配装**。
  *
- * 「查看存档」（本地 .plr）与「玩家管理」（TShock `/pm/look`）共用同一套展示，
- * 只是数据来源不同；`actions` 用来在右上角放「导出图片」等按钮。
+ * 「玩家存档」（本地 .plr）与「玩家管理」（TShock `/pm/look`）共用同一套展示，
+ * 只是数据来源不同；页面级动作（导出图片 / 简约视图）放在顶栏，不放这里。
  */
 export function PlayerLookPanel({
   look,
@@ -25,7 +24,6 @@ export function PlayerLookPanel({
   compact,
   collapsed,
   onToggleCollapse,
-  actions,
 }: {
   look: PlayerLook
   /** 数据来自本地 .plr（不显示在线 / 离线徽章）。 */
@@ -34,7 +32,6 @@ export function PlayerLookPanel({
   compact: boolean
   collapsed: Record<string, boolean>
   onToggleCollapse: (key: string) => void
-  actions?: ReactNode
 }) {
   const { t } = useI18n()
   return (
@@ -52,7 +49,6 @@ export function PlayerLookPanel({
                 {look.online ? t('players.online') : t('players.offline')}
               </Badge>
             )}
-            {actions && <div className="ml-auto flex items-center gap-1.5">{actions}</div>}
           </div>
           <PlayerInfoPanel look={look} />
         </div>

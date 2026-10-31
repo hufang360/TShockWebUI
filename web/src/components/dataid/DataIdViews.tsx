@@ -25,12 +25,12 @@ const ICON_GRID =
  * hover 时**整格**（图标 + 文字）一起上浮，只有 72×72 的图标区在 hover 时才出现底色。
  */
 const CELL_CLASS =
-  'group/cell flex w-18 cursor-pointer flex-col items-center gap-1 rounded-xl text-center transition'
+  'group/cell flex w-18 cursor-pointer flex-col items-center gap-1 rounded-container text-center transition'
 const CELL_HOVER =
   'hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 /** 图标区：默认**无底色**、无描边，72×72；hover 时才铺 `bg-primary/10`。 */
 const ICON_CELL_BG =
-  'flex size-18 items-center justify-center rounded-lg transition-colors group-hover/cell:bg-primary/10'
+  'flex size-18 items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10'
 
 export function NpcCell({
   npc,
@@ -74,7 +74,7 @@ export function NpcCell({
 export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc: Npc) => void }) {
   const { t } = useI18n()
   return (
-    <div className="overflow-hidden rounded-lg border border-border/60">
+    <div className="overflow-hidden rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-14" />
@@ -83,7 +83,7 @@ export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc
           <col />
           <col className="w-9" />
         </colgroup>
-        <thead className="sticky top-0 z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
             <th className="px-3 py-2 text-right font-medium">NPCID</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
@@ -102,7 +102,7 @@ export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc
               tabIndex={0}
               className="group/row border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10"
             >
-              <td className="px-3 py-1.5 text-right font-mono text-xs text-muted-foreground">
+              <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                 {npc.id}
               </td>
               <td className="px-1 py-0.5">
@@ -110,11 +110,11 @@ export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc
                   <NpcSprite id={npc.id} size={24} name={npc.name} />
                 </span>
               </td>
-              <td className="truncate px-3 py-1.5 text-foreground" title={npc.name}>
+              <td className="truncate px-3 py-2 text-foreground" title={npc.name}>
                 {npc.name}
               </td>
               <td
-                className="truncate px-3 py-1.5 font-mono text-xs text-muted-foreground"
+                className="truncate px-3 py-2 font-mono text-xs text-muted-foreground"
                 title={npc.key}
               >
                 {npc.key}
@@ -259,7 +259,7 @@ export function BuffGrid({
 function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) => void }) {
   const { t } = useI18n()
   return (
-    <div className="overflow-hidden rounded-lg border border-border/60">
+    <div className="overflow-hidden rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-14" />
@@ -269,7 +269,7 @@ function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) =>
           <col className="w-9" />
         </colgroup>
         {/* 表头不铺白底：用页面背景色（半透明 + 模糊），吸顶时也不会看到下面的行糊在一起 */}
-        <thead className="sticky top-0 z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
             <th className="px-3 py-2 text-right font-medium">BuffID</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
@@ -285,7 +285,7 @@ function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) =>
               tabIndex={0}
               className="group/row border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10"
             >
-              <td className="px-3 py-1.5 text-right font-mono text-xs text-muted-foreground">
+              <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                 {buff.id}
               </td>
               <td className="px-1 py-0.5">
@@ -293,11 +293,11 @@ function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) =>
                   <BuffIcon id={buff.id} size={24} name={buff.name} />
                 </span>
               </td>
-              <td className="truncate px-3 py-1.5 text-foreground" title={buff.name}>
+              <td className="truncate px-3 py-2 text-foreground" title={buff.name}>
                 {buff.name}
               </td>
               <td
-                className="truncate px-3 py-1.5 font-mono text-xs text-muted-foreground"
+                className="truncate px-3 py-2 font-mono text-xs text-muted-foreground"
                 title={buff.key}
               >
                 {buff.key}
@@ -366,7 +366,7 @@ export function TileIconGrid({
                 </span>
                 <span className="w-full truncate text-xs leading-4 text-foreground">{name}</span>
                 {entry.subId == null && (entry.styles?.length ?? 0) > 0 && (
-                  <span className="max-w-full truncate rounded bg-accent/60 px-1.5 py-0.5 text-2xs text-muted-foreground">
+                  <span className="max-w-full truncate rounded bg-accent/60 px-2 py-0.5 text-2xs text-muted-foreground">
                     {t('dataId.styles.count', { n: entry.styles!.length })}
                   </span>
                 )}
@@ -398,7 +398,7 @@ function DataTable({
   const { t } = useI18n()
   const isTile = kind === 'tile'
   return (
-    <div className="overflow-hidden rounded-lg border border-border/60">
+    <div className="overflow-hidden rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-14" />
@@ -409,7 +409,7 @@ function DataTable({
           <col className="w-9" />
         </colgroup>
         {/* 表头不铺白底：用页面背景色（半透明 + 模糊），吸顶时也不会看到下面的行糊在一起 */}
-        <thead className="sticky top-0 z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
             <th className="px-3 py-2 text-right font-medium">{isTile ? 'TileID' : 'WallID'}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
@@ -434,7 +434,7 @@ function DataTable({
                 tabIndex={0}
                 className="group/row border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10"
               >
-                <td className="px-3 py-1.5 text-right font-mono text-xs text-muted-foreground">
+                <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                   {displayId}
                 </td>
                 <td className="px-1 py-0.5">
@@ -446,8 +446,8 @@ function DataTable({
                     )}
                   </span>
                 </td>
-                <td className="px-3 py-1.5">
-                  <span className="flex min-w-0 items-center gap-1.5">
+                <td className="px-3 py-2">
+                  <span className="flex min-w-0 items-center gap-2">
                     <span
                       className={cn(
                         'truncate',
@@ -458,23 +458,23 @@ function DataTable({
                       {name}
                     </span>
                     {isTile && entry.subId == null && (entry.styles?.length ?? 0) > 0 && (
-                      <span className="shrink-0 rounded bg-accent/60 px-1.5 py-0.5 text-2xs text-muted-foreground">
+                      <span className="shrink-0 rounded bg-accent/60 px-2 py-0.5 text-2xs text-muted-foreground">
                         {t('dataId.styles.count', { n: entry.styles!.length })}
                       </span>
                     )}
                   </span>
                 </td>
                 {isTile && (
-                  <td className="px-2 py-1.5 text-center font-mono text-xs text-muted-foreground">
+                  <td className="px-2 py-2 text-center font-mono text-xs text-muted-foreground">
                     {tileSizeLabel(entry) && (
-                      <span className="inline-block rounded bg-accent/60 px-1.5 py-0.5 text-2xs">
+                      <span className="inline-block rounded bg-accent/60 px-2 py-0.5 text-2xs">
                         {tileSizeLabel(entry)}
                       </span>
                     )}
                   </td>
                 )}
                 <td
-                  className="truncate px-3 py-1.5 font-mono text-xs text-muted-foreground"
+                  className="truncate px-3 py-2 font-mono text-xs text-muted-foreground"
                   title={entry.key}
                 >
                   {entry.key}
@@ -547,7 +547,7 @@ export function NpcDetail({ npc, large = false }: { npc: Npc; large?: boolean })
     : []
   return (
     <div className={cn('flex flex-col gap-2', large && 'gap-4')}>
-      <div className={cn(large ? 'flex flex-col items-center gap-3' : 'flex items-center gap-2.5')}>
+      <div className={cn(large ? 'flex flex-col items-center gap-3' : 'flex items-center gap-3')}>
         <NpcSprite
           id={npc.id}
           size={large ? 128 : 32}
@@ -601,7 +601,7 @@ export function DataDetail({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col items-center gap-3">
-        <div className="flex size-40 items-center justify-center rounded-xl bg-accent">
+        <div className="flex size-40 items-center justify-center rounded-container bg-accent">
           {item ? (
             <ItemIcon item={item} atlas={atlas} size={64} name={name} tooltip={false} />
           ) : (
@@ -621,7 +621,7 @@ export function DataDetail({
             {kind === 'wall' ? 'WallID' : 'TileID'} #{entry.id}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Badge tone="neutral">
             {kind === 'wall' ? t('dataId.tab.wall') : t('dataId.tab.tile')}
           </Badge>
@@ -637,7 +637,7 @@ export function DataDetail({
         <div className="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 text-xs">
           <span className="text-muted-foreground">{t('dataId.field.item')}</span>
           {item ? (
-            <span className="flex min-w-0 items-center justify-end gap-1.5">
+            <span className="flex min-w-0 items-center justify-end gap-2">
               {/* 带悬停提示（游戏同款物品提示） */}
               <ItemIcon item={item} atlas={atlas} size={20} name={item.name} />
               <span className="truncate text-foreground">
@@ -676,7 +676,7 @@ export function DataDetail({
               return (
                 <div
                   key={s.subId}
-                  className="flex min-w-0 items-center gap-1.5 rounded-md border border-border/60 px-1.5 py-1"
+                  className="flex min-w-0 items-center gap-2 rounded-control border border-border/60 px-2 py-1"
                 >
                   {styleItem ? (
                     <ItemIcon item={styleItem} atlas={atlas} size={20} tooltip={false} />
@@ -713,7 +713,7 @@ export function BuffDetail({
   const { t } = useI18n()
   return (
     <div className={cn('flex flex-col gap-2', large && 'gap-4')}>
-      <div className={cn(large ? 'flex flex-col items-center gap-3' : 'flex items-center gap-2.5')}>
+      <div className={cn(large ? 'flex flex-col items-center gap-3' : 'flex items-center gap-3')}>
         <BuffIcon id={buff.id} size={large ? 128 : 32} name={buff.name} />
         <div className={cn('min-w-0', large && 'text-center')}>
           <div className={cn('truncate font-semibold text-foreground', large ? 'text-base' : 'text-sm')}>

@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils'
 /**
  * shadcn/ui Select（Radix `@radix-ui/react-select`）。
  *
- * 与项目里的 `NativeSelect` 并存：`NativeSelect` 用于**表单 / 紧凑无 JS**场景；
- * `Select` 用于需要**分组、分隔线、选中对勾**等富交互的场景（如物品图鉴的筛选）。
+ * 项目里**只用这一个**下拉组件（原先那些原生 `<select>` 已全部换过来）：统一外观、键盘操作、
+ * 分组 / 分隔线 / 选中对勾都由它提供；表单字段同样用它（`SelectTrigger id=…` + `Label htmlFor=…` 照样能点标签）。
  */
 export const Select = SelectPrimitive.Root
 export const SelectGroup = SelectPrimitive.Group
@@ -28,7 +28,7 @@ export function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        'flex w-fit cursor-pointer items-center justify-between gap-1.5 rounded-lg bg-accent whitespace-nowrap text-foreground',
+        'flex w-fit cursor-pointer items-center justify-between gap-2 rounded-control bg-accent whitespace-nowrap text-foreground',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
         'data-[placeholder]:text-muted-foreground',
@@ -38,7 +38,7 @@ export function SelectTrigger({
       )}
       {...props}
     >
-      <span className="line-clamp-1 flex items-center gap-1.5">{children}</span>
+      <span className="line-clamp-1 flex items-center gap-2">{children}</span>
       <SelectPrimitive.Icon asChild>
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </SelectPrimitive.Icon>
@@ -61,7 +61,7 @@ export function SelectContent({
         sideOffset={sideOffset}
         className={cn(
           'relative z-50 max-h-[min(24rem,60vh)] min-w-[8rem] overflow-x-hidden overflow-y-auto',
-          'rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-lg',
+          'rounded-menu border border-border/60 bg-popover text-popover-foreground shadow-lg',
           className,
         )}
         {...props}
@@ -83,7 +83,7 @@ export function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        'relative flex w-full cursor-pointer items-center rounded-lg py-1.5 pr-7 pl-2 text-xs outline-none select-none',
+        'relative flex w-full cursor-pointer items-center rounded-control py-2 pr-7 pl-2 text-xs outline-none select-none',
         'focus:bg-accent focus:text-accent-foreground',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-3.5',

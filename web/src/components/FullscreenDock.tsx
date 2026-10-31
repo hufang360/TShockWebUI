@@ -50,7 +50,7 @@ export function FullscreenDock({ label, children }: FullscreenDockProps) {
       onBlur={() => setFocused(false)}
     >
       {expanded ? (
-        <div className="mr-2 flex flex-col items-center gap-1 rounded-xl border border-border/60 bg-card/95 p-1 shadow-sm backdrop-blur">
+        <div className="mr-2 flex flex-col items-center gap-1 rounded-container border border-border/60 bg-card/95 p-1 shadow-sm backdrop-blur">
           {children}
         </div>
       ) : (

@@ -13,18 +13,21 @@ import type { TabId } from '@/types'
 /** 内置 tab → hash 片段。 */
 const TAB_SEGMENT: Record<string, string> = {
   editor: 'cmd',
+  chat: 'chat',
   commands: 'commands',
   save: 'plr',
   worldview: 'wld',
   players: 'pm',
   world: 'wm',
   store: 'fish',
+  spritesheet: 'slice',
 }
 
 /** 短名 / 旧名 → tab。 */
 const SEGMENT_TAB: Record<string, TabId> = {
   cmd: 'editor',
   editor: 'editor',
+  chat: 'chat',
   plr: 'save',
   save: 'save',
   wld: 'worldview',
@@ -35,6 +38,7 @@ const SEGMENT_TAB: Record<string, TabId> = {
   world: 'world',
   fish: 'store',
   store: 'store',
+  slice: 'spritesheet',
   commands: 'commands',
   spawn: 'commands',
   history: 'editor',

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { RefreshCw, Settings2, Terminal } from 'lucide-react'
+import { PlayingCardsFan, RefreshCw, Terminal } from 'lucide-react'
 import { COMMAND_CARD_BY_ID, type CommandCardId } from '@/components/home/commandCards'
 import { IconAction } from '@/components/IconAction'
 import {
@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { requestEditorFocus } from '@/lib/editorFocus'
 import { useLocalState } from '@/hooks/useLocalState'
 import {
   DEFAULT_AUTO_EXEC,
@@ -52,14 +53,14 @@ import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
 
 /** 右栏「概览」卡片（固定放在右列，顺序：服务器状态 / 服务器动态 / 快捷入口 / 最近执行）。 */
 const RIGHT_COLUMN_IDS = new Set<string>(['server', 'events', 'quick', 'recent'])
-/** 「最近执行」固定一个合适的高度，内容超出时内部滚动。 */
+/** 「最近执行」最多展示几条（去重后）。 */
 const RECENT_LIMIT = 5
 
 /**
  * 首页左栏的展示顺序：世界信息 / 我的背包 一组，在线玩家 + 游戏时间、死亡次数 + Boss 战伤害各一组，
  * Boss 进度放最后；自定义卡片插在 Boss 进度之前。
  */
-const LEFT_ORDER = ['world', 'lookbag', 'online', 'time', 'alldeath'] as const
+const LEFT_ORDER = ['world', 'lookbag', 'online', 'time', 'alldeath', 'bossdamage'] as const
 /** 这些卡片占半栏；其余（Boss 进度 / 自定义）占整行。 */
 const HALF_WIDTH_IDS = new Set<string>(LEFT_ORDER)
 
@@ -459,6 +460,8 @@ export function HomePage({
     (cmd: string) => {
       // 写入草稿后跳到编辑器：CommandPage 挂载时会读取 tswui:draft。
       writeJson(StorageKeys.draft, cmd)
+      // 顺便把焦点交给输入框：点完就能直接改 / 直接回车。
+      requestEditorFocus()
       onNavigate('editor')
     },
     [onNavigate],
@@ -481,6 +484,8 @@ export function HomePage({
     unavailableText?: string
     emptyText?: string
     footerNote?: ReactNode
+    /** 卡片底部左下角常显「上次刷新 …」（只有「游戏时间」卡用）。 */
+    showLastRunAt?: boolean
     onRefresh?: () => void
   }) => (
     <CommandCard
@@ -496,6 +501,7 @@ export function HomePage({
       footerNote={opts.footerNote}
       action={isManual(autoExec, `home:${opts.id}`) ? 'run' : 'refresh'}
       collapseKey={`home:${opts.id}`}
+      showLastRunAt={opts.showLastRunAt}
       onRefresh={opts.onRefresh}
       className="max-h-[48rem]"
       itemsById={dataset.itemsById}
@@ -517,6 +523,9 @@ export function HomePage({
       loading: busy(`home:${id}`),
       unavailable: !authenticated || !cmd,
       onRefresh: cmd ? () => queueCommand(id, cmd) : undefined,
+      // 只有「游戏时间」卡左下角常显刷新时刻：游戏内时间一直在走，
+      // 要对着现实时间看才知道卡片里的「当前时间是…」新不新。
+      showLastRunAt: id === 'time',
       footerNote: def.noteKey ? (
         <span className="text-2xs text-muted-foreground">{t(def.noteKey)}</span>
       ) : undefined,
@@ -633,13 +642,15 @@ export function HomePage({
         />
         <IconAction
           label={t('home.manage')}
-          icon={Settings2}
+          icon={PlayingCardsFan}
           onClick={() => setManageOpen(true)}
         />
       </TopBarActions>
 
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_360px]">
-        {/* 左栏：指令卡片（单列，高度随内容并限 min/max） */}
+        {/* 左栏：指令卡片（两列；同一行的两张卡**等高**，视觉上成行成列）。
+            拉高后多出来的高度由卡片里的灰底正文区吸收（`CommandOutput fill`），
+            所以正文与卡片底部 / 页脚（备注、上次刷新）之间的间距仍然紧，不会出现一条裸空白。 */}
         <div data-testid="home-left" className="grid gap-2 sm:grid-cols-2">
           {leftCards.map((id) => (
             <div

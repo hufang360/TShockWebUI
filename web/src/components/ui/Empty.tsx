@@ -17,7 +17,7 @@ const emptyVariants = cva(
   {
     variants: {
       size: {
-        default: 'gap-4 rounded-xl',
+        default: 'gap-4 rounded-container',
         sm: 'gap-1 py-5',
       },
     },
@@ -29,7 +29,7 @@ export function EmptyHeader({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
       data-slot="empty-header"
-      className={cn('flex max-w-sm flex-col items-center gap-1.5', className)}
+      className={cn('flex max-w-sm flex-col items-center gap-2', className)}
       {...props}
     />
   )
@@ -41,7 +41,7 @@ const emptyMediaVariants = cva(
     variants: {
       variant: {
         default: 'bg-transparent',
-        icon: 'grid size-9 place-items-center rounded-lg bg-muted text-foreground [&_svg:not([class*="size-"])]:size-4',
+        icon: 'grid size-9 place-items-center rounded-control bg-muted text-foreground [&_svg:not([class*="size-"])]:size-4',
       },
     },
     defaultVariants: { variant: 'default' },

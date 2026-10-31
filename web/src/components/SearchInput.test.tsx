@@ -51,3 +51,57 @@ describe('SearchInput 最近搜索', () => {
     expect(group?.lastElementChild?.contains(screen.getByTestId('trailing-search'))).toBe(true)
   })
 })
+
+describe('SearchInput 快捷键与结果数', () => {
+  const renderOne = (props: Partial<Parameters<typeof SearchInput>[0]> = {}) =>
+    render(
+      <I18nProvider lang="zh">
+        <SearchInput
+          value=""
+          onValueChange={vi.fn()}
+          history={['木匣']}
+          resultLabel="12 个结果"
+          shortcut
+          placeholder="搜索"
+          {...props}
+        />
+      </I18nProvider>,
+    )
+
+  it('失焦且没内容：右侧只显示 `/`，结果数与最近搜索让位', () => {
+    renderOne()
+    expect(screen.getByTestId('search-shortcut').textContent).toBe('/')
+    expect(screen.queryByText('12 个结果')).toBeNull()
+    expect(screen.queryByRole('button', { name: '最近搜索' })).toBeNull()
+  })
+
+  it('按 `/` 聚焦搜索框（不是在输入框里打字时）', () => {
+    renderOne()
+    const input = screen.getByPlaceholderText('搜索')
+    fireEvent.keyDown(window, { key: '/' })
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('聚焦后隐藏 `/`，显示结果数与最近搜索', () => {
+    renderOne()
+    fireEvent.focus(screen.getByPlaceholderText('搜索'))
+    expect(screen.queryByTestId('search-shortcut')).toBeNull()
+    expect(screen.getByText('12 个结果')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '最近搜索' })).toBeTruthy()
+  })
+
+  it('有内容时即使失焦也隐藏 `/`（显示结果数与清空）', () => {
+    renderOne({ value: '铁镐' })
+    expect(screen.queryByTestId('search-shortcut')).toBeNull()
+    expect(screen.getByText('12 个结果')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '清空' })).toBeTruthy()
+  })
+
+  it('不开 shortcut 时不显示 `/`，也不抢 `/` 焦点', () => {
+    renderOne({ shortcut: false })
+    expect(screen.queryByTestId('search-shortcut')).toBeNull()
+    const input = screen.getByPlaceholderText('搜索')
+    fireEvent.keyDown(window, { key: '/' })
+    expect(document.activeElement).not.toBe(input)
+  })
+})

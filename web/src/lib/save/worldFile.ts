@@ -26,7 +26,7 @@ export interface WorldPoint {
   y: number
 }
 
-/** 世界基本信息（「查看世界」页面展示的全部字段）。 */
+/** 世界基本信息（「世界存档」页面展示的全部字段）。 */
 export interface WorldInfo {
   /** 文件版本（对应游戏 1.4.x 存档版本号）。 */
   release: number

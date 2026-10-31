@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { computeCompletions, paramHintFor } from './completion'
+import { commandHelpLine, commandSyntaxArgs, computeCompletions } from './completion'
 import { makeDataset } from '@/test/fixtures'
 import type { CommandDef, PermissionsData } from '@/types'
 
@@ -31,6 +31,39 @@ describe('真实命令数据（data/commands.json）', () => {
         }
       }
     }
+  })
+
+  it('/accountinfo：候选行带语法，参数区给出完整用法 + 说明', () => {
+    const cmd = commands.find((c) => c.name === 'accountinfo')
+    expect(cmd).toBeTruthy()
+    // 候选行：`<username>`（指令名已在行首，不重复）。
+    expect(commandSyntaxArgs(cmd!)).toBe('<username>')
+    const item = computeCompletions(at('/accountinfo')).find((c) => c.command?.name === 'accountinfo')
+    expect(item?.syntax).toBe('<username>')
+    // 参数区：完整用法 + 中文说明；没人时下拉框也能靠这一行说明怎么写。
+    expect(commandHelpLine(dataset, '/accountinfo ', 13)).toEqual({
+      syntax: '/accountinfo <username>',
+      note: '显示一个用户的信息。',
+      argName: 'username',
+      argRequired: true,
+    })
+    // 在线玩家为空时没有值候选（帮助行照样显示，见 CommandEditor）。
+    expect(computeCompletions({ ...at('/accountinfo '), players: [] })).toHaveLength(0)
+  })
+
+  it('/help：候选行只说「是什么」，语法留给帮助条（不重复）', () => {
+    const item = computeCompletions(at('/help')).find((c) => c.command?.name === 'help')
+    // 行内：只有说明（别名先拼，没别名就只剩说明）。
+    expect(item?.detail).toBe('列出指令或显示指令的帮助信息。')
+    expect(item?.detail).not.toContain('<command/page>')
+    // 帮助条：完整用法（带指令名）。
+    expect(item?.syntax).toBe('<command/page>')
+    // 参数区：同一条用法 + 当前参数名（供高亮）。
+    expect(commandHelpLine(dataset, '/help ', 6)).toMatchObject({
+      syntax: '/help <command/page>',
+      argName: 'command/page',
+      argRequired: true,
+    })
   })
 
   it('/give：物品 → 玩家 → 数量 → 词缀 逐位补全', () => {
@@ -139,14 +172,15 @@ describe('真实命令数据（data/commands.json）', () => {
       allowServer: true,
       doLog: true,
     }
+    // 下拉框「指令帮助」条：用法串 + 该形态的备注（按语言切换）。
     const fishDs = makeDataset({ commands: [fish] })
-    expect(paramHintFor(fishDs, '/fish jar ', 10, 'zh')).toContain('不加参数 = 查看鱼罐')
-    expect(paramHintFor(fishDs, '/fish jar ', 10, 'en')).toContain('no arg = view jar')
+    expect(commandHelpLine(fishDs, '/fish jar ', 10, 'zh')?.note).toContain('不加参数 = 查看鱼罐')
+    expect(commandHelpLine(fishDs, '/fish jar ', 10, 'en')?.note).toContain('no arg = view jar')
 
     const wmDs = makeDataset({ commands: [wm] })
-    expect(paramHintFor(wmDs, '/wm name ', 9, 'zh')).toContain('查看世界名')
-    expect(paramHintFor(wmDs, '/wm seed ', 9, 'zh')).toContain('查看种子')
-    expect(paramHintFor(wmDs, '/wm wind ', 9, 'zh')).toContain('查看风速')
+    expect(commandHelpLine(wmDs, '/wm name ', 9, 'zh')?.note).toContain('查看世界名')
+    expect(commandHelpLine(wmDs, '/wm seed ', 9, 'zh')?.note).toContain('查看种子')
+    expect(commandHelpLine(wmDs, '/wm wind ', 9, 'zh')?.note).toContain('查看风速')
   })
 
   it('/time 与 /clear：枚举取值不允许顺手弹玩家名', () => {

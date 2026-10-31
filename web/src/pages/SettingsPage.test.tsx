@@ -64,13 +64,12 @@ function openModuleTab(name: '内置模块' | '已适配' | '自定义') {
 }
 
 describe('SettingsPage 未登录', () => {
-  it('隐藏设置内容，显示登录提示与登录按钮', () => {
-    const onLogin = vi.fn()
+  const renderAnon = (onLogin = vi.fn(), onChange = vi.fn()) => {
     render(
       <I18nProvider lang="zh">
         <SettingsPage
           settings={settings}
-          onChange={vi.fn()}
+          onChange={onChange}
           serverId="default"
           transport={fakeTransport()}
           authenticated={false}
@@ -83,9 +82,24 @@ describe('SettingsPage 未登录', () => {
         />
       </I18nProvider>,
     )
+    return { onLogin, onChange }
+  }
 
+  it('界面偏好照常可用，登录提示放在下面', () => {
+    const { onLogin, onChange } = renderAnon()
+
+    // 界面偏好是纯本地设置：不登录也能改。
+    const prefCard = screen.getByText('界面偏好').closest('[data-slot="card"]')
+    expect(prefCard).toBeTruthy()
+    expect(within(prefCard as HTMLElement).getByText('字号')).toBeTruthy()
+    fireEvent.click(within(prefCard as HTMLElement).getByRole('switch', { name: '紧凑视图' }))
+    expect(onChange).toHaveBeenCalledWith({ compact: false })
+
+    // 要 token 的部分不渲染，登录提示 + 一行说明在下方。
+    expect(screen.queryByText('激活模块')).toBeNull()
+    expect(screen.queryByText('在线授权 / 账户')).toBeNull()
     expect(screen.getByText('请先登录！')).toBeTruthy()
-    expect(screen.queryByText('批量执行卡片')).toBeNull()
+    expect(screen.getByText(/激活模块、数据刷新与在线账户需要登录/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '登录' }))
     expect(onLogin).toHaveBeenCalledTimes(1)
   })
@@ -368,11 +382,13 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
-    const select = (await screen.findByLabelText('服务器动态刷新间隔')) as HTMLSelectElement
-    await waitFor(() => {
-      const opt = Array.from(select.options).find((o) => o.value === '60000')
-      expect(opt?.disabled).toBe(true)
-    })
+    // 权限探测完成（提示「1 分钟仅 GM / superadmin / vip 可选」）后再点开下拉。
+    await screen.findByText('1 分钟仅 GM / superadmin / vip 可选')
+    // Radix Select：点开触发器，1 分钟那项应当是禁用的（`data-disabled` / `aria-disabled`）。
+    fireEvent.click(screen.getByLabelText('服务器动态刷新间隔'))
+    const oneMinute = await screen.findByRole('option', { name: '1 分钟' })
+    expect(oneMinute.getAttribute('aria-disabled')).toBe('true')
+    expect(oneMinute.hasAttribute('data-disabled')).toBe(true)
   })
 
   it('服务器动态刷新间隔：vip 组可选 1 分钟', async () => {
@@ -401,11 +417,14 @@ describe('SettingsPage 激活模块', () => {
         />
       </I18nProvider>,
     )
-    const select = (await screen.findByLabelText('服务器动态刷新间隔')) as HTMLSelectElement
-    await waitFor(() => {
-      const opt = Array.from(select.options).find((o) => o.value === '60000')
-      expect(opt?.disabled).toBe(false)
-    })
+    // vip 组：提示行消失 = 权限探测完成且允许 1 分钟。
+    await waitFor(() =>
+      expect(screen.queryByText('1 分钟仅 GM / superadmin / vip 可选')).toBeNull(),
+    )
+    fireEvent.click(screen.getByLabelText('服务器动态刷新间隔'))
+    const oneMinute = await screen.findByRole('option', { name: '1 分钟' })
+    expect(oneMinute.getAttribute('aria-disabled')).not.toBe('true')
+    expect(oneMinute.hasAttribute('data-disabled')).toBe(false)
   })
 
   it('创建自定义模块：写入定义、把指令当成首张卡片并自动激活', async () => {

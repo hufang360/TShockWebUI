@@ -12,8 +12,11 @@ import {
   DialogTitle,
   Input,
   Label,
-  NativeSelect,
-  NativeSelectOption,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 import type { ItemLimits } from '@/lib/itemLimits'
@@ -113,7 +116,7 @@ export function PlrItemEditor({
                 key={it.id}
                 type="button"
                 onClick={() => pick(it.id)}
-                className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-accent"
+                className="flex min-w-0 items-center gap-2 rounded-control px-2 py-2 text-left hover:bg-accent"
               >
                 <ItemIcon item={it} atlas={dataset.atlas} size={24} />
                 <span className="truncate text-sm">{it.name}</span>
@@ -129,7 +132,7 @@ export function PlrItemEditor({
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-lg border border-dashed p-3">
+          <div className="flex items-center gap-3 rounded-control border border-dashed p-3">
             {item_ ? (
               <>
                 <ItemIcon item={item_} atlas={dataset.atlas} size={36} />
@@ -148,7 +151,7 @@ export function PlrItemEditor({
         )}
 
         <div className="grid gap-3 @[420px]:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="plr-edit-stack">{t('save.edit.item.stack')}</Label>
             <Input
               id="plr-edit-stack"
@@ -163,21 +166,32 @@ export function PlrItemEditor({
               {equipment ? t('save.edit.item.stackNA') : t('save.edit.item.stackMax', { max: maxStack })}
             </p>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="plr-edit-prefix">{t('save.edit.item.prefix')}</Label>
-            <NativeSelect
-              id="plr-edit-prefix"
+            <Select
               value={String(prefix)}
               disabled={picked === 0 || allowedPrefixes.length === 0}
-              onChange={(e) => setPrefix(Number(e.target.value))}
+              onValueChange={(next) => setPrefix(Number(next))}
             >
-              <NativeSelectOption value="0">{t('save.edit.item.prefixNone')}</NativeSelectOption>
-              {allowedPrefixes.map((id) => (
-                <NativeSelectOption key={id} value={String(id)}>
-                  {dataset.prefixesById.get(id)?.name ?? `#${id}`}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+              <SelectTrigger id="plr-edit-prefix" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">{t('save.edit.item.prefixNone')}</SelectItem>
+                {allowedPrefixes.map((id) => (
+                  <SelectItem key={id} value={String(id)}>
+                    {dataset.prefixesById.get(id)?.name ?? `#${id}`}
+                  </SelectItem>
+                ))}
+                {/* 已选词缀不在这件物品的可选列表里（换过物品 / 旧存档）：仍然显示出来，
+                    否则 Radix 找不到对应 item 会把触发器显示成空的。 */}
+                {prefix !== 0 && !allowedPrefixes.includes(prefix) && (
+                  <SelectItem value={String(prefix)}>
+                    {dataset.prefixesById.get(prefix)?.name ?? `#${prefix}`}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
             <p className="text-2xs text-muted-foreground">
               {picked > 0 && allowedPrefixes.length === 0
                 ? t('save.edit.item.prefixNA')

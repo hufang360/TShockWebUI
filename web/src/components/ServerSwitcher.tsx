@@ -146,7 +146,7 @@ export function ServerSwitcherDialog({
   // 整行（地址 + 操作按钮）共用背景/hover，视觉上是一块整体。
   const rowClass = (selected: boolean) =>
     cn(
-      'flex items-center rounded-lg transition-colors',
+      'flex items-center rounded-control transition-colors',
       selected ? 'bg-primary/15' : 'hover:bg-accent',
     )
 

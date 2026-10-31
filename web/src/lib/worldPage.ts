@@ -4,7 +4,7 @@ import { parseWorldSections, type WorldSections } from '@/lib/save/worldStats'
 import { renderWorldThumbnail, type WorldThumb } from '@/lib/save/worldThumb'
 
 /**
- * 「查看世界」页的小工具：本地解析、按上游缓存上次结果、字段展示映射。
+ * 「世界存档」页的小工具：本地解析、按上游缓存上次结果、字段展示映射。
  *
  * **全程在浏览器里完成**：`.wld` 不上传服务器（`lib/save/worldFile.ts` 解析，
  * `lib/save/worldThumb.ts` 渲染缩略图），因此没有登录、权限、限流这些服务端约束。

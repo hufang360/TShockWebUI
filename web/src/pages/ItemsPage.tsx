@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ChevronDown, Download, Info, ListFilter, Maximize2, Minimize2, Search, Settings2, Star, X } from 'lucide-react'
+import { FavoriteRecipesPanel } from '@/components/FavoriteRecipesPanel'
+import { CommonRecipes, type CommonRecipeEntry } from '@/components/items/CommonRecipes'
 import { DexCell } from '@/components/items/DexCell'
 import { DexGroupDrawer } from '@/components/items/DexGroupDrawer'
 import { ItemDetailDrawer, type ItemDetailRecipeOptions } from '@/components/items/ItemDetailDrawer'
@@ -29,9 +31,11 @@ import {
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { FullscreenDock } from '@/components/FullscreenDock'
 import { TopBarActions } from '@/components/TopBar'
+import { useItemFavoritesState } from '@/hooks/useItemFavoritesState'
+import { useRecipeFavoritesState } from '@/hooks/useRecipeFavoritesState'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { usePageHeight } from '@/hooks/usePageHeight'
+import { useStickyHeaderOffset, usePageScroller } from '@/hooks/usePageScroll'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
 import {
@@ -42,19 +46,18 @@ import {
   type ItemCollection,
 } from '@/lib/collections'
 import { useI18n } from '@/lib/i18n'
-import {
-  addItemFavorite,
-  isItemFavorited,
-  removeItemFavorite,
-  sanitizeItemFavorites,
-} from '@/lib/itemFavorites'
 import { readDexState, rememberDexState, DEFAULT_GAME_TAB, type DexMode, type DexState } from '@/lib/dexState'
-import { ItemFavoritesProvider, type ItemFavoritesApi } from '@/lib/itemFavoritesContext'
+import { ItemFavoritesProvider } from '@/lib/itemFavoritesContext'
 import { ItemDetailProvider, type ItemDetailApi } from '@/lib/itemDetailContext'
 import { searchItems } from '@/lib/items'
+import {
+  COMMON_RECIPE_EXCLUDED_RESULT_IDS,
+  COMMON_RECIPE_ITEM_IDS,
+  COMMON_RECIPE_MAKE_LIMIT,
+} from '@/lib/commonRecipes'
 import { StorageKeys } from '@/lib/storage'
 import { computeVirtualGrid } from '@/lib/virtualGrid'
-import type { Dataset, Item, ItemFavorite } from '@/types'
+import type { Dataset, Item } from '@/types'
 
 /** 尺寸与「数据 ID → NPC」一致：格宽 72、图标 64；列间距手机 8px / 桌面 16px，行距 16px。 */
 const CELL_WIDTH = 72
@@ -80,7 +83,7 @@ function DexSettingField({
   onCheckedChange,
 }: DexSettingFieldProps) {
   return (
-    <Field orientation="horizontal" className="items-start rounded-lg px-2 py-2 hover:bg-accent/50">
+    <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
       <Checkbox
         id={id}
         checked={checked}
@@ -97,7 +100,7 @@ function DexSettingField({
               <button
                 type="button"
                 aria-label={`${label}：${hint}`}
-                className="grid size-5 shrink-0 cursor-help place-items-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="grid size-5 shrink-0 cursor-help place-items-center rounded-chip text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <Info className="size-3.5" />
               </button>
@@ -117,6 +120,9 @@ function DexSettingField({
  *
  * 页面填满可用高度、自身不滚动（顶部工具条与底部翻页器固定）：只有网格区与详情内部滚动。
  */
+/** ⭐ 收藏模式里的三份内容：物品（格子）/ 合成表（收藏的合成记录）/ 常用（常用合成表）。 */
+type FavoriteKind = 'items' | 'recipes' | 'common'
+
 export function ItemsPage({
   dataset,
   focusItemId,
@@ -162,7 +168,6 @@ export function ItemsPage({
     // 正在收起的那一层（>= 它的层一起关）：等收起动画结束才出栈，避免抽屉瞬间消失。
     closingFrom: null,
   }))
-  const [viewport, setViewport] = useState({ w: 0, h: 0 })
   const debounced = useDebouncedValue(state.query, 180)
   const compactCells = useMediaQuery('(max-width: 639px)')
   const mobileGrid = useMediaQuery('(max-width: 767px)')
@@ -172,36 +177,36 @@ export function ItemsPage({
 
   const rootRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // 工具条吸在顶栏下面，表头再吸在工具条下面。
+  const toolbarRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const pageHeight = usePageHeight(rootRef)
+  const stickyTop = useStickyHeaderOffset(toolbarRef)
   /**
-   * 滚动位置：**渲染**用 `scrollTop` state（虚拟化窗口），**持久化**用 `scrollTopRef`。
-   *
-   * 不能直接用 `state.scrollTop` 渲染：挂载那一刻滚动容器还没有固定高度（`pageHeight` 未生效），
-   * 浏览器会把 `scrollTop = 上次位置` 夹回 0，而虚拟窗口仍停在旧位置 → 可视区一片空白。
-   * 现在先渲染顶部，等容器高度就绪后再还原，并以浏览器夹取后的真实值为准。
+   * 滚动交给**页面**：网格自己不再溢出滚动，所以 `scrollTop` / 可视高度都要从宿主上取。
+   * **持久化**仍用 `scrollTopRef`（存的是相对网格顶部的位置，不参与渲染）。
    */
-  const [scrollTop, setScrollTop] = useState(0)
-  /**
-   * 首次布局完成前不挂格子。否则 `viewport` 还是 0×0 时会用兜底 10 列 × 560px
-   * 先挂几十个 canvas，紧接着真实列数生效又整体替换，形成数百毫秒首帧长任务。
-   */
-  const [scrollReady, setScrollReady] = useState(false)
   const scrollTopRef = useRef(state.scrollTop)
-  const scrollRafRef = useRef<number | null>(null)
-  const layoutRef = useRef<ReturnType<typeof computeVirtualGrid> | null>(null)
+  const page = usePageScroller(scrollRef, {
+    // 全屏时页面自己就是滚动区；不全屏时是 AppShell 的 `<main>`。
+    host: resultsFullscreen ? rootRef.current : null,
+    revision: resultsFullscreen,
+    onScroll: (top) => {
+      scrollTopRef.current = top
+    },
+  })
+  const { scrollToTop } = page
+  /** 网格可视宽度（决定列数）；高度用宿主的可视高度。 */
+  const [viewportWidth, setViewportWidth] = useState(0)
+  /** 宿主挂上了（`<main>` / 全屏容器）才挂格子，避免先在兜底列数下挂一批又整体替换。 */
+  const scrollReady = page.host != null
   const pendingFocusIndexRef = useRef<number | null>(null)
 
   /** 滚回顶部（换筛选 / 搜索 / 跳转时），并同步持久化值。 */
   const resetScroll = useCallback(() => {
     scrollTopRef.current = 0
-    setScrollTop(0)
-    if (scrollRafRef.current != null) {
-      cancelAnimationFrame(scrollRafRef.current)
-      scrollRafRef.current = null
-    }
-    if (scrollRef.current) scrollRef.current.scrollTop = 0
-  }, [])
+    // 网格的滚动位置就是页面（`<main>`）的滚动位置：回到页面顶部，工具条与第一行都在眼前。
+    scrollToTop()
+  }, [scrollToTop])
 
   // 全屏查看结果时，Esc 退出，并避免背景页面继续滚动。
   useEffect(() => {
@@ -223,12 +228,18 @@ export function ItemsPage({
     if (focusItemId == null && !compactCells) searchRef.current?.focus()
   }, [compactCells, focusItemId])
 
-  // 物品收藏（tswui:itemFavorites）：图鉴里收藏后，会出现在「指令」模块的收藏 tab。
-  const [rawItemFavs, setRawItemFavs] = useLocalState<ItemFavorite[]>(
-    StorageKeys.itemFavorites,
-    [],
-  )
-  const itemFavs = useMemo(() => sanitizeItemFavorites(rawItemFavs), [rawItemFavs])
+  // 物品收藏（`tswui:itemFavorites`）：与提示里的 ⭐ 、指令页的收藏 tab 共用同一份状态。
+  const { list: itemFavs, api: favoritesApi } = useItemFavoritesState()
+  // 合成记录收藏（`tswui:recipeFavorites`）：合成表条目的 ⭐ 写的就是这一份。
+  const { list: recipeFavs } = useRecipeFavoritesState()
+  /**
+   * ⭐ 收藏模式下看哪一份：物品（默认）/ 合成表 / 常用（常用合成表）。
+   * 只是这一屏的视图状态，不写 `DexState`：退出收藏模式就回到「物品」。
+   */
+  const [favoritesKind, setFavoritesKind] = useState<FavoriteKind>('items')
+  useEffect(() => {
+    if (!state.favoritesOnly) setFavoritesKind('items')
+  }, [state.favoritesOnly])
   // 默认显示格子文字与 ID；用户可在页面设置里切换为仅图标。
   const [hideItemMeta, setHideItemMeta] = useLocalState<boolean>(
     StorageKeys.dexHideItemMeta,
@@ -239,10 +250,15 @@ export function ItemsPage({
     StorageKeys.dexRecipeShowNames,
     false,
   )
-  // 合成表「两列视图」开关（默认不勾选 = 单列；勾选后固定两列）。
+  // 合成表「两列视图-详情页」开关（默认不勾选；勾选后详情里的合成表固定两列）。
   const [recipeTwoColumn, setRecipeTwoColumn] = useLocalState<boolean>(
     StorageKeys.dexRecipeTwoColumn,
     false,
+  )
+  // 合成表「两列视图-收藏页」开关（默认勾选：收藏 → 合成表 / 常用 两列）。
+  const [recipeTwoColumnFavorites, setRecipeTwoColumnFavorites] = useLocalState<boolean>(
+    StorageKeys.dexRecipeTwoColumnFavorites,
+    true,
   )
   // 「最近搜索」（统一规则：最多 10 条、窄区域显示 5 条；见 lib/searchHistory.ts）。
   const {
@@ -250,15 +266,6 @@ export function ItemsPage({
     remember: rememberSearch,
     remove: removeSearchHistory,
   } = useSearchHistory(StorageKeys.dexSearchHistory)
-  const toggleItemFavorite = useCallback(
-    (id: number) => {
-      setRawItemFavs((prev) => {
-        const clean = sanitizeItemFavorites(prev)
-        return isItemFavorited(clean, id) ? removeItemFavorite(clean, id) : addItemFavorite(clean, id)
-      })
-    },
-    [setRawItemFavs],
-  )
 
   /**
    * 打开物品详情：没开抽屉时开根抽屉；已经开着时**叠一层**（可堆叠 drawer）。
@@ -438,15 +445,6 @@ export function ItemsPage({
     [selectMode, resetScroll],
   )
 
-  /** 工具提示右上角 ⭐ 用的收藏读写。 */
-  const favoritesApi = useMemo<ItemFavoritesApi>(
-    () => ({
-      isFavorited: (id) => isItemFavorited(itemFavs, id),
-      toggle: toggleItemFavorite,
-    }),
-    [itemFavs, toggleItemFavorite],
-  )
-
   /** 选择「制作界面」的页签：再次点选中的页签 = 取消，回到全部物品。 */
   const selectGameTab = useCallback(
     (tabId: string) => {
@@ -525,16 +523,41 @@ export function ItemsPage({
 
   /** 收藏模式下但收藏夹为空：区别于「有记录但没匹配到」。 */
   const favoritesEmpty = state.favoritesOnly && favoriteItems.length === 0
+  /** 「收藏 → 常用」：清单里每件物品 + 它的合成记录；搜索词只按物品名 / 内部名过滤。 */
+  const commonEntries = useMemo<CommonRecipeEntry[]>(() => {
+    const kw = keyword.toLowerCase()
+    const out: CommonRecipeEntry[] = []
+    for (const id of COMMON_RECIPE_ITEM_IDS) {
+      const item = dataset.itemsById.get(id)
+      if (!item) continue
+      if (kw && !item.name.toLowerCase().includes(kw) && !item.key.toLowerCase().includes(kw)) {
+        continue
+      }
+      const make = (dataset.recipes.byResult[String(id)] ?? [])
+        .map((i) => dataset.recipes.recipes[i])
+        .slice(0, COMMON_RECIPE_MAKE_LIMIT)
+      // 「用于合成」剔掉合成链下一层的冗余结果（清单见 `lib/commonRecipes.ts`）。
+      const use = (dataset.recipes.byIngredient[String(id)] ?? [])
+        .map((i) => dataset.recipes.recipes[i])
+        .filter((r) => !COMMON_RECIPE_EXCLUDED_RESULT_IDS.includes(r.result.id))
+      out.push({ id, item, make, use })
+    }
+    return out
+  }, [dataset.itemsById, dataset.recipes, keyword])
 
-  // 页面高度 = 容器可用高度（详见 docs/页面-物品图鉴.md：不能用「视口 − rect.top」，要减掉容器滚动偏移）
-  // 测量逻辑统一在 usePageHeight：不要用 MutationObserver 监听子节点（滚动时每挂/卸一行都会触发，
-  // 每次都要读一次布局 → 掉帧）。
+  /** ⭐ 收藏模式 + 左上角选了「合成表」：结果区换成收藏的合成记录（网格 / 表格都不渲染）。 */
+  const showFavoriteRecipes = state.favoritesOnly && favoritesKind === 'recipes'
+  /** ⭐ 收藏模式 + 左上角选了「常用」：结果区换成常用合成表。 */
+  const showCommonRecipes = state.favoritesOnly && favoritesKind === 'common'
 
-  // 容器尺寸（决定列数、可视行数）；尺寸变化时重测
+  // 页面是整页滚动（见 docs/页面-物品图鉴.md）：高度用宿主的可视高度，这里只量宽度（决定列数）。
+  // 不要用 MutationObserver 监听子节点（滚动时每挂/卸一行都会触发，每次都要读一次布局 → 掉帧）。
+
+  // 网格可视宽度（决定列数）；尺寸变化时重测
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const measure = () => setViewport({ w: el.clientWidth, h: el.clientHeight })
+    const measure = () => setViewportWidth(el.clientWidth)
     measure()
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined
     ro?.observe(el)
@@ -546,26 +569,20 @@ export function ItemsPage({
   }, [])
 
   /**
-   * 等 `pageHeight` 生效（容器真正有高度、可滚动）后再：量尺寸 → 还原上次滚动位置。
+   * 挂载时还原上次记住的网格位置（相对网格顶部，不是页面顶部）。
    *
-   * 这三件事在同一个 layout effect 里完成，React 会在**绘制前**一次性提交，
-   * 于是第一屏格子直接在正确的位置 / 列数上挂载：
-   * - 不会先渲染顶部再跳到上次位置（少了整整一轮格子挂载）；
-   * - 也不会出现「scrollTop 被浏览器夹回 0，虚拟窗口却停在旧位置」的空白。
+   * 整页滚动后，网格的滚动位置就是宿主（`<main>` / 全屏容器）的滚动位置；
+   * 切页回来时宿主还停在上一页的位置，所以没记忆时也要先滚回顶部。
    */
   useLayoutEffect(() => {
-    if (pageHeight == null) return
     const el = scrollRef.current
-    if (!el) return
-    setViewport({ w: el.clientWidth, h: el.clientHeight })
-    const target = scrollTopRef.current
-    if (target > 0 && el.scrollTop !== target) el.scrollTop = target
-    // 浏览器可能把目标位置夹取到最大可滚动范围，以真实值为准
-    const actual = el.scrollTop
-    scrollTopRef.current = actual
-    setScrollTop((prev) => (prev === actual ? prev : actual))
-    setScrollReady(true)
-  }, [pageHeight])
+    const host = (resultsFullscreen ? rootRef.current : el?.closest('main')) as HTMLElement | null
+    if (!host) return
+    if (scrollTopRef.current > 0) page.scrollTo(scrollTopRef.current)
+    else host.scrollTop = 0
+    // 仅挂载时一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 与 NPC 格子同尺寸：宽度固定 72；带文字时高 106，只显示图标时高 72。
   const cellWidth = CELL_WIDTH
@@ -576,16 +593,12 @@ export function ItemsPage({
     cell: cellWidth,
     cellHeight,
     gap: gridGap,
-    viewportWidth: viewport.w,
-    viewportHeight: viewport.h,
-    scrollTop,
+    viewportWidth,
+    viewportHeight: page.viewportHeight,
+    scrollTop: page.scrollTop,
     overscanRows: 1,
   })
   const visible = ordered.slice(layout.startIndex, layout.endIndex)
-
-  useLayoutEffect(() => {
-    layoutRef.current = layout
-  })
 
   useLayoutEffect(() => {
     const target = pendingFocusIndexRef.current
@@ -627,38 +640,8 @@ export function ItemsPage({
     }
     pendingFocusIndexRef.current = target
     const targetTop = Math.floor(target / layout.cols) * layout.rowHeight
-    if (scrollRef.current) scrollRef.current.scrollTop = targetTop
-    setScrollTop(targetTop)
+    page.scrollTo(targetTop)
   }
-
-  /**
-   * 滚动：用 rAF 合并同一帧内的多次 scroll 事件，并且**只有可视行窗口变化时才 setState**
-   * （同一行内的小幅滚动不需要重新渲染）。
-   */
-  const handleScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      scrollTopRef.current = e.currentTarget.scrollTop
-      if (scrollRafRef.current != null) return
-      scrollRafRef.current = requestAnimationFrame(() => {
-        scrollRafRef.current = null
-        const top = scrollTopRef.current
-        const next = computeVirtualGrid({
-          count: ordered.length,
-          cell: cellWidth,
-          cellHeight,
-          gap: gridGap,
-          viewportWidth: viewport.w,
-          viewportHeight: viewport.h,
-          scrollTop: top,
-          overscanRows: 1,
-        })
-        const cur = layoutRef.current
-        if (cur && cur.startRow === next.startRow && cur.endRow === next.endRow) return
-        setScrollTop(top)
-      })
-    },
-    [ordered.length, cellWidth, cellHeight, gridGap, viewport.w, viewport.h],
-  )
 
   const groupSearch = groupQuery.trim().toLowerCase()
   const groupSearchResults = useMemo(() => {
@@ -729,14 +712,6 @@ export function ItemsPage({
     [selectGameTab, selectCollectionItem],
   )
 
-  // 卸载时取消未执行的 rAF
-  useEffect(
-    () => () => {
-      if (scrollRafRef.current != null) cancelAnimationFrame(scrollRafRef.current)
-    },
-    [],
-  )
-
   /** 详情抽屉里合成表的三个勾选项（页面级状态，各层抽屉共享）。 */
   const detailRecipe: ItemDetailRecipeOptions = {
     showItemNames: recipeShowNames,
@@ -770,8 +745,8 @@ export function ItemsPage({
                         aria-label={t('dex.settings')}
                         title={t('dex.settings')}
                         className={cn(
-                          'text-muted-foreground hover:bg-card hover:text-foreground',
-                          settingsPopoverOpen && 'bg-card text-foreground',
+                          'text-muted-foreground hover:bg-accent hover:text-foreground',
+                          settingsPopoverOpen && 'bg-accent text-foreground',
                         )}
                       >
                         <Settings2 />
@@ -788,7 +763,7 @@ export function ItemsPage({
                       <div className="border-b px-4 py-3 text-sm font-semibold text-foreground">
                         {t('dex.settings')}
                       </div>
-                      <FieldGroup className="gap-0.5 p-1.5">
+                      <FieldGroup className="gap-0.5 p-2">
                         <div className="px-2 py-1 text-2xs font-medium text-muted-foreground">
                           {t('dex.viewSection')}
                         </div>
@@ -843,6 +818,13 @@ export function ItemsPage({
                           onCheckedChange={setRecipeShowNames}
                         />
                         <DexSettingField
+                          id="dex-two-column-favorites"
+                          label={t('dex.recipeTwoColumnFavorites')}
+                          hint={t('dex.recipeTwoColumnFavoritesHint')}
+                          checked={recipeTwoColumnFavorites}
+                          onCheckedChange={setRecipeTwoColumnFavorites}
+                        />
+                        <DexSettingField
                           id="dex-two-column"
                           label={t('dex.recipeTwoColumn')}
                           hint={t('dex.twoColumnHint')}
@@ -863,7 +845,7 @@ export function ItemsPage({
       title={resultsFullscreen ? t('dex.exitFullscreen') : t('dex.enterFullscreen')}
       aria-pressed={resultsFullscreen}
       onClick={() => setResultsFullscreen((value) => !value)}
-      className="text-muted-foreground hover:bg-card hover:text-foreground"
+      className="text-muted-foreground hover:bg-accent hover:text-foreground"
     >
       {resultsFullscreen ? <Minimize2 /> : <Maximize2 />}
       <span data-action-label className="hidden truncate">
@@ -880,10 +862,13 @@ export function ItemsPage({
           data-testid="dex-page"
           data-fullscreen={resultsFullscreen || undefined}
           className={cn(
-            'flex min-h-[360px] flex-col gap-3 overflow-hidden',
-            resultsFullscreen && 'fixed inset-0 z-50 bg-background p-3 sm:p-4',
+            'flex min-h-[360px] flex-col gap-3',
+            // 全屏：页面自己就是滚动区；常规：整页交给 AppShell 的 `<main>` 滚（浏览器右侧那条滚动条）。
+            resultsFullscreen && 'fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-4',
           )}
-          style={{ height: resultsFullscreen ? '100dvh' : pageHeight }}
+          style={
+            { '--page-sticky-top': `${resultsFullscreen ? 0 : stickyTop}px` } as CSSProperties
+          }
         >
           {/* 页面设置 / 全屏收到顶栏右侧，工具条只留搜索与筛选。 */}
           {!resultsFullscreen && (
@@ -894,7 +879,10 @@ export function ItemsPage({
           )}
           {/* 工具条：不再套卡片，直接铺在页面上（与数据 ID 一致） */}
           {!resultsFullscreen && (
-          <div className="flex shrink-0 flex-col gap-2 p-1 sm:flex-row sm:flex-wrap sm:items-center">
+          <div
+            ref={toolbarRef}
+            className="sticky top-12 z-20 flex flex-col gap-2 bg-background p-1 sm:flex-row sm:flex-wrap sm:items-center"
+          >
             <div className="flex w-full min-w-0 items-center gap-2 sm:flex-1">
               <div className="w-full max-w-sm">
                 <SearchInput
@@ -910,19 +898,18 @@ export function ItemsPage({
                   onHistorySelect={selectKeyword}
                   onHistoryRemove={removeSearchHistory}
                   historyOnInput={false}
-                  trailingIcon={<Search className="size-4 text-muted-foreground" />}
-                  className="h-9 rounded-full pl-3 pr-1"
+                  leadingIcon={<Search className="size-4 text-muted-foreground" />}
+                  // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
+                  resultLabel={t('dex.resultCount', { n: ordered.length })}
+                  shortcut
                   inputClassName="text-sm"
                 />
               </div>
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {t('dex.resultCount', { n: ordered.length })}
-              </span>
             </div>
 
             {/* 手机上搜索独占第一行；筛选项从下一行开始。 */}
             <div className="ml-0 flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground sm:ml-auto sm:w-auto">
-              <div className="flex min-w-0 items-center rounded-lg bg-accent p-0.5">
+              <div className="flex min-w-0 items-center rounded-container bg-accent p-0.5">
                 <ToggleGroup
                   type="single"
                   value={activeTopMode}
@@ -952,7 +939,7 @@ export function ItemsPage({
                   aria-label={t('dex.collectionGroup')}
                   onClick={() => setGroupDrawerOpen(true)}
                   className={cn(
-                    'max-w-64 gap-1.5 px-2.5 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground',
+                    'max-w-64 gap-2 px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground',
                     (collection || gameMode) && 'bg-card font-semibold text-foreground shadow-sm',
                   )}
                 >
@@ -982,7 +969,7 @@ export function ItemsPage({
                     aria-label={t('dex.clearGroup')}
                     title={t('dex.clearGroup')}
                     onClick={clearGroup}
-                    className="text-muted-foreground hover:bg-card hover:text-foreground"
+                    className="text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     <X />
                   </Button>
@@ -1025,11 +1012,45 @@ export function ItemsPage({
           <div
             ref={scrollRef}
             data-testid="dex-list"
-            onScroll={handleScroll}
-            onKeyDown={handleGridKeyDown}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-1"
+            onKeyDown={showFavoriteRecipes ? undefined : handleGridKeyDown}
+            className="px-1 py-1"
           >
-            {favoritesEmpty || ordered.length === 0 ? (
+            {/* ⭐ 收藏模式的左上角：物品 / 合成表 两份收藏切换（数量直接写在按钮上）。 */}
+            {state.favoritesOnly && (
+              <div className="mb-2 flex items-center px-1">
+                <ToggleGroup
+                  size="sm"
+                  value={favoritesKind}
+                  onValueChange={(next) => next && setFavoritesKind(next as FavoriteKind)}
+                  aria-label={t('favorites.kind')}
+                >
+                  <ToggleGroupItem value="items" data-testid="dex-favorites-kind-items">
+                    {t('favorites.items', { n: favoriteItems.length })}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="recipes" data-testid="dex-favorites-kind-recipes">
+                    {t('favorites.recipes', { n: recipeFavs.length })}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="common" data-testid="dex-favorites-kind-common">
+                    {t('dex.common')}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            )}
+            {showFavoriteRecipes ? (
+              <FavoriteRecipesPanel
+                dataset={dataset}
+                favorites={recipeFavs}
+                iconOnly={!recipeShowNames}
+                twoColumn={recipeTwoColumnFavorites}
+              />
+            ) : showCommonRecipes ? (
+              <CommonRecipes
+                dataset={dataset}
+                entries={commonEntries}
+                iconOnly={!recipeShowNames}
+                twoColumn={recipeTwoColumnFavorites}
+              />
+            ) : favoritesEmpty || ordered.length === 0 ? (
               <Empty className="min-h-40 border border-dashed">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">{favoritesEmpty ? <Star /> : <Search />}</EmptyMedia>

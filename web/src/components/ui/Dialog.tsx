@@ -20,17 +20,19 @@ export function DialogOverlay({ className, ...props }: ComponentProps<typeof Dia
 export function DialogContent({
   className,
   children,
+  /** 是否渲染暗色遮罩；`false` = 背景不变暗（更接近 popover 的行为，配 `modal={false}` 用）。 */
+  overlay = true,
   ...props
-}: ComponentProps<typeof DialogPrimitive.Content>) {
+}: ComponentProps<typeof DialogPrimitive.Content> & { overlay?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogOverlay />
+      {overlay && <DialogOverlay />}
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
           'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4',
           'max-h-[calc(100dvh-2rem)] overflow-y-auto',
-          'rounded-2xl bg-card p-5 text-card-foreground shadow-2xl',
+          'rounded-modal bg-card p-4 text-card-foreground shadow-2xl',
           'focus:outline-none',
           className,
         )}
@@ -39,7 +41,7 @@ export function DialogContent({
         {children}
         <DialogPrimitive.Close
           className={cn(
-            'absolute top-3 right-3 cursor-pointer rounded-md p-1 text-muted-foreground transition-colors',
+            'absolute top-3 right-3 cursor-pointer rounded-control p-1 text-muted-foreground transition-colors',
             'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
           )}
           aria-label="Close"
@@ -89,7 +91,7 @@ export function DialogFooter({ className, ...props }: ComponentProps<'div'>) {
       data-slot="dialog-footer"
       className={cn(
         'flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end',
-        '-mx-5 -mb-5 mt-1 rounded-b-2xl border-t border-border/60 bg-background px-5 py-4',
+        '-mx-4 -mb-4 mt-1 rounded-b-modal border-t border-border/60 bg-background px-4 py-4',
         className,
       )}
       {...props}

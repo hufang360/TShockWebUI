@@ -18,10 +18,10 @@ describe('CommandPickerPanel（指令列表）', () => {
   it('「游戏内」指令排到最下并收进可折叠分组（默认收起）', () => {
     renderPanel()
     // 可执行指令直接可见
-    expect(screen.getByTitle('Shows command help.')).toBeTruthy()
+    expect(screen.getByText('Shows command help.')).toBeTruthy()
     expect(screen.queryByText('/item')).toBeNull()
 
-    const group = screen.getByRole('button', { name: /游戏内指令（只能进游戏执行）/ })
+    const group = screen.getByRole('button', { name: /游戏内指令（\d+）/ })
     expect(group.getAttribute('aria-expanded')).toBe('false')
 
     fireEvent.click(group)
@@ -39,16 +39,37 @@ describe('CommandPickerPanel（指令列表）', () => {
 
   it('点一行载入指令', () => {
     const { onLoad } = renderPanel()
-    fireEvent.click(screen.getByTitle('Shows command help.'))
+    fireEvent.click(screen.getByText('/help'))
     expect(onLoad).toHaveBeenCalledWith('/help ')
   })
 
-  it('指令行的注释保留完整行高', () => {
+  it('指令与说明同一行：说明占满剩余宽度并截断（不再是两行）', () => {
     renderPanel()
     const help = screen.getByText('Shows command help.')
     const row = help.closest('button')
-    expect(row?.className).toContain('min-h-16')
-    expect(help.className).toContain('leading-5')
+    // 单行高度（不再是最小 64px 的两行卡片），说明列 own 剩余宽度 + truncate。
+    expect(row?.className).toContain('h-7')
+    expect(help.className).toContain('truncate')
+    expect(help.className).toContain('flex-1')
+  })
+
+  it('「全部指令」分组可折叠', () => {
+    renderPanel()
+    const all = screen.getByRole('button', { name: /全部指令（\d+）/ })
+    expect(all.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('/help')).toBeTruthy()
+
+    fireEvent.click(all)
+    expect(all.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('/help')).toBeNull()
+  })
+
+  it('游戏内指令名用红色（不再挂「游戏内」badge）', () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: /游戏内指令（\d+）/ }))
+    const name = screen.getByText('/item')
+    expect(name.className).toContain('text-destructive')
+    expect(screen.queryByText('游戏内')).toBeNull()
   })
 
   it('不显示收藏星标（收藏是独立入口）', async () => {

@@ -54,7 +54,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('WorldPage（查看世界）', () => {
+describe('WorldPage（世界存档）', () => {
   it('本地解析 .wld：显示世界信息、缩略图与两个导出按钮（不需要登录）', async () => {
     renderPage()
 

@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react'
 import { Button, Card, CardBody } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 
 interface LoginGateProps {
   /** 点击「登录」时打开登录框。 */
   onLogin: () => void
+  /** 「请先登录！」下面的一行补充：说明这一块为什么需要登录（已有公开内容的页面才传）。 */
+  hint?: ReactNode
 }
 
 /**
@@ -12,12 +15,15 @@ interface LoginGateProps {
  * 首页 / 指令 / 指令卡片模块 / 玩家管理 / 鱼店 / 设置共用（`docs/设计原则与约束.md` §4.6：
  * token 只在后端，页面级数据都要登录后才能拉取）。
  */
-export function LoginGate({ onLogin }: LoginGateProps) {
+export function LoginGate({ onLogin, hint }: LoginGateProps) {
   const { t } = useI18n()
   return (
     <Card>
       <CardBody className="flex flex-wrap items-center justify-between gap-3 pt-2">
-        <p className="text-sm text-foreground/80">{t('login.required')}</p>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="text-sm text-foreground/80">{t('login.required')}</p>
+          {hint && <p className="text-2xs text-muted-foreground">{hint}</p>}
+        </div>
         <Button variant="primary" onClick={onLogin}>
           {t('action.login')}
         </Button>

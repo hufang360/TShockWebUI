@@ -227,7 +227,7 @@ export function LoginDialog({
     <button
       type="button"
       onClick={() => setServerOpen(true)}
-      className="flex w-full cursor-pointer items-center gap-2 rounded-lg bg-accent/50 px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex w-full cursor-pointer items-center gap-2 rounded-control bg-accent/50 px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={`${t('login.server')}: ${serverLabel}`}
     >
       <Server className="size-4 shrink-0 text-muted-foreground" />
@@ -395,7 +395,7 @@ export function LoginDialog({
                       <AlertDescription className="min-w-0 justify-items-stretch">
                         <p>{t('login.permissionHint')}</p>
                         <div className="mt-1 flex w-full min-w-0 items-center gap-2">
-                          <code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-1 font-pixel text-2xs">
+                          <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1 font-pixel text-2xs">
                             {PERM_COMMAND}
                           </code>
                           <Button size="sm" variant="ghost" onClick={() => void copyPermCommand()}>
@@ -436,7 +436,7 @@ export function LoginDialog({
               {submitting && mode === 'online' && (
                 <button
                   type="button"
-                  className="mx-auto cursor-pointer rounded-sm text-xs font-medium text-foreground/75 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="mx-auto cursor-pointer rounded-chip text-xs font-medium text-foreground/75 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={cancelWait}
                 >
                   {t('login.onlineCancel')}
@@ -488,7 +488,7 @@ export function LoginDialog({
                       type="button"
                       onPointerEnter={openHelp}
                       onPointerLeave={scheduleCloseHelp}
-                      className="flex cursor-pointer items-center gap-1 rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex cursor-pointer items-center gap-1 rounded-chip text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <CircleHelp className="size-3.5" />
                       {t('login.help')}
@@ -510,7 +510,7 @@ export function LoginDialog({
                       {helpText}
                     </p>
                     {mode === 'password' && !transport.mock && (
-                      <p className="pt-1.5 text-xs leading-5 whitespace-pre-line text-foreground/70">
+                      <p className="pt-2 text-xs leading-5 whitespace-pre-line text-foreground/70">
                         {t('login.help.registerHint')}
                       </p>
                     )}

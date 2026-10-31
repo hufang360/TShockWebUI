@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ClipboardList, PackagePlus, RefreshCw, Search, ShieldAlert, X } from 'lucide-react'
+import { ClipboardList, PackagePlus, RefreshCw, Search, ShieldAlert, Star, X } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
 import { Notice } from '@/components/Notice'
 import { RequisitionCard } from '@/components/requisition/RequisitionCard'
+import { SearchInput } from '@/components/SearchInput'
 import {
   Alert,
   AlertDescription,
@@ -28,8 +29,9 @@ import {
   FieldDescription,
   FieldLabel,
   Input,
-  NativeSelect,
-  NativeSelectOption,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Spinner,
   Tabs,
   TabsContent,
@@ -39,6 +41,7 @@ import {
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useDataset } from '@/lib/datasetContext'
+import { useItemFavoritesState } from '@/hooks/useItemFavoritesState'
 import { useI18n } from '@/lib/i18n'
 import { formatClock } from '@/lib/clock'
 
@@ -101,7 +104,12 @@ export function RequisitionPage({
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null)
 
   const [query, setQuery] = useState('')
+  /** 「物品收藏」浮层：选一件就自动收起（不用再点一下外面）。 */
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
   const debounced = useDebouncedValue(query, 180)
+  // 物品收藏（全局同一份 `tswui:itemFavorites`）：搜索框右侧的 ⭐ 直接从这里往清单里加，
+  // 常申请的东西不用每次重新搜。
+  const { list: favoriteItems } = useItemFavoritesState()
   const [cart, setCart] = useState<RequisitionItem[]>([])
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
@@ -247,6 +255,17 @@ export function RequisitionPage({
   const results = useMemo(
     () => (debounced.trim() ? searchItems(items, debounced, 24) : []),
     [items, debounced],
+  )
+
+  /** 收藏面板的行：按收藏时间倒序，数据集里找不到的物品直接跳过。 */
+  const favoriteRows = useMemo(
+    () =>
+      favoriteItems
+        .map((fav) => ({ fav, item: itemsById.get(fav.id) }))
+        .filter((row): row is { fav: (typeof favoriteItems)[number]; item: Item } =>
+          row.item != null,
+        ),
+    [favoriteItems, itemsById],
   )
 
   const addItem = (item: Item) => {
@@ -403,7 +422,7 @@ export function RequisitionPage({
 
       {canReview ? (
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-          <TabsList variant="line" className="w-full justify-start">
+          <TabsList variant="line" className="w-full justify-start" aria-label={t('requests.sections')}>
             <TabsTrigger value="mine" variant="line" className="flex-none" disabled={!canSubmit}>
               {t('requests.mine')}
             </TabsTrigger>
@@ -476,23 +495,78 @@ export function RequisitionPage({
           <CardBody className="flex flex-col gap-3">
             <Field>
               <FieldLabel htmlFor="requisition-search">{t('requests.item')}</FieldLabel>
-              <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="requisition-search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={t('requests.searchPlaceholder')}
-                  className="pl-9"
-                />
-              </div>
+              <SearchInput
+                id="requisition-search"
+                value={query}
+                onValueChange={setQuery}
+                placeholder={t('requests.searchPlaceholder')}
+                leadingIcon={<Search className="size-4" />}
+                // 页面级 `/`：焦点不在输入框里时按 `/` 直接进来（与物品 ID / 鱼店同规）。
+                shortcut
+                className="h-9"
+                inputClassName="text-sm"
+                // 「物品收藏」按钮是**输入框的 addon**（同一输入框组，没有缝隙），
+                // 选一件就自动收起浮层。
+                trailingAddon={
+                  <Popover open={favoritesOpen} onOpenChange={setFavoritesOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        className="rounded-full text-muted-foreground hover:text-foreground"
+                        aria-label={t('requests.favorites')}
+                        title={t('requests.favorites')}
+                        aria-haspopup="dialog"
+                      >
+                        <Star data-icon="inline-start" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" sideOffset={6} className="w-72 p-1">
+                      <div className="px-2 py-1.5 text-2xs font-medium text-muted-foreground">
+                        {t('requests.favorites')}
+                      </div>
+                      {favoriteRows.length === 0 ? (
+                        <p className="px-2 py-3 text-xs text-muted-foreground">
+                          {t('requests.favoritesEmpty')}
+                        </p>
+                      ) : (
+                        <ul className="max-h-72 overflow-y-auto">
+                          {favoriteRows.map(({ fav, item }) => (
+                            <li key={fav.id}>
+                              <button
+                                type="button"
+                                aria-label={t('requests.addFavorite', { name: item.name })}
+                                title={item.name}
+                                onClick={() => {
+                                  addItem(item)
+                                  setFavoritesOpen(false)
+                                }}
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              >
+                                <ItemIcon item={item} atlas={atlas} size={24} />
+                                <span className="min-w-0 flex-1 truncate text-sm">{item.name}</span>
+                                <span className="font-pixel text-2xs text-muted-foreground">
+                                  #{item.id}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className="px-2 pt-1 pb-1.5 text-2xs text-muted-foreground">
+                        {t('requests.favoritesHint')}
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                }
+              />
               <FieldDescription>
                 {cart.length >= MAX_ITEMS ? t('requests.cartMax') : t('requests.searchHint')}
               </FieldDescription>
             </Field>
 
             {query.trim() && (
-              <div className="max-h-64 overflow-y-auto rounded-lg border border-border/50">
+              <div className="max-h-64 overflow-y-auto rounded-control border border-border/50">
                 {results.length === 0 ? (
                   <p className="px-3 py-4 text-center text-xs text-muted-foreground">
                     {t('requests.noMatch')}
@@ -503,7 +577,7 @@ export function RequisitionPage({
                       <li key={item.id}>
                         <button
                           type="button"
-                          className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                          className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                           onClick={() => addItem(item)}
                         >
                           <ItemIcon item={item} atlas={atlas} size={28} />
@@ -533,15 +607,18 @@ export function RequisitionPage({
                 )}
               </div>
               {cart.length === 0 ? (
-                <Empty size="sm">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <PackagePlus />
-                    </EmptyMedia>
-                    <EmptyTitle>{t('requests.cartEmpty')}</EmptyTitle>
-                    <EmptyDescription>{t('requests.cartEmptyHint')}</EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
+                // 虚线框：空清单也占一个「位置」，不会因为什么都没有就凭空消失。
+                <div className="rounded-container border border-dashed border-border/70 px-3 py-1">
+                  <Empty size="sm">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <PackagePlus />
+                      </EmptyMedia>
+                      <EmptyTitle>{t('requests.cartEmpty')}</EmptyTitle>
+                      <EmptyDescription>{t('requests.cartEmptyHint')}</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                </div>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {cart.map((it) => {
@@ -549,7 +626,7 @@ export function RequisitionPage({
                     return (
                       <li
                         key={it.id}
-                        className="flex flex-wrap items-center gap-2 rounded-lg bg-accent/40 px-2.5 py-2"
+                        className="flex flex-wrap items-center gap-2 rounded-control bg-accent/40 px-3 py-2"
                       >
                         {item ? (
                           <ItemIcon item={item} atlas={atlas} size={26} />
@@ -684,49 +761,72 @@ export function RequisitionPage({
   function renderReview() {
     return (
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <NativeSelect
-            size="sm"
-            aria-label={t('requests.filter')}
-            value={reviewStatus}
-            onChange={(e) => setReviewStatus(e.target.value === 'all' ? 'all' : 'pending')}
-          >
-            <NativeSelectOption value="pending">{t('requests.filter.pending')}</NativeSelectOption>
-            <NativeSelectOption value="all">{t('requests.filter.all')}</NativeSelectOption>
-          </NativeSelect>
-          <span className="text-2xs text-muted-foreground">
-            {t('requests.reviewHint')}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="ml-auto"
-            disabled={loading}
-            onClick={() => void refreshEverything()}
-          >
-            <RefreshCw data-icon className={loading ? 'animate-spin' : undefined} />
-            {t('requests.refresh')}
-          </Button>
-        </div>
-
-        {loading && all.length === 0 ? (
-          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-            <Spinner /> {t('requests.loading')}
+        {/* 待审核 / 全部：两个 tab（原来是下拉框，得点开才知道还有另一边）。 */}
+        <Tabs value={reviewStatus} onValueChange={(v) => setReviewStatus(v === 'all' ? 'all' : 'pending')}>
+          <div className="flex flex-wrap items-center gap-2">
+            <TabsList
+              variant="line"
+              className="w-auto justify-start"
+              aria-label={t('requests.filterScope')}
+            >
+              <TabsTrigger value="pending" variant="line" className="flex-none">
+                {t('requests.filter.pending')}
+              </TabsTrigger>
+              <TabsTrigger value="all" variant="line" className="flex-none">
+                {t('requests.filter.all')}
+              </TabsTrigger>
+            </TabsList>
+            <span className="text-2xs text-muted-foreground">{t('requests.reviewHint')}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto"
+              disabled={loading}
+              onClick={() => void refreshEverything()}
+            >
+              <RefreshCw data-icon className={loading ? 'animate-spin' : undefined} />
+              {t('requests.refresh')}
+            </Button>
           </div>
-        ) : empty ? (
-          <Empty size="sm">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ClipboardList />
-              </EmptyMedia>
-              <EmptyTitle>{t('requests.reviewEmpty')}</EmptyTitle>
-              <EmptyDescription>{t('requests.reviewEmptyHint')}</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          all.map((record) => (
+
+          <TabsContent value="pending" className="pt-3">
+            {renderReviewList()}
+          </TabsContent>
+          <TabsContent value="all" className="pt-3">
+            {renderReviewList()}
+          </TabsContent>
+        </Tabs>
+      </div>
+    )
+  }
+
+  /** 审核记录：**两列**（每列各自按内容定高，不互相拉高）。 */
+  function renderReviewList() {
+    if (loading && all.length === 0) {
+      return (
+        <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+          <Spinner /> {t('requests.loading')}
+        </div>
+      )
+    }
+    if (empty) {
+      return (
+        <Empty size="sm">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ClipboardList />
+            </EmptyMedia>
+            <EmptyTitle>{t('requests.reviewEmpty')}</EmptyTitle>
+            <EmptyDescription>{t('requests.reviewEmptyHint')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )
+    }
+    return (
+      <div className="grid content-start gap-3 md:grid-cols-2">
+        {all.map((record) => (
+          <div key={record.id} className="min-w-0 self-start">
             <RequisitionCard
-              key={record.id}
               record={record}
               mode="review"
               itemsById={itemsById}
@@ -739,10 +839,10 @@ export function RequisitionPage({
               }}
               onDeliver={(r) => void deliver(r)}
             />
-          ))
-        )}
+          </div>
+        ))}
       </div>
     )
   }
-
 }
+

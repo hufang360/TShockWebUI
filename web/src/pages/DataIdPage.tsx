@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Download, Maximize2, Minimize2, Search, Settings2 } from 'lucide-react'
 import {
   BuffDetail,
@@ -38,7 +38,7 @@ import {
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { usePageHeight } from '@/hooks/usePageHeight'
+import { usePageScrollReset, usePageScroller, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
 import { readDataIdState, rememberDataIdState, type DataIdKind } from '@/lib/dataIdState'
@@ -132,16 +132,31 @@ export function DataIdPage({
   const canSee = (permission: string) => authenticated && (!known || has(permission))
 
   const rootRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const pageHeight = usePageHeight(rootRef)
+  // 工具条（数据源 Tab + 搜索 / 筛选）吸在顶栏下面，表头再吸在它下面。
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const stickyTop = useStickyHeaderOffset(toolbarRef)
+
+  // 整页滚动：滚动条是浏览器右侧那条，网格自己不再溢出滚动。
+  // 全屏查看时页面本身变成滚动区（不全屏时滚动区是 AppShell 的 `<main>`）。
+  const scrollTopRef = useRef(initial.scrollTop)
+  const scroller = usePageScroller(listRef, {
+    host: resultsFullscreen ? rootRef.current : null,
+    revision: resultsFullscreen,
+    onScroll: (top) => {
+      scrollTopRef.current = top
+    },
+  })
+  const { scrollToTop } = scroller
+  // 切页回来时把主内容区滚回顶部，再还原上次记住的位置（整个页面共用一个滚动条）。
+  usePageScrollReset(rootRef)
 
   // 把当前状态存到 ref，卸载（切走）时一次性写回模块内存。
   const stateRef = useRef({ kind, npcFilter, twoCols, tableView })
   useEffect(() => {
     stateRef.current = { kind, npcFilter, twoCols, tableView }
   }, [kind, npcFilter, twoCols, tableView])
-  const scrollTopRef = useRef(initial.scrollTop)
   useEffect(
     () => () => {
       rememberDataIdState({ ...stateRef.current, scrollTop: scrollTopRef.current })
@@ -150,8 +165,7 @@ export function DataIdPage({
   )
   // 切页面回来时还原上次滚动位置（刷新后 initial.scrollTop = 0）。
   useLayoutEffect(() => {
-    const el = scrollRef.current
-    if (el && initial.scrollTop > 0) el.scrollTop = initial.scrollTop
+    if (scrollTopRef.current > 0) scroller.scrollTo(scrollTopRef.current)
     // 仅挂载时一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -259,8 +273,8 @@ export function DataIdPage({
       return
     }
     scrollTopRef.current = 0
-    if (scrollRef.current) scrollRef.current.scrollTop = 0
-  }, [debounced, kind, npcFilter, tableView])
+    scrollToTop()
+  }, [debounced, kind, npcFilter, tableView, scrollToTop])
 
   // 搜过的词进「最近搜索」（统一规则：最多 10 条），按当前数据源分别记。
   const rememberNpc = npcHistory.remember
@@ -372,8 +386,8 @@ export function DataIdPage({
           aria-label={t('dataId.settings')}
           title={t('dataId.settings')}
           className={cn(
-            'text-muted-foreground hover:bg-card hover:text-foreground',
-            settingsOpen && 'bg-card text-foreground',
+            'text-muted-foreground hover:bg-accent hover:text-foreground',
+            settingsOpen && 'bg-accent text-foreground',
           )}
         >
           <Settings2 />
@@ -480,7 +494,7 @@ export function DataIdPage({
                 href={dataWikiLink.href}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex rounded-md border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="inline-flex rounded-control border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 {dataWikiLink.label}
               </a>
@@ -492,7 +506,7 @@ export function DataIdPage({
                   href={link.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-md border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="rounded-control border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   {link.label}
                 </a>
@@ -527,10 +541,11 @@ export function DataIdPage({
       data-testid="dataid-page"
       data-fullscreen={resultsFullscreen || undefined}
       className={cn(
-        'flex min-h-[360px] flex-col overflow-hidden',
-        resultsFullscreen && 'fixed inset-0 z-50 bg-background',
+        'flex min-h-[360px] flex-col gap-2',
+        // 全屏：页面自己就是滚动区（Fixed 满屏 + 自己的滚动条）。
+        resultsFullscreen && 'fixed inset-0 z-50 gap-0 overflow-y-auto bg-background',
       )}
-      style={{ height: resultsFullscreen ? '100dvh' : pageHeight }}
+      style={{ '--page-sticky-top': `${resultsFullscreen ? 0 : stickyTop}px` } as CSSProperties}
     >
       {!resultsFullscreen && (
         <TopBarActions>
@@ -545,98 +560,95 @@ export function DataIdPage({
         </FullscreenDock>
       ) : (
         <>
-          {/* 数据源 Tab 独立置顶。 */}
-          <Tabs
-            value={kind}
-            onValueChange={(v) => switchKind(v as DataIdKind)}
-            className="w-full shrink-0 gap-0"
+          {/* 数据源 Tab + 搜索 / 筛选：整页滚动时吸在顶栏下面，不跟着列表滚走。 */}
+          <div
+            ref={toolbarRef}
+            className="sticky top-12 z-20 flex flex-col gap-2 bg-background py-1.5"
           >
-            <TabsList aria-label={t('dataId.tabs')} variant="line" className="w-full justify-start">
-              <TabsTrigger value="npc" variant="line" className="flex-none">
-                {t('dataId.tab.npc')}
-              </TabsTrigger>
-              <TabsTrigger value="tile" variant="line" className="flex-none">
-                {t('dataId.tab.tile')}
-              </TabsTrigger>
-              <TabsTrigger value="wall" variant="line" className="flex-none">
-                {t('dataId.tab.wall')}
-              </TabsTrigger>
-              <TabsTrigger value="buff" variant="line" className="flex-none">
-                {t('dataId.tab.buff')}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <Tabs
+              value={kind}
+              onValueChange={(v) => switchKind(v as DataIdKind)}
+              className="w-full shrink-0 gap-0"
+            >
+              <TabsList aria-label={t('dataId.tabs')} variant="line" className="w-full justify-start">
+                <TabsTrigger value="npc" variant="line" className="flex-none">
+                  {t('dataId.tab.npc')}
+                </TabsTrigger>
+                <TabsTrigger value="tile" variant="line" className="flex-none">
+                  {t('dataId.tab.tile')}
+                </TabsTrigger>
+                <TabsTrigger value="wall" variant="line" className="flex-none">
+                  {t('dataId.tab.wall')}
+                </TabsTrigger>
+                <TabsTrigger value="buff" variant="line" className="flex-none">
+                  {t('dataId.tab.buff')}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          {/* 工具行：不再套卡片，直接铺在页面上 */}
-          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 p-1">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <div className="w-full max-w-sm min-w-0">
-                <SearchInput
-                  ref={searchRef}
-                  value={query}
-                  onValueChange={changeQuery}
-                  placeholder={
-                    kind === 'npc'
-                      ? t('dataId.search.npc')
-                      : kind === 'tile'
-                        ? t('dataId.search.tile')
-                        : kind === 'wall'
-                          ? t('dataId.search.wall')
-                          : t('dataId.search.buff')
-                  }
-                  aria-label={t('nav.dataId')}
-                  history={searchHistory}
-                  onHistoryRemove={removeSearchHistory}
-                  trailingIcon={<Search className="size-4 text-muted-foreground" />}
-                  className="h-9 rounded-full pl-3 pr-1"
-                  inputClassName="text-sm"
-                />
+            {/* 工具行：不再套卡片，直接铺在页面上 */}
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 p-1">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div className="w-full max-w-sm min-w-0">
+                  <SearchInput
+                    ref={searchRef}
+                    value={query}
+                    onValueChange={changeQuery}
+                    placeholder={
+                      kind === 'npc'
+                        ? t('dataId.search.npc')
+                        : kind === 'tile'
+                          ? t('dataId.search.tile')
+                          : kind === 'wall'
+                            ? t('dataId.search.wall')
+                            : t('dataId.search.buff')
+                    }
+                    aria-label={t('nav.dataId')}
+                    history={searchHistory}
+                    onHistoryRemove={removeSearchHistory}
+                    leadingIcon={<Search className="size-4 text-muted-foreground" />}
+                    // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
+                    resultLabel={t('dataId.resultCount', { n: total })}
+                    shortcut
+                    inputClassName="text-sm"
+                  />
+                </div>
               </div>
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {t('dataId.resultCount', { n: total })}
-              </span>
-            </div>
 
-            <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-1 sm:w-auto">
-              {kind === 'npc' && (
-                <Tabs
-                  value={npcFilter || 'all'}
-                  onValueChange={(value) => setNpcFilter(value === 'all' ? '' : value)}
-                  className="w-auto max-w-full shrink-0 gap-0"
-                >
-                  <TabsList
-                    aria-label={t('npcs.collections')}
-                    data-testid="npc-category-tabs"
-                    className="h-8 max-w-full justify-start overflow-x-auto p-0.5"
+              <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-1 sm:w-auto">
+                {kind === 'npc' && (
+                  <Tabs
+                    value={npcFilter || 'all'}
+                    onValueChange={(value) => setNpcFilter(value === 'all' ? '' : value)}
+                    className="w-auto max-w-full shrink-0 gap-0"
                   >
-                    <TabsTrigger value="all" className="h-7 flex-none px-2">
-                      {t('npcs.filter.all')}
-                    </TabsTrigger>
-                    <TabsTrigger value="boss" className="h-7 flex-none px-2">
-                      {t('npcs.filter.boss')}
-                    </TabsTrigger>
-                    {NPC_COLLECTIONS.map((c) => (
-                      <TabsTrigger key={c.id} value={c.id} className="h-7 flex-none px-2">
-                        {npcCollectionName(c, lang)}
+                    <TabsList
+                      aria-label={t('npcs.collections')}
+                      data-testid="npc-category-tabs"
+                      className="h-8 max-w-full justify-start overflow-x-auto p-0.5"
+                    >
+                      <TabsTrigger value="all" className="h-7 flex-none px-2">
+                        {t('npcs.filter.all')}
                       </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              )}
+                      <TabsTrigger value="boss" className="h-7 flex-none px-2">
+                        {t('npcs.filter.boss')}
+                      </TabsTrigger>
+                      {NPC_COLLECTIONS.map((c) => (
+                        <TabsTrigger key={c.id} value={c.id} className="h-7 flex-none px-2">
+                          {npcCollectionName(c, lang)}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                )}
+              </div>
             </div>
           </div>
         </>
       )}
 
-      {/* 网格：不是卡片（直接铺在页面上），内部滚动 */}
-      <div
-        ref={scrollRef}
-        data-testid="dataid-list"
-        onScroll={(e) => {
-          scrollTopRef.current = e.currentTarget.scrollTop
-        }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-1"
-      >
+      {/* 网格 / 表格：不是卡片（直接铺在页面上），整页滚动 */}
+      <div ref={listRef} data-testid="dataid-list" className="px-1 py-1">
         {total === 0 ? (
           <Empty className="min-h-40 border border-dashed">
             <EmptyHeader>

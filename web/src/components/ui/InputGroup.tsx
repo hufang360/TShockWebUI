@@ -11,7 +11,7 @@ export function InputGroup({ className, ...props }: ComponentProps<'div'>) {
       data-slot="input-group"
       role="group"
       className={cn(
-        'group/input-group relative flex h-9 w-full min-w-0 items-center rounded-lg bg-accent',
+        'group/input-group relative flex h-9 w-full min-w-0 items-center rounded-control bg-accent',
         'focus-within:ring-2 focus-within:ring-ring focus-within:outline-none',
         'has-[[data-slot=input-group-control]:disabled]:cursor-not-allowed has-[[data-slot=input-group-control]:disabled]:opacity-50',
         'has-[>[data-align=inline-start]]:pl-1 has-[>[data-align=inline-end]]:pr-1',
@@ -32,7 +32,7 @@ export function InputGroupAddon({
       data-slot="input-group-addon"
       data-align={align}
       className={cn(
-        'flex h-full shrink-0 items-center justify-center gap-1 px-1.5 text-muted-foreground',
+        'flex h-full shrink-0 items-center justify-center gap-1 px-2 text-muted-foreground',
         '[&_button]:size-7 [&_button]:px-0',
         align === 'inline-end' && 'order-last',
         className,

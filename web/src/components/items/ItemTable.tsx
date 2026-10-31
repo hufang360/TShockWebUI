@@ -65,7 +65,7 @@ function ItemTable({
 
   const shown = rows.slice(0, limit)
   return (
-    <div className="overflow-hidden rounded-lg border border-border/60">
+    <div className="overflow-hidden rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-16" />
@@ -74,7 +74,7 @@ function ItemTable({
           <col />
           <col className="w-9" />
         </colgroup>
-        <thead className="sticky top-0 z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
             <th className="px-3 py-2 text-right font-medium">ID</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
@@ -95,7 +95,7 @@ function ItemTable({
                 selectedId === item.id && 'bg-primary/10',
               )}
             >
-              <td className="px-3 py-1.5 text-right font-mono text-xs text-muted-foreground">
+              <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                 {item.id}
               </td>
               <td className="px-1 py-0.5">
@@ -103,11 +103,11 @@ function ItemTable({
                   <ItemIcon item={item} atlas={atlas} size={24} tooltip={false} />
                 </span>
               </td>
-              <td className="truncate px-3 py-1.5 text-foreground" title={item.name}>
+              <td className="truncate px-3 py-2 text-foreground" title={item.name}>
                 {item.name}
               </td>
               <td
-                className="truncate px-3 py-1.5 font-mono text-xs text-muted-foreground"
+                className="truncate px-3 py-2 font-mono text-xs text-muted-foreground"
                 title={item.key}
               >
                 {item.key}

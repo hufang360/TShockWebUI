@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { Button, Spinner, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 interface IconActionProps {
   /** 按钮含义（同时作为 Tooltip 文本与 aria-label）。 */
@@ -21,6 +22,10 @@ interface IconActionProps {
  *
  * 统一用它而不是手写 `<Button title=…>`：`title` 在触屏与快速划过的场景几乎不出现，
  * Tooltip 的可读性与一致性更好。
+ *
+ * 颜色统一为「次要图标」：常态 `text-muted-foreground`（比正文浅一档，不抢标题），
+ * 悬停才变 `text-foreground`。顶栏右侧、卡片页头、各类工具条因此是同一档灰，
+ * 不再出现「有的纯黑、有的灰」的混搭（需要更醒目的按钮就别用图标按钮，用带文字的 `Button`）。
  */
 export function IconAction({
   label,
@@ -44,7 +49,7 @@ export function IconAction({
             aria-pressed={pressed}
             disabled={disabled || loading}
             onClick={onClick}
-            className={className}
+            className={cn('text-muted-foreground hover:text-foreground', className)}
             data-testid={testId}
           >
             {loading ? <Spinner aria-hidden /> : <Icon />}

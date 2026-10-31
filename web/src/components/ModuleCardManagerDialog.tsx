@@ -26,6 +26,15 @@ interface ModuleCardManagerDialogProps {
   onRemove: (id: string) => void
   /** 固定卡片依赖的插件未安装时返回 true（置灰并标「缺少插件」）。 */
   pluginMissing?: (id: string) => boolean
+  /**
+   * 内置卡片的「显示 / 隐藏」开关（不给则不显示开关，卡片恒显示）。
+   *
+   * 鱼店用它：鱼罐 / 消费榜 / 鱼篓榜默认不显示，玩家在这里打开才出现。
+   */
+  visibility?: {
+    isHidden: (id: string) => boolean
+    onToggle: (id: string) => void
+  }
 }
 
 /**
@@ -42,6 +51,7 @@ export function ModuleCardManagerDialog({
   onUpdate,
   onRemove,
   pluginMissing,
+  visibility,
 }: ModuleCardManagerDialogProps) {
   const { t } = useI18n()
   const byId = new Map(cards.map((c) => [c.id, c]))
@@ -75,6 +85,16 @@ export function ModuleCardManagerDialog({
       commandLabel={t('modules.cards.commandPlaceholder')}
       onUpdate={(id, patch) => onUpdate(id, patch)}
       onRemove={onRemove}
+      visibility={
+        visibility
+          ? {
+              isHidden: (id) => visibility.isHidden(id),
+              onToggle: (id) => visibility.onToggle(id),
+              hideLabel: t('home.manageHide'),
+              showLabel: t('home.manageShow'),
+            }
+          : undefined
+      }
       autoExec={{
         isManual: (id) => {
           const card = byId.get(id)

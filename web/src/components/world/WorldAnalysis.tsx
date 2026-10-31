@@ -188,11 +188,11 @@ export function WorldAnalysis({ info, stats, sections }: WorldAnalysisProps) {
         </div>
 
         {/* 概览：空气占比 + 液体 + 各段计数 */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {chips.map((chip) => (
             <span
               key={chip.key}
-              className="inline-flex items-baseline gap-1 rounded-md border border-border/60 px-2 py-1 text-2xs"
+              className="inline-flex items-baseline gap-1 rounded-control border border-border/60 px-2 py-1 text-2xs"
             >
               <span className="text-muted-foreground">{chip.label}</span>
               <span className="font-medium tabular-nums">{chip.value}</span>
@@ -218,7 +218,7 @@ export function WorldAnalysis({ info, stats, sections }: WorldAnalysisProps) {
                     setDetail(c.key)
                   }}
                   className={cn(
-                    'inline-flex items-baseline gap-1 rounded-md border border-border/60 px-2 py-1 text-2xs',
+                    'inline-flex items-baseline gap-1 rounded-control border border-border/60 px-2 py-1 text-2xs',
                     canOpen ? 'hover:border-foreground/40 hover:bg-accent' : 'cursor-default',
                   )}
                 >
@@ -234,7 +234,7 @@ export function WorldAnalysis({ info, stats, sections }: WorldAnalysisProps) {
         {/* 分层：地表 / 地下 / 洞穴 / 地狱（按存储层，不是生物群系） */}
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-muted-foreground">{t('wld.analysis.zones')}</span>
-          <ul className="flex flex-col gap-1.5" data-testid="analysis-zones">
+          <ul className="flex flex-col gap-2" data-testid="analysis-zones">
             {stats.zones.map((zone, i) => {
               const from = stats.zoneBounds[i] ?? 0
               const to =
@@ -290,7 +290,7 @@ export function WorldAnalysis({ info, stats, sections }: WorldAnalysisProps) {
               </Button>
             )}
           </div>
-          <ul className="flex flex-col gap-1.5" data-testid="analysis-tiles">
+          <ul className="flex flex-col gap-2" data-testid="analysis-tiles">
             {tiles.slice(0, expanded ? tiles.length : TOP_ROWS).map((r) =>
               row(`tile-${r.id}`, tileName(r.id), r.count, stats.total, maxTile),
             )}
@@ -311,7 +311,7 @@ export function WorldAnalysis({ info, stats, sections }: WorldAnalysisProps) {
                 {t('wld.analysis.walls', { n: walls.length })}
               </button>
               {showWalls && (
-                <ul className="flex flex-col gap-1.5" data-testid="analysis-walls">
+                <ul className="flex flex-col gap-2" data-testid="analysis-walls">
                   {walls.slice(0, TOP_ROWS).map((r) =>
                     row(`wall-${r.id}`, wallName(r.id), r.count, stats.total, maxWall),
                   )}
@@ -329,7 +329,7 @@ export function WorldAnalysis({ info, stats, sections }: WorldAnalysisProps) {
               <span className="text-xs font-medium text-muted-foreground">
                 {t('wld.analysis.chestItems', { kinds: chestItems.length })}
               </span>
-              <ul className="flex flex-col gap-1.5" data-testid="analysis-chest-items">
+              <ul className="flex flex-col gap-2" data-testid="analysis-chest-items">
                 {chestItems.slice(0, TOP_ROWS).map((r) => (
                   <li
                     key={`item-${r.id}`}
@@ -394,14 +394,14 @@ export function WorldAnalysis({ info, stats, sections }: WorldAnalysisProps) {
                     </span>
                     <div className="flex flex-wrap gap-x-2 gap-y-1">
                       {chest.items.length === 0 ? (
-                        <span className="text-2xs text-muted-foreground/60">
+                        <span className="text-2xs text-muted-foreground">
                           {t('wld.analysis.detail.emptyChest')}
                         </span>
                       ) : (
                         chest.items.map((it) => (
                           <span
                             key={it.slot}
-                            className="inline-flex items-baseline gap-1 rounded border border-border/60 px-1.5 py-0.5 text-2xs"
+                            className="inline-flex items-baseline gap-1 rounded border border-border/60 px-2 py-0.5 text-2xs"
                           >
                             {it.prefix > 0 && (
                               <span className="text-muted-foreground">

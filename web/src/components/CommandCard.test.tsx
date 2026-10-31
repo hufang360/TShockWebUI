@@ -8,10 +8,16 @@ beforeEach(() => {
   window.localStorage.clear()
 })
 
-function renderCard(result?: CommandResult, onRefresh = vi.fn()) {
+function renderCard(result?: CommandResult, onRefresh = vi.fn(), showLastRunAt = false) {
   render(
     <I18nProvider lang="zh">
-      <CommandCard title="测试卡片" command="/time" result={result} onRefresh={onRefresh} />
+      <CommandCard
+        title="测试卡片"
+        command="/time"
+        result={result}
+        onRefresh={onRefresh}
+        showLastRunAt={showLastRunAt}
+      />
     </I18nProvider>,
   )
 }
@@ -30,9 +36,36 @@ describe('CommandCard 刷新按钮提示', () => {
     expect((await screen.findByRole('tooltip')).textContent).toContain('尚未执行')
   })
 
-  it('底部不再显示执行时间', () => {
+  it('默认不在底部显示执行时间（时间只藏在刷新 Tooltip 里）', () => {
     renderCard({ status: 'ok', output: ['ok'], ts: Date.now() })
     expect(screen.queryByText(/执行于/)).toBeNull()
+  })
+
+  it('showLastRunAt：底部**左下角**常显「上次刷新 HH:MM:SS」（手动执行的卡说「执行于」）', () => {
+    const ts = new Date(2026, 0, 2, 13, 32, 50).getTime()
+    const { unmount } = render(
+      <I18nProvider lang="zh">
+        <CommandCard title="游戏时间" result={{ status: 'ok', output: ['ok'], ts }} showLastRunAt />
+      </I18nProvider>,
+    )
+    const label = screen.getByText(/上次刷新/)
+    expect(label.textContent).toContain('13:32:50')
+    // 左下角：它是底部那一行的第一个子元素（后面才是备注），不是靠右的尾巴。
+    expect(label.parentElement?.firstElementChild).toBe(label)
+    unmount()
+
+    // action='run'（手动执行卡）用「执行于」。
+    render(
+      <I18nProvider lang="zh">
+        <CommandCard
+          title="游戏时间"
+          result={{ status: 'ok', output: ['ok'], ts }}
+          showLastRunAt
+          action="run"
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText(/执行于/).textContent).toContain('13:32:50')
   })
 
   it('点击整个表头折叠 / 展开卡片', () => {

@@ -5,7 +5,6 @@ import { ConfirmButton } from '@/components/ConfirmButton'
 import { SearchInput } from '@/components/SearchInput'
 import { SelectIndicator } from '@/components/SelectIndicator'
 import {
-  Badge,
   Button,
   Collapsible,
   CollapsibleContent,
@@ -15,6 +14,10 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@/components/ui'
 import { CollapseChevron } from '@/components/CollapseChevron'
 import { useBatchSelect } from '@/hooks/useBatchSelect'
@@ -82,11 +85,14 @@ export function CommandPickerPanel({
     for (const cmd of commands) (cmd.allowServer === false ? blocked : ok).push(cmd)
     return { runnable: ok, inGame: blocked }
   }, [commands])
-  // 搜索时自动展开「游戏内」分组（否则搜到了也看不见）；清空搜索后回到用户手动选择的状态。
+  // 两个分组都可折叠；搜索时自动展开（否则搜到了也看不见），清空搜索后回到用户手动选择的状态。
+  const [showAll, setShowAll] = useState(true)
   const [showInGame, setShowInGame] = useState(false)
+  const allOpen = showAll || (keyword.length > 0 && runnable.length > 0)
   const inGameOpen = showInGame || (keyword.length > 0 && inGame.length > 0)
-  // 键盘导航只用当前可见的行（折叠时跳过游戏内那些）。
-  const visibleCount = runnable.length + (inGameOpen ? inGame.length : 0)
+  // 键盘导航只用当前可见的行（折叠的分组跳过），下标从 0 连续排。
+  const inGameBase = allOpen ? runnable.length : 0
+  const visibleCount = inGameBase + (inGameOpen ? inGame.length : 0)
 
   const roving = useRovingFocus(
     view === 'commands' ? visibleCount : filteredFavorites.length,
@@ -122,31 +128,43 @@ export function CommandPickerPanel({
     }
   }
 
-  /** 一行指令（可执行 / 仅游戏内共用）。 */
+  /** 一行指令：**指令与说明同一行**（说明占满剩余宽度、超出截断，hover 出完整说明）。 */
   const renderRow = (cmd: Dataset['commands'][number], index: number) => {
     const inGameOnly = cmd.allowServer === false
+    const help = cmd.helpZh ?? cmd.help
     return (
       <li key={cmd.name}>
-        <Button
-          variant="ghost"
-          ref={roving.setRef(index)}
-          onFocus={() => roving.setActive(index)}
-          onClick={() => onLoad(`/${cmd.name} `)}
-          onKeyDown={(e) => onRowKeyDown(e, index)}
-          title={cmd.helpZh ?? cmd.help}
-          className={cn(
-            'h-auto min-h-16 w-full cursor-pointer flex-col items-start gap-1 whitespace-normal px-2 py-2.5 font-normal',
-            roving.activeIndex === index && 'bg-accent',
-          )}
-        >
-          <span className="flex items-center gap-2">
-            <span className="font-pixel text-xs leading-5 text-foreground">/{cmd.name}</span>
-            {inGameOnly && <Badge tone="warn">{t('editor.badge.inGame')}</Badge>}
-          </span>
-          <span className="block w-full text-left text-xs leading-5 text-muted-foreground">
-            {cmd.helpZh ?? cmd.help}
-          </span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              ref={roving.setRef(index)}
+              onFocus={() => roving.setActive(index)}
+              onClick={() => onLoad(`/${cmd.name} `)}
+              onKeyDown={(e) => onRowKeyDown(e, index)}
+              className={cn(
+                'h-7 w-full cursor-pointer justify-start gap-2 px-2 font-normal',
+                roving.activeIndex === index && 'bg-accent',
+              )}
+            >
+              <span
+                className={cn(
+                  'max-w-[40%] shrink-0 truncate font-pixel text-xs leading-5',
+                  // 只能进游戏执行的指令用红色，和可执行的一眼区分（不再挂 badge）。
+                  inGameOnly ? 'text-destructive' : 'text-foreground',
+                )}
+              >
+                /{cmd.name}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-left text-xs leading-5 text-muted-foreground">
+                {help}
+              </span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-80 text-balance">
+            {help}
+          </TooltipContent>
+        </Tooltip>
       </li>
     )
   }
@@ -227,7 +245,7 @@ export function CommandPickerPanel({
                         onClick={() => activate(key, fav.cmd)}
                         onKeyDown={(e) => onRowKeyDown(e, index)}
                         className={cn(
-                          'h-auto w-full cursor-pointer justify-start gap-2 rounded-lg bg-accent/40 px-1.5 py-1 font-normal hover:bg-accent',
+                          'h-auto w-full cursor-pointer justify-start gap-2 rounded-control bg-accent/40 px-2 py-1 font-normal hover:bg-accent',
                           isSelected && 'bg-accent',
                         )}
                       >
@@ -244,40 +262,57 @@ export function CommandPickerPanel({
           </div>
         </>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
-          <section className="flex flex-col gap-1.5">
-            <h3 className="text-xs text-muted-foreground">
-              {t('cmd.all', { n: commands.length })}
-            </h3>
-            <ul>
-              {runnable.map((cmd, index) => renderRow(cmd, index))}
-              {runnable.length === 0 && inGame.length === 0 && (
-                <li className="px-2 py-2 text-xs text-muted-foreground">{t('cmd.noMatch')}</li>
-              )}
-            </ul>
-          </section>
-
-          {inGame.length > 0 && (
+        <TooltipProvider delayDuration={300}>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
             <Collapsible
-              open={inGameOpen}
+              open={allOpen}
               onOpenChange={(open) => {
-                setShowInGame(open)
+                setShowAll(open)
                 roving.reset()
               }}
-              className="mt-3 flex flex-col gap-1.5"
+              className="flex flex-col"
             >
-              <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-left">
+              {/* 分组标题在滚动区里**吸顶**（吸在搜索框下面那一行），滚动时不跟着走。 */}
+              <CollapsibleTrigger className="group/title sticky top-0 z-10 flex w-full cursor-pointer items-center gap-2 border-b border-border/60 bg-popover py-1.5 text-left">
                 <span className="text-xs text-muted-foreground">
-                  {t('cmd.ingameGroup', { n: inGame.length })}
+                  {t('cmd.all', { n: commands.length })}
                 </span>
-                <CollapseChevron open={inGameOpen} />
+                <CollapseChevron open={allOpen} />
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <ul>{inGame.map((cmd, index) => renderRow(cmd, runnable.length + index))}</ul>
+                <ul className="pt-1">
+                  {runnable.map((cmd, index) => renderRow(cmd, index))}
+                  {runnable.length === 0 && inGame.length === 0 && (
+                    <li className="px-2 py-2 text-xs text-muted-foreground">{t('cmd.noMatch')}</li>
+                  )}
+                </ul>
               </CollapsibleContent>
             </Collapsible>
-          )}
-        </div>
+
+            {inGame.length > 0 && (
+              <Collapsible
+                open={inGameOpen}
+                onOpenChange={(open) => {
+                  setShowInGame(open)
+                  roving.reset()
+                }}
+                className="flex flex-col"
+              >
+                <CollapsibleTrigger className="group/title sticky top-0 z-10 mt-1 flex w-full cursor-pointer items-center gap-2 border-b border-border/60 bg-popover py-1.5 text-left">
+                  <span className="text-xs text-muted-foreground">
+                    {t('cmd.ingameGroup', { n: inGame.length })}
+                  </span>
+                  <CollapseChevron open={inGameOpen} />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ul className="pt-1">
+                    {inGame.map((cmd, index) => renderRow(cmd, inGameBase + index))}
+                  </ul>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </div>
+        </TooltipProvider>
       )}
     </div>
   )

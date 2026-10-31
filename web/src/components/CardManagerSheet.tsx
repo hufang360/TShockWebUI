@@ -228,7 +228,7 @@ export function CardManagerSheet({
           </div>
         )}
 
-        <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-5 py-4">
+        <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
           {cards.map((card, index) => {
             const label = card.name || card.command
             const suggestionListId = `${suggestionBaseId}-${index}`
@@ -267,14 +267,14 @@ export function CardManagerSheet({
                 }
                 onDragEnd={ordering ? resetDrag : undefined}
                 className={cn(
-                  'flex flex-col gap-2.5 rounded-xl bg-accent/40 p-3 transition-shadow',
+                  'flex flex-col gap-3 rounded-container bg-accent/40 p-3 transition-shadow',
                   dragId === card.id && 'opacity-50',
                   dragId && overId === card.id && dragId !== card.id && 'ring-2 ring-ring',
                   (card.hidden || card.disabled) && 'opacity-60',
                 )}
                 aria-label={label}
               >
-                <div className="flex min-w-0 items-start gap-1.5">
+                <div className="flex min-w-0 items-start gap-2">
                   {ordering ? (
                     <Button
                       size="icon-sm"

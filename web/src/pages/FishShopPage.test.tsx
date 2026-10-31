@@ -127,16 +127,78 @@ describe('FishShopPage', () => {
     expect(grid.className).toContain('gap-2')
   })
 
-  it('右侧只保留「钓鱼信息」卡片，且不再有「游戏内指令」开关', async () => {
+  it('右侧默认只有「钓鱼信息」卡片：鱼罐 / 消费榜 / 鱼篓榜默认不显示', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
     await screen.findAllByText('生命水晶')
     expect(await screen.findByText('钓鱼信息')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '游戏内指令' })).toBeNull()
-    // 已移除的卡片不再出现。
+    // 三张新增卡片默认**不显示**（要玩家在「管理卡片」里打开）。
     expect(screen.queryByText('鱼罐')).toBeNull()
     expect(screen.queryByText('消费榜')).toBeNull()
     expect(screen.queryByText('鱼篓榜')).toBeNull()
+  })
+
+  it('鱼罐 / 消费榜 / 鱼篓榜默认不显示、不自动执行，在「管理卡片」里打开才出现', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), runCommand }))
+    await screen.findByText('钓鱼信息')
+    expect(screen.queryByText('鱼罐')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    const sheet = await screen.findByRole('dialog')
+    const jarRow = within(sheet).getByRole('listitem', { name: '鱼罐' })
+    // 默认：显示开关关着（文案是「显示」），自动执行也没勾。
+    const showSwitch = within(jarRow).getByRole('switch', { name: '显示' })
+    const autoBox = within(jarRow).getByRole('checkbox', { name: '鱼罐 自动执行' })
+    expect(autoBox.getAttribute('data-state')).not.toBe('checked')
+
+    fireEvent.click(showSwitch)
+    // 打开后开关变成「隐藏」。
+    expect(within(jarRow).getByRole('switch', { name: '隐藏' })).toBeTruthy()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // 卡片出现了，但仍是「手动执行」：刷新全部只跑钓鱼信息。
+    expect(await screen.findByText('鱼罐')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '刷新全部' }))
+    await waitFor(() =>
+      expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish info')).toBe(true),
+    )
+    expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish jar')).toBe(false)
+  })
+
+  it('把鱼罐勾成「自动执行」后，刷新全部会执行它', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), runCommand }))
+    await screen.findByText('钓鱼信息')
+
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    const sheet = await screen.findByRole('dialog')
+    const jarRow = within(sheet).getByRole('listitem', { name: '鱼罐' })
+    fireEvent.click(within(jarRow).getByRole('switch', { name: '显示' }))
+    fireEvent.click(within(jarRow).getByRole('checkbox', { name: '鱼罐 自动执行' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新全部' }))
+    await waitFor(() =>
+      expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish jar')).toBe(true),
+    )
+  })
+
+  it('记事本贴在「钓鱼信息」卡片下面一行，输入自动存本机（按服务器分开）', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    const info = await screen.findByText('钓鱼信息')
+    const note = screen.getByTestId('fish-notepad')
+    // DOM 顺序：钓鱼信息卡片在前，记事本紧跟其后。
+    expect(info.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const box = within(note).getByLabelText('记事本') as HTMLTextAreaElement
+    fireEvent.change(box, { target: { value: '今天鱼价 3 金' } })
+    expect(box.value).toBe('今天鱼价 3 金')
+    // 边打边存：按 serverId 存在本机。
+    expect(JSON.parse(localStorage.getItem('tswui:fishNote') ?? '{}').default).toBe('今天鱼价 3 金')
   })
 
   it('非原生物品（指令类，desc 无 [i:..]）悬停不显示物品提示，图标不压透明度', async () => {
@@ -151,26 +213,40 @@ describe('FishShopPage', () => {
     expect(within(cell).getByRole('img').parentElement?.className ?? '').not.toContain('opacity-80')
   })
 
-  it('件数与输入框在同一行（输入框宽度收窄），且不在卡片里、属于滚动区域', async () => {
+  it('件数在输入框右侧（失焦且空时让位给 / 提示），整页滚动、工具条吸顶', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
-    const count = await screen.findByText('1 件商品')
-    const group = document.querySelector('[data-slot="input-group"]') as HTMLElement
-    // 件数不再是输入框下面的一行：与输入框同一个 row 容器，且输入框宽度有上限。
-    const row = group.parentElement as HTMLElement
-    expect(row.contains(count)).toBe(true)
-    expect(row.className).toContain('items-center')
-    expect(group.className).toContain('max-w-sm')
-    expect(count.className).toContain('shrink-0')
-    // 头部白卡已移除：输入框直接铺在页面背景上，和货架同处一个滚动区域（往下滚会一起滚走）。
-    expect(group.closest('[data-slot="card"]')).toBeNull()
-    const scroller = group.closest('[class*="xl:overflow-y-auto"]') as HTMLElement | null
-    expect(scroller).toBeTruthy()
-    expect(scroller?.contains(screen.getByText('#1'))).toBe(true)
+    // 先等搜索框出现（货架是异步拉的）。
+    const input = await screen.findByRole('textbox', { name: '搜索商品：编号 / 名称 / 说明' })
+    const group = input.closest('[data-slot="input-group"]') as HTMLElement
+    // 失焦且没内容：右侧让位给 `/` 快捷键提示（点一下或按 / 才聚焦输入框）。
+    expect(within(group).getByText('/')).toBeTruthy()
 
-    fireEvent.focus(within(group).getByRole('button', { name: '刷新' }))
-    const tip = await screen.findByRole('tooltip')
-    expect(within(tip).getByText(/上次刷新/)).toBeTruthy()
+    // 聚焦后：件数就在输入框右侧（不再是输入框下面的一行），输入框宽度有上限。
+    fireEvent.focus(input)
+    const count = await screen.findByText('1 件商品')
+    expect(group.contains(count)).toBe(true)
+    // 输入框宽度有上限（包在 `max-w-sm` 的容器里，避免长占位符撑满整行）。
+    expect(group.closest('.max-w-sm')).toBeTruthy()
+    // 头部白卡已移除：输入框直接铺在页面背景上。
+    expect(group.closest('[data-slot="card"]')).toBeNull()
+
+    // 整页滚动：工具条吸在顶栏（48px）下面，货架跟着页面走、不再有内层滚动区。
+    const toolbar = group.closest('.sticky') as HTMLElement | null
+    expect(toolbar?.className).toContain('top-12')
+    expect(toolbar?.contains(screen.getByText('#1'))).toBe(false)
+    // 货架不再套内层滚动区：整页滚（滚动条在浏览器右侧）。
+    const grid = screen.getByText('#1').closest('button')?.parentElement as HTMLElement
+    expect(grid.className).toContain('grid')
+    expect(grid.closest('[class*="overflow-y-auto"]')).toBeNull()
+
+    // 刷新不再放在输入框里（顶栏那个「刷新全部」会连货架一起刷）。
+    expect(within(group).queryByRole('button', { name: '刷新' })).toBeNull()
+
+    // 右列（指令卡片）钉在顶栏下面：滚左侧货架时不跟着一起滚。
+    const rightColumn = document.querySelector('[class*="xl:sticky"]') as HTMLElement | null
+    expect(rightColumn?.className).toContain('xl:top-12')
+    expect(within(rightColumn!).getByText('钓鱼信息')).toBeTruthy()
   })
 
   it('词缀：格子在商品名前显示词缀名（warning 色），悬停图标提示也带词缀', async () => {
@@ -678,5 +754,106 @@ describe('FishShopPage 右侧指令卡片', () => {
     await waitFor(() => expect(runBatch).toHaveBeenCalled())
     expect(runBatch.mock.calls[0][0]).toEqual(['/fish info'])
     expect(runCommand).not.toHaveBeenCalled()
+  })
+})
+
+describe('FishShopPage 最近购买 / 页面设置', () => {
+  const seedRecent = (goods: unknown[]) => {
+    localStorage.setItem(
+      'tswui:moduleState',
+      JSON.stringify({ default: { store: { recentBuys: goods } } }),
+    )
+  }
+
+  it('买成功就在搜索框旁边显示「最近购买」徽标', async () => {
+    const fishBuy = vi.fn(async () => ({
+      serial: 1,
+      name: '生命水晶',
+      amount: 1,
+      cost: '[i/s1:73] 2 金币',
+    }))
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), fishBuy }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '购买' }))
+    fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
+    await waitFor(() => expect(fishBuy).toHaveBeenCalled())
+
+    // 关掉详情再查徽标：弹框开着时背景是 aria-hidden，按 role 查不到里面的按钮。
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    const recent = await screen.findByTestId('fish-recent-buys')
+    expect(within(recent).getAllByRole('button')).toHaveLength(1)
+    expect(within(recent).getByText('生命水晶')).toBeTruthy()
+    // 点徽标能重新打开详情（货架上还在时用最新货架数据）。
+    fireEvent.click(within(recent).getByRole('button'))
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+  })
+
+  it('最近购买按编号去重、最多 5 件', async () => {
+    seedRecent([
+      { ...GOOD, serial: 1 },
+      { ...GOOD, serial: 1, name: '重复的' },
+      { ...GOOD, serial: 2, name: '二号' },
+      { ...GOOD, serial: 3, name: '三号' },
+      { ...GOOD, serial: 4, name: '四号' },
+      { ...GOOD, serial: 5, name: '五号' },
+      { ...GOOD, serial: 6, name: '六号' },
+    ])
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+
+    const recent = await screen.findByTestId('fish-recent-buys')
+    const names = within(recent)
+      .getAllByRole('button')
+      .map((el) => el.textContent)
+    expect(names).toHaveLength(5)
+    expect(names[0]).toContain('生命水晶')
+    expect(names.some((n) => n?.includes('重复的'))).toBe(false)
+  })
+
+  it('页面设置：隐藏编号和名称 / 表格视图 / 导出表格', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    expect(await screen.findByText('#1')).toBeTruthy()
+
+    // 隐藏编号和名称：格子里只剩图标。
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    fireEvent.click(await screen.findByLabelText('隐藏编号和名称'))
+    await waitFor(() => expect(screen.queryByText('#1')).toBeNull())
+
+    // 表格视图：换成一张表（编号 / 图标 / 名称 / 价格 / 说明）。
+    fireEvent.click(screen.getByLabelText('表格视图'))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('编号')).toBeTruthy()
+    expect(within(table).getAllByText('生命水晶').length).toBeGreaterThan(0)
+    // 备注列：表头叫「备注」，内容单行截断（长备注不换行、不撑高行高）。
+    expect(within(table).getByRole('columnheader', { name: '备注' })).toBeTruthy()
+    const noteCell = within(table).getByTitle('备注 [i:29]')
+    expect(noteCell.className).toContain('truncate')
+
+    // 导出表格：CSV（`[i:..]` 还原成 #ID）。
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:fish')
+    const revokeObjectURL = vi.fn((_url: string) => {})
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true })
+    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true })
+    fireEvent.click(screen.getByRole('button', { name: '导出表格' }))
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    const blob = createObjectURL.mock.calls[0]![0]
+    const text = await blob.text()
+    expect(text).toContain('生命水晶')
+    // 富文本标签不原样写进 CSV：`[i/s2:73] 2 金币` → `#73x2 2 金币`。
+    expect(text).toContain('#73x2 2 金币')
+    expect(text).not.toContain('[i/s2:73]')
+  })
+
+  it('顶栏「刷新全部」同时刷新货架（输入框里不再有刷新按钮）', async () => {
+    const fishList = vi.fn(async () => shopOf([GOOD]))
+    renderPage(fakeTransport({ fishList }))
+    await screen.findByRole('button', { name: '生命水晶' })
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
   })
 })

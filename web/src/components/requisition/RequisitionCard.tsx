@@ -66,11 +66,11 @@ export function RequisitionCard({
           <span className="ml-auto text-2xs text-muted-foreground">{formatTime(record.createdAt)}</span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {(record.items ?? []).map((it) => {
             const item = itemsById.get(it.id)
             return (
-              <span key={it.id} className="inline-flex items-center gap-1.5">
+              <span key={it.id} className="inline-flex items-center gap-2">
                 {item ? (
                   <ItemIcon item={item} atlas={atlas ?? undefined} size={22} />
                 ) : (

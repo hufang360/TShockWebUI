@@ -1,13 +1,27 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { AlertTriangle, Droplets, Fish, RefreshCw, ShieldAlert, ShoppingCart } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  AlertTriangle,
+  Download,
+  Droplets,
+  Fish,
+  RefreshCw,
+  Search,
+  Settings2,
+  ShieldAlert,
+  ShoppingCart,
+} from 'lucide-react'
 import { InfoPopover } from '@/components/InfoPopover'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
+import { SearchInput } from '@/components/SearchInput'
 import { Notice } from '@/components/Notice'
 import { CommandOutput } from '@/components/ResultPanel'
 import { FishCommandCards } from '@/components/FishCommandCards'
 import { TopBarActions } from '@/components/TopBar'
 import { CELL_ICON_SIZE, GOOD_GRID, GoodCell, GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
+import { GoodsTable } from '@/components/fishshop/GoodsTable'
+import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
+import { parseRichText } from '@/lib/richtext'
 import { cn } from '@/lib/cn'
 import { splitFishArgs } from '@/lib/fishArgs'
 import { isDegradedGood } from '@/lib/fishGood'
@@ -22,26 +36,25 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Checkbox,
+  Field,
+  FieldGroup,
+  FieldLabel,
   Input,
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
   Kbd,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   Skeleton,
   Spinner,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components/ui'
 import { useModuleState } from '@/hooks/useModuleState'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
-import { formatClock } from '@/lib/clock'
 
 import { TshockRequestError } from '@/lib/tshock'
 import type { BackendTransport, FishBuyResult, FishCapabilities, FishGood, FishShop } from '@/lib/tshock'
@@ -73,13 +86,42 @@ interface FishShopPageProps {
 
 interface FishUiState extends Record<string, unknown> {
   query: string
+  /** 「页面设置 → 隐藏编号和名称」：只显示图标（与物品 ID 的同一开关同义）。 */
+  hideMeta?: boolean
+  /** 「页面设置 → 表格视图」。 */
+  tableView?: boolean
+  /** 最近购买的 5 件商品（去重、最新在前）：本机记忆，买完还能一键找回。 */
+  recentBuys?: FishGood[]
 }
 
 const DEFAULT_STATE: FishUiState = { query: '' }
 
+/** 「最近购买」最多记几件。 */
+const RECENT_BUYS_MAX = 5
+
+/**
+ * 本机记忆的数据可能被改坏 / 版本升级后形状不对：只保留结构对得上的条目，
+ * 按 `serial` 去重（同一件商品只留最新的一条），最多 `RECENT_BUYS_MAX` 条。
+ */
+function sanitizeRecentBuys(value: unknown): FishGood[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<number>()
+  const out: FishGood[] = []
+  for (const good of value) {
+    if (!good || typeof (good as FishGood).serial !== 'number') continue
+    if (typeof (good as FishGood).name !== 'string') continue
+    const entry = good as FishGood
+    if (seen.has(entry.serial)) continue
+    seen.add(entry.serial)
+    out.push(entry)
+    if (out.length >= RECENT_BUYS_MAX) break
+  }
+  return out
+}
+
 /** 网格图标尺寸：与「物品图鉴」一致（64px）。 */
 export function FishShopPage({ serverId, transport, authenticated, refreshInterval, onTokenInvalid, onLogin }: FishShopPageProps) {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const dataset = useDataset()
   const [ui, setUi] = useModuleState<FishUiState>(serverId, 'store', DEFAULT_STATE)
   const [capability, setCapability] = useState<FishCapabilities | null>(null)
@@ -88,8 +130,6 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const [shop, setShop] = useState<FishShop | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** 货架上次刷新时间（刷新图标 tooltip 用）。 */
-  const [lastShopLoadedAt, setLastShopLoadedAt] = useState<number | null>(null)
 
   // 详情弹框：`selectedSnapshot` 只是「点了哪一条」，真正展示/购买用的是派生出来的
   // `selected`（同一 serial 的最新货架数据）——这样刷新货架后「我的进度」「能不能买」
@@ -189,7 +229,6 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
         data = await transport.fishList()
       }
       setShop(data)
-      setLastShopLoadedAt(Date.now())
     } catch (err) {
       if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
         onTokenInvalid()
@@ -230,6 +269,25 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     setBuyResult(null)
     setError(null)
   }, [])
+
+  /** 买成功就记一笔（去重 + 最多 5 条，最新在前）。 */
+  const rememberPurchase = useCallback(
+    (good: FishGood) => {
+      const current = sanitizeRecentBuys(ui.recentBuys).filter((g) => g.serial !== good.serial)
+      setUi({ recentBuys: [good, ...current].slice(0, RECENT_BUYS_MAX) })
+    },
+    [setUi, ui.recentBuys],
+  )
+
+  /** 点「最近购买」：货架上还在就打开最新的那条（能直接再买），已经下架就用快照。 */
+  const openRecent = useCallback(
+    (good: FishGood) => {
+      const live = shop?.goods.find((g) => g.serial === good.serial)
+      openDetail(live ?? good)
+    },
+    [shop, openDetail],
+  )
+
 
   // 支持参数（指令类）时不调数量；只有 buyMax > 1 才显示数量调节。
   const needArgs = selected?.needArgs === true
@@ -312,6 +370,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       // 购买成功不关闭弹框：在界面显示结果（name/cost 里的 [i:..] 会渲染成图标）。
       setBuyResult(res)
       setConfirming(false)
+      // 买成功就记进「最近购买」（已全额退款的没拿到东西，不记）。
+      if (res.refunded !== true) rememberPurchase(selected)
       // 冷却数秒：按钮禁用 + 提示闪烁，避免玩家连点重复购买。
       // 没发货（已自动全额退款）时不给冷却：什么都没拿到，让人干等 3 秒只会莫名其妙。
       setBuyCooldown(res.refunded === true ? 0 : 3)
@@ -325,7 +385,18 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     } finally {
       setBuying(false)
     }
-  }, [selected, argsReady, transport, buyAmount, needArgs, args, loadShop, onTokenInvalid, kindMessage])
+  }, [
+    selected,
+    argsReady,
+    transport,
+    buyAmount,
+    needArgs,
+    args,
+    loadShop,
+    onTokenInvalid,
+    kindMessage,
+    rememberPurchase,
+  ])
 
   // 冷却倒计时（每秒 -1，到 0 为止）。
   useEffect(() => {
@@ -358,31 +429,111 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   )
   const renderRich = (text: string) => renderRichLines([text])
 
-  // 右列高度 = 实测可用高度（sticky + 内部滚动），避免整页多出滚动。
+  // 整页滚动（与指令 / 物品 ID / 数据 ID 一致）：货架跟着页面走，工具条吸在顶栏下面。
   const rootRef = useRef<HTMLDivElement>(null)
-  const [fillHeight, setFillHeight] = useState<number | undefined>(undefined)
-  useLayoutEffect(() => {
-    const el = rootRef.current
-    const scroller = el?.closest('main')
-    if (!el || !(scroller instanceof HTMLElement)) return
-    const measure = () => {
-      const box = scroller.getBoundingClientRect()
-      const top = el.getBoundingClientRect().top - box.top + scroller.scrollTop
-      let wrap: HTMLElement | null = el
-      while (wrap && wrap.parentElement !== scroller) wrap = wrap.parentElement
-      const padBottom = wrap ? Number.parseFloat(getComputedStyle(wrap).paddingBottom) || 0 : 0
-      setFillHeight(Math.max(280, Math.round(scroller.clientHeight - top - padBottom)))
-    }
-    measure()
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined
-    ro?.observe(scroller)
-    window.addEventListener('resize', measure)
-    return () => {
-      ro?.disconnect()
-      window.removeEventListener('resize', measure)
-    }
-    // 依赖 authenticated：未登录时先渲染 LoginGate，rootRef 尚未挂载；登录后需重新量高。
-  }, [authenticated])
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const stickyTop = useStickyHeaderOffset(toolbarRef)
+  usePageScrollReset(rootRef)
+
+  const hideMeta = ui.hideMeta === true
+  const tableView = ui.tableView === true
+  const recentBuys = useMemo(() => sanitizeRecentBuys(ui.recentBuys), [ui.recentBuys])
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  /** 导出当前筛选结果（CSV）：`[i:..]` 这类富文本标签还原成 `#ID`，Excel 打开不乱。 */
+  const exportGoods = useCallback(() => {
+    const plain = (text: string | undefined) =>
+      parseRichText(text ?? '')
+        .map((token) =>
+          token.kind === 'item'
+            ? `#${token.itemId}${token.stack && token.stack > 1 ? `x${token.stack}` : ''}`
+            : token.text,
+        )
+        .join('')
+    const escape = (value: string) => `"${value.replaceAll('"', '""')}"`
+    const csv = [
+      ['Serial', 'Name', 'Cost', 'Tags', 'Comment', 'Description'],
+      ...goods.map((good) => [
+        String(good.serial),
+        good.name,
+        plain(good.cost),
+        good.map.join(' / '),
+        plain(good.comment),
+        plain(good.desc),
+      ]),
+    ]
+      .map((row) => row.map(escape).join(','))
+      .join('\r\n')
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'tswui-fish.csv'
+    anchor.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }, [goods])
+
+  /** 页面设置（与物品 ID 同规）：隐藏编号和名称 / 表格视图 / 导出表格。 */
+  const fishSettingsControl = (
+    <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('fish.settings')}
+          title={t('fish.settings')}
+          className={cn(
+            'text-muted-foreground hover:bg-accent hover:text-foreground',
+            settingsOpen && 'bg-accent text-foreground',
+          )}
+        >
+          <Settings2 />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] p-0" data-testid="fish-settings-popover">
+        <div className="border-b px-4 py-3 text-sm font-semibold text-foreground">
+          {t('fish.settings')}
+        </div>
+        <FieldGroup className="gap-0.5 p-2">
+          <div className="px-2 py-1 text-2xs font-medium text-muted-foreground">
+            {t('dex.viewSection')}
+          </div>
+          <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
+            <Checkbox
+              id="fish-hide-meta"
+              checked={hideMeta}
+              onCheckedChange={(value) => setUi({ hideMeta: value === true })}
+              className="mt-0.5"
+            />
+            <FieldLabel htmlFor="fish-hide-meta" className="cursor-pointer font-medium text-foreground">
+              {t('fish.hideMeta')}
+            </FieldLabel>
+          </Field>
+          <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
+            <Checkbox
+              id="fish-table-view"
+              checked={tableView}
+              onCheckedChange={(value) => setUi({ tableView: value === true })}
+              className="mt-0.5"
+            />
+            <FieldLabel htmlFor="fish-table-view" className="cursor-pointer font-medium text-foreground">
+              {t('fish.tableView')}
+            </FieldLabel>
+          </Field>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mx-2 mt-1 w-[calc(100%-1rem)]"
+            onClick={exportGoods}
+            disabled={goods.length === 0}
+          >
+            <Download />
+            {t('fish.exportTable')}
+          </Button>
+        </FieldGroup>
+      </PopoverContent>
+    </Popover>
+  )
 
   /** 「重新检测」：刚装好 / 刚重启插件时 REST 端点会晚几秒才注册，点了不用切页面。 */
   const recheck = (
@@ -430,9 +581,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       </div>
       <div
         ref={rootRef}
-        // 两列：左货架 / 右指令卡片，各自内部滚动；整页锁定到可用高度。
-        className="grid gap-2 xl:h-[var(--fish-fill)] xl:grid-cols-[minmax(0,1fr)_360px]"
-        style={fillHeight ? ({ '--fish-fill': `${fillHeight}px` } as CSSProperties) : undefined}
+        // 整页滚动（与指令 / 物品 ID / 数据 ID 一致）：左货架 / 右指令卡片都跟着页面走，
+        // 滚动条是浏览器右侧那条；搜索工具条吸在顶栏下面（`sticky top-12`）。
+        className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_360px]"
+        style={{ '--page-sticky-top': `${stickyTop}px` } as CSSProperties}
       >
         {pageActions}
 
@@ -472,50 +624,48 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       )}
 
       {canUse && (
-        // 搜索行与货架一起铺在页面背景上、放在同一个滚动区域内：输入框不再是单独一张卡片，
-        // 往下滚看商品时它会随内容一起滚走（避免「白卡 + 网格」两段式观感）。
-        <div className="min-w-0 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain">
-          <div className="flex min-w-0 flex-col gap-2 pb-2">
-            <div className="flex min-w-0 items-center gap-3">
-                <InputGroup className="max-w-sm">
-                    <InputGroupInput
-                      value={ui.query}
-                      onChange={(e) => setUi({ query: e.target.value })}
-                      placeholder={t('fish.search')}
-                      aria-label={t('fish.search')}
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              disabled={loading}
-                              aria-label={t('home.refresh')}
-                              onClick={() => void loadShop()}
-                            >
-                              {loading ? (
-                                <Spinner aria-hidden />
-                              ) : (
-                                <RefreshCw aria-hidden />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {lastShopLoadedAt
-                              ? t('home.lastRefresh', {
-                                  time: formatClock(lang, lastShopLoadedAt),
-                                })
-                              : t('home.neverRefreshed')}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </InputGroupAddon>
-              </InputGroup>
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {t('fish.total', { n: goods.length })}
-              </span>
+        <>
+          {/* 吸顶工具条：搜索（结果数在框内）+ 最近购买 + 页面设置。
+              货架（页面）往上滚时它留在顶栏下面，不用滚回顶部找搜索框。 */}
+          <div
+            ref={toolbarRef}
+            className="sticky top-12 z-20 flex flex-col gap-2 bg-background py-1.5"
+          >
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="w-full max-w-sm min-w-0">
+                <SearchInput
+                  value={ui.query}
+                  onValueChange={(query) => setUi({ query })}
+                  placeholder={t('fish.search')}
+                  aria-label={t('fish.search')}
+                  leadingIcon={<Search className="size-4 text-muted-foreground" />}
+                  // 货架条数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
+                  resultLabel={t('fish.total', { n: goods.length })}
+                  shortcut
+                />
+              </div>
+              {recentBuys.length > 0 && (
+                <div
+                  data-testid="fish-recent-buys"
+                  aria-label={t('fish.recentBuys')}
+                  className="flex min-w-0 flex-wrap items-center gap-1"
+                >
+                  {recentBuys.map((good) => (
+                    <Button
+                      key={good.serial}
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 max-w-40 gap-1 px-1.5"
+                      title={`${t('fish.recentBuys')}：#${good.serial} ${good.name}`}
+                      onClick={() => openRecent(good)}
+                    >
+                      <GoodThumb good={good} dataset={dataset} size={18} />
+                      <span className="truncate text-2xs">{good.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              )}
+              <div className="ml-auto flex shrink-0 items-center gap-1">{fishSettingsControl}</div>
             </div>
             {error && !selected && (
               <Alert variant="destructive">
@@ -528,9 +678,9 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             <div className={GOOD_GRID} role="status" aria-busy="true" aria-label={t('fish.loading')}>
               {Array.from({ length: 12 }, (_, i) => (
                 <div key={i} className="grid place-items-center gap-1">
-                  <Skeleton className="size-18 rounded-lg" />
-                  <Skeleton className="h-2.5 w-8" />
-                  <Skeleton className="h-3 w-12" />
+                  <Skeleton className="size-18 rounded-control" />
+                  {!hideMeta && <Skeleton className="h-2.5 w-8" />}
+                  {!hideMeta && <Skeleton className="h-3 w-12" />}
                 </div>
               ))}
             </div>
@@ -547,26 +697,40 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 </EmptyHeader>
               </Empty>
             )
+          ) : tableView ? (
+            <GoodsTable rows={goods} dataset={dataset} onSelect={openDetail} />
           ) : (
             <div className={GOOD_GRID}>
               {goods.map((good) => (
-                <GoodCell key={good.serial} good={good} dataset={dataset} onSelect={openDetail} />
+                <GoodCell
+                  key={good.serial}
+                  good={good}
+                  dataset={dataset}
+                  hideMeta={hideMeta}
+                  onSelect={openDetail}
+                />
               ))}
             </div>
           )}
-        </div>
+        </>
       )}
         </div>
 
-        {/* 右列：指令卡片（只依赖 rawcmd，不依赖鱼店 REST API）。 */}
-        <FishCommandCards
-          dataset={dataset}
-          transport={transport}
-          authenticated={authenticated}
-          serverId={serverId}
-          refreshInterval={refreshInterval}
-          onTokenInvalid={onTokenInvalid}
-        />
+        {/* 右列：指令卡片（只依赖 rawcmd，不依赖鱼店 REST API）。
+            整页滚动只滚**左侧货架**：右列 `xl:sticky` 钉在顶栏下面，内容比一屏高时自己内部滚，
+            这样往下翻商品时右侧的「钓鱼信息」不会跟着一起滚走。 */}
+        <div className="min-w-0 xl:sticky xl:top-12 xl:flex xl:h-[calc(100dvh-4rem)] xl:flex-col xl:self-start">
+          <FishCommandCards
+            dataset={dataset}
+            transport={transport}
+            authenticated={authenticated}
+            serverId={serverId}
+            refreshInterval={refreshInterval}
+            onTokenInvalid={onTokenInvalid}
+            // 顶栏那个「刷新全部」同时刷新货架（输入框里不再单独放刷新按钮）。
+            onManualRefresh={() => void loadShop()}
+          />
+        </div>
       </div>
       </div>
 
@@ -585,7 +749,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             <>
               <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
                 <SheetTitle>{t('fish.detail')}</SheetTitle>
-                <div className="mt-2 flex flex-col items-center gap-1.5">
+                <div className="mt-2 flex flex-col items-center gap-2">
                   <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} />
                   <p className="text-center text-base font-semibold text-foreground">
                     #{selected.serial}{' '}
@@ -600,27 +764,27 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
                 {/* 属性（价格 / 解锁 / 别名 / 限购 / 备注）：文字统一在值框上面一行的左上角 */}
                 <dl className="flex flex-col gap-2">
-                  <Field label={t('fish.cost')}>
+                  <DetailField label={t('fish.cost')}>
                     {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
-                  </Field>
+                  </DetailField>
                   {personalNotes.length > 0 && (
-                    <Field label={t('fish.myState')}>{renderRichLines(personalNotes)}</Field>
+                    <DetailField label={t('fish.myState')}>{renderRichLines(personalNotes)}</DetailField>
                   )}
                   {selected.unlock.trim() && (
-                    <Field label={t('fish.unlock')}>{renderRich(selected.unlock)}</Field>
+                    <DetailField label={t('fish.unlock')}>{renderRich(selected.unlock)}</DetailField>
                   )}
                   {selected.map.length > 0 && (
-                    <Field label={t('fish.alias')}>{renderRich(selected.map.join(', '))}</Field>
+                    <DetailField label={t('fish.alias')}>{renderRich(selected.map.join(', '))}</DetailField>
                   )}
-                  {hasLimit && <Field label={t('fish.limit')}>{renderRichLines(limitLines)}</Field>}
+                  {hasLimit && <DetailField label={t('fish.limit')}>{renderRichLines(limitLines)}</DetailField>}
                   {timingLines.length > 0 && (
-                    <Field label={t('fish.timing')}>{renderRichLines(timingLines)}</Field>
+                    <DetailField label={t('fish.timing')}>{renderRichLines(timingLines)}</DetailField>
                   )}
                   {selected.check?.trim() && (
-                    <Field label={t('fish.check')}>{renderRich(selected.check)}</Field>
+                    <DetailField label={t('fish.check')}>{renderRich(selected.check)}</DetailField>
                   )}
                   {selected.comment.trim() && (
-                    <Field label={t('fish.comment')}>{renderRich(selected.comment)}</Field>
+                    <DetailField label={t('fish.comment')}>{renderRich(selected.comment)}</DetailField>
                   )}
                 </dl>
 
@@ -638,7 +802,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
                 {/* 确认 / 参数（操作按钮在底部操作区） */}
                 {confirming && (
-                  <div className="flex flex-col gap-2 rounded-lg bg-accent/50 p-3">
+                  <div className="flex flex-col gap-2 rounded-control bg-accent/50 p-3">
                     <p className="text-xs text-foreground">
                       {needArgs
                         ? t('fish.buyConfirmArgs', { args: args.trim() })
@@ -788,7 +952,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 }
 
 /** 属性块：标签在值框**上面一行的左上角**（价格 / 解锁 / 别名 / 限购 / 备注统一）。 */
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <dt className="text-2xs text-muted-foreground">{label}</dt>

@@ -106,8 +106,10 @@ describe('CommandTerminal', () => {
     expect(screen.getByRole('dialog', { name: '指令' })).toBe(win)
     const input = within(win).getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
     expect(input.className).toContain('h-7')
-    // 紧凑外壳：内边距也更小（桌面是 py-2，终端是 py-1.5）
-    expect((win.querySelector('.rounded-2xl') as HTMLElement).className).toContain('py-1.5')
+    // 紧凑外壳：内边距也更小，且落在 4px 网格上（桌面 py-2，终端 py-1）
+    const shell = win.querySelector('[data-slot=composer]') as HTMLElement
+    expect(shell.className).toContain('py-1 ')
+    expect(shell.className).not.toContain('py-2')
   })
 
   it('Ctrl + ` 可开关终端', () => {

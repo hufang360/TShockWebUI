@@ -1,9 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useRecipeFavoritesState } from '@/hooks/useRecipeFavoritesState'
 import { I18nProvider } from '@/lib/i18n'
+import { RecipeFavoritesProvider } from '@/lib/recipeFavoritesProviders'
 import { makeDataset } from '@/test/fixtures'
 import type { Dataset } from '@/types'
-import { RecipePanel } from './RecipePanel'
+import { RecipePanel, RecipeRow } from './RecipePanel'
 
 const ironOre = { id: 11, key: 'IronOre', name: '铁矿', icon: 11, frames: 1, sprite: [16, 16] as [number, number], tags: [] }
 const ironBar = { id: 22, key: 'IronBar', name: '铁锭', icon: 22, frames: 1, sprite: [16, 16] as [number, number], tags: [] }
@@ -43,6 +45,83 @@ function renderPanel(iconOnly = false, copyTags = true) {
     </I18nProvider>,
   )
 }
+
+afterEach(() => {
+  localStorage.clear()
+})
+
+/** 挂上收藏 Provider 的面板（条目 ⭐ 需要它，与线上 `App` 的挂法一致）。 */
+function renderWithFavorites(itemId = 22) {
+  function Host() {
+    const { api } = useRecipeFavoritesState()
+    return (
+      <I18nProvider lang="zh">
+        <RecipeFavoritesProvider api={api}>
+          <RecipePanel itemId={itemId} dataset={dataset} />
+        </RecipeFavoritesProvider>
+      </I18nProvider>
+    )
+  }
+  return render(<Host />)
+}
+
+describe('RecipePanel 合成记录收藏', () => {
+  it('没有收藏 Provider 时不渲染 ⭐（只留复制）', () => {
+    renderPanel()
+    expect(screen.queryByRole('button', { name: '收藏这条合成记录' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: '复制' }).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('传了 onPick 时整行可点（鼠标 / 键盘都能触发），⭐ 与复制不会误触发', () => {
+    const onPick = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <RecipeRow
+          recipe={dataset.recipes.recipes[0]}
+          dataset={dataset}
+          iconOnly={false}
+          copyTags={false}
+          onPick={onPick}
+          pickLabel="填充到输入框"
+        />
+      </I18nProvider>,
+    )
+    const row = screen.getByTestId('recipe-row')
+    expect(row.getAttribute('role')).toBe('button')
+    expect(row.getAttribute('tabIndex')).toBe('0')
+
+    fireEvent.click(row)
+    expect(onPick).toHaveBeenCalledTimes(1)
+
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onPick).toHaveBeenCalledTimes(2)
+
+    // 行内按钮 stopPropagation：点复制不会顺带触发填充。
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '复制' }))
+    expect(onPick).toHaveBeenCalledTimes(2)
+  })
+
+  it('hover 区里有 ⭐：点一下收藏、再点取消（写入 tswui:recipeFavorites）', () => {
+    renderWithFavorites()
+    const star = screen.getByRole('button', { name: '收藏这条合成记录' })
+    expect(star.getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.click(star)
+    const saved = JSON.parse(localStorage.getItem('tswui:recipeFavorites') ?? '[]')
+    expect(saved).toHaveLength(1)
+    expect(saved[0].key).toContain('fwd:22x1:17:11x3')
+    expect(screen.getByRole('button', { name: '取消收藏' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '取消收藏' }))
+    expect(JSON.parse(localStorage.getItem('tswui:recipeFavorites') ?? '[]')).toEqual([])
+  })
+})
 
 describe('RecipePanel', () => {
   it('渲染合成表 / 微光嬗变，数量以图标角标展示（不再有 ×N 文字）', () => {

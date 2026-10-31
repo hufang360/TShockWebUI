@@ -36,7 +36,7 @@ function NotebookCard({ moduleId }: { moduleId: string }) {
           }}
           placeholder={t('modules.notebookPlaceholder')}
           aria-label={t('modules.notebook')}
-          className="min-h-52 flex-1 resize-y rounded-lg bg-accent p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-h-52 flex-1 resize-y rounded-control bg-accent p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </CardBody>
     </Card>

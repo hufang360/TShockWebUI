@@ -152,7 +152,7 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
               {sessions.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-accent/40 px-2 py-1 text-2xs"
+                  className="flex items-center justify-between gap-2 rounded-control bg-accent/40 px-2 py-1 text-2xs"
                 >
                   {s.current ? (
                     <Badge tone="success">{t('account.current')}</Badge>

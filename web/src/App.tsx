@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, ScrollText, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
+import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, MessageCircle, Plug, ScissorsLineDashed, ScrollText, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
 import { CommandTerminal } from '@/components/CommandTerminal'
 import { TerminalTopBarButton } from '@/components/TerminalTopBarButton'
 import { AppShell, type NavItem } from '@/components/AppShell'
@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   Spinner,
+  Toaster,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { preloadAtlasImage } from '@/lib/atlas'
@@ -32,6 +33,8 @@ import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { I18nProvider, translate } from '@/lib/i18n'
 import { TerminalProvider } from '@/lib/terminalContext'
 import { ItemDetailProvider, type ItemDetailApi } from '@/lib/itemDetailContext'
+import { ItemFavoritesStoreProvider } from '@/lib/itemFavoritesContext'
+import { RecipeFavoritesStoreProvider } from '@/lib/recipeFavoritesProviders'
 import {
   DEFAULT_MODULES,
   MODULE_DEFS,
@@ -275,36 +278,45 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     }
   }, [activeTab, customModules])
 
-  // 侧边栏导航：固定项 + 已激活模块入口（玩家管理 / 鱼店）。
+  // 侧边栏导航：固定项 + 已激活模块入口（玩家管理 / 鱼店 / 物资申请 / 世界管理）。
   // 注意：必须在任何 early return 之前声明（Hooks 顺序稳定）；模块按服务器区分。
   const nav = useMemo(() => {
     const items: NavItem[] = [
+      // 首组不带分组标题：使用频率最高 + 不依赖插件的入口。
       { id: 'home', label: t('nav.home'), icon: House, group: 'primary' },
       { id: 'editor', label: t('nav.editor'), icon: Terminal, group: 'primary' },
-      { id: 'commands', label: t('nav.commands'), icon: ScrollText, group: 'primary', onPrefetch: () => preloadRoute('commands') },
-      { id: 'items', label: t('nav.items'), icon: BookOpen, group: 'library', onPrefetch: preloadItems },
-      { id: 'dataid', label: t('nav.dataId'), icon: LayoutGrid, group: 'library', onPrefetch: () => preloadRoute('dataid') },
-      // 查看存档是公开工具（上传本地 .plr，不读 TShock），不跟随「玩家管理」模块开关。
-      { id: 'save', label: t('nav.save'), icon: UserRound, group: 'players', onPrefetch: () => preloadRoute('save') },
-      // 查看世界同样是公开工具（上传本地 .wld，不读 TShock），排在「世界管理」模块之前。
-      { id: 'worldview', label: t('nav.worldView'), icon: MapIcon, group: 'world', onPrefetch: () => preloadRoute('worldview') },
-      // 小抄：世界事件 / 时间 / 召唤等指令的生成器（不依赖插件，恒在）。
+      // 聊天紧跟「指令」下一行：看服务器动态 / 网页发言，都是高频的玩家动作。
+      { id: 'chat', label: t('nav.chat'), icon: MessageCircle, group: 'primary', onPrefetch: () => preloadRoute('chat') },
+      // 工具：查询类 + 纯本地文件的公开工具（都不读 TShock、不跟随模块开关）。
+      { id: 'items', label: t('nav.items'), icon: BookOpen, group: 'tools', onPrefetch: preloadItems },
+      { id: 'dataid', label: t('nav.dataId'), icon: LayoutGrid, group: 'tools', onPrefetch: () => preloadRoute('dataid') },
+      // 指令小抄：跟着「数据 ID」放（查完 NPC / 图格，顺手看对应指令）。
+      { id: 'commands', label: t('nav.commands'), icon: ScrollText, group: 'tools', onPrefetch: () => preloadRoute('commands') },
+      { id: 'save', label: t('nav.save'), icon: UserRound, group: 'tools', onPrefetch: () => preloadRoute('save') },
+      { id: 'worldview', label: t('nav.worldView'), icon: MapIcon, group: 'tools', onPrefetch: () => preloadRoute('worldview') },
+      { id: 'spritesheet', label: t('nav.slice'), icon: ScissorsLineDashed, group: 'tools', onPrefetch: () => preloadRoute('spritesheet') },
     ]
     const icons: Record<string, typeof House> = { players: Users, store: Fish, requisition: ClipboardList, world: Globe2 }
     const groups: Record<string, NavItem['group']> = {
-      players: 'players',
-      world: 'world',
-      store: 'store',
-      requisition: 'services',
+      players: 'extension',
+      world: 'extension',
+      store: 'extension',
+      // 物资申请是玩家自己的入口，留在首组（首页 / 指令 / 物资申请），不进扩展分组。
+      requisition: 'primary',
     }
-    for (const def of MODULE_DEFS) {
+    // 「扩展」分组内的展示顺序（自定义模块恒在最后）。
+    const moduleOrder = ['store', 'players', 'requisition', 'world']
+    const defs = [...MODULE_DEFS].sort(
+      (a, b) => moduleOrder.indexOf(a.id) - moduleOrder.indexOf(b.id),
+    )
+    for (const def of defs) {
       // 内置模块同样只由开关控制侧边栏显隐，不因插件未安装而锁定。
       if (!isModuleEnabled(modules, activeServerId, def.id)) continue
       items.push({
         id: def.id,
         label: t(def.titleKey),
         icon: icons[def.id] ?? House,
-        group: groups[def.id] ?? 'services',
+        group: groups[def.id] ?? 'extension',
         onPrefetch: () => preloadRoute(def.id),
       })
     }
@@ -315,7 +327,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         label: mod.name || t('modules.custom.untitled'),
         // 与「设置 → 激活模块」卡片同图标（lucide Plug）。
         icon: Plug,
-        group: 'custom',
+        group: 'extension',
         onPrefetch: () => preloadRoute('world'),
       })
     }
@@ -672,7 +684,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const banner = (
     <div className="flex flex-col">
       {transport.mock && (
-        <Alert variant="info" className="rounded-none px-4 py-1.5">
+        <Alert variant="info" className="rounded-none px-4 py-2">
           <AlertDescription className="flex min-w-0 items-center gap-2 text-xs text-foreground">
             <Badge tone="mock">Mock</Badge>
             <span
@@ -685,7 +697,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         </Alert>
       )}
       {versionMismatch && (
-        <Alert variant="warning" className="rounded-none px-4 py-1.5">
+        <Alert variant="warning" className="rounded-none px-4 py-2">
           <AlertDescription className="text-2xs">
             {t('app.versionMismatch', {
               server: status?.serverversion ?? '?',
@@ -695,7 +707,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         </Alert>
       )}
       {notice && (
-        <Alert variant="default" className="rounded-none px-4 py-1.5">
+        <Alert variant="default" className="rounded-none px-4 py-2">
           <AlertDescription className="flex items-center justify-between gap-2 text-2xs text-foreground">
             <span>{notice}</span>
             <Button size="sm" variant="ghost" onClick={() => setNotice(null)}>
@@ -725,6 +737,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         <CommandResultsProvider serverId={activeServerId}>
         <div className="h-full">
         <ItemDetailProvider api={itemDetailApi}>
+        <ItemFavoritesStoreProvider>
+        <RecipeFavoritesStoreProvider>
         <TerminalProvider>
         <AppShell
           activeTab={activeTab}
@@ -739,7 +753,9 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             />
           }
           headerActions={
-            terminalAllowed && session.authenticated ? (
+            // 「聊天」页把终端入口挪到了输入框发送按钮旁（见 `ChatPage`），顶栏就不再重复；
+            // 首页不放（右侧顶栏留给刷新 / 管理卡片，终端从侧栏「指令」页进）。
+            terminalAllowed && session.authenticated && activeTab !== 'chat' && activeTab !== 'home' ? (
               <TerminalTopBarButton visible />
             ) : undefined
           }
@@ -824,6 +840,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
           onNavigate={navigate}
         />
         </TerminalProvider>
+        </RecipeFavoritesStoreProvider>
+        </ItemFavoritesStoreProvider>
         </ItemDetailProvider>
 
         <Dialog open={confirmLogoutOpen} onOpenChange={setConfirmLogoutOpen}>
@@ -848,6 +866,19 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* 全局提示条（sonner）：多条堆叠、每条带关闭按钮、数秒后自动消失。
+            top-right + 56px 偏移是为了让开 48px 的 sticky 顶栏，不遮住页面操作按钮。 */}
+        <Toaster
+          theme={isDark ? 'dark' : 'light'}
+          position="top-right"
+          offset={{ top: 56, right: 12 }}
+          mobileOffset={{ top: 56, right: 12, left: 12 }}
+          closeButton
+          duration={4000}
+          visibleToasts={4}
+          toastOptions={{ closeButtonAriaLabel: t('action.close') }}
+        />
 
         <LoginDialog
           open={loginOpen}

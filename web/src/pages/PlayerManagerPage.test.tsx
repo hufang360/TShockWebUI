@@ -44,7 +44,7 @@ function renderPage(transport: BackendTransport, authenticated = true, username:
   )
 }
 
-/** 渲染「玩家管理」（「查看存档」已独立成页面，见 PlrPage.test.tsx）。 */
+/** 渲染「玩家管理」（「玩家存档」已独立成页面，见 PlrPage.test.tsx）。 */
 function renderManage(
   transport: BackendTransport,
   authenticated = true,
@@ -66,7 +66,7 @@ afterEach(() => {
 })
 
 describe('PlayerManagerPage', () => {
-  it('未登录时提示先登录（查看存档已独立成公开页面）', () => {
+  it('未登录时提示先登录（玩家存档已独立成公开页面）', () => {
     renderPage(makeTransport(), false)
     expect(screen.getByText('请先登录！')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /导入 \.plr/ })).toBeNull()
@@ -220,6 +220,28 @@ describe('PlayerManagerPage', () => {
     expect(await screen.findByText('找不到名为 hf 的玩家!')).toBeTruthy()
   })
 
+  it('简约视图 / 导出图片 在顶栏，查询行用小号控件', async () => {
+    renderManage(makeTransport())
+    const input = await screen.findByPlaceholderText(/输入玩家名/)
+    fireEvent.change(input, { target: { value: 'hf' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    const shot = await screen.findByRole('button', { name: '导出图片' })
+    const compact = screen.getByLabelText('简约视图')
+
+    // 顶栏动作：不在任何卡片里，且排在查询输入框之前（TopBarActions 无 Provider 时原地渲染）。
+    expect(shot.closest('[data-slot="card"]')).toBeNull()
+    expect(compact.closest('[data-slot="card"]')).toBeNull()
+    expect(shot.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(compact.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // 查询行小号：输入框 text-xs / 外层 h-8 + md:h-7，按钮用 size="sm"（md:h-7）。
+    expect(input.className).toContain('text-xs')
+    expect(input.closest('[data-slot="input-group"]')?.className).toContain('md:h-7')
+    expect(screen.getByRole('button', { name: '查看背包' }).className).toContain('md:h-7')
+    expect(screen.getByRole('button', { name: '下载存档' }).className).toContain('md:h-7')
+  })
+
   it('银行 / 配装分组可折叠（aria-expanded 切换）', async () => {
     const items = Array.from({ length: 350 }, (_, slot) => ({
       slot,
@@ -255,7 +277,7 @@ describe('PlayerManagerPage 探测失败（旧后端 / 网络异常）', () => {
     })
     renderManage(transport)
     expect(await screen.findByText('无法检测 PlayerManager 插件')).toBeTruthy()
-    // 页面已不再有 tab（查看存档独立成菜单），但提醒与说明必须在，不能是空白页。
+    // 页面已不再有 tab（玩家存档独立成菜单），但提醒与说明必须在，不能是空白页。
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.getByText('Unexpected token <')).toBeTruthy()
   })

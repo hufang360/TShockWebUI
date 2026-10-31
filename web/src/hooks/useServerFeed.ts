@@ -39,7 +39,7 @@ export interface ServerFeedState {
 }
 
 /**
- * 服务器动态（首页卡片 + 指令页「动态」tab 共用）。
+ * 服务器动态（首页卡片 + 「聊天」页共用）。
  *
  * - 挂载即刷新一次：先取 `eventsTail`（最近 N 条，新插件走磁盘历史；旧插件 / 未实现则退回
  *   `events(since=0)`）并拉一次增强状态；

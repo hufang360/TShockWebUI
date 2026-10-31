@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { ServerFeedList } from '@/components/ServerFeed'
+import { IconAction } from '@/components/IconAction'
 import {
   Badge,
   Button,
@@ -22,12 +23,15 @@ import {
   Empty,
   EmptyDescription,
   Separator,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { formatClock } from '@/lib/clock'
 import { isModuleEnabled, type ModulesPrefs } from '@/lib/modules'
-import { StorageKeys, writeJson } from '@/lib/storage'
 import type { ServerStatus } from '@/lib/tshock'
 import type { Dataset, HistoryEntry, TabId } from '@/types'
 
@@ -36,12 +40,9 @@ import type { Dataset, HistoryEntry, TabId } from '@/types'
  * 服务器状态 / 服务器动态 / 快捷入口 / 最近执行。纯展示，数据与回调由 `HomePage` 注入。
  */
 
-/** 「最近执行」卡片固定高度，内容超出时内部滚动。 */
-const RECENT_CARD_HEIGHT = 'xl:h-64'
-
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
+    <div className="flex items-center justify-between gap-3 py-2">
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0 truncate text-right text-sm text-foreground tabular-nums">{value}</dd>
     </div>
@@ -140,36 +141,24 @@ export function EventsCard({
   const { t } = useI18n()
   return (
     <Card className="flex flex-col">
-      <CardHeader>
+      <CardHeader className="group/header">
         <CardTitle className="flex items-center gap-2">
           <Activity />
           {t('home.events')}
         </CardTitle>
-        <div className="flex items-center gap-1">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="text-muted-foreground"
-            onClick={onRefresh}
-            aria-label={t('home.refresh')}
-            title={t('home.refresh')}
-          >
-            <RefreshCw data-icon="inline-start" />
-          </Button>
+        {/* 刷新 / 箭头默认隐藏，hover（或键盘聚焦）表头才淡入；触屏常显。 */}
+        <div className="flex touch-visible items-center gap-1 opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100">
+          <IconAction label={t('home.refresh')} icon={RefreshCw} onClick={onRefresh} />
           {eventsPlugin !== false && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground"
+            // 只要箭头（文字去掉）：tooltip / aria-label 仍然是「查看全部」。
+            <IconAction
+              label={t('home.viewAll')}
+              icon={ArrowRight}
               onClick={() => {
-                // 直接落到「指令」页的「聊天」tab（服务器动态在那里）。
-                writeJson(StorageKeys.commandPageTab, 'chat')
-                onNavigate('editor')
+                // 直接落到「聊天」页（服务器动态在那里）。
+                onNavigate('chat')
               }}
-            >
-              {t('home.viewAll')}
-              <ArrowRight data-icon="inline-end" />
-            </Button>
+            />
           )}
         </div>
       </CardHeader>
@@ -190,7 +179,15 @@ export function EventsCard({
   )
 }
 
-/** 最近执行卡片。 */
+/**
+ * 最近执行卡片。
+ *
+ * 高度跟着内容走（`HomePage` 最多取 5 条）：之前是固定 `xl:h-64` + 内部滚动，
+ * 右侧多出一条几乎不可见的滚动条，看着像内容被截断了。滚动条没了，列表整段露出来。
+ * 右端显示的是这条指令的执行时间（与「指令 → 历史」面板同一格式），不再是右箭头——
+ * 整行都可点：跳到指令页、填进输入框、光标落进去。
+ * 指令长了会被截断，所以 hover 整行用 `Tooltip` 出全文（不是 `title`，那个要等一两年才弹）。
+ */
 export function RecentCard({
   recent,
   onOpen,
@@ -198,43 +195,56 @@ export function RecentCard({
   recent: HistoryEntry[]
   onOpen: (cmd: string) => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   return (
-    <Card className={cn('flex flex-col', RECENT_CARD_HEIGHT)}>
+    <Card className="flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History />
           {t('home.recent')}
         </CardTitle>
       </CardHeader>
-      <CardBody className="flex-1 overflow-y-auto">
+      <CardBody>
         {recent.length === 0 ? (
           <Empty size="sm">
             <EmptyDescription>{t('home.recentEmpty')}</EmptyDescription>
           </Empty>
         ) : (
-          <ul className="flex flex-col gap-1.5">
-            {recent.map((h) => (
-              <li key={h.cmd}>
-                <Button
-                  variant="ghost"
-                  className="h-auto w-full justify-start gap-2 px-1.5 py-1 font-normal"
-                  onClick={() => onOpen(h.cmd)}
-                  title={h.cmd}
-                >
-                  <code
-                    className={cn(
-                      'min-w-0 flex-1 truncate text-left font-pixel text-xs',
-                      h.ok ? 'text-foreground' : 'text-destructive',
-                    )}
-                  >
-                    {h.cmd}
-                  </code>
-                  <ArrowRight className="text-muted-foreground" data-icon="inline-end" />
-                </Button>
-              </li>
-            ))}
-          </ul>
+          <TooltipProvider delayDuration={200}>
+            <ul className="flex flex-col gap-1">
+              {recent.map((h) => (
+                <li key={h.cmd}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="h-auto w-full justify-start gap-2 px-2 py-1 font-normal"
+                        onClick={() => onOpen(h.cmd)}
+                      >
+                        <code
+                          className={cn(
+                            'min-w-0 flex-1 truncate text-left font-pixel text-xs',
+                            h.ok ? 'text-foreground' : 'text-destructive',
+                          )}
+                        >
+                          {h.cmd}
+                        </code>
+                        <span className="shrink-0 font-sans text-2xs text-muted-foreground tabular-nums">
+                          {formatClock(lang, h.ts)}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      className="max-w-72 text-left font-pixel text-2xs break-all whitespace-pre-wrap"
+                    >
+                      {h.cmd}
+                    </TooltipContent>
+                  </Tooltip>
+                </li>
+              ))}
+            </ul>
+          </TooltipProvider>
         )}
       </CardBody>
     </Card>

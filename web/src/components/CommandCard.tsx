@@ -46,6 +46,14 @@ export interface CommandCardProps {
   onRefresh?: () => void
   /** 折叠状态记忆 key（不传则不持久化）；如 `home:status` / `world:relive` / `fish:rank`。 */
   collapseKey?: string
+  /**
+   * 卡片底部**左下角**是否常显「上次刷新 13:32:50」。
+   *
+   * 目前只有首页「游戏时间」用（`lib/homeCards` 里的 `time` 卡片）：游戏内时间一直在走，
+   * 看到现实里的刷新时刻才能判断卡片里的「当前时间是…」是不是已经过时了。
+   * 时间以前只藏在刷新按钮的 Tooltip 里（要 hover 才知道数据新旧）。
+   */
+  showLastRunAt?: boolean
   /** 结果里 [i:ID] 渲染图标所需的索引。 */
   itemsById?: Map<number, Item>
   prefixesById?: Map<number, Prefix>
@@ -71,6 +79,7 @@ export function CommandCard({
   action = 'refresh',
   onRefresh,
   collapseKey,
+  showLastRunAt = false,
   itemsById,
   prefixesById,
   atlas,
@@ -80,6 +89,13 @@ export function CommandCard({
   // 展开 / 折叠状态按卡片记忆（切换模块回来仍保持）。
   const [open, setOpen] = useCollapsed(collapseKey)
   const lastRun = result?.ts ? new Date(result.ts) : null
+  // 底部那行时间：自动刷新的卡说「上次刷新」，手动执行的卡说「执行于」。
+  const lastRunLabel =
+    showLastRunAt && lastRun
+      ? t(action === 'run' ? 'home.lastRun' : 'home.lastRefresh', {
+          time: formatClock(lang, lastRun),
+        })
+      : null
   const refreshButton = (compact: boolean) =>
     onRefresh ? (
       <TooltipProvider delayDuration={150}>
@@ -91,6 +107,9 @@ export function CommandCard({
               aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
               disabled={unavailable || loading}
               onClick={onRefresh}
+              // 卡片页头的图标按钮统一用「次要灰」（与顶栏 IconAction 同一档）；
+              // 带文字的形态保持正文色，免得标签也跟着变淡。
+              className={compact ? 'text-muted-foreground hover:text-foreground' : undefined}
             >
               {loading ? (
                 <Spinner aria-hidden data-icon="inline-start" />
@@ -112,7 +131,7 @@ export function CommandCard({
   if (compactEmpty && !result && !loading && !unavailable && onRefresh) {
     return (
       <Card className={cn('overflow-hidden', className)} data-command={command ?? undefined}>
-        <CardBody className="flex flex-wrap items-center gap-2 py-2.5">
+        <CardBody className="flex flex-wrap items-center gap-2 py-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             {icon}
             <span className="min-w-0 truncate text-sm font-semibold text-foreground">{title}</span>
@@ -171,7 +190,9 @@ export function CommandCard({
         </CollapsibleTrigger>
         <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
           <CardBody className="flex min-h-0 flex-1 flex-col gap-2">
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            {/* 撑满剩余高度：卡片被同行更高的卡拉高时，多出来的空间留在灰底正文区里，
+                正文与卡片底部（或页脚备注 / 「上次刷新」）之间的间距保持和「Boss 进度」一样紧。 */}
+            <div className="flex min-h-0 flex-1 flex-col">
               {unavailable ? (
                 <p className="text-xs text-muted-foreground">
                   {unavailableText ?? t('home.needLogin')}
@@ -183,6 +204,7 @@ export function CommandCard({
                   itemsById={itemsById}
                   prefixesById={prefixesById}
                   atlas={atlas}
+                  fill
                 />
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -193,7 +215,15 @@ export function CommandCard({
                 </div>
               )}
             </div>
-            {footerNote && <div className="shrink-0 text-2xs text-muted-foreground">{footerNote}</div>}
+            {(footerNote || lastRunLabel) && (
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 text-2xs text-muted-foreground">
+                {/* 时间在左：只有一项时 `justify-between` 不会把它推到右边。 */}
+                {lastRunLabel && (
+                  <span className="shrink-0 tabular-nums">{lastRunLabel}</span>
+                )}
+                {footerNote}
+              </div>
+            )}
           </CardBody>
         </CollapsibleContent>
       </Collapsible>

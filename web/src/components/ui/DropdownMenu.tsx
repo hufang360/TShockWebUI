@@ -18,7 +18,7 @@ export function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          'z-50 min-w-[8rem] overflow-hidden rounded-xl bg-popover p-1 text-popover-foreground shadow-lg',
+          'z-50 min-w-[8rem] overflow-hidden rounded-menu bg-popover p-1 text-popover-foreground shadow-lg',
           'border border-border/60',
           className,
         )}
@@ -38,7 +38,7 @@ export function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-variant={variant}
       className={cn(
-        'relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs outline-none select-none',
+        'relative flex cursor-pointer items-center gap-2 rounded-control px-2 py-2 text-xs outline-none select-none',
         'focus:bg-accent focus:text-accent-foreground',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-3.5',
@@ -57,7 +57,7 @@ export function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
-      className={cn('px-2 py-1.5 text-xs font-semibold text-foreground', className)}
+      className={cn('px-2 py-2 text-xs font-semibold text-foreground', className)}
       {...props}
     />
   )

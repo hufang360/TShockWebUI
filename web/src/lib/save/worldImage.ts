@@ -1,7 +1,7 @@
 /**
  * 把世界缩略图位图编码成 PNG（浏览器本地，`canvas.toBlob`），用于「导出图片」。
  *
- * 与「查看存档」的图片导出（`lib/playerShot.ts`）同一套思路：位图已经渲染好，
+ * 与「玩家存档」的图片导出（`lib/playerShot.ts`）同一套思路：位图已经渲染好，
  * 这里只负责编码与下载，不依赖任何服务端。
  */
 import type { WorldThumb } from './worldThumb'

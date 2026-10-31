@@ -5,6 +5,7 @@ import { CommandResultsProvider } from '@/lib/commandResults'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { DEFAULT_HOME_CARDS, createCustomCard } from '@/lib/homeCards'
 import { resetRefreshGate } from '@/lib/refreshGate'
+import { consumeEditorFocus } from '@/lib/editorFocus'
 import type { BackendTransport } from '@/lib/tshock'
 import { makeDataset } from '@/test/fixtures'
 import { playerStubs } from '@/test/playerStubs'
@@ -35,6 +36,7 @@ function renderPage(
   transport: BackendTransport,
   authenticated = true,
   onLogin: () => void = vi.fn(),
+  onNavigate: (tab: string) => void = vi.fn(),
 ) {
   return render(
     <I18nProvider lang="zh">
@@ -50,7 +52,7 @@ function renderPage(
             eventsRefreshInterval={180000}
             onTokenInvalid={vi.fn().mockResolvedValue(true)}
             onLogin={onLogin}
-            onNavigate={vi.fn()}
+            onNavigate={onNavigate as never}
           />
         </CommandResultsProvider>
       </ExecutionQueueProvider>
@@ -296,6 +298,71 @@ describe('HomePage 卡片管理', () => {
     expect(within(recentCard).queryByText('执行成功')).toBeNull()
   })
 
+  it('最近执行：行右端是执行时间（不是箭头），点一行写入草稿、请求聚焦并跳到指令页', async () => {
+    localStorage.setItem(
+      'tswui:history',
+      JSON.stringify([{ cmd: '/who', ts: new Date('2024-01-01T12:35:56').getTime(), ok: true, status: 'ok' }]),
+    )
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    const onNavigate = vi.fn()
+    renderPage(fakeTransport(runCommand), true, vi.fn(), onNavigate)
+
+    const recentCard = screen.getByText('最近执行').closest('[data-slot="card"]') as HTMLElement
+    // 时间跟「指令 → 历史」同一格式（12:35:56），行尾不再有箭头（svg）。
+    const row = within(recentCard).getByText('/who').closest('button') as HTMLElement
+    expect(within(row).getByText('12:35:56')).toBeTruthy()
+    expect(row.querySelector('svg')).toBeNull()
+
+    expect(consumeEditorFocus()).toBe(false)
+    fireEvent.click(row)
+    // 草稿写入 + 请求聚焦 + 切到指令页（「聚焦」由 CommandPage 消费这个信号）。
+    expect(JSON.parse(localStorage.getItem('tswui:draft') as string)).toBe('/who')
+    expect(consumeEditorFocus()).toBe(true)
+    expect(onNavigate).toHaveBeenCalledWith('editor')
+  })
+
+  it('最近执行：hover 一条用 Tooltip 出完整指令（不靠原生 title）', async () => {
+    const long = '/judge unfreeze axing 这是一条很长很长很长很长的指令'
+    localStorage.setItem(
+      'tswui:history',
+      JSON.stringify([{ cmd: long, ts: Date.now(), ok: true, status: 'ok' }]),
+    )
+    renderPage(fakeTransport(vi.fn().mockResolvedValue({ status: 'ok', output: [] })))
+
+    const recentCard = screen.getByText('最近执行').closest('[data-slot="card"]') as HTMLElement
+    const row = within(recentCard).getByText(long).closest('button') as HTMLElement
+    // 不再用原生 title（等很久才弹、样式也不统一）。
+    expect(row.getAttribute('title')).toBeNull()
+
+    fireEvent.focus(row)
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip.textContent).toBe(long)
+  })
+
+  it('只有「游戏时间」卡左下角常显「上次刷新 HH:MM:SS」，其他卡不占这行', async () => {
+    const runCommand = vi.fn().mockImplementation((cmd: string): Promise<CommandResult> =>
+      Promise.resolve(
+        cmd === '/time'
+          ? { status: 'ok', output: ['当前时间是20:41。'] }
+          : { status: 'ok', output: ['其他结果'] },
+      ),
+    )
+    renderPage(fakeTransport(runCommand))
+
+    // 先等结果落地（卡片会从「空态行」重渲染成完整卡片）。
+    await waitFor(() => expect(screen.getByText('当前时间是20:41。')).toBeTruthy())
+    const timeCard = screen.getByText('游戏时间').closest('[data-slot="card"]') as HTMLElement
+    // 现实里的刷新时刻，格式与顶栏 / 服务器状态卡一致（HH:MM:SS）。
+    expect(within(timeCard).getByText(/^上次刷新 \d{2}:\d{2}:\d{2}$/)).toBeTruthy()
+
+    // 其他指令卡片没有这行（尤其不要把「执行于」硬塞到所有卡片上）。
+    for (const title of ['在线玩家', 'Boss 战伤害']) {
+      const card = screen.getByText(title).closest('[data-slot="card"]') as HTMLElement
+      expect(within(card).queryByText(/上次刷新/)).toBeNull()
+      expect(within(card).queryByText(/执行于/)).toBeNull()
+    }
+  })
+
   it('两栏布局：概览卡在右栏，指令卡在左栏', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
@@ -311,6 +378,11 @@ describe('HomePage 卡片管理', () => {
     expect(within(right).queryByText('快捷入口')).toBeNull()
     // 左栏：指令卡
     expect(within(left).getByText('在线玩家')).toBeTruthy()
+    // 同一行的半宽卡片**等高**（网格项把卡片拉满）：多出来的高度由灰底正文区吸收（`CommandOutput fill`）。
+    const onlineWrapper = screen.getByText('在线玩家').closest('[data-slot="card"]')
+      ?.parentElement as HTMLElement
+    expect(onlineWrapper.className).toContain('h-full')
+    expect(onlineWrapper.className).not.toContain('self-start')
   })
 
   it('插件指令不存在（command_not_found）→ 卡片隐藏且只探测一次；装上插件后「刷新全部」恢复', async () => {

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { History, X } from 'lucide-react'
-import { Button, InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui'
+import { Button, InputGroup, InputGroupAddon, InputGroupInput, Kbd } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { SEARCH_HISTORY_MAX, SEARCH_HISTORY_NARROW_MAX } from '@/lib/searchHistory'
@@ -42,6 +42,24 @@ type SearchInputProps = Omit<ComponentProps<'input'>, 'onChange' | 'value'> & {
   leadingIcon?: ReactNode
   /** 输入框最右侧的操作图标（如搜索放大镜）。 */
   trailingIcon?: ReactNode
+  /**
+   * 输入框**外面再挂一个 addon**（同一 `InputGroup` 里的 `inline-end`，例如「物品收藏」按钮）：
+   * 与输入框是一个整体（没有缝隙），也不会被「最近搜索 / `/` 提示」顶掉。
+   */
+  trailingAddon?: ReactNode
+  /**
+   * 搜索结果的条数文案（已翻译，如「12 个结果」），显示在输入框右侧。
+   *
+   * **失焦且没有内容时让位给快捷键提示**（`shortcut`），与「最近搜索」同一个位置。
+   */
+  resultLabel?: ReactNode
+  /**
+   * 页面内的 `/` 快捷键：失焦且输入框为空时在右侧显示 `kbd` 提示，按 `/` 聚焦它。
+   *
+   * 只给**页面级**搜索框开（物品 ID / 数据 ID / 指令小抄 / 鱼店 / 玩家管理）；
+   * 弹框、面板里的搜索框不要开（会和指令页的 `/` 抢焦点）。
+   */
+  shortcut?: boolean
 }
 
 /**
@@ -65,6 +83,9 @@ export function SearchInput({
   historyOnInput = true,
   leadingIcon,
   trailingIcon,
+  resultLabel,
+  trailingAddon,
+  shortcut = false,
   onFocus,
   onBlur,
   onKeyDown,
@@ -72,6 +93,7 @@ export function SearchInput({
 }: SearchInputProps) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
   const [narrow, setNarrow] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const q = value.trim().toLowerCase()
@@ -98,6 +120,39 @@ export function SearchInput({
   }, [])
 
   const showList = open && shown.length > 0
+  /** 失焦且没有内容：右侧让位给 `/` 快捷键提示（有内容 / 聚焦时显示结果数与最近搜索）。 */
+  const idle = !focused && value.length === 0
+  const showShortcut = idle && shortcut
+
+  // 页面级 `/`：不在输入框里时聚焦本搜索框（`/` 本身不是搜索词的一部分，只负责聚焦）。
+  useEffect(() => {
+    if (!shortcut) return
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))
+      ) {
+        return
+      }
+      // 浮层（指令工具弹框、抽屉、弹框）开着时让 `/` 留在浮层里。
+      if (
+        document.querySelector(
+          '[data-slot="popover-content"], [data-slot="dialog-content"], [data-slot="sheet-content"], [data-slot="drawer-content"]',
+        )
+      ) {
+        return
+      }
+      const input = rootRef.current?.querySelector('input')
+      if (!input) return
+      event.preventDefault()
+      input.focus()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [shortcut])
 
   // 点到输入框 / 历史按钮以外的地方收起下拉（历史按钮在容器内，不会误关）。
   useEffect(() => {
@@ -110,10 +165,12 @@ export function SearchInput({
   }, [showList])
 
   const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
+    setFocused(true)
     if (historyOnFocus) setOpen(true)
     onFocus?.(e)
   }
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
+    setFocused(false)
     // 延迟关闭，允许鼠标点候选（onMouseDown preventDefault 已避免失焦，这里兜底）。
     window.setTimeout(() => setOpen(false), 150)
     onBlur?.(e)
@@ -149,12 +206,29 @@ export function SearchInput({
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className={cn('px-2.5 text-xs', inputClassName)}
+          className={cn('px-3 text-xs', inputClassName)}
+          aria-keyshortcuts={shortcut ? '/' : undefined}
           {...props}
         />
-        {((historyToggle && items.length > 0) || value.length > 0 || trailingIcon) && (
+        {(showShortcut ||
+          resultLabel != null ||
+          (historyToggle && items.length > 0) ||
+          value.length > 0 ||
+          trailingIcon != null) && (
           <InputGroupAddon align="inline-end">
-            {historyToggle && items.length > 0 && (
+            {showShortcut && (
+              <Kbd
+                title={t('search.shortcut')}
+                data-testid="search-shortcut"
+                className="h-5 min-w-5 border border-border/60 bg-background/70 px-1 text-2xs text-muted-foreground"
+              >
+                /
+              </Kbd>
+            )}
+            {!showShortcut && resultLabel != null && (
+              <span className="px-1 text-xs text-muted-foreground tabular-nums">{resultLabel}</span>
+            )}
+            {!showShortcut && historyToggle && items.length > 0 && (
               <Button
                 size="icon-sm"
                 variant="ghost"
@@ -172,7 +246,7 @@ export function SearchInput({
                 <History data-icon="inline-start" />
               </Button>
             )}
-            {value.length > 0 && (
+            {!showShortcut && value.length > 0 && (
               <Button
                 size="icon-sm"
                 variant="ghost"
@@ -187,7 +261,12 @@ export function SearchInput({
                 <X data-icon="inline-start" />
               </Button>
             )}
-            {trailingIcon}
+            {!showShortcut && trailingIcon}
+          </InputGroupAddon>
+        )}
+        {trailingAddon != null && (
+          <InputGroupAddon align="inline-end" className="pl-0">
+            {trailingAddon}
           </InputGroupAddon>
         )}
       </InputGroup>
@@ -195,7 +274,7 @@ export function SearchInput({
         <ul
           role="listbox"
           data-testid="search-history-list"
-          className="absolute top-full left-0 z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-xl bg-popover py-1 shadow-xl"
+          className="absolute top-full left-0 z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-container bg-popover py-1 shadow-xl"
         >
           <li className="px-3 py-1 text-2xs text-muted-foreground">
             {historyHeader ?? t('search.recent')}
@@ -214,7 +293,7 @@ export function SearchInput({
                   else onValueChange(h)
                   setOpen(false)
                 }}
-                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               >
                 <History className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{h}</span>

@@ -86,7 +86,7 @@ export function CustomModulesSection({
                 }}
                 onDragEnd={resetDrag}
                 className={cn(
-                  'flex flex-col gap-2 rounded-xl bg-accent/40 p-3 transition-shadow',
+                  'flex flex-col gap-2 rounded-control bg-accent/40 p-3 transition-shadow',
                   dragId === mod.id && 'opacity-50',
                   dragId && overId === mod.id && dragId !== mod.id && 'ring-2 ring-ring',
                 )}
@@ -173,7 +173,7 @@ export function CustomModulesSection({
             ))}
           </ul>
         )}
-        <div className="flex flex-col gap-2 rounded-xl bg-accent/40 p-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-2 rounded-control bg-accent/40 p-3 sm:flex-row sm:items-end">
           <Field className="min-w-0 flex-1">
             <FieldLabel htmlFor="custom-module-name">{t('modules.custom.name')}</FieldLabel>
             <Input
