@@ -124,9 +124,9 @@ describe('RecipePanel 合成记录收藏', () => {
 })
 
 describe('RecipePanel', () => {
-  it('渲染合成表 / 微光嬗变，数量以图标角标展示（不再有 ×N 文字）', () => {
+  it('渲染合成来源 / 微光嬗变，数量以图标角标展示（不再有 ×N 文字）', () => {
     renderPanel()
-    expect(screen.getByText('合成表（1）')).toBeTruthy()
+    expect(screen.getByText('合成来源（1）')).toBeTruthy()
     expect(screen.getByText('微光嬗变（1）')).toBeTruthy()
     expect(screen.getAllByText('铁矿').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('铁锭').length).toBeGreaterThanOrEqual(1)
@@ -232,7 +232,7 @@ describe('RecipePanel', () => {
     expect(text).not.toContain('[i:')
   })
 
-  it('可微光分解：额外显示一条反向记录（产物 @ 微光 → 原材料）', () => {
+  it('可微光分解：反向记录挂在「微光嬗变」分组（产物 @ 微光 → 原材料）', () => {
     const ds: Dataset = makeDataset({
       items: [ironOre, ironBar, shimmer],
       recipes: {
@@ -266,6 +266,9 @@ describe('RecipePanel', () => {
     expect(reverse.textContent).toContain('铁锭')
     expect(reverse.textContent).toContain('铁矿')
     expect(reverse.textContent).toContain('微光')
+    // 它属于「微光嬗变」分组（计数把反向记录也算进去），不再挂在「合成来源」下面。
+    expect(screen.getByText('微光嬗变（1）')).toBeTruthy()
+    expect(screen.getByText('合成来源（1）').parentElement?.textContent).not.toContain('微光')
     // 第一条记录不再额外挂「可丢微光分解」标记
     expect(screen.queryByText('可丢微光分解')).toBeNull()
   })
@@ -385,5 +388,24 @@ describe('RecipePanel', () => {
     const text = writeText.mock.calls[0][0] as string
     // 铁矿 x3 @ 图格 17 (墓地) → 铁锭
     expect(text).toBe('铁矿 x3 @ 图格 17 (墓地) → 铁锭')
+  })
+})
+
+describe('合成记录条目样式统一', () => {
+  it('无描边、浅底、悬停加深（配方 / 反向配方 / 微光三处同一套）', () => {
+    renderPanel()
+    const rows = [
+      ...screen.getAllByTestId('recipe-row'),
+      ...screen.queryAllByTestId('reverse-recipe-row'),
+      ...screen.queryAllByTestId('shimmer-row'),
+    ]
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      // 底色（不再描边），悬停加深到 accent。
+      expect(row.className).toContain('bg-accent/40')
+      expect(row.className).toContain('hover:bg-accent')
+      expect(row.className).not.toContain('border')
+      expect(row.className).not.toContain('hover:-translate-y')
+    }
   })
 })

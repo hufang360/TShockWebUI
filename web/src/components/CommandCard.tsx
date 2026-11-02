@@ -131,7 +131,9 @@ export function CommandCard({
   if (compactEmpty && !result && !loading && !unavailable && onRefresh) {
     return (
       <Card className={cn('overflow-hidden', className)} data-command={command ?? undefined}>
-        <CardBody className="flex flex-wrap items-center gap-2 py-3">
+        {/* 紧凑行也要把图标压到 `size-4`：这里少了这条规则，图标会按 SVG 默认的 24px 渲染，
+            看起来比展开态的页头图标大一圈（鱼篓榜那种「画满画布」的图标尤其明显）。 */}
+        <CardBody className="flex flex-wrap items-center gap-2 py-3 [&_svg:not([class*='size-'])]:size-4">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             {icon}
             <span className="min-w-0 truncate text-sm font-semibold text-foreground">{title}</span>

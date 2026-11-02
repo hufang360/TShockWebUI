@@ -81,7 +81,7 @@ export function ItemDropsPanel({
                 )}
               </>
             )
-            // 小图标/条目本身不可点：要看详情就悬停出提示，点提示底部的「合成表」。
+            // 小图标/条目本身不可点：要看详情就悬停出提示，点提示右上角的 ⓘ「物品详情」。
             return (
               <div key={drop.id} className={rowClass}>
                 {body}

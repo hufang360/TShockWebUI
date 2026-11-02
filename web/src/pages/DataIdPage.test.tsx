@@ -4,38 +4,19 @@ import { DatasetProvider } from '@/lib/datasetContext'
 import { resetDataIdState } from '@/lib/dataIdState'
 import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
-import type { BackendTransport, MeInfo } from '@/lib/tshock'
 import type { Dataset } from '@/types'
 import { DataIdPage } from './DataIdPage'
-
-/** 只实现 `/me`（权限）的最小传输层；不登录时页面不会调用它。 */
-function permsTransport(permissions: string[], username = 'Alice'): BackendTransport {
-  return {
-    mock: false,
-    label: 'test',
-    me: async (): Promise<MeInfo> => ({
-      username,
-      group: 'default',
-      permissions,
-      canUseApi: true,
-      canRunCommands: true,
-    }),
-  } as unknown as BackendTransport
-}
 
 function renderPage(
   dataset: Dataset = makeDataset(),
   lang: 'zh' | 'en' = 'zh',
-  opts: { authenticated?: boolean; transport?: BackendTransport } = {},
+  /** 已登录玩家名；不传 = 未登录。页面**不探测权限**，只按用户名决定能不能拼 `/gbuff`。 */
+  username: string | null = null,
 ) {
   return render(
     <I18nProvider lang={lang}>
       <DatasetProvider value={dataset}>
-        <DataIdPage
-          authenticated={opts.authenticated ?? false}
-          serverId="default"
-          transport={opts.transport}
-        />
+        <DataIdPage username={username} />
       </DatasetProvider>
     </I18nProvider>,
   )
@@ -67,6 +48,23 @@ describe('DataIdPage', () => {
 
   function selectNpcCategory(name: string) {
     fireEvent.mouseDown(within(screen.getByTestId('npc-category-tabs')).getByRole('tab', { name }))
+  }
+
+  /**
+   * 第 n 张表的表头文字。列名统一是 `ID`（不带 NPCID / TileID / WallID / BuffID 前缀），
+   * 且列名个数必须等于行里的单元格个数（表头与列一一对应，见 `colgroup`）。
+   */
+  function headers(index = 0): string[] {
+    const table = screen.getAllByRole('table')[index]!
+    return within(table)
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent?.trim() ?? '')
+  }
+
+  /** `colgroup` 的 `<col>` 个数（`table-fixed` 下决定列宽；与表头数量必须一致）。 */
+  function columnCount(index = 0): number {
+    const table = screen.getAllByRole('table')[index]!
+    return table.querySelectorAll('colgroup > col').length
   }
 
   beforeEach(() => {
@@ -112,6 +110,7 @@ describe('DataIdPage', () => {
     renderPage()
     const cell = screen.getByTitle('蓝史莱姆 #1')
     expect(within(cell).getByText('蓝史莱姆')).toBeTruthy()
+    // 图标下方仍是原来的两行：ID 一行（不带 `#`）、名称一行。
     expect(within(cell).getByText('1')).toBeTruthy()
 
     openSettings()
@@ -259,7 +258,8 @@ describe('DataIdPage', () => {
     expect(screen.queryByTitle('Dirt #0')).toBeNull()
     expect(screen.queryByRole('table')).toBeNull()
     enableTable()
-    expect(screen.getByText('WallID')).toBeTruthy()
+    expect(headers()).toEqual(['ID', '图标', '名称', '内部名'])
+    expect(columnCount()).toBe(4)
   })
 
   it('切到 Buff：默认图标网格；勾选「表格视图」后可用表格', async () => {
@@ -275,7 +275,7 @@ describe('DataIdPage', () => {
     expect(screen.queryByRole('table')).toBeNull()
 
     enableTable()
-    expect(screen.getByText('BuffID')).toBeTruthy()
+    expect(headers()).toEqual(['ID', '图标', '名称', '内部名'])
     expect(screen.getByRole('table')).toBeTruthy()
   })
 
@@ -343,16 +343,25 @@ describe('DataIdPage', () => {
     expect(canvas.style.width).toBe('128px')
     expect(canvas.style.height).toBe('128px')
     expect(within(drawer).queryByText('Boss')).toBeNull()
-    expect(within(drawer).queryByText('/sb all')).toBeNull()
+    // Boss 详情里的相关指令现在含 `/sb all`（召唤所有 Boss）。
+    expect(within(drawer).getByText('/sb all')).toBeTruthy()
   })
 
-  it('NPC 表格视图：勾选后显示 NPCID 表格', () => {
+  it('NPC 表格视图：列名是 ID，整行可点打开抽屉', () => {
     renderPage()
     enableTable()
-    expect(screen.getByText('NPCID')).toBeTruthy()
+    expect(headers()).toEqual(['ID', '图标', '名称', '内部名'])
+    expect(columnCount()).toBe(4)
     expect(screen.getByRole('table')).toBeTruthy()
     // 表格视图图标不加背景框（网格视图仍保留）。
     expect(screen.getByTestId('dataid-list').querySelector('[class*="bg-muted/50"]')).toBeNull()
+    // 行本身可点（指针变手型）：点行即开右侧抽屉，不再需要行尾的「眼睛」按钮。
+    const row = screen.getByTitle('克苏鲁之眼 #4')
+    expect(row.tagName).toBe('TR')
+    expect(row.className).toContain('cursor-pointer')
+    expect(within(row).queryByRole('button')).toBeNull()
+    fireEvent.click(row)
+    expect(screen.getByTestId('dataid-detail').getAttribute('data-kind')).toBe('npc')
   })
 
   it('点图格打开右侧抽屉：内部名 / 代表物品 / 尺寸', async () => {
@@ -369,96 +378,147 @@ describe('DataIdPage', () => {
     expect(within(detail).getByText('多格')).toBeTruthy()
   })
 
-  it('NPC 详情：召唤指令不判权限，始终显示（Boss 完整写法 + 简写合并成一块两行）', async () => {
-    // 未登录、也拿不到任何权限：照样显示。
+  it('NPC 详情：相关指令不探测权限；传送 / 改名只给城镇 NPC', async () => {
+    // 未登录也照样显示（页面不调 /api/me，不把权限当展示门槛）。
     renderPage()
     fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
     const detail = await screen.findByTestId('dataid-detail')
-    expect(await within(detail).findByText('Boss召唤指令')).toBeTruthy()
-    // 两行：完整写法 + 单字简写；「（简写）」不再单独占一个属性名。
+    // 标题带条目数量。
+    expect(await within(detail).findByText('相关指令（4）')).toBeTruthy()
+    // Boss：完整写法 + 单字简写 + 召唤全部；两种写法共用一个属性名，不再各占一块。
     expect(within(detail).getByText('/spawnboss "eye of cthulhu"')).toBeTruthy()
     expect(within(detail).getByText('/sb eoc')).toBeTruthy()
-    expect(within(detail).getByText('NPC召唤指令')).toBeTruthy()
-    expect(within(detail).getByText('/spawnmob 4')).toBeTruthy()
+    expect(within(detail).getByText('/sb all')).toBeTruthy()
+    // `/spawnmob` 写别名 `/sm`。
+    expect(within(detail).getByText('/sm 4')).toBeTruthy()
+    // Boss 不是城镇 NPC：`/tpnpc`、`/renameNPC` 都不给；也不是「可解救 / 可购买」的 → 没有 `/npc`。
+    expect(within(detail).queryByText('/tpnpc "Eye of Cthulhu"')).toBeNull()
+    expect(within(detail).queryByText('/renameNPC 4 <newname>')).toBeNull()
+    expect(within(detail).queryByText('/npc 4')).toBeNull()
 
     fireEvent.keyDown(document.body, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByTestId('dataid-detail')).toBeNull())
 
-    // 普通怪：没有 `sb`，就没有 Boss 那一块，但 NPC 召唤照旧有。
+    // 普通怪（蓝史莱姆）：只剩召唤那一行。
     fireEvent.click(screen.getByTitle('蓝史莱姆 #1'))
     const detail2 = await screen.findByTestId('dataid-detail')
-    expect(within(detail2).queryByText('Boss召唤指令')).toBeNull()
-    expect(within(detail2).getByText('/spawnmob 1')).toBeTruthy()
+    expect(within(detail2).queryByText('/spawnboss "eye of cthulhu"')).toBeNull()
+    expect(within(detail2).getByText('/sm 1')).toBeTruthy()
+    expect(within(detail2).queryByText('/tpnpc "Blue Slime"')).toBeNull()
   })
 
-  it('召唤指令：属性名在灰框外，每条指令各占一行且整行可复制', async () => {
+  it('NPC 详情：图标下方是「#4 名称」，英文名在内部名上一行', async () => {
+    renderPage()
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    // 图标下方只剩一行：#4 克苏鲁之眼（不再有单独的 NPCID 行）。
+    expect(within(detail).getByText('#4')).toBeTruthy()
+    expect(within(detail).queryByText(/NPCID/)).toBeNull()
+    expect(await within(detail).findByText('英文名')).toBeTruthy()
+    expect(within(detail).getByText('Eye of Cthulhu')).toBeTruthy()
+  })
+
+  it('NPC 详情：英文界面不再重复显示英文名', async () => {
+    renderPage(makeDataset(), 'en')
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(await within(detail).findByText('Internal name')).toBeTruthy()
+    expect(within(detail).queryByText('English name')).toBeNull()
+  })
+
+  it('相关指令的 ⭐ 写进「指令」页的收藏（tswui:favorites）', async () => {
+    window.localStorage.removeItem('tswui:favorites')
+    renderPage()
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    fireEvent.click(within(detail).getAllByRole('button', { name: '收藏这条指令' })[0])
+    await waitFor(() => {
+      const saved = JSON.parse(window.localStorage.getItem('tswui:favorites') ?? '[]')
+      expect(saved[0]?.cmd).toBe('/spawnboss "eye of cthulhu"')
+    })
+  })
+
+  it('NPC 详情：城镇 NPC 才有 /tpnpc 与 /renameNPC；可解救的再多一条 /npc', async () => {
+    const base = makeDataset()
+    const angler = { id: 369, key: 'Angler', name: '渔夫', en: 'Angler' }
+    renderPage({
+      ...base,
+      npcs: [...base.npcs, angler],
+      npcsById: new Map([...base.npcsById, [369, angler]]),
+    })
+    fireEvent.click(screen.getByTitle('渔夫 #369'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(await within(detail).findByText('/npc 369')).toBeTruthy()
+    expect(within(detail).getByText('/tpnpc Angler')).toBeTruthy()
+    // 渔夫是城镇 NPC → 也有改名（用 ID，避免 `Bunny` / `Golfer` 这类重名改错人）。
+    expect(within(detail).getByText('/renameNPC 369 <newname>')).toBeTruthy()
+  })
+
+  it('相关指令：点条目本身不复制，只有复制图标才复制', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     renderPage()
     fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
     const detail = await screen.findByTestId('dataid-detail')
 
-    // 属性名本身不是按钮、也不在灰底框里：它是行外的一个纯文本。
-    const label = within(detail).getByText('Boss召唤指令')
-    expect(label.closest('button')).toBeNull()
+    // 分组标题是折叠触发器（不是灰底框），条目本身没有任何角色 / 点击行为。
+    const label = within(detail).getByText('相关指令（4）')
     expect(label.className).not.toContain('bg-accent')
 
-    // 两条指令各是一行（各带复制按钮），点行即复制该行文本。
-    const rows = within(detail).getAllByRole('button', { name: /^复制 / })
-    expect(rows).toHaveLength(3) // Boss 两行 + NPC 召唤一行
+    // Boss：召唤 2 行 + /sb all + NPC 召唤 = 4 行（各带 终端 / ⭐ / 复制）。
+    const rows = within(detail).getAllByTestId('command-row')
+    expect(rows).toHaveLength(4)
     fireEvent.click(rows[1])
+    expect(writeText).not.toHaveBeenCalled()
+
+    expect(within(detail).getAllByRole('button', { name: '复制' })).toHaveLength(4)
+    fireEvent.click(within(rows[1]).getByRole('button', { name: '复制' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('/sb eoc'))
-    fireEvent.click(rows[2])
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('/spawnmob 4'))
+    fireEvent.click(within(rows[0]).getByRole('button', { name: '复制' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('/spawnboss "eye of cthulhu"'))
   })
 
-  it('Buff 详情：通配权限（*、tshock.*）也算有权限（/gbuff 仍需知道玩家名）', async () => {
-    for (const wildcard of ['*', 'tshock.*', 'tshock.buff.*']) {
-      const transport = permsTransport([wildcard])
-      const view = renderPage(makeDataset(), 'zh', { authenticated: true, transport })
-      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
-      fireEvent.click(await screen.findByTitle('再生 #2'))
-      const detail = await screen.findByTestId('dataid-detail')
-      expect(await within(detail).findByText('/gbuff Alice 2')).toBeTruthy()
-      view.unmount()
-    }
-  })
-
-  it('拿不到权限（/api/me 失败）时召唤指令照样显示', async () => {
-    const transport = {
-      mock: false,
-      label: 'test',
-      me: async () => {
-        throw new Error('not implemented')
-      },
-    } as unknown as BackendTransport
-    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
-
+  it('NPC 详情：点「填充指令」后关掉抽屉（浮动终端在抽屉下面）', async () => {
+    renderPage()
     fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
     const detail = await screen.findByTestId('dataid-detail')
-    expect(await within(detail).findByText('/spawnboss "eye of cthulhu"')).toBeTruthy()
-    expect(within(detail).getByText('/spawnmob 4')).toBeTruthy()
+    fireEvent.click(within(detail).getAllByRole('button', { name: '填充指令' })[0])
+    await waitFor(() => expect(screen.queryByTestId('dataid-detail')).toBeNull())
   })
 
-  it('Buff 详情：有 tshock.buff.others 才显示 /gbuff <玩家> <buffID>', async () => {
-    const transport = permsTransport(['tshock.buff.others'])
-    renderPage(makeDataset(), 'zh', { authenticated: true, transport })
+  it('Buff 详情：知道玩家名就显示 /gbuff <玩家> <buffID>（不探测权限）', async () => {
+    renderPage(makeDataset(), 'zh', 'Alice')
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
     fireEvent.click(await screen.findByTitle('再生 #2'))
     const detail = await screen.findByTestId('dataid-detail')
-    expect(await within(detail).findByText('增益指令')).toBeTruthy()
+    expect(await within(detail).findByText('相关指令（1）')).toBeTruthy()
     expect(within(detail).getByText('/gbuff Alice 2')).toBeTruthy()
   })
 
-  it('表格行默认不可点，hover 出现的详情按钮才打开抽屉', () => {
+  it('Buff 详情：未登录（不知道玩家名）时不给 /gbuff', async () => {
+    renderPage()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
+    fireEvent.click(await screen.findByTitle('再生 #2'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(await within(detail).findByText('内部名')).toBeTruthy()
+    expect(within(detail).queryByText('相关指令')).toBeNull()
+  })
+
+  it('表格行整行可点（指针手型），行内不再有详情按钮；键盘也能开抽屉', () => {
     renderPage()
     enableTable()
     const row = screen.getByTitle('蓝史莱姆 #1')
-    expect(row.className).not.toContain('cursor-pointer')
+    expect(row.className).toContain('cursor-pointer')
+    expect(within(row).queryByRole('button')).toBeNull()
     fireEvent.click(row)
+    expect(screen.getByTestId('dataid-detail')).toBeTruthy()
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.queryByTestId('dataid-detail')).toBeNull()
-    fireEvent.click(within(row).getByRole('button', { name: 'NPC 详情' }))
+    // Enter / 空格同样能打开（行可聚焦）。
+    fireEvent.keyDown(row, { key: 'Enter' })
     expect(screen.getByTestId('dataid-detail')).toBeTruthy()
   })
 
@@ -549,7 +609,7 @@ describe('DataIdPage', () => {
     expect(screen.getByTitle('金箱 #21-1')).toBeTruthy()
   })
 
-  it('图格表头是 TileID，墙是 WallID；尺寸列只显示非 1×1', () => {
+  it('列名统一是 ID（图格多一列尺寸）；尺寸列只显示非 1×1', () => {
     const ds = makeDataset({
       tiles: {
         meta: { gameVersion: '1.4.5.8', count: 3, withItem: 2, source: 't', generatedBy: 't', note: '' },
@@ -563,14 +623,16 @@ describe('DataIdPage', () => {
     renderPage(ds)
     fireEvent.mouseDown(screen.getByRole('tab', { name: '图格' }))
     enableTable()
-    expect(screen.getByText('TileID')).toBeTruthy()
+    expect(headers()).toEqual(['ID', '图标', '名称', '尺寸', '内部名'])
+    expect(columnCount()).toBe(5)
     expect(screen.getByText('尺寸')).toBeTruthy()
     expect(screen.getByText('1×3')).toBeTruthy()
     // 1×1 不显示
     expect(screen.queryByText('1×1')).toBeNull()
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: '墙' }))
-    expect(screen.getByText('WallID')).toBeTruthy()
+    expect(headers()).toEqual(['ID', '图标', '名称', '内部名'])
+    expect(columnCount()).toBe(4)
     // 墙没有尺寸列
     expect(screen.queryByText('尺寸')).toBeNull()
   })
@@ -613,16 +675,16 @@ describe('DataIdPage', () => {
     const first = renderPage()
     fireEvent.mouseDown(screen.getByRole('tab', { name: '图格' }))
     enableTable()
-    await waitFor(() => expect(screen.getByText('TileID')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
     first.unmount()
     // 重新挂载（模拟切页面回来，模块内存还在）
     const second = renderPage()
-    expect(screen.getByText('TileID')).toBeTruthy()
+    expect(screen.getByRole('table')).toBeTruthy()
     second.unmount()
     // 重置后（模拟刷新页面）回到默认 NPC
     resetDataIdState()
     renderPage()
-    expect(screen.queryByText('TileID')).toBeNull()
+    expect(screen.queryByRole('table')).toBeNull()
     expect(screen.getByTitle('蓝史莱姆 #1')).toBeTruthy()
   })
 })

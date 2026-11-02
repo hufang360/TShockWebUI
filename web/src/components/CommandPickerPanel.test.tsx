@@ -1,8 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
 import { CommandPickerPanel } from './CommandPickerPanel'
+
+// 面板会记忆搜索词（`tswui:toolsMemory`）：用例之间要清掉，否则前一个用例的词会带过来。
+beforeEach(() => localStorage.removeItem('tswui:toolsMemory'))
 
 function renderPanel() {
   const onLoad = vi.fn()

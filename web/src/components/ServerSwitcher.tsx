@@ -13,6 +13,7 @@ import {
   Input,
   Separator,
 } from '@/components/ui'
+import { IconAction } from '@/components/IconAction'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { ConfirmButton } from '@/components/ConfirmButton'
@@ -160,22 +161,17 @@ export function ServerSwitcherDialog({
           ? t('servers.offline')
           : t('servers.checking')
     return (
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        className="shrink-0"
-        aria-label={`${t('servers.probe')}: ${label}`}
-        title={`${t('servers.probe')}: ${label}`}
-        onClick={() => void probe(id, header)}
-      >
-        {s === 'online' ? (
-          <Wifi className="text-success" data-icon="inline-start" />
-        ) : s === 'offline' ? (
-          <WifiOff className="text-destructive" data-icon="inline-start" />
-        ) : (
-          <LoaderCircle className="animate-spin" data-icon="inline-start" />
+      <IconAction
+        label={`${t('servers.probe')}: ${label}`}
+        icon={s === 'online' ? Wifi : s === 'offline' ? WifiOff : LoaderCircle}
+        iconClassName={cn(
+          s === 'online' && 'text-success',
+          s === 'offline' && 'text-destructive',
+          s === 'checking' && 'animate-spin',
         )}
-      </Button>
+        className="shrink-0"
+        onClick={() => void probe(id, header)}
+      />
     )
   }
 
@@ -232,16 +228,12 @@ export function ServerSwitcherDialog({
               </button>
               {probeButton(s.id, targetHeader(s) ?? '')}
               {info.allowCustom && (
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
+                <IconAction
+                  label={t('servers.edit')}
+                  icon={Pencil}
                   className="shrink-0"
-                  aria-label={t('servers.edit')}
-                  title={t('servers.edit')}
                   onClick={() => startEdit(s)}
-                >
-                  <Pencil data-icon="inline-start" />
-                </Button>
+                />
               )}
               <ConfirmButton
                 size="icon-sm"

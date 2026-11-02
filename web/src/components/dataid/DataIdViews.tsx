@@ -2,13 +2,14 @@ import { BuffIcon } from '@/components/BuffIcon'
 import { CommandLine } from '@/components/CommandLine'
 import { ItemIcon } from '@/components/ItemIcon'
 import { NpcSprite } from '@/components/NpcSprite'
-import { Eye } from 'lucide-react'
-import { Badge, Button } from '@/components/ui'
+import { Badge } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { DataIdKind } from '@/lib/dataIdState'
 import { useI18n } from '@/lib/i18n'
 import { gbuffCommand } from '@/lib/commandFormat'
-import { spawnBossCommand, spawnMobCommand } from '@/lib/spawnTips'
+import { useDataset } from '@/lib/datasetContext'
+import { npcRelatedCommands } from '@/lib/npcRelatedCommands'
+import { selectableRow } from '@/lib/rowSelect'
 import type { Atlas, Buff, Item, Npc, TileWallEntry } from '@/types'
 
 /**
@@ -31,6 +32,13 @@ const CELL_HOVER =
 /** 图标区：默认**无底色**、无描边，72×72；hover 时才铺 `bg-primary/10`。 */
 const ICON_CELL_BG =
   'flex size-18 items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10'
+
+/**
+ * 数据表格的一行：斑马纹 + hover / 键盘聚焦高亮 + **整行可点**（指针变手型）。
+ * `cursor-pointer` 与 `selectableRow()` 的事件配对使用。
+ */
+const ROW_CLASS =
+  'cursor-pointer border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-none'
 
 export function NpcCell({
   npc,
@@ -70,28 +78,24 @@ export function NpcCell({
   )
 }
 
-/** NPC 表格视图：贴图 / ID / 名称 / 内部名；点行开 Popover。 */
+/** NPC 表格视图：ID / 贴图 / 名称 / 内部名；整行可点（含键盘 Enter / 空格），打开详情抽屉。 */
 export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc: Npc) => void }) {
   const { t } = useI18n()
   return (
-    <div className="overflow-hidden rounded-control border border-border/60">
+    <div className="overflow-clip rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-14" />
           <col className="w-10" />
           <col />
           <col />
-          <col className="w-9" />
         </colgroup>
         <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
-            <th className="px-3 py-2 text-right font-medium">NPCID</th>
+            <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.name')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.key')}</th>
-            <th className="w-9 px-1 py-2"><span className="sr-only">{t('dataId.detail')}</span></th>
-            <th className="w-9 px-1 py-2"><span className="sr-only">{t('dataId.detail.buff')}</span></th>
-            <th className="w-9 px-1 py-2"><span className="sr-only">{t('dataId.detail.npc')}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -100,7 +104,8 @@ export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc
               key={npc.id}
               title={`${npc.name} #${npc.id}`}
               tabIndex={0}
-              className="group/row border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10"
+              {...selectableRow(() => onSelect(npc))}
+              className={ROW_CLASS}
             >
               <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                 {npc.id}
@@ -118,17 +123,6 @@ export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc
                 title={npc.key}
               >
                 {npc.key}
-              </td>
-              <td className="px-1 py-1">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={t('dataId.detail.npc')}
-                  onClick={() => onSelect(npc)}
-                  className="opacity-100 md:opacity-0 md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100"
-                >
-                  <Eye />
-                </Button>
               </td>
             </tr>
           ))}
@@ -255,23 +249,22 @@ export function BuffGrid({
   )
 }
 
-/** 单张 Buff 表：斑马纹 + hover + 行可点（打开 Popover）；表头吸顶。 */
+/** 单张 Buff 表：ID / 图标 / 名称 / 内部名；整行可点，打开详情抽屉；表头吸顶。 */
 function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) => void }) {
   const { t } = useI18n()
   return (
-    <div className="overflow-hidden rounded-control border border-border/60">
+    <div className="overflow-clip rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-14" />
           <col className="w-10" />
           <col />
           <col />
-          <col className="w-9" />
         </colgroup>
         {/* 表头不铺白底：用页面背景色（半透明 + 模糊），吸顶时也不会看到下面的行糊在一起 */}
         <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
-            <th className="px-3 py-2 text-right font-medium">BuffID</th>
+            <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.name')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.key')}</th>
@@ -283,7 +276,8 @@ function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) =>
               key={buff.id}
               title={`${buff.name} #${buff.id}`}
               tabIndex={0}
-              className="group/row border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10"
+              {...selectableRow(() => onSelect(buff))}
+              className={ROW_CLASS}
             >
               <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                 {buff.id}
@@ -301,17 +295,6 @@ function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) =>
                 title={buff.key}
               >
                 {buff.key}
-              </td>
-              <td className="px-1 py-1">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={t('dataId.detail.buff')}
-                  onClick={() => onSelect(buff)}
-                  className="opacity-100 md:opacity-0 md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100"
-                >
-                  <Eye />
-                </Button>
               </td>
             </tr>
           ))}
@@ -379,7 +362,7 @@ export function TileIconGrid({
   )
 }
 
-/** 单张表：图标 + ID + 名称 + 尺寸（图格）+ 内部名；斑马纹 + hover + 行可点（打开详情）；表头吸顶。 */
+/** 单张表：ID / 图标 / 名称 / 尺寸（图格）/ 内部名；整行可点，打开详情抽屉；表头吸顶。 */
 function DataTable({
   rows,
   kind,
@@ -398,7 +381,7 @@ function DataTable({
   const { t } = useI18n()
   const isTile = kind === 'tile'
   return (
-    <div className="overflow-hidden rounded-control border border-border/60">
+    <div className="overflow-clip rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-14" />
@@ -406,12 +389,11 @@ function DataTable({
           <col />
           {isTile && <col className="w-12" />}
           <col />
-          <col className="w-9" />
         </colgroup>
         {/* 表头不铺白底：用页面背景色（半透明 + 模糊），吸顶时也不会看到下面的行糊在一起 */}
         <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
-            <th className="px-3 py-2 text-right font-medium">{isTile ? 'TileID' : 'WallID'}</th>
+            <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.name')}</th>
             {isTile && (
@@ -432,7 +414,8 @@ function DataTable({
                 key={displayId}
                 title={`${name} #${displayId}`}
                 tabIndex={0}
-                className="group/row border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10"
+                {...selectableRow(() => onSelect(entry))}
+                className={ROW_CLASS}
               >
                 <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                   {displayId}
@@ -479,17 +462,6 @@ function DataTable({
                 >
                   {entry.key}
                 </td>
-                <td className="px-1 py-1">
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label={t('dataId.detail')}
-                    onClick={() => onSelect(entry)}
-                    className="opacity-100 md:opacity-0 md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100"
-                  >
-                    <Eye />
-                  </Button>
-                </td>
               </tr>
             )
           })}
@@ -524,27 +496,29 @@ function DetailRow({
 }
 
 /**
- * 一条只读指令：左 = 属性 / 命令名，右 = 指令原文，末尾复制按钮。
- * 与「内部名」那行同一套左右布局。
+ * NPC 详情：贴图 + `#ID 名称` / 英文名 / 内部名，底部是「相关指令」。
+ *
+ * 相关指令**不按权限隐藏**：玩家照常能看到 / 复制（能不能执行由 TShock 判定，
+ * 与「小抄」页一致：不把权限当展示门槛）。行内 ⭐ / 终端 / 复制见 `CommandLine`。
  */
-/** Boss 的单字简写（优先 `sbAliases` 里不等于全名的项，其次取全名第一个词）。 */
-function bossShortAlias(npc: Npc): string | null {
-  if (!npc.sb) return null
-  const alias = npc.sbAliases?.find((a) => a && a !== npc.sb)
-  const short = alias ?? npc.sb.split(/\s+/)[0]
-  return short && short !== npc.sb ? short : null
-}
-
-export function NpcDetail({ npc, large = false }: { npc: Npc; large?: boolean }) {
-  const { t } = useI18n()
-  // 召唤指令**不按权限隐藏**：玩家照常能看到 / 复制（能不能执行由 TShock 判定，
-  // 与「小抄」页一致：不把权限当展示门槛）。
-  const shortAlias = bossShortAlias(npc)
-  const bossCommands = npc.sb
-    ? [spawnBossCommand(npc.sb), shortAlias ? `/sb ${shortAlias}` : null].filter(
-        (c): c is string => c !== null,
-      )
-    : []
+export function NpcDetail({
+  npc,
+  large = false,
+  username = null,
+  onOpenTerminal,
+}: {
+  npc: Npc
+  large?: boolean
+  /** 当前登录玩家名：Boss 召唤物那条要拼 `/give <物品> <玩家>`（未登录就没有这一行）。 */
+  username?: string | null
+  /** 点了「填充指令」后关掉抽屉（浮动终端在抽屉下面，不关就看不见）。 */
+  onOpenTerminal?: () => void
+}) {
+  const { t, lang } = useI18n()
+  const dataset = useDataset()
+  // 英文名只在**非英文界面**显示（英文界面上它就是 NPC 的本名，重复一遍没意义）。
+  const enName = lang === 'en' ? '' : (npc.en ?? '')
+  const itemName = (itemId: number) => dataset?.itemsById.get(itemId)?.name
   return (
     <div className={cn('flex flex-col gap-2', large && 'gap-4')}>
       <div className={cn(large ? 'flex flex-col items-center gap-3' : 'flex items-center gap-3')}>
@@ -554,21 +528,20 @@ export function NpcDetail({ npc, large = false }: { npc: Npc; large?: boolean })
           name={npc.name}
           mode={large ? 'fit' : 'game'}
         />
+        {/* 图标下方一行：`#4 克苏鲁之眼`（ID 弱色，与图标格的写法一致）。 */}
         <div className={cn('min-w-0', large && 'text-center')}>
           <div className={cn('truncate font-semibold text-foreground', large ? 'text-base' : 'text-sm')}>
-            {npc.name}
+            <span className="text-muted-foreground">#{npc.id}</span> {npc.name}
           </div>
-          <div className="font-pixel text-xs text-muted-foreground">NPCID #{npc.id}</div>
         </div>
       </div>
+      {enName && <DetailRow label={t('dataId.field.en')} value={enName} />}
       <DetailRow label={t('dataId.field.internal')} value={npc.key} mono />
-      {/* 召唤指令：Boss 的完整写法与单字简写合并成一块（一行一条），下面再一条 NPC 召唤。 */}
-      <div className="flex flex-col gap-2">
-        {bossCommands.length > 0 && (
-          <CommandLine label={t('dataId.cmd.spawnboss')} commands={bossCommands} />
-        )}
-        <CommandLine label={t('dataId.cmd.spawnmob')} commands={[spawnMobCommand(npc.id)]} />
-      </div>
+      <CommandLine
+        label={t('commandLine.related')}
+        commands={npcRelatedCommands(npc, { itemName, username })}
+        onOpenTerminal={onOpenTerminal}
+      />
     </div>
   )
 }
@@ -701,12 +674,15 @@ export function BuffDetail({
   buff,
   large = false,
   gbuffPlayer = null,
+  onOpenTerminal,
 }: {
   buff: Buff
   large?: boolean
+  /** 点了「填充指令」后关掉抽屉（浮动终端在抽屉下面）。 */
+  onOpenTerminal?: () => void
   /**
-   * 有 `tshock.buff.others` 时传当前玩家名 → 显示 `/gbuff <玩家> <buffID>`；
-   * 未登录 / 无权限传 null（不显示）。
+   * 当前玩家名 → 显示 `/gbuff <玩家> <buffID>`；未登录 / 不知道玩家名传 null（拼不出来，不显示）。
+   * 不探测权限（见 `DataIdPage`：本页不请求 `/api/me`）。
    */
   gbuffPlayer?: string | null
 }) {
@@ -725,8 +701,9 @@ export function BuffDetail({
       <DetailRow label={t('dataId.field.internal')} value={buff.key} mono />
       {gbuffPlayer && (
         <CommandLine
-          label={t('dataId.cmd.gbuff')}
+          label={t('commandLine.related')}
           commands={[gbuffCommand(gbuffPlayer, buff.id)]}
+          onOpenTerminal={onOpenTerminal}
         />
       )}
     </div>

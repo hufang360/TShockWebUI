@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   BUILTIN_CARD_IDS,
+  readHomeCardsStore,
   DEFAULT_HOME_CARDS,
+  cardWidth,
   createCustomCard,
   customCardCommand,
+  defaultCardWidth,
   isBuiltinCardId,
   isCustomCardId,
   moveCard,
@@ -122,22 +125,48 @@ describe('默认配置', () => {
 })
 
 describe('upgradeHomeCardsLayout', () => {
-  it('老布局只挪动动态与快捷入口，其余顺序与隐藏态保留', () => {
+  it('v4：老默认顺序被换成 v4 的视觉默认，隐藏态保留', () => {
     const prefs = sanitizeHomeCards({
-      order: ['server', 'online', 'events', 'bossinfo', 'world', 'lookbag', 'time', 'bossdamage', 'alldeath', 'recent', 'quick'],
+      order: ['server', 'events', 'quick', 'online', 'bossinfo', 'world', 'lookbag', 'time', 'bossdamage', 'alldeath', 'recent'],
       hidden: { alldeath: true },
     })
     const upgraded = upgradeHomeCardsLayout(prefs)
-    expect(upgraded.order.slice(0, 4)).toEqual(['server', 'events', 'quick', 'online'])
+    // 右栏概览在前，然后是左栏两列卡，整行卡最后。
+    expect(upgraded.order).toEqual([
+      'server',
+      'events',
+      'quick',
+      'recent',
+      'world',
+      'lookbag',
+      'online',
+      'time',
+      'alldeath',
+      'bossdamage',
+      'bossinfo',
+    ])
     expect(upgraded.hidden).toEqual({ alldeath: true, quick: true })
-    expect(upgraded.order).toHaveLength(BUILTIN_CARD_IDS.length)
   })
 
-  it('自定义卡片保持原有相对顺序', () => {
-    const card = createCustomCard('钓鲈鱼', 'fish')
-    const prefs = sanitizeHomeCards({ order: [card.id, ...BUILTIN_CARD_IDS], custom: [card] })
+  it('v4：用户自己排过的顺序原样保留（v4 起拖拽才真正生效）', () => {
+    const prefs = sanitizeHomeCards({
+      order: ['world', 'server', 'lookbag', 'events', 'quick', 'recent', 'online', 'time', 'alldeath', 'bossdamage', 'bossinfo'],
+      layoutVersion: 0,
+    })
     const upgraded = upgradeHomeCardsLayout(prefs)
-    expect(upgraded.order[0]).toBe(card.id)
+    // events / quick 仍被钉在第 2 / 第 3，其余保持用户顺序。
+    expect(upgraded.order.slice(0, 5)).toEqual(['world', 'events', 'quick', 'server', 'lookbag'])
+  })
+
+  it('自定义卡片保持原有相对顺序（老默认顺序时挪到末尾）', () => {
+    const card = createCustomCard('钓鲈鱼', 'fish')
+    const thing = createCustomCard('第二条', 'who')
+    const prefs = sanitizeHomeCards({
+      order: ['server', 'events', 'quick', 'online', 'bossinfo', 'world', 'lookbag', 'time', 'bossdamage', 'alldeath', 'recent', card.id, thing.id],
+      custom: [card, thing],
+    })
+    const upgraded = upgradeHomeCardsLayout(prefs)
+    expect(upgraded.order.slice(-2)).toEqual([card.id, thing.id])
     expect(upgraded.order[1]).toBe('events')
     expect(upgraded.order[2]).toBe('quick')
   })
@@ -145,5 +174,64 @@ describe('upgradeHomeCardsLayout', () => {
   it('已是当前版本时原样返回', () => {
     const prefs = sanitizeHomeCards(DEFAULT_HOME_CARDS)
     expect(upgradeHomeCardsLayout(prefs)).toBe(prefs)
+  })
+})
+
+describe('卡片宽度', () => {
+  it('默认宽度：概览右栏、Boss 进度大、其余小、自定义小', () => {
+    expect(defaultCardWidth('server')).toBe('right')
+    expect(defaultCardWidth('events')).toBe('right')
+    expect(defaultCardWidth('quick')).toBe('right')
+    expect(defaultCardWidth('recent')).toBe('right')
+    expect(defaultCardWidth('bossinfo')).toBe('full')
+    expect(defaultCardWidth('world')).toBe('half')
+    expect(defaultCardWidth('time')).toBe('half')
+    // 用户添加的卡片默认「小」。
+    expect(defaultCardWidth('c:123')).toBe('half')
+  })
+
+  it('用户设置优先，非法值丢弃', () => {
+    const prefs = sanitizeHomeCards({
+      width: { world: 'full', time: 'right', online: 'huge', 'c:nope': 'half' },
+    })
+    expect(cardWidth(prefs, 'world')).toBe('full')
+    expect(cardWidth(prefs, 'time')).toBe('right')
+    expect(cardWidth(prefs, 'online')).toBe('half') // 非法 → 默认
+    expect(cardWidth(prefs, 'server')).toBe('right')
+    expect(prefs.width).toEqual({ world: 'full', time: 'right' })
+  })
+})
+
+
+describe('readHomeCardsStore（按服务器分开）', () => {
+  it('新形态：byServer 下每台服务器各自 sanitize', () => {
+    const card = createCustomCard('钓鲈鱼', 'fish')
+    const { store, legacy } = readHomeCardsStore({
+      byServer: {
+        a: { order: ['server', card.id], custom: [card], width: { server: 'full' } },
+        b: { order: ['online'] },
+      },
+    })
+    expect(legacy).toBeNull()
+    expect(store.byServer.a.custom).toHaveLength(1)
+    expect(store.byServer.a.order.slice(0, 2)).toEqual(['server', card.id])
+    expect(store.byServer.a.width).toEqual({ server: 'full' })
+    // 缺失的内置卡片会补齐。
+    expect(store.byServer.b.order).toContain('world')
+  })
+
+  it('老形态（顶层就是一份布局）当作所有服务器的兜底', () => {
+    const card = createCustomCard('钓鲈鱼', 'fish')
+    const { store, legacy } = readHomeCardsStore({
+      order: ['server', card.id],
+      custom: [card],
+    })
+    expect(store.byServer).toEqual({})
+    expect(legacy?.custom).toHaveLength(1)
+  })
+
+  it('空 / 非法输入没有兜底', () => {
+    expect(readHomeCardsStore(null).legacy).toBeNull()
+    expect(readHomeCardsStore({ foo: 1 }).legacy).toBeNull()
   })
 })

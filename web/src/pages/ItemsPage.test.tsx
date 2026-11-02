@@ -46,7 +46,7 @@ const detail = () => screen.getByTestId('dex-detail')
 const gridIcons = () => within(screen.getByTestId('dex-list')).getAllByRole('img')
 
 /**
- * 通过**小图标的提示**打开某物品的详情（小图标本身不可点）：悬停图标 → 点提示底部的「合成表」。
+ * 通过**小图标的提示**打开某物品的详情（小图标本身不可点）：悬停图标 → 点提示右上角的 ⓘ「物品详情」。
  * `scope` 用来限定在某一层抽屉里找那一行配方。
  */
 async function openFromRecipeRowTip(name: string, scope: HTMLElement) {
@@ -54,7 +54,7 @@ async function openFromRecipeRowTip(name: string, scope: HTMLElement) {
   const icon = within(row).getByRole('img', { name })
   fireEvent.mouseOver(icon)
   const tip = await screen.findByRole('tooltip')
-  fireEvent.click(within(tip).getByRole('button', { name: '合成表' }))
+  fireEvent.click(within(tip).getByRole('button', { name: '物品详情' }))
 }
 
 /** 点「分组」按钮打开侧抽屉。 */
@@ -180,8 +180,8 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.mouseOver(canvas)
     const tip = await screen.findByRole('tooltip', {}, { timeout: 1200 })
     expect(tip.textContent).toContain('物品1')
-    // 图标点一下就能开详情，提示里不再重复「合成表」入口
-    expect(within(tip).queryByRole('button', { name: '合成表' })).toBeNull()
+    // 图标点一下就能开详情，提示里不再重复「物品详情」入口
+    expect(within(tip).queryByRole('button', { name: '物品详情' })).toBeNull()
 
     // 点提示文字不能穿透到下方格子打开详情。
     fireEvent.click(within(tip).getByText('物品1'))
@@ -291,21 +291,24 @@ describe('ItemsPage 图鉴', () => {
     expect(within(dialog).getByRole('button', { name: '复制名称' })).toBeTruthy()
     // 物品给予指令（`/give <物品> <玩家>`）；有词缀时才带数量与词缀。
     expect(within(dialog).getByText('/give 1 Alice')).toBeTruthy()
-    const side = within(dialog).getByTestId('dex-detail-side')
-    const wiki = within(side).getByRole('link', { name: /前往 Wiki/ })
+    const actions = within(dialog).getByTestId('dex-detail-actions')
+    const wiki = within(actions).getByRole('link', { name: /前往 Wiki/ })
     expect(wiki.getAttribute('href')).toBe(
       'https://terraria.wiki.gg/zh/wiki/' + encodeURIComponent('物品1'),
     )
-    // tips：与悬停同一套样式（半透明黑、同宽上限），左下角 ID · key
+    // tips：与悬停同一套样式，但**通栏、无阴影**，左下角 ID · key
     const tip = within(dialog).getByTestId('item-tooltip')
     expect(tip.className).toContain('bg-black/85')
-    expect(tip.className).toContain('max-w-96')
+    expect(tip.className).toContain('w-full')
+    expect(tip.className).toContain('max-w-none')
+    expect(tip.className).not.toContain('max-w-96')
+    expect(tip.className).not.toContain('shadow-xl')
     expect(within(tip).getByText('1 · Item1')).toBeTruthy()
     // 说明文案已按需求移除
     expect(within(dialog).queryByText(/标签仅用于聊天显示/)).toBeNull()
   })
 
-  it('可堆叠抽屉：在详情里从材料提示的「合成表」再叠一层，返回 / 关闭可逐层退回', async () => {
+  it('可堆叠抽屉：在详情里从材料提示的「物品详情」再叠一层，返回 / 关闭可逐层退回', async () => {
     renderPage(
       makeDataset({
         items: makeItems(3),
@@ -332,7 +335,7 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.getAllByTestId('dex-detail')).toHaveLength(1)
     expect(within(detail()).getByTestId('item-tooltip').textContent).toContain('物品1')
 
-    // 材料「物品2」的提示里点「合成表」→ 叠一层新抽屉（父抽屉留在后面）
+    // 材料「物品2」的提示里点「物品详情」→ 叠一层新抽屉（父抽屉留在后面）
     await openFromRecipeRowTip('物品2', detail())
     const layers = screen.getAllByTestId('dex-detail')
     expect(layers).toHaveLength(2)
@@ -350,6 +353,38 @@ describe('ItemsPage 图鉴', () => {
     // 右上角 × 关闭根抽屉 → 全部关闭（栈清空）
     fireEvent.click(within(afterBack[0]).getByTestId('dex-detail-close'))
     expect(screen.queryByTestId('dex-detail')).toBeNull()
+  })
+
+  it('相关指令的「填充指令」把整叠抽屉一起关掉（浮动终端在抽屉下面）', async () => {
+    renderPage(
+      makeDataset({
+        items: makeItems(3),
+        recipes: {
+          meta: { gameVersion: '1.4.5.8', count: 1, groupCount: 0, source: 'test', generatedBy: 'test' },
+          groups: {},
+          recipes: [
+            {
+              result: { id: 1, stack: 1 },
+              ingredients: [{ id: 2, stack: 1 }],
+              station: -1,
+              stationItems: [],
+              env: [],
+              flags: [],
+            },
+          ],
+          byResult: { '1': [0] },
+          byIngredient: { '2': [0] },
+        },
+      }),
+    )
+    fireEvent.click(cell('物品1'))
+    await openFromRecipeRowTip('物品2', detail())
+    const layers = screen.getAllByTestId('dex-detail')
+    expect(layers).toHaveLength(2)
+
+    fireEvent.click(within(layers[1]).getByRole('button', { name: '填充指令' }))
+    // 两层都进入收起动画 → 最终全部出栈（`queryAll` 因为期间会同时挂着两层）。
+    await waitFor(() => expect(screen.queryAllByTestId('dex-detail')).toHaveLength(0))
   })
 
   it('可堆叠抽屉：右上角 × 直接关掉整个抽屉（不回到上一层）', async () => {
@@ -407,12 +442,12 @@ describe('ItemsPage 图鉴', () => {
       }),
     )
     fireEvent.click(cell('物品1'))
-    // 配方行末尾的产物就是当前物品：从它的提示点「合成表」不会重复叠层
+    // 配方行末尾的产物就是当前物品：从它的提示点「物品详情」不会重复叠层
     await openFromRecipeRowTip('物品1', detail())
     expect(screen.getAllByTestId('dex-detail')).toHaveLength(1)
   })
 
-  it('大格子点击打开抽屉；配方行里的小图标点击不弹（只有提示里的「合成表」能开）', async () => {
+  it('大格子点击打开抽屉；配方行里的小图标点击不弹（只有提示里的「物品详情」能开）', async () => {
     renderPage(
       makeDataset({
         items: makeItems(3),
@@ -445,38 +480,48 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(chip)
     expect(screen.getAllByTestId('dex-detail')).toHaveLength(1)
 
-    // 只有提示底部的「合成表」能再叠一层
+    // 只有提示右上角的「物品详情」能再叠一层
     await openFromRecipeRowTip('物品2', detail())
     expect(screen.getAllByTestId('dex-detail')).toHaveLength(2)
   })
 
-  it('抽屉里的 tips 不显示「合成表」入口（指向自己没意义）', () => {
+  it('抽屉里的 tips 不显示「物品详情」入口（指向自己没意义）', () => {
     renderPage(makeItems(3))
     fireEvent.click(cell('物品1'))
     const dialog = detail()
     const tip = within(dialog).getByTestId('item-tooltip')
-    expect(within(tip).queryByRole('button', { name: '合成表' })).toBeNull()
+    expect(within(tip).queryByRole('button', { name: '物品详情' })).toBeNull()
     // ID · key 仍在
     expect(within(tip).getByText('1 · Item1')).toBeTruthy()
   })
 
-  it('复制 ID / 名称位于 Wiki 上方，底部不再提供关闭按钮', () => {
+  it('复制 ID / 复制名称 / 前往 Wiki 都在抽屉底部的固定操作区', () => {
     renderPage(makeItems(3))
     fireEvent.click(cell('物品2'))
     const dialog = detail()
-    const side = within(dialog).getByTestId('dex-detail-side')
-    const copyId = within(side).getByRole('button', { name: '复制ID' })
-    const copyName = within(side).getByRole('button', { name: '复制名称' })
-    const wiki = within(side).getByRole('link', { name: '前往 Wiki' })
+    const actions = within(dialog).getByTestId('dex-detail-actions')
+    const copyId = within(actions).getByRole('button', { name: '复制ID' })
+    const copyName = within(actions).getByRole('button', { name: '复制名称' })
+    const wiki = within(actions).getByRole('link', { name: '前往 Wiki' })
     expect(copyId.className).toContain('bg-primary')
     expect(copyName.className).toContain('border-border')
-    expect(copyId.compareDocumentPosition(wiki) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(copyName.compareDocumentPosition(wiki) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // 顺序：前往 Wiki 在最左，复制名称其次，复制 ID 在最右；按钮按内容宽度（不等分）
+    expect(wiki.compareDocumentPosition(copyName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(copyName.compareDocumentPosition(copyId) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    for (const el of [wiki, copyName, copyId]) {
+      expect(el.className).not.toContain('flex-1')
+      expect(el.className).not.toContain('w-full')
+    }
+    expect(actions.className).toContain('justify-between')
+    // 操作区在滚动区之后（底部），不在 tips 右侧
+    expect(actions.className).toContain('border-t')
+    const scroll = within(dialog).getByTestId('item-tooltip').parentElement!
+    expect(scroll.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(dialog).queryByLabelText('复制内容')).toBeNull()
     expect(within(dialog).getAllByRole('button', { name: '关闭' })).toHaveLength(1)
   })
 
-  it('表格视图支持两列表格与导出按钮', () => {
+  it('表格视图支持两列表格与导出按钮', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
     renderPage(makeItems(10))
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
@@ -485,9 +530,38 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(within(popover).getByRole('checkbox', { name: '表格视图' }))
     expect(screen.getAllByRole('table')).toHaveLength(2)
     expect(screen.getAllByTestId('item-table-icon')[0]!.className).not.toContain('bg-muted/50')
+    // 列名统一是 ID；行整行可点（指针变手型），不再有行尾的「眼睛」按钮。
+    const table = screen.getAllByRole('table')[0]!
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((th) => th.textContent?.trim()),
+    ).toEqual(['ID', '图标', '名称', '内部名'])
+    expect(table.querySelectorAll('colgroup > col')).toHaveLength(4)
+
+    // 图标列悬停出物品提示（行本身可点开详情，两者不冲突）
+    const icon = within(table).getAllByRole('img', { name: '物品1' })[0]!
+    fireEvent.mouseOver(icon)
+    expect(await screen.findByTestId('item-tooltip')).toBeTruthy()
 
     fireEvent.click(within(popover).getByRole('checkbox', { name: '两列表格' }))
     expect(screen.getAllByRole('table')).toHaveLength(1)
+  })
+
+  it('表格视图整行可点：点行开详情，行内不再有「眼睛」按钮', async () => {
+    renderPage(makeItems(10))
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    const popover = screen.getByTestId('dex-settings-popover')
+    fireEvent.click(within(popover).getByRole('checkbox', { name: '表格视图' }))
+
+    const table = screen.getAllByRole('table')[0]!
+    const row = within(table).getAllByRole('row')[1]!
+    expect(row.getAttribute('title')).toContain('#')
+    expect(row.className).toContain('cursor-pointer')
+    expect(within(row).queryByRole('button')).toBeNull()
+
+    fireEvent.click(row)
+    expect(await screen.findByTestId('dex-detail')).toBeTruthy()
   })
 
   it('分组 Popover：手风琴单开，默认制作界面；有选中时打开选中分区', () => {
@@ -825,10 +899,59 @@ describe('ItemsPage 图鉴', () => {
       '传奇1.760',
     ])
     fireEvent.click(screen.getByRole('option', { name: /传奇/ }))
-    expect(screen.getByText('[i/p81:1]')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '复制词缀标签' })).toBeTruthy()
-    // 「最佳词缀：传奇」可点击直接套用
-    expect(screen.getByText(/最佳词缀：传奇/)).toBeTruthy()
+    // 标签条目与「相关指令」同款：浅底 + `py-2`，悬停才出复制按钮
+    let tag = screen.getByTestId('prefix-tag')
+    expect(within(tag).getByText('[i/p81:1]')).toBeTruthy()
+    expect(within(tag).getByRole('button', { name: '复制' })).toBeTruthy()
+    expect(tag.className).toContain('bg-accent/40')
+    expect(tag.className).toContain('py-2')
+    // 分区标题粉色（游戏「神级」物品名色），左边是 1513 图标
+    expect(screen.getByText('词缀').className).toContain('text-pink')
+    // 下拉 + ⚡ 融合成一块：桌面占半行宽，高度跟右侧标签条目一样（`items-stretch`）
+    const group = screen.getByTestId('prefix-group')
+    expect(group.className).toContain('sm:w-1/2')
+    expect(group.parentElement!.className).toContain('items-stretch')
+    expect(group.className).toContain('bg-accent')
+    // ⚡「最佳词缀」按钮：tooltip 就是这四个字，点一下套用评分最高的词缀
+    const best = screen.getByRole('button', { name: '最佳词缀' })
+    fireEvent.click(screen.getByLabelText('词缀'))
+    fireEvent.click(screen.getByRole('option', { name: '无词缀' }))
+    expect(screen.queryByTestId('prefix-tag')).toBeNull()
+    fireEvent.click(best)
+    tag = screen.getByTestId('prefix-tag')
+    expect(within(tag).getByText('[i/p81:1]')).toBeTruthy()
+  })
+
+  it('合成记录超过 60 条时，底部「还有 N 条未显示」与条目同款（有底色、hover 加深）', () => {
+    const recipes = Array.from({ length: 61 }, () => ({
+      result: { id: 1, stack: 1 },
+      ingredients: [{ id: 2, stack: 1 }],
+      station: -1,
+      stationItems: [],
+      env: [],
+      flags: [],
+    }))
+    renderPage(
+      makeDataset({
+        items: makeItems(3),
+        recipes: {
+          meta: { gameVersion: '1.4.5.8', count: 61, groupCount: 0, source: 'test', generatedBy: 'test' },
+          groups: {},
+          recipes,
+          byResult: { '1': recipes.map((_, i) => i) },
+          byIngredient: {},
+        },
+      }),
+    )
+    fireEvent.click(cell('物品1'))
+    const more = within(detail()).getByRole('button', { name: /还有 1 条未显示/ })
+    // 与 RecipeRow 同一套：浅底 + 悬停加深 + 同圆角
+    expect(more.className).toContain('bg-accent/40')
+    expect(more.className).toContain('hover:bg-accent')
+    expect(more.className).toContain('rounded-control')
+    fireEvent.click(more)
+    expect(within(detail()).queryByRole('button', { name: /条未显示/ })).toBeNull()
+    expect(within(detail()).getAllByTestId('recipe-row')).toHaveLength(61)
   })
 
   it('合成表「两列视图-详情页」：默认不勾选，勾选后固定两列', () => {
@@ -859,7 +982,8 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(cb)
     expect(cb.getAttribute('data-state')).toBe('checked')
     fireEvent.click(cell('物品1'))
-    expect(within(detail()).getByText('合成表（1）')).toBeTruthy()
+    // 两个合成分区标题都用木色（取自 9 号木材图标）
+    expect(within(detail()).getByText('合成来源（1）').className).toContain('text-wood')
     expect(detail().querySelector('.grid.grid-cols-2')).toBeTruthy()
   })
 
@@ -884,7 +1008,7 @@ describe('ItemsPage 图鉴', () => {
     expect(within(dialog).queryByLabelText('两列视图-收藏页')).toBeNull()
   })
 
-  it('饰品不显示「最佳词缀」行（下拉里已带 ⭐ 与效果）', () => {
+  it('饰品不显示「最佳词缀」按钮（下拉里已带 ⭐ 与效果）', () => {
     renderPage(
       makeDataset({
         items: makeItems(3),
@@ -897,7 +1021,8 @@ describe('ItemsPage 图鉴', () => {
       }),
     )
     fireEvent.click(cell('物品1'))
-    expect(screen.queryByText(/最佳词缀/)).toBeNull()
+    expect(screen.getByLabelText('词缀')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '最佳词缀' })).toBeNull()
   })
 
   it('最近搜索：搜过的词进历史，可点回搜', async () => {

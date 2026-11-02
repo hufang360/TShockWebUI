@@ -2,7 +2,7 @@
 
 TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达给在线玩家与服务器，再把游戏内的真实结果带回网页。
 
-> 版本 **0.1.0-rc.4**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
+> 版本 **0.1.0-rc.8**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
 > 配置 `<TShock SavePath>/WebUI/config.json`。
 
 核心能力：
@@ -49,11 +49,15 @@ scripts/build-plugin.sh      # 打印 DLL 路径
 
 1. 把 `WebUI.dll` 放进 TShock 的插件目录。
 2. **重启 TShock**（插件不支持热重载）。
-3. 启动日志应出现：
+3. 启动日志应出现（**在世界加载完、端口已监听之后**才输出，不会被世界加载的输出冲掉）：
    ```
-   [WebUI] REST 端点已注册：/webui/auth/*、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}、/webui/requests*
    [Server API] Info Plugin WebUI v0.1.0.0 (by TShockWebUI) initiated.
+   正在侦听端口7777
+   [WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}、/webui/requests*
    ```
+
+> 启动报告在 `GamePostInitialize`（世界加载 + 监听端口之后）才打，跟 TShock 自己的 UUID / 登录提醒同一段；
+> 若第一个 `GameUpdate` 时仍未打过，会补打一次（保底）。体检不过时还会多一行缺哪些权限 + 可用 `/web init` 一键补。
 
 ### 本机测试容器（一键）
 
@@ -176,12 +180,16 @@ docker restart tshock
 **统一入口**：`/web`（`/webui`），功能指令均为**二级子命令**；权限节点 `webui.use` / `webui.admin`：
 
 ```
+/web init                    # 一键初始化（需 webui.admin + tshock.rest.cfg）
 /web auth <验证码>          # 同意（需 webui.use）
 /web deny <验证码>          # 拒绝（需 webui.use）
 /web limit                   # 查看 TShock 建令牌限流（需 webui.admin + tshock.rest.cfg）
 /web limit <上限>            # 设为 N（≥1）；unlimited=1000000；default=5
 ```
 
+- `init` 是给新开服的「一条指令搞定」：打开 `RestApiEnabled` / `LogRest`、把限流写成 50 / 每 10 分钟恢复 1，
+  并给默认注册组补上 `tshock.rest.useapi`、`tshock.rest.command`、`webui.use`、`webui.request.use`。
+  幂等、只往上调不往下调；`RestApiEnabled` 需重启 TShock 生效。
 - `auth` / `deny` 必须在游戏内由本人执行（控制台顶替不了玩家确认）。
 - `limit` 会修改并保存 TShock 的 `config.json` 中的 `RESTMaximumRequestsPerInterval`——
   属用户明确要求的例外；同时要求 `webui.admin` 与 `tshock.rest.cfg`（控制台 / superadmin 满足）。

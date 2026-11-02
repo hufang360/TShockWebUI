@@ -1,8 +1,6 @@
 import { Fragment, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Check, Copy, ExternalLink, Info, ListFilter, Search, Terminal, X } from 'lucide-react'
 import {
-  Alert,
-  AlertDescription,
   Button,
   Drawer,
   DrawerContent,
@@ -17,6 +15,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui'
+import { IconAction } from '@/components/IconAction'
+import { PageHelp } from '@/components/PageHelp'
 import { SearchInput } from '@/components/SearchInput'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { TIPS_GROUPS, type TipsGroup } from '@/lib/commandTips'
@@ -231,36 +231,29 @@ function CommandTable({
                     <td className="px-1 py-0.5 align-top">
                       <div className="flex items-center justify-end gap-0.5">
                         {row.syntax ? (
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label={`${t('action.copy')}：${row.command}`}
+                          <IconAction
+                            size="icon-xs"
+                            label={`${t('action.copy')}：${row.command}`}
+                            icon={copied === row.command ? Check : Copy}
+                            iconClassName="size-3.5"
                             onClick={() => void copy(row.command)}
-                          >
-                            {copied === row.command ? (
-                              <Check className="size-3.5" />
-                            ) : (
-                              <Copy className="size-3.5" />
-                            )}
-                          </Button>
+                          />
                         ) : (
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label={`${t('commands.col.fill')}：${row.command}`}
+                          <IconAction
+                            size="icon-xs"
+                            label={`${t('commands.col.fill')}：${row.command}`}
+                            icon={Terminal}
+                            iconClassName="size-3.5"
                             onClick={() => onPick(row.command)}
-                          >
-                            <Terminal className="size-3.5" />
-                          </Button>
+                          />
                         )}
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`${t('commands.detail.title')}：${row.command}`}
+                        <IconAction
+                          size="icon-xs"
+                          label={`${t('commands.detail.title')}：${row.command}`}
+                          icon={Info}
+                          iconClassName="size-3.5"
                           onClick={() => onDetails(row)}
-                        >
-                          <Info className="size-3.5" />
-                        </Button>
+                        />
                       </div>
                     </td>
                   </tr>
@@ -533,9 +526,9 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
       className="relative flex min-h-[360px] flex-col gap-2"
       style={{ '--page-sticky-top': `${stickyTop}px` } as CSSProperties}
     >
-      <Alert variant="info" className="shrink-0">
-        <AlertDescription className="text-xs">{t('commands.notice.perm')}</AlertDescription>
-      </Alert>
+      <PageHelp scopeId="tips">
+        <span className="whitespace-pre-line">{t('page.tips.desc')}</span>
+      </PageHelp>
 
       <div className="flex items-start gap-3">
         {/* 左：搜索框（吸顶）+ 表格（整页滚动） */}
@@ -600,14 +593,11 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
         <DrawerContent className="flex w-64 flex-col">
           <DrawerHeader className="flex-row items-center border-b px-4 py-3">
             <DrawerTitle className="min-w-0 flex-1">{t('commands.groups')}</DrawerTitle>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label={t('action.close')}
+            <IconAction
+              label={t('action.close')}
+              icon={X}
               onClick={() => setGroupDrawerOpen(false)}
-            >
-              <X />
-            </Button>
+            />
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
             <GroupList
@@ -670,9 +660,7 @@ function CommandDetailDrawer({
             <DrawerTitle>{t('commands.detail.title')}</DrawerTitle>
             <p className="mt-1 font-mono text-xs break-all text-muted-foreground">{row?.command}</p>
           </div>
-          <Button size="icon-sm" variant="ghost" aria-label={t('action.close')} onClick={onClose}>
-            <X />
-          </Button>
+          <IconAction label={t('action.close')} icon={X} onClick={onClose} />
         </DrawerHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">

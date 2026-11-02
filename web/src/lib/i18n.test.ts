@@ -20,6 +20,20 @@ describe('i18n 语言包一致性', () => {
     expect(enKeys).toEqual(zhKeys)
   })
 
+  it('每个键的值都是字符串（防止误写出一元 + 把文案变成 NaN）', () => {
+    // 真实踩过：`'x.help':` 下面那行写成 `+ '...'`，一元加号把字符串算成 NaN，
+    // 界面上直接显示成「NaN权限由 TShock 判定…」。
+    const bad: Array<{ lang: string; key: string; type: string; head: string }> = []
+    for (const lang of ['zh', 'en'] as const) {
+      for (const [key, value] of Object.entries(dicts[lang])) {
+        if (typeof value !== 'string' || value.startsWith('NaN')) {
+          bad.push({ lang, key, type: typeof value, head: String(value).slice(0, 12) })
+        }
+      }
+    }
+    expect(bad).toEqual([])
+  })
+
   it('同一键在两语言里的占位符一致', () => {
     const mismatches: Array<{ key: string; zh: string[]; en: string[] }> = []
     for (const key of zhKeys) {

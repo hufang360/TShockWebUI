@@ -1,9 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Star } from 'lucide-react'
-import { BatchDeleteControls } from '@/components/BatchDeleteControls'
-import { ConfirmButton } from '@/components/ConfirmButton'
+import { IconAction } from '@/components/IconAction'
 import { SearchInput } from '@/components/SearchInput'
-import { SelectIndicator } from '@/components/SelectIndicator'
 import {
   Button,
   Collapsible,
@@ -20,8 +18,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui'
 import { CollapseChevron } from '@/components/CollapseChevron'
-import { useBatchSelect } from '@/hooks/useBatchSelect'
 import { useRovingFocus } from '@/hooks/useRovingFocus'
+import { usePanelMemory } from '@/hooks/useToolsMemory'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import type { Dataset, FavoriteEntry } from '@/types'
@@ -31,10 +29,8 @@ interface CommandPickerPanelProps {
   dataset: Dataset
   /** 指令收藏（`view="favorites"` 用）。 */
   favorites?: FavoriteEntry[]
-  /** 移除一个指令收藏。 */
+  /** 取消收藏（行内星标的点击）。 */
   onRemoveFavorite?: (cmd: string) => void
-  /** 清空全部指令收藏。 */
-  onClearFavorites?: () => void
   /** 用指令替换编辑器内容（并把焦点移回输入框）。 */
   onLoad: (cmd: string) => void
 }
@@ -42,7 +38,7 @@ interface CommandPickerPanelProps {
 /**
  * 编辑器右侧卡片：
  * - `view="commands"`：全部指令（按名称 / 别名 / 帮助搜索，前导 `/` 会被忽略），点击载入编辑器；
- * - `view="favorites"`：指令收藏（搜索 + 批量删除 / 清空 + 列表）。点击行即载入编辑器。
+ * - `view="favorites"`：指令收藏（搜索 + 列表）。点击行即载入编辑器，行右上的星标取消收藏。
  * 两个视图都支持搜索框 ↑↓ 进入列表、列表内 ↑↓ 移动、Enter 确认。
  */
 export function CommandPickerPanel({
@@ -50,13 +46,14 @@ export function CommandPickerPanel({
   dataset,
   favorites = [],
   onRemoveFavorite,
-  onClearFavorites,
   onLoad,
 }: CommandPickerPanelProps) {
   const { t } = useI18n()
-  const [query, setQuery] = useState('')
+  // 搜索词 + 滚动位置按页记忆（关掉弹框再打开还在）。
+  const { query, setQuery, scrollRef, flushScroll } = usePanelMemory(
+    view === 'favorites' ? 'favorites' : 'commands',
+  )
   const inputRef = useRef<HTMLInputElement>(null)
-  const batch = useBatchSelect()
 
   // 前导 `/` 不参与匹配（用户常直接粘贴 `/setup`）。
   const trimmed = query.trim().toLowerCase()
@@ -85,6 +82,9 @@ export function CommandPickerPanel({
     for (const cmd of commands) (cmd.allowServer === false ? blocked : ok).push(cmd)
     return { runnable: ok, inGame: blocked }
   }, [commands])
+  // 关掉弹框时把滚动位置落盘（滚动事件里只记内存）。
+  useEffect(() => flushScroll, [flushScroll])
+
   // 两个分组都可折叠；搜索时自动展开（否则搜到了也看不见），清空搜索后回到用户手动选择的状态。
   const [showAll, setShowAll] = useState(true)
   const [showInGame, setShowInGame] = useState(false)
@@ -98,19 +98,8 @@ export function CommandPickerPanel({
     view === 'commands' ? visibleCount : filteredFavorites.length,
   )
 
-  const handleBatchDelete = () => {
-    for (const key of batch.selected) {
-      if (key.startsWith('cmd:')) onRemoveFavorite?.(key.slice(4))
-    }
-    batch.cancel()
-  }
-
-  /** 普通模式：点击/Enter 载入编辑器；批量模式：点击勾选。 */
-  const activate = (key: string, cmd: string) => {
-    if (batch.active) {
-      batch.toggle(key)
-      return
-    }
+  /** 点击 / Enter：把这条指令载入编辑器。 */
+  const activate = (cmd: string) => {
     roving.reset()
     onLoad(cmd)
   }
@@ -178,6 +167,7 @@ export function CommandPickerPanel({
   }
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="flex h-full min-h-0 flex-col gap-2">
       <SearchInput
         ref={inputRef}
@@ -193,32 +183,7 @@ export function CommandPickerPanel({
 
       {view === 'favorites' ? (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-              {batch.active
-                ? t('batch.hint')
-                : t('favorites.commands', { n: filteredFavorites.length })}
-            </span>
-            <div className="flex shrink-0 items-center gap-1">
-              <BatchDeleteControls
-                active={batch.active}
-                count={batch.count}
-                disabled={favorites.length === 0}
-                onEnter={batch.enter}
-                onCancel={batch.cancel}
-                onConfirm={handleBatchDelete}
-              />
-              {!batch.active && (
-                <ConfirmButton
-                  onConfirm={() => onClearFavorites?.()}
-                  confirmLabel={t('action.clearConfirm')}
-                >
-                  {t('favorites.clear')}
-                </ConfirmButton>
-              )}
-            </div>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
             {filteredFavorites.length === 0 ? (
               <Empty className="py-6">
                 <EmptyHeader>
@@ -231,39 +196,55 @@ export function CommandPickerPanel({
               </Empty>
             ) : (
               <ul className="flex flex-col gap-1">
-                {filteredFavorites.map((fav, index) => {
-                  const key = `cmd:${fav.cmd}`
-                  const isSelected = batch.active ? batch.has(key) : roving.activeIndex === index
-                  return (
-                    <li key={fav.cmd}>
-                      <Button
-                        variant="ghost"
-                        ref={roving.setRef(index)}
-                        aria-pressed={batch.active ? batch.has(key) : undefined}
-                        title={batch.active ? undefined : t('favorites.loadHint')}
-                        onFocus={() => roving.setActive(index)}
-                        onClick={() => activate(key, fav.cmd)}
-                        onKeyDown={(e) => onRowKeyDown(e, index)}
-                        className={cn(
-                          'h-auto w-full cursor-pointer justify-start gap-2 rounded-control bg-accent/40 px-2 py-1 font-normal hover:bg-accent',
-                          isSelected && 'bg-accent',
-                        )}
-                      >
-                        {batch.active && <SelectIndicator checked={batch.has(key)} />}
-                        <code className="min-w-0 flex-1 truncate text-left font-pixel text-2xs text-foreground">
-                          {fav.cmd}
-                        </code>
-                      </Button>
-                    </li>
-                  )
-                })}
+                {filteredFavorites.map((fav, index) => (
+                  <li
+                    key={fav.cmd}
+                    // `group/row`：星标**浮在行右上角**（不占布局宽度），悬停 / 键盘聚焦才出现。
+                    // 行本身占满整宽，右内边距留出星标的位置，长指令不会压到图标底下。
+                    className="group/row relative"
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          ref={roving.setRef(index)}
+                          onFocus={() => roving.setActive(index)}
+                          onClick={() => activate(fav.cmd)}
+                          onKeyDown={(e) => onRowKeyDown(e, index)}
+                          className={cn(
+                            'h-auto w-full cursor-pointer justify-start rounded-control bg-accent/40 py-1 pr-8 pl-2 font-normal hover:bg-accent',
+                            roving.activeIndex === index && 'bg-accent',
+                          )}
+                        >
+                          <code className="min-w-0 flex-1 truncate text-left font-pixel text-2xs text-foreground">
+                            {fav.cmd}
+                          </code>
+                        </Button>
+                      </TooltipTrigger>
+                      {/* 悬停出完整指令（行里是截断的）。 */}
+                      <TooltipContent side="right" className="max-w-80">
+                        {fav.cmd}
+                      </TooltipContent>
+                    </Tooltip>
+                    <IconAction
+                      label={t('favorites.remove')}
+                      icon={Star}
+                      size="icon-xs"
+                      iconClassName="fill-current"
+                      onClick={() => onRemoveFavorite?.(fav.cmd)}
+                      className={cn(
+                        'absolute top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity',
+                        'group-hover/row:opacity-100 group-focus-within/row:opacity-100',
+                      )}
+                    />
+                  </li>
+                ))}
               </ul>
             )}
           </div>
         </>
       ) : (
-        <TooltipProvider delayDuration={300}>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
             <Collapsible
               open={allOpen}
               onOpenChange={(open) => {
@@ -312,8 +293,8 @@ export function CommandPickerPanel({
               </Collapsible>
             )}
           </div>
-        </TooltipProvider>
       )}
     </div>
+    </TooltipProvider>
   )
 }

@@ -1,4 +1,5 @@
 import { Monitor, Moon, Sun } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { Button } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 import type { Lang, ThemeName } from '@/types'
@@ -40,15 +41,11 @@ export function QuickPreferences({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon-sm"
+      <IconAction
+        label={t('settings.theme.toggle', { name: themeName })}
+        icon={ThemeIcon}
         onClick={() => onThemeChange(nextTheme)}
-        aria-label={t('settings.theme.toggle', { name: themeName })}
-        title={t('settings.theme.toggle', { name: themeName })}
-      >
-        <ThemeIcon data-icon="inline-start" />
-      </Button>
+      />
       <Button
         variant="ghost"
         size="icon-sm"

@@ -75,6 +75,20 @@ export function formatItemTag(itemId: number, options: ItemTagOptions = {}): str
   return parts.length > 0 ? `[i/${parts.join('/')}:${itemId}]` : `[i:${itemId}]`
 }
 
+/**
+ * 内部名（`IronPickaxe`）→ 英文显示名（`Iron Pickaxe`）。
+ *
+ * 用途：「物品」弹框在中文界面下把内部名换成**英文名**（TShock 的 `/i` / `/give` 认英文名，
+ * 内部枚举名对人没用）。数据集只加载当前语言的本地化，所以这里按大驼峰切词近似，
+ * 少数物品的官方英文名与此不同（如带连字符的）——只当提示用。
+ */
+export function itemEnglishName(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .trim()
+}
+
 export function itemDisplayName(item: Item | undefined, fallbackId: number): string {
   if (!item) return `未知物品 #${fallbackId}`
   return item.name || item.key

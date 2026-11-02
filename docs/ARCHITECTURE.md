@@ -73,7 +73,7 @@ TShock REST API  (env TSHOCK_URL，默认 http://127.0.0.1:7878)
        ├─ /webui/{commands,me,data,serverinfo,events} → 只读信息；/webui/auth/{sessions,revoke} → 会话自助管理
        ├─ /webui/{chat} → 网页发言（带 [WebUI] 前缀）
        ├─ /webui/requests* → 物资申请（玩家提交 / 服主审核 / 补发；见 docs/插件-物资申请.md）
-       └─ 高级指令 `/web limit [值|unlimited|default]` → 查看/放宽 RESTMaximumRequestsPerInterval（需 webui.admin + tshock.rest.cfg）
+       └─ 高级指令 `/web init` → 一键初始化（开 REST / 写限流 / 给默认组补权限；需 webui.admin + tshock.rest.cfg）
 ```
 
 关键点：**TShock token 只存在于后端内存**，只出现在 Go → TShock 的出站请求里；浏览器、Cookie、URL、日志里都没有它。
@@ -329,9 +329,12 @@ make dev-web                              # 浏览器开 http://localhost:5173
 1. `RestApiEnabled = true`、`RestApiPort = 7878`（已确认本机环境满足）。
 2. 玩家的用户组必须有 **`tshock.rest.useapi`**（建 token）与 **`tshock.rest.command`**（rawcmd）。
    默认 `guest`/`default` 组都没有，需管理员赋权。
-3. **调大 `RESTMaximumRequestsPerInterval`**（建议 `60`）：经反代后 TShock 只看到网关 IP，
+3. **调大 `RESTMaximumRequestsPerInterval`**（建议 `50`）：经反代后 TShock 只看到网关 IP，
    所有玩家共用一个限流桶（实测 `<gateway-ip>`），默认 5/分钟会互相影响。
-   装了 WebUI 插件后也可在游戏内 / 控制台执行 `/web limit 60`（或 `unlimited`）自动改并保存（需 `webui.admin` + `tshock.rest.cfg`）。
+   - 一条指令全搞定：装了 WebUI 插件后在游戏内 / 控制台执行 `/web init`（需 `webui.admin` + `tshock.rest.cfg`）——
+     它会打开 `RestApiEnabled` / `LogRest`、把限流写成 50 / 每 10 分钟恢复 1，并把上面第 2 条的四项权限加到默认组
+     （`tshock.rest.useapi`、`tshock.rest.command`、`webui.use`、`webui.request.use`）；幂等，只往上调不往下调。
+   - 只想改限流：`/web limit 60`（或 `unlimited`）会自动改并保存 `config.json`。
 4. 可选：`EnableTokenEndpointAuthentication = false` 让 `/v2/server/status` 公开（否则登录前拿不到版本）。
    后端已兼容两种情况（401 也视为「可达」）。
 5. `7878` 尽量只对本容器网络开放，不要暴露到公网。

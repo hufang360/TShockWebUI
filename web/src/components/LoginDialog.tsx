@@ -34,6 +34,7 @@ import {
   Separator,
   Spinner,
 } from '@/components/ui'
+import { IconAction } from '@/components/IconAction'
 import { ServerSwitcherDialog } from '@/components/ServerSwitcher'
 import { cn } from '@/lib/cn'
 import { loadLoginMemory, saveLoginMemory } from '@/lib/credentials'
@@ -295,19 +296,11 @@ export function LoginDialog({
                           }}
                         />
                         <InputGroupAddon align="inline-end">
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
+                          <IconAction
+                            label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
+                            icon={showPassword ? EyeOff : Eye}
                             onClick={() => setShowPassword((v) => !v)}
-                            aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
-                            title={showPassword ? t('login.hidePassword') : t('login.showPassword')}
-                          >
-                            {showPassword ? (
-                              <EyeOff data-icon="inline-start" />
-                            ) : (
-                              <Eye data-icon="inline-start" />
-                            )}
-                          </Button>
+                          />
                         </InputGroupAddon>
                       </InputGroup>
                     </Field>

@@ -290,6 +290,12 @@ export interface FishGood {
   costItems?: { id: number; stack: number }[]
   /** 购买前检查（`check`）的说明文本，空 = 无检查。 */
   check?: string
+  /**
+   * 购买后实际执行的指令（指令类商品才有；原版物品 / 降级条目为空数组）。
+   * 前端据此判断「这个商品会做什么」——建造类商品靠它选注解图（见 `lib/fishDiagram.ts`），
+   * 不要用商品名判断（服主可以随便改名）。
+   */
+  cmds?: string[]
   /** 每个玩家的限购次数（`0` = 不限）。这是**配置值**，"还剩几次" 只有购买时才知道。 */
   limit?: number
   /** 全服限购总数（`0` = 不限）。 */

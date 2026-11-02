@@ -141,8 +141,8 @@ describe('AppShell 侧栏模块分类', () => {
   })
 })
 
-describe('AppShell 滚动条槽（聊天页整页滚动）', () => {
-  const renderShell = (activeTab: 'home' | 'chat') =>
+describe('AppShell 滚动条槽（整页滚动的页面）', () => {
+  const renderShell = (activeTab: 'home' | 'editor') =>
     render(
       <I18nProvider lang="zh">
         <AppShell
@@ -158,8 +158,8 @@ describe('AppShell 滚动条槽（聊天页整页滚动）', () => {
       </I18nProvider>,
     )
 
-  it('「聊天」页给主内容区常驻预留滚动条槽，避免切筛选时整列左右跳', () => {
-    renderShell('chat')
+  it('「指令」页给主内容区常驻预留滚动条槽，避免切筛选时整列左右跳', () => {
+    renderShell('editor')
     const main = document.querySelector('main') as HTMLElement
     expect(main.className).toContain('[scrollbar-gutter:stable]')
     main.remove()

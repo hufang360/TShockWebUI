@@ -41,6 +41,11 @@ namespace WebUI
         internal static AuthStore Store;
         internal static SessionRegistry Sessions;
 
+        /// <summary>REST 端点是否已成功注册（用于启动报告，避免在 Initialize 里刷屏）。</summary>
+        private static bool _restRegistered;
+        /// <summary>启动报告是否已输出（GamePostInitialize / 首个 GameUpdate 只打一次）。</summary>
+        private bool _startupAnnounced;
+
         private static Plugin _instance;
         private readonly ConcurrentQueue<Action> _mainThread = new ConcurrentQueue<Action>();
         private int _sweepTicks;
@@ -69,12 +74,14 @@ namespace WebUI
                 new List<string> { WebUiPermissions.Use, WebUiPermissions.Admin, WebUiPermissions.RequestReview },
                 WebCommand, "webui", "web")
             {
-                // 控制台可跑 /web limit；auth / deny 在 handler 内要求游戏内本人。
+                // 控制台可跑 /web init、/web limit；auth / deny 在 handler 内要求游戏内本人。
                 AllowServer = true,
-                HelpText = "网页端信使插件：/web auth <验证码> | /web deny <验证码> | /web limit <上限|unlimited|default> | /web req <list|show|ok|no|give>",
+                HelpText = "网页端信使插件：/web init | /web auth <验证码> | /web deny <验证码> | /web limit <上限|unlimited|default> | /web req <list|show|ok|no|give>",
             });
 
             ServerApi.Hooks.GameUpdate.Register(this, OnGameUpdate);
+            // 启动报告推迟到世界加载完成之后（否则会被加载世界的输出冲掉）。
+            ServerApi.Hooks.GamePostInitialize.Register(this, OnGamePostInitialize);
             // 服务器动态（首页事件流）。
             ServerApi.Hooks.ServerJoin.Register(this, OnServerJoin);
             ServerApi.Hooks.ServerLeave.Register(this, OnServerLeave);
@@ -95,54 +102,66 @@ namespace WebUI
 
             if (TShock.RestApi != null)
             {
-                TShock.RestApi.Register(new RestCommand("/webui/auth/request", WebAuthRest.Request));
-                TShock.RestApi.Register(new RestCommand("/webui/auth/poll", WebAuthRest.Poll));
-                TShock.RestApi.Register(new RestCommand("/webui/auth/cancel", WebAuthRest.Cancel));
+                // 全部声明 DoLog=false：TShock 的 LogRest 会把请求 URI（含参数）写进日志，
+                // 而本插件的端点带 secret / 聊天内容 / 申请物品等敏感参数，不应入日志。
+                TShock.RestApi.Register(new RestCommand("/webui/auth/request", WebAuthRest.Request) { DoLog = false });
+                TShock.RestApi.Register(new RestCommand("/webui/auth/poll", WebAuthRest.Poll) { DoLog = false });
+                TShock.RestApi.Register(new RestCommand("/webui/auth/cancel", WebAuthRest.Cancel) { DoLog = false });
                 // 建令牌限流快照（只读、调用者自己 IP）；后端用它精确判定是否被限流。
-                TShock.RestApi.Register(new RestCommand("/webui/restlimit", WebAuthRest.RateLimit));
+                TShock.RestApi.Register(new RestCommand("/webui/restlimit", WebAuthRest.RateLimit) { DoLog = false });
                 // 协议握手（版本 / 协议号 / 能力清单）：后端据此区分未安装、版本过旧与协议不匹配。
-                TShock.RestApi.Register(new RestCommand("/webui/meta", WebAuthRest.Meta));
+                TShock.RestApi.Register(new RestCommand("/webui/meta", WebAuthRest.Meta) { DoLog = false });
                 // 批量执行需 token（用户本人），与 rawcmd 同权限；逐个指令仍走 TShock 权限检查。
-                TShock.RestApi.Register(new SecureRestCommand("/webui/batch", WebAuthRest.Batch, RestPermissions.restrawcommand));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/batch", WebAuthRest.Batch, RestPermissions.restrawcommand) { DoLog = false });
                 // 只读信息 / 会话管理：只要有效 token（不额外要求权限）。
-                TShock.RestApi.Register(new SecureRestCommand("/webui/commands", WebAuthRest.Commands));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/me", WebAuthRest.Me));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/data", WebAuthRest.Data));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/serverinfo", WebAuthRest.ServerInfo));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/events", WebAuthRest.Events));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/commands", WebAuthRest.Commands) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/me", WebAuthRest.Me) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/data", WebAuthRest.Data) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/serverinfo", WebAuthRest.ServerInfo) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/events", WebAuthRest.Events) { DoLog = false });
                 // 网页发言：任意有效 token；消息带 [WebUI] 前缀，与真实玩家聊天区分（不提权、不伪造身份）。
-                TShock.RestApi.Register(new SecureRestCommand("/webui/chat", WebAuthRest.Chat));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/auth/sessions", WebAuthRest.Sessions));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/auth/revoke", WebAuthRest.Revoke));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/chat", WebAuthRest.Chat) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/auth/sessions", WebAuthRest.Sessions) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/auth/revoke", WebAuthRest.Revoke) { DoLog = false });
                 // 物资申请：玩家提交 / 查看 / 撤回（webui.request.use）；服主审核 / 补发（webui.request.review）。
-                TShock.RestApi.Register(new SecureRestCommand("/webui/requests", RequestRest.ListMine, WebUiPermissions.RequestUse));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/create", RequestRest.Create, WebUiPermissions.RequestUse));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/cancel", RequestRest.Cancel, WebUiPermissions.RequestUse));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/all", RequestRest.ListAll, WebUiPermissions.RequestReview));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/review", RequestRest.Review, WebUiPermissions.RequestReview));
-                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/deliver", RequestRest.Deliver, WebUiPermissions.RequestReview));
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests", RequestRest.ListMine, WebUiPermissions.RequestUse) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/create", RequestRest.Create, WebUiPermissions.RequestUse) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/cancel", RequestRest.Cancel, WebUiPermissions.RequestUse) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/all", RequestRest.ListAll, WebUiPermissions.RequestReview) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/review", RequestRest.Review, WebUiPermissions.RequestReview) { DoLog = false });
+                TShock.RestApi.Register(new SecureRestCommand("/webui/requests/deliver", RequestRest.Deliver, WebUiPermissions.RequestReview) { DoLog = false });
+                _restRegistered = true;
+            }
+        }
+
+        /// <summary>
+        /// 启动完成的「体检报告」：在这里而不是 <see cref="Initialize"/> 里输出。
+        /// 原因：插件初始化发生在世界加载之前，那时的输出会被「正在加载世界数据」「正在侦听端口」等行冲掉，
+        /// 服主根本看不到；而 <c>GamePostInitialize</c> 发生在世界加载完、端口已监听之后（TShock 自己的
+        /// UUID / 登录提醒也打在这里），此时控制台已经安静下来。
+        /// </summary>
+        private void AnnounceStartup()
+        {
+            if (_startupAnnounced) return;
+            _startupAnnounced = true;
+
+            if (_restRegistered)
                 TShock.Log.ConsoleInfo("[WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}、/webui/requests*");
-            }
             else
-            {
-                TShock.Log.ConsoleError("[WebUI] TShock REST 未启用（RestApiEnabled=false），在线授权不可用。");
-            }
+                TShock.Log.ConsoleError("[WebUI] TShock REST 未启用（RestApiEnabled=false），在线授权不可用；在游戏内 / 控制台执行 /web init 可自动打开。");
 
             if (string.IsNullOrEmpty(Config.Secret))
                 TShock.Log.ConsoleWarn("[WebUI] 未设置 Secret（tshock/WebUI/config.json）：请确保 REST 端口 7878 不对公网暴露，或设置 Secret 并在后端配置 TSWUI_AUTH_SECRET。");
 
-            // 提醒：/web auth 需要 webui.use；没有组拥有时玩家无法在线登录。
-            if (!AnyGroupHasPermission(WebUiPermissions.Use))
-                TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有 {WebUiPermissions.Use}，玩家将无法用 /web auth 登录；请例如：/group addperm default {WebUiPermissions.Use}");
+            // 权限 / 初始化体检：只在真有问题时才提，不刷屏。
+            var missing = new List<string>();
+            if (!AnyGroupHasPermission(WebUiPermissions.Use)) missing.Add(WebUiPermissions.Use);
+            if (!AnyGroupHasPermission(WebUiPermissions.RequestUse)) missing.Add(WebUiPermissions.RequestUse);
+            if (!AnyGroupHasPermission(WebUiPermissions.Admin)) missing.Add(WebUiPermissions.Admin);
+            if (!AnyGroupHasPermission(WebUiPermissions.RequestReview)) missing.Add(WebUiPermissions.RequestReview);
 
-            if (!AnyGroupHasPermission(WebUiPermissions.Admin))
-                TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有 {WebUiPermissions.Admin}，/web limit 仅 superadmin 可用。");
-
-            if (!AnyGroupHasPermission(WebUiPermissions.RequestUse))
-                TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有 {WebUiPermissions.RequestUse}，玩家将无法提交物资申请；请例如：/group addperm default {WebUiPermissions.RequestUse}");
-
-            if (!AnyGroupHasPermission(WebUiPermissions.RequestReview))
-                TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有 {WebUiPermissions.RequestReview}，物资申请只能由 superadmin 审核；请例如：/group addperm <管理组> {WebUiPermissions.RequestReview}");
+            if (missing.Count > 0)
+                TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有：{string.Join("、", missing)}。玩家侧需要的权限可用 /web init 一键补到默认组（管理类需手动授予）。");
         }
 
         private static bool AnyGroupHasPermission(string permission)
@@ -163,6 +182,7 @@ namespace WebUI
             if (disposing)
             {
                 ServerApi.Hooks.GameUpdate.Deregister(this, OnGameUpdate);
+                ServerApi.Hooks.GamePostInitialize.Deregister(this, OnGamePostInitialize);
                 ServerApi.Hooks.ServerJoin.Deregister(this, OnServerJoin);
                 ServerApi.Hooks.ServerLeave.Deregister(this, OnServerLeave);
                 ServerApi.Hooks.NpcKilled.Deregister(this, OnNpcKilled);
@@ -183,8 +203,20 @@ namespace WebUI
 
         // ---------- 主线程任务队列 ----------
 
+        /// <summary>
+        /// 世界加载 / 端口监听都已完成（TShock 自己也在这里打 UUID、登录提醒）。
+        /// 在这里输出启动报告，服主一眼能看到。
+        /// </summary>
+        private void OnGamePostInitialize(EventArgs args)
+        {
+            try { AnnounceStartup(); }
+            catch (Exception ex) { TShock.Log.ConsoleError("[WebUI] 启动报告输出失败：" + ex.Message); }
+        }
+
         private void OnGameUpdate(EventArgs args)
         {
+            // 保底：万一 GamePostInitialize 没触发（或插件加载得更晚），第一个 tick 时补打。
+            if (!_startupAnnounced) OnGamePostInitialize(args);
             while (_mainThread.TryDequeue(out var action))
             {
                 try { action(); }
@@ -513,6 +545,17 @@ namespace WebUI
                     WebLimit(args, args.Parameters.Skip(1).ToList());
                     return;
 
+                case "init":
+                case "初始化":
+                    // 同样会写 TShock 的 config.json（REST 开关 / 限流 / 日志）+ 改默认组权限。
+                    if (!HasAll(args.Player, WebUiPermissions.Admin, RestPermissions.restcfg))
+                    {
+                        args.Player?.SendErrorMessage("需要 webui.admin（且 tshock.rest.cfg）权限。");
+                        return;
+                    }
+                    WebInit(args);
+                    return;
+
                 case "req":
                 case "request":
                 case "申请":
@@ -528,6 +571,7 @@ namespace WebUI
         private static void WebHelp(CommandArgs args)
         {
             args.Player?.SendInfoMessage("网页端信使插件（/webui，简写 /web）：");
+            args.Player?.SendInfoMessage("  /web init  一键初始化：打开 REST / 限流 / 给默认组补权限（需 webui.admin + tshock.rest.cfg）");
             args.Player?.SendInfoMessage("  /web auth <验证码>  同意网页登录（需 webui.use）");
             args.Player?.SendInfoMessage("  /web deny <验证码>  拒绝网页登录");
             args.Player?.SendInfoMessage("  /web limit <上限|unlimited|default>  放宽 REST 建令牌限流（需 webui.admin + tshock.rest.cfg）");
@@ -691,6 +735,139 @@ namespace WebUI
             var who = string.IsNullOrEmpty(player?.Name) ? "Console" : player.Name;
             TShock.Log.ConsoleInfo($"[WebUI] RESTMaximumRequestsPerInterval 已由 {who} 设为 {value}。");
             player.SendSuccessMessage($"已把 REST 建令牌上限设为 {value}（每 {settings.RESTRequestBucketDecreaseIntervalMinutes} 分钟恢复 1 个），并写入 config.json。");
+        }
+
+        // ---------- /web init ----------
+
+        /// <summary><see cref="WebInit"/> 写入的建令牌上限（TShock 默认 5，太小：晚高峰会莫名登录失败）。</summary>
+        internal const int InitRestLimit = 50;
+
+        /// <summary><see cref="WebInit"/> 写入的限流桶恢复间隔（分钟）。</summary>
+        internal const int InitRestIntervalMinutes = 10;
+
+        /// <summary>
+        /// <see cref="WebInit"/> 给默认注册组补的权限。
+        /// 只给「网页端能登录 / 能执行 / 能提交申请」所需的 4 个；
+        /// 管理类（<c>webui.admin</c>、<c>webui.request.review</c>、<c>tshock.rest.cfg</c>）**不自动给**。
+        /// </summary>
+        internal static readonly string[] InitDefaultGroupPermissions =
+        {
+            RestPermissions.restapi,        // tshock.rest.useapi：建 token
+            RestPermissions.restrawcommand, // tshock.rest.command：rawcmd（网页批量执行）
+            WebUiPermissions.Use,           // webui.use：/web auth 确认登录
+            WebUiPermissions.RequestUse,    // webui.request.use：物资申请
+        };
+
+        /// <summary>
+        /// /web init：新人服主一键初始化（幂等，重复执行没有副作用）。
+        ///   1. TShock 配置：RestApiEnabled=true、LogRest=true、限流 50 / 每 10 分钟恢复 1 → 写 config.json；
+        ///   2. 默认注册组补上 <see cref="InitDefaultGroupPermissions"/> 四个权限。
+        /// 只往上调、不往下调：已有更大的建令牌上限保持原值。
+        /// 权限：webui.admin + tshock.rest.cfg（会写 TShock 的 config.json）。
+        /// </summary>
+        private void WebInit(CommandArgs args)
+        {
+            var player = args.Player;
+            var settings = TShock.Config.Settings;
+            var done = new List<string>();
+            var kept = new List<string>();
+
+            // ---- 1. TShock 的 REST 配置 ----
+            var configChanged = false;
+
+            if (!settings.RestApiEnabled)
+            {
+                settings.RestApiEnabled = true;
+                configChanged = true;
+                done.Add("RestApiEnabled = true：开启 REST 接口（需重启 TShock 才生效）");
+            }
+
+            if (!settings.LogRest)
+            {
+                settings.LogRest = true;
+                configChanged = true;
+                done.Add("LogRest = true：REST 调用记入 TShock 日志（插件自己的端点已声明不记，避免 secret / 聊天进日志）");
+            }
+
+            if (settings.RESTMaximumRequestsPerInterval < InitRestLimit)
+            {
+                var old = settings.RESTMaximumRequestsPerInterval;
+                settings.RESTMaximumRequestsPerInterval = InitRestLimit;
+                configChanged = true;
+                done.Add($"RESTMaximumRequestsPerInterval = {InitRestLimit}（原 {old}）：建令牌上限，够晚高峰一次开服");
+            }
+            else if (settings.RESTMaximumRequestsPerInterval > InitRestLimit)
+            {
+                kept.Add($"RESTMaximumRequestsPerInterval 保持 {settings.RESTMaximumRequestsPerInterval}（不往下调）");
+            }
+
+            if (settings.RESTRequestBucketDecreaseIntervalMinutes != InitRestIntervalMinutes)
+            {
+                var old = settings.RESTRequestBucketDecreaseIntervalMinutes;
+                settings.RESTRequestBucketDecreaseIntervalMinutes = InitRestIntervalMinutes;
+                configChanged = true;
+                done.Add($"RESTRequestBucketDecreaseIntervalMinutes = {InitRestIntervalMinutes}（原 {old}）：每 {InitRestIntervalMinutes} 分钟恢复 1 个令牌额度");
+            }
+
+            if (configChanged)
+            {
+                try
+                {
+                    TShock.Config.Write(System.IO.Path.Combine(TShock.SavePath, "config.json"));
+                    done.Add("以上配置已写入 TShock 的 config.json");
+                }
+                catch (Exception ex)
+                {
+                    player?.SendErrorMessage("写入 TShock config.json 失败：" + ex.Message);
+                    return;
+                }
+            }
+
+            // ---- 2. 默认注册组的权限 ----
+            var preferred = (settings.DefaultRegistrationGroupName ?? "").Trim();
+            var group = preferred.Length > 0 ? TShock.Groups.GetGroupByName(preferred) : null;
+            if (group == null) group = TShock.Groups.GetGroupByName("default");
+
+            if (group == null)
+            {
+                player?.SendErrorMessage($"找不到默认注册组（{(preferred.Length > 0 ? preferred : "default")}），权限未改动；请用 /group addperm 手动授予：" + string.Join(" ", InitDefaultGroupPermissions));
+            }
+            else
+            {
+                var missing = InitDefaultGroupPermissions.Where(p => !group.TotalPermissions.Contains(p)).ToList();
+                if (missing.Count == 0)
+                {
+                    kept.Add($"{group.Name} 组已具备全部所需权限");
+                }
+                else
+                {
+                    try
+                    {
+                        TShock.Groups.AddPermissions(group.Name, missing);
+                        done.Add($"{group.Name} 组 + {string.Join(" ", missing)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        player?.SendErrorMessage($"给 {group.Name} 组添加权限失败：{ex.Message}");
+                    }
+                }
+            }
+
+            // ---- 3. 汇报 ----
+            var who = string.IsNullOrEmpty(player?.Name) ? "Console" : player.Name;
+            TShock.Log.ConsoleInfo($"[WebUI] /web init 已由 {who} 执行：改动 {done.Count} 项。");
+
+            if (done.Count == 0)
+                player?.SendSuccessMessage("[WebUI] 初始化检查完毕：已经是推荐配置，没有改动。");
+            else
+            {
+                player?.SendSuccessMessage($"[WebUI] 初始化完成，共改动 {done.Count} 项：");
+                foreach (var line in done) player?.SendInfoMessage("  " + line);
+            }
+
+            foreach (var line in kept) player?.SendInfoMessage("  · " + line);
+
+            player?.SendInfoMessage("下一步：插件 Secret 与后端 TSWUI_AUTH_SECRET 保持一致；刚打开 REST 的需重启 TShock。");
         }
     }
 

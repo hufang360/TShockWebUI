@@ -2,15 +2,16 @@ import { lazy, Suspense } from 'react'
 import { CommandPage } from '@/pages/CommandPage'
 import { HomePage } from '@/pages/HomePage'
 import { Skeleton } from '@/components/ui'
+import { PluginHelp } from '@/components/PluginHelp'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import type { CustomModule } from '@/lib/customModules'
 import { useI18n } from '@/lib/i18n'
+import { PLUGIN_LINKS } from '@/lib/pluginLinks'
 import { MODULE_BY_ID, isModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
 import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset, Settings, TabId } from '@/types'
 
 // 首屏只保留首页与指令页；重数据页 / 插件页按导航需求加载。
-const loadChatPage = () => import('@/pages/ChatPage')
 const loadCommandModulePage = () => import('@/pages/CommandModulePage')
 const loadCommandTipsPage = () => import('@/pages/CommandTipsPage')
 const loadDataIdPage = () => import('@/pages/DataIdPage')
@@ -23,7 +24,6 @@ const loadSettingsPage = () => import('@/pages/SettingsPage')
 const loadSpriteSheetPage = () => import('@/pages/SpriteSheetPage')
 const loadWorldPage = () => import('@/pages/WorldPage')
 
-const ChatPage = lazy(() => loadChatPage().then((m) => ({ default: m.ChatPage })))
 const CommandModulePage = lazy(() =>
   loadCommandModulePage().then((m) => ({ default: m.CommandModulePage })),
 )
@@ -47,7 +47,6 @@ const SpriteSheetPage = lazy(() =>
 const WorldPage = lazy(() => loadWorldPage().then((m) => ({ default: m.WorldPage })))
 
 const routeLoaders: Partial<Record<TabId, () => Promise<unknown>>> = {
-  chat: loadChatPage,
   items: loadItemsPage,
   dataid: loadDataIdPage,
   save: loadPlrPage,
@@ -177,21 +176,11 @@ export function AppRoutes({
           serverId={serverId}
           players={players}
           ingameAllowed={ingameAllowed}
+          username={username}
           runtimeValues={runtimeValues}
           onTokenInvalid={onTokenInvalid}
           onLogin={openLogin}
           onOpenInDex={onOpenInDex}
-        />
-      )}
-      {activeTab === 'chat' && (
-        <ChatPage
-          dataset={dataset}
-          transport={transport}
-          authenticated={authenticated}
-          serverId={serverId}
-          refreshInterval={settings.eventsRefreshInterval}
-          onTokenInvalid={onTokenInvalid}
-          onLogin={openLogin}
         />
       )}
       {activeTab === 'items' && (
@@ -203,7 +192,7 @@ export function AppRoutes({
         />
       )}
       {activeTab === 'dataid' && (
-        <DataIdPage authenticated={authenticated} serverId={serverId} transport={transport} />
+        <DataIdPage username={username} />
       )}
       {activeTab === 'save' && <PlrPage serverId={serverId} transport={transport} />}
       {activeTab === 'worldview' && <WorldPage serverId={serverId} />}
@@ -255,8 +244,16 @@ export function AppRoutes({
           onLogin={openLogin}
           moduleId="world"
           keyPrefix="world:"
-          title={t('nav.world')}
-          desc={t('page.world.desc')}
+          desc={
+            <PluginHelp
+              plugin={t('plugin.world.name')}
+              en="WorldModify"
+              note={t('page.world.note')}
+              href={PLUGIN_LINKS.worldModify}
+            >
+              {t('page.world.desc')}
+            </PluginHelp>
+          }
           fixedCards={MODULE_BY_ID.get('world')?.cards}
           pluginName={MODULE_BY_ID.get('world')?.pluginName}
         />
@@ -275,8 +272,8 @@ export function AppRoutes({
             onLogin={openLogin}
             moduleId={mod.id}
             keyPrefix={`${mod.id}:`}
-            title={mod.name || t('modules.custom.untitled')}
-            desc={mod.desc.trim() || t('modules.custom.hint')}
+            // 没写说明就回退到「卡片怎么用」的帮助（写了就用作者自己的）。
+            desc={mod.desc.trim() || t('modules.custom.help')}
           />
         ))}
       {activeTab === 'settings' && (

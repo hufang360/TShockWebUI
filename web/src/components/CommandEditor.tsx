@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
-import { Send, User } from 'lucide-react'
+import { MessageSquare, Send, User } from 'lucide-react'
 import { Composer } from '@/components/Composer'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Badge, Button, Kbd, Spinner } from '@/components/ui'
@@ -56,6 +56,26 @@ export interface CommandEditorProps {
   slashToFocus?: boolean
   /** 紧凑尺寸（浮动终端用）：降低输入框高度与字号，节省纵向空间。 */
   compact?: boolean
+  /**
+   * 输入模式（文案 / 图标随之变）：
+   *
+   * - `command`（默认）：主色发送键 = 执行指令；
+   * - `chat`：次级灰发送键 = 发到游戏内聊天（同一个输入框，靠首字符 `/` 区分，与游戏内一致）。
+   */
+  mode?: 'command' | 'chat'
+  /** 占位文案（不传用指令输入框的默认文案）。 */
+  placeholder?: string
+  /** 字数上限（聊天沿用插件的 `MaxChatLength`）；不传不限。 */
+  maxLength?: number
+}
+
+/**
+ * 幽灵文字紧跟在已输入内容后面：如果它不以空格开头、而用户也没敲空格，就补一个，
+ * 免得 `/accountinfo h` 提示成 `h<username>`（像一个参数连在一起）。
+ */
+function withLeadingSpace(value: string, ghost: string): string {
+  if (!ghost || /^\s/.test(ghost) || /\s$/.test(value)) return ghost
+  return ` ${ghost}`
 }
 
 export function CommandEditor({
@@ -76,6 +96,9 @@ export function CommandEditor({
   trailing,
   slashToFocus = false,
   compact = false,
+  mode = 'command',
+  placeholder,
+  maxLength,
 }: CommandEditorProps) {
   const { t } = useI18n()
   const inputId = useId()
@@ -181,11 +204,13 @@ export function CommandEditor({
     }
     const hint = helpLine
     if (hint && hint.syntax.length > value.length && hint.syntax.toLowerCase().startsWith(value.toLowerCase())) {
-      return hint.syntax.slice(value.length)
+      return withLeadingSpace(value, hint.syntax.slice(value.length))
     }
     // 参数已经敲了具体值（和用法串里的占位符对不上）时，退一步只提示「下一个参数长什么样」。
+    // 补一个空格：否则 `/accountinfo h` 的幽灵会粘成 `h<username>`，看着像一个参数。
     if (hint?.argName) {
-      return `${hint.argRequired === false ? `[${hint.argName}]` : `<${hint.argName}>`} `
+      const ph = hint.argRequired === false ? `[${hint.argName}]` : `<${hint.argName}>`
+      return `${withLeadingSpace(value, ph)} `
     }
     return ''
   }, [busy, caret, value, showDropup, items, highlight, helpLine])
@@ -395,15 +420,25 @@ export function CommandEditor({
           <>
             {trailing}
             <Button
-              size="icon"
-              variant="primary"
-              className={cn('shrink-0 rounded-full', compact ? 'size-7' : 'size-8')}
+              size={compact ? 'icon-sm' : 'icon'}
+              variant={mode === 'chat' ? 'secondary' : 'primary'}
+              className="shrink-0 rounded-full"
               onClick={onExecute}
-              disabled={busy}
-              aria-label={busy ? t('editor.running') : t('editor.execute')}
-              title={busy ? t('editor.running') : t('editor.execute')}
+              disabled={busy || (mode === 'chat' && value.trim().length === 0)}
+              aria-label={
+                busy ? t('editor.running') : mode === 'chat' ? t('feed.chatSend') : t('editor.execute')
+              }
+              title={
+                busy ? t('editor.running') : mode === 'chat' ? t('feed.chatSend') : t('editor.execute')
+              }
             >
-              {busy ? <Spinner aria-hidden /> : <Send data-icon="inline-start" />}
+              {busy ? (
+                <Spinner aria-hidden />
+              ) : mode === 'chat' ? (
+                <MessageSquare data-icon="inline-start" />
+              ) : (
+                <Send data-icon="inline-start" />
+              )}
             </Button>
           </>
         }
@@ -415,7 +450,9 @@ export function CommandEditor({
             <div
               aria-hidden
               data-slot="command-ghost"
-              className="pointer-events-none absolute inset-0 overflow-hidden px-1 font-pixel whitespace-pre text-muted-foreground/40 select-none"
+              // 字体 / 行高 / 字距与 textarea **同源**：`index.css` 里
+              // `textarea.editor, [data-slot='command-ghost']` 共享同一套度量（这里再写 font-pixel 双保险）。
+              className="font-pixel pointer-events-none absolute inset-0 overflow-hidden px-1 whitespace-pre text-muted-foreground/40 select-none"
               style={{
                 fontSize: inputFontSize,
                 lineHeight: 1.7,
@@ -433,6 +470,7 @@ export function CommandEditor({
           name={inputId}
           rows={1}
           wrap="off"
+          maxLength={maxLength}
           className={cn(
             'editor relative w-full min-w-0 resize-none overflow-x-auto overflow-y-hidden bg-transparent px-1',
             compact ? 'h-7' : 'h-8',
@@ -444,7 +482,7 @@ export function CommandEditor({
           spellCheck={false}
           autoComplete="off"
           autoCapitalize="off"
-          placeholder={t('editor.placeholder')}
+          placeholder={placeholder ?? t('editor.placeholder')}
           onChange={(e) => {
             // 单行：粘贴/输入的多行内容折叠为空格。
             const next = e.target.value.replace(/\r?\n/g, ' ')

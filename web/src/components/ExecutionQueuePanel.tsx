@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, ListOrdered, X } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import {
   Badge,
@@ -128,16 +129,12 @@ function QueueItem({
         </code>
       </div>
       {onForbid ? (
-        <Button
-          size="icon-sm"
-          variant="ghost"
+        <IconAction
+          label={t('queue.forbid')}
+          icon={X}
           className="shrink-0"
-          aria-label={t('queue.forbid')}
-          title={t('queue.forbid')}
           onClick={onForbid}
-        >
-          <X data-icon="inline-start" />
-        </Button>
+        />
       ) : (
         <span className="shrink-0 text-2xs text-muted-foreground">{t('queue.running')}</span>
       )}

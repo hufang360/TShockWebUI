@@ -1,4 +1,12 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, RefreshCw } from 'lucide-react'
 import { IconAction } from '@/components/IconAction'
@@ -6,6 +14,7 @@ import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
 import { TopBarActions } from '@/components/TopBar'
 import { Badge, Button, Empty, EmptyDescription } from '@/components/ui'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { useBottomList } from '@/hooks/useBottomList'
 import { useNow } from '@/hooks/useNow'
 import { useServerFeed } from '@/hooks/useServerFeed'
@@ -68,6 +77,109 @@ function eventDot(type: string, source?: string): string {
   }
 }
 
+/** 世界状态文案（困难模式 / 血月 / 日食 / 下雨 / 入侵），无状态时返回空数组。 */
+function feedFlagLabels(
+  t: (key: string) => string,
+  extra: ServerInfoExtra | null,
+): string[] {
+  if (!extra) return []
+  const flags: string[] = []
+  if (extra.hardMode) flags.push(t('home.hardMode'))
+  if (extra.bloodMoon) flags.push(t('home.bloodMoon'))
+  if (extra.eclipse) flags.push(t('home.eclipse'))
+  if (extra.raining) flags.push(t('home.raining'))
+  if (extra.invasionType > 0) flags.push(t('home.invasion'))
+  return flags
+}
+
+/**
+ * 事件流底部的两行小字（**紧凑版**，「指令」页聊天栏与首页「最新动态」卡片共用）：
+ *
+ * ```
+ * 困难模式 · 下雨                    ← 世界状态（纯文字，过长截断，悬停给完整状态）
+ * 上次刷新 03:19:09  ·  游戏内 12:00  ← 刷新时间（悬停给带日期的完整时间）
+ * ```
+ *
+ * `showWorld` 控制世界名要不要带上：**首页不带**（同一屏的「服务器状态」「最近执行」已经写了世界名，
+ * 重复三遍没意义）；「指令」页的聊天栏带，因为那一栏没有别的世界名可看。
+ */
+export function FeedFootLines({
+  extra,
+  refreshedAt,
+  switchedAt = null,
+  showWorld = false,
+  showRefresh = true,
+  className,
+}: {
+  extra: ServerInfoExtra | null
+  refreshedAt?: number | null
+  /** 最近一次「上游换了服」的时间戳：短暂显示，随后自行消失。 */
+  switchedAt?: number | null
+  /** 状态行是否带世界名（`『世界名』 · 困难模式`）。 */
+  showWorld?: boolean
+  /**
+   * 是否渲染「上次刷新 · 游戏内」那一行。
+   *
+   * 关掉时**连游戏内时间一起不画**：页头右侧已经有完整的一行时，这里再留半行（只剩「游戏内」）更乱。
+   */
+  showRefresh?: boolean
+  className?: string
+}) {
+  const { t, lang } = useI18n()
+  const worldName = extra?.name?.trim() ?? ''
+  const flagLabels = feedFlagLabels(t, extra)
+  const statusText = [
+    showWorld && worldName ? `『${worldName}』` : '',
+    ...flagLabels,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const refreshParts: string[] = []
+  if (showRefresh && refreshedAt != null) {
+    refreshParts.push(t('home.lastRefresh', { time: formatClock(lang, refreshedAt) }))
+  }
+  const gameTime = showRefresh ? formatGameTime(extra) : null
+  if (gameTime) refreshParts.push(t('home.feedGameTime', { time: gameTime }))
+
+  // 换服提示只显示一小会儿：用户看到「列表自己换了」就知道原因，不必一直挂着。
+  const [dismissedSwitchedAt, setDismissedSwitchedAt] = useState<number | null>(null)
+  const showSwitched = switchedAt != null && switchedAt !== dismissedSwitchedAt
+  useEffect(() => {
+    if (switchedAt == null) return
+    const id = window.setTimeout(() => setDismissedSwitchedAt(switchedAt), SWITCH_HINT_MS)
+    return () => window.clearTimeout(id)
+  }, [switchedAt])
+
+  if (!statusText && refreshParts.length === 0 && !showSwitched) return null
+
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-1', className)}>
+      {statusText && (
+        <p
+          className="min-w-0 truncate text-2xs text-muted-foreground"
+          // 悬停给完整状态（**不含**世界名）：截断时才知道后面还有哪些。
+          title={flagLabels.length > 0 ? flagLabels.join(' · ') : undefined}
+        >
+          {statusText}
+        </p>
+      )}
+      {(refreshParts.length > 0 || showSwitched) && (
+        <p
+          className="flex min-w-0 items-center gap-2 text-2xs text-muted-foreground tabular-nums"
+          title={refreshedAt != null ? formatClockWithDate(lang, refreshedAt) : undefined}
+        >
+          {refreshParts.length > 0 && <span className="min-w-0 truncate">{refreshParts.join('  ·  ')}</span>}
+          {showSwitched && (
+            <span className="shrink-0 text-info" title={t('feed.switchedHint')}>
+              {t('feed.switched')}
+            </span>
+          )}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /** 世界状态徽标（困难模式 / 血月 / 日食 / 下雨 / 入侵）。无状态时渲染 null。 */
 function ServerFeedFlags({
   extra,
@@ -77,13 +189,7 @@ function ServerFeedFlags({
   className?: string
 }) {
   const { t } = useI18n()
-  if (!extra) return null
-  const flags: string[] = []
-  if (extra.hardMode) flags.push(t('home.hardMode'))
-  if (extra.bloodMoon) flags.push(t('home.bloodMoon'))
-  if (extra.eclipse) flags.push(t('home.eclipse'))
-  if (extra.raining) flags.push(t('home.raining'))
-  if (extra.invasionType > 0) flags.push(t('home.invasion'))
+  const flags = feedFlagLabels(t, extra)
   if (flags.length === 0) return null
   return (
     <div className={cn('flex flex-wrap gap-1', className)}>
@@ -215,6 +321,16 @@ interface ServerFeedListProps {
   pageScroll?: boolean
   /** `pageScroll` 时「回到底部」浮按钮的宿主（投到吸底的输入区上方）。 */
   jumpSlot?: HTMLElement | null
+  /**
+   * 底部信息区的排法：
+   *
+   * - `default`：「世界名 · 刷新于 HH:MM:SS · 游戏内 HH:MM」一行（「聊天」页）；
+   * - `text`：紧凑两行 —— 世界状态一行 + 「上次刷新 HH:MM:SS · 游戏内 HH:MM」一行（首页「最新动态」卡片）。
+   *   不带世界名（同屏的其它卡片已经写了）。
+   */
+  footerVariant?: 'default' | 'text'
+  /** 是否画「今天 / 昨天 / M月D日」分隔线（首页卡片关掉：只显示最近几条，分隔线是噪声）。 */
+  showDayDivider?: boolean
 }
 
 /** 事件流展示（徽标 + 列表）。滚动交给父容器的高度约束。 */
@@ -234,6 +350,8 @@ export function ServerFeedList({
   showFlags = true,
   pageScroll = false,
   jumpSlot,
+  footerVariant = 'default',
+  showDayDivider = true,
 }: ServerFeedListProps) {
   const { t, lang } = useI18n()
   // 页面级滚动时真正在滚的是 `<main>`（AppShell 主内容区），列表只负责把内容铺开。
@@ -328,7 +446,7 @@ export function ServerFeedList({
               const showDay = dayKey !== '' && dayKey !== prevKey
               return (
                 <Fragment key={e.seq}>
-                  {showDay && (
+                  {showDay && showDayDivider && (
                     <li className="my-1 flex items-center gap-2 text-2xs text-muted-foreground">
                       <span className="h-px flex-1 bg-border" />
                       <span className="shrink-0">{formatEventDay(lang, t, e.time, now)}</span>
@@ -366,19 +484,24 @@ export function ServerFeedList({
               ))}
         </div>
       )}
-      {(refreshLabel || showSwitched) && (
-        <div className="flex min-w-0 items-center gap-2 text-2xs text-muted-foreground">
-          {refreshLabel && (
-            <span className="min-w-0 truncate tabular-nums" title={refreshLabel}>
-              {refreshLabel}
-            </span>
-          )}
-          {showSwitched && (
-            <span className="shrink-0 text-info" title={t('feed.switchedHint')}>
-              {t('feed.switched')}
-            </span>
-          )}
-        </div>
+      {footerVariant === 'text' ? (
+        <FeedFootLines extra={extra} refreshedAt={refreshedAt ?? null} switchedAt={switchedAt} />
+      ) : (
+        refreshLabel ||
+        showSwitched ? (
+          <div className="flex min-w-0 items-center gap-2 text-2xs text-muted-foreground">
+            {refreshLabel && (
+              <span className="min-w-0 truncate tabular-nums" title={refreshLabel}>
+                {refreshLabel}
+              </span>
+            )}
+            {showSwitched && (
+              <span className="shrink-0 text-info" title={t('feed.switchedHint')}>
+                {t('feed.switched')}
+              </span>
+            )}
+          </div>
+        ) : null
       )}
     </div>
   )
@@ -401,6 +524,8 @@ export function ServerFeedTab({
   jumpSlot,
   actionsSlot,
   pageScroll = false,
+  footerVariant = 'default',
+  footerSlot,
 }: {
   transport: BackendTransport
   authenticated: boolean
@@ -427,8 +552,21 @@ export function ServerFeedTab({
   pageScroll?: boolean
   /** 刷新一簇（上次刷新 + 刷新按钮）的挂载点；不传则按 `pageScroll` 决定放顶栏或就地渲染。 */
   actionsSlot?: HTMLElement | null
+  /**
+   * 底部信息区的排法（「指令」页的聊天栏用，聊天页不传）：
+   *
+   * - `default`：世界徽标（Badge）一行 + 筛选 chips 一行，各自用 `filtersSlot` / `actionsSlot` 投放；
+   * - `stacked`：三行贴底 —— ①`世界名 · 困难模式, 下雨`（文字，不占 Badge，过长截断 + `title` 给完整状态）
+   *   ②`上次刷新 HH:MM:SS · 游戏内 HH:MM` ③`[⟳] │ 全部 进服 Boss …`（刷新按钮在 chips 左边，中间一条竖线）。
+   *   `stacked` 下整个信息区可通过 `footerSlot` 投到吸底输入区上方（窄屏）或就地贴在列表下方（宽屏）。
+   */
+  footerVariant?: 'default' | 'stacked'
+  /** `stacked` 时底部信息区的挂载点（窄屏投到吸底区；不传则就地渲染在列表下方）。 */
+  footerSlot?: HTMLElement | null
 }) {
   const { t, lang } = useI18n()
+  // 手机端顶栏右侧会折进 `…` 菜单（`TopBarSlot` 用同一个断点），所以「上次刷新」改由底部那小字显示。
+  const isMobile = useIsMobile()
   const [filter, setFilter] = useState<FeedFilter>('all')
   const { events, extra, available, refreshedAt, switchedAt, refresh, refreshing } = useServerFeed({
     transport,
@@ -444,29 +582,38 @@ export function ServerFeedTab({
     [events, filter],
   )
 
-  // 世界状态徽标单独一行（在筛选 chips 上方，靠左、不换行）；chips 靠左。
+  const chips = FEED_FILTERS.map((f) => (
+    <Button
+      key={f}
+      size="sm"
+      variant={filter === f ? 'secondary' : 'ghost'}
+      className={cn('px-2', filter !== f && 'text-muted-foreground')}
+      aria-pressed={filter === f}
+      onClick={() => setFilter(f)}
+    >
+      {t(FEED_FILTER_LABEL[f])}
+    </Button>
+  ))
+
+  // 默认：世界状态徽标单独一行（在筛选 chips 上方，靠左、不换行）；chips 靠左。
   const filterRow = (
     <>
       <ServerFeedFlags extra={extra} className="flex-nowrap justify-start overflow-x-auto" />
-      <div className="flex min-w-0 flex-wrap items-center gap-1">
-        {FEED_FILTERS.map((f) => (
-          <Button
-            key={f}
-            size="sm"
-            variant={filter === f ? 'secondary' : 'ghost'}
-            className={cn('px-2', filter !== f && 'text-muted-foreground')}
-            aria-pressed={filter === f}
-            onClick={() => setFilter(f)}
-          >
-            {t(FEED_FILTER_LABEL[f])}
-          </Button>
-        ))}
-      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-1">{chips}</div>
     </>
   )
 
   // 刷新一簇（上次刷新文案 + 刷新按钮）：挂载点由页面决定——「聊天」页放在输入框发送按钮左边，
   // 其它场景退回顶栏。文案在手机端隐藏，只留图标。
+  const refreshButton = (
+    /* 强制重新同步：SSE 连接中也能点（会断开重连并重拉尾部事件），跑的时候转圈 + 禁用。 */
+    <IconAction
+      label={refreshing ? t('home.refreshing') : t('feed.refresh')}
+      icon={RefreshCw}
+      loading={refreshing}
+      onClick={refresh}
+    />
+  )
   const refreshActions = (
     <>
       {refreshedAt != null && (
@@ -477,23 +624,79 @@ export function ServerFeedTab({
           {t('home.lastRefresh', { time: formatClock(lang, refreshedAt) })}
         </span>
       )}
-      {/* 强制重新同步：SSE 连接中也能点（会断开重连并重拉尾部事件），跑的时候转圈 + 禁用。 */}
-      <IconAction
-        label={refreshing ? t('home.refreshing') : t('feed.refresh')}
-        icon={RefreshCw}
-        loading={refreshing}
-        onClick={refresh}
-      />
+      {refreshButton}
     </>
   )
 
+  // `stacked`（「指令」页）：底部只剩两行 —— `『世界名』 · 困难模式 · 下雨` 与筛选 chips；
+  // 「上次刷新 HH:MM:SS · 游戏内 HH:MM」+ 刷新按钮挪到**顶栏右侧**（与其它模块同位置，
+  // 差别只在这页有聊天内容，所以多带一个游戏内时间）。
+  const refreshParts: string[] = []
+  if (refreshedAt != null) {
+    refreshParts.push(t('home.lastRefresh', { time: formatClock(lang, refreshedAt) }))
+  }
+  const gameTime = formatGameTime(extra)
+  if (gameTime) refreshParts.push(t('home.feedGameTime', { time: gameTime }))
+  const refreshLine = refreshParts.join('  ·  ')
+  const stackedFooter = (
+    <div className="flex min-w-0 flex-col gap-1">
+      {/* 状态行（带世界名）：与首页「最新动态」卡片共用 `FeedFootLines`，样式完全一致。
+          「上次刷新 … · 游戏内 …」平时不在这里重复（页头右侧已经有了）；**手机端顶栏折进 `…`**，
+          那里看不到刷新时间，所以这一行在窄屏补上。 */}
+      <FeedFootLines
+        extra={extra}
+        refreshedAt={refreshedAt}
+        // 只在窄屏（顶栏折叠）画那一行；宽屏页头右侧已经有完整的「上次刷新 · 游戏内」。
+        showRefresh={isMobile}
+        showWorld
+      />
+      <div className="flex min-w-0 flex-wrap items-center gap-1">{chips}</div>
+    </div>
+  )
+
+  if (footerVariant === 'stacked') {
+    return (
+      <div className={cn('flex min-w-0 flex-col gap-1', pageScroll ? 'flex-1' : 'h-full min-h-0')}>
+        {/* 上次刷新（带游戏内时间）+ 刷新按钮在**顶栏右侧**，与其它模块同一位置。 */}
+        <TopBarActions>
+          {refreshLine && (
+            <span
+              className="hidden text-2xs text-muted-foreground tabular-nums sm:inline"
+              title={refreshedAt != null ? formatClockWithDate(lang, refreshedAt) : undefined}
+            >
+              {refreshLine}
+            </span>
+          )}
+          {refreshButton}
+        </TopBarActions>
+        {/* 状态行 / chips 由 `stackedFooter` 统一画：`extra` 与 `refreshedAt` 不再传给列表，
+            否则列表底部会再画一遍「世界名 · 游戏内」。列表只保留「已切换服务器」这条临时提示。 */}
+        <ServerFeedList
+          events={filtered}
+          extra={null}
+          unavailable={available === false}
+          unavailableText={t('editor.eventsPluginMissing')}
+          showFlags={false}
+          pageScroll={pageScroll}
+          jumpSlot={jumpSlot}
+          switchedAt={switchedAt}
+          followNewest
+          itemsById={itemsById}
+          prefixesById={prefixesById}
+          atlas={atlas}
+        />
+        {footerSlot ? createPortal(stackedFooter, footerSlot) : stackedFooter}
+      </div>
+    )
+  }
+
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', pageScroll ? 'flex-1' : 'h-full min-h-0')}>
-      {actionsSlot
-        ? createPortal(refreshActions, actionsSlot)
-        : pageScroll
-          ? null
-          : <TopBarActions>{refreshActions}</TopBarActions>}
+      {actionsSlot ? (
+        createPortal(refreshActions, actionsSlot)
+      ) : pageScroll ? null : (
+        <TopBarActions>{refreshActions}</TopBarActions>
+      )}
       {filtersSlot ? createPortal(filterRow, filtersSlot) : pageScroll ? null : filterRow}
       <ServerFeedList
         events={filtered}

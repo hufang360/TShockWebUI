@@ -5,6 +5,8 @@ import { LoginGate } from '@/components/LoginGate'
 import { Notice } from '@/components/Notice'
 import { PlayerLookPanel } from '@/components/player/PlayerLookPanel'
 import { SearchInput } from '@/components/SearchInput'
+import { PageHelp } from '@/components/PageHelp'
+import { PluginHelp } from '@/components/PluginHelp'
 import { TopBarActions } from '@/components/TopBar'
 import {
   Alert,
@@ -24,6 +26,7 @@ import { useModuleState } from '@/hooks/useModuleState'
 import { usePlayerShot } from '@/hooks/usePlayerShot'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
+import { PLUGIN_LINKS } from '@/lib/pluginLinks'
 import { cacheFor, downloadBlob, playerErrorMessage } from '@/lib/playerPage'
 import { addSearchHistory } from '@/lib/searchHistory'
 import { setSelfAvatar } from '@/lib/selfAvatar'
@@ -247,6 +250,18 @@ export function PlayerManagerPage({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 页面说明：顶栏 ⓘ 控制，正文里占一行（在本页所有区块上面）。 */}
+      <PageHelp scopeId="players">
+        <PluginHelp
+          plugin={t('plugin.players.name')}
+          en="TShockPlayerManager"
+          note={t('page.players.note')}
+          href={PLUGIN_LINKS.playerManager}
+        >
+          {t('page.players.desc')}
+        </PluginHelp>
+      </PageHelp>
+
       {moduleEnabled && authenticated && (
         <TopBarActions>
           {canUse && (

@@ -407,7 +407,7 @@ v1.6.2 ~ v1.6.6，现已删除，避免每次调用多打一次空请求）。
               "map": ["物品"], "desc": "[i:29] 生命水晶 x5", "cost": "5 金币", "unlock": "",
               "comment": "", "allowGroup": [], "allowPlayers": [], "denyPlayers": [],
               "id": 29, "stack": 5, "prefix": 0, "iconId": 29, "argCount": 0,
-              "costMoney": 500, "costItems": [{ "id": 29, "stack": 3 }], "check": "",
+              "costMoney": 500, "costItems": [{ "id": 29, "stack": 3 }], "check": "", "cmds": [],
               "limit": 3, "serverLimit": 0, "cd": 0, "serverCd": 0,
               "needAlive": false, "needDay": false, "needNight": false }]
 }
@@ -424,6 +424,7 @@ v1.6.2 ~ v1.6.6，现已删除，避免每次调用多打一次空请求）。
 | `id` / `stack` / `prefix` | 商品 id（`<0` = 内置服务）、发放堆叠、词缀 id |
 | `costMoney` / `costItems` | 结构化价格：铜币数 + 要扣的物品（不含货币） |
 | `check` | 购买前检查（`check`）的说明文本 |
+| `cmds` | 购买后实际执行的指令（原版物品 / 降级条目为空数组）。前端用它判断「这个商品会做什么」（如 `/igen pond` → 鱼池建造注解图），不参与本地校验 |
 | `limit` / `serverLimit` / `cd` / `serverCd` | 限购次数 / 全服限量 / 冷却 / 全服冷却（都是**配置值**，`0` = 不限） |
 | `needAlive` / `needDay` / `needNight` | 死亡不能买 / 只能白天买 / 只能夜晚买 |
 
@@ -643,7 +644,7 @@ invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosse
   前端据此清空本地事件重拉而不是把两个服的事件混排；旧插件不返回，前端退回「`lastSeq` 回退」判定。
 
 ### `GET /api/events/stream?since=`（SSE）
-以 `text/event-stream` 持续推送（网页打开「聊天」页时用）：
+以 `text/event-stream` 持续推送（「指令」页的聊天栏用它）：
 - `event: message` + `data: <ServerEvent>`：一条事件；
 - `event: world` + `data: <ServerInfoExtra>`：世界状态（约 20s 一帧；前端用它更新徽标 / 游戏内时间）；
 - `event: reset` + `data: {"instance":"..."}`：上游换了实例（同一地址下换了另一个服）。

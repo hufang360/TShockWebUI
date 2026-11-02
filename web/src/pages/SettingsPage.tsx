@@ -309,13 +309,10 @@ export function SettingsPage({
     onCustomModulesChange([...customModules, mod])
     // 去掉可能已带上的 help，统一拼成「<cmd> help」。
     const base = cmd.replace(/\s+help$/i, '')
+    // 卡片对象在 updater 外面创建（StrictMode 会把 updater 跑两次）。
+    const helpCard = createModuleCard(t('modules.custom.helpCard'), `${base} help`)
     setRawModuleCards((prev) =>
-      addModuleCard(
-        sanitizeModuleCards(prev),
-        serverId,
-        mod.id,
-        createModuleCard(t('modules.custom.helpCard'), `${base} help`),
-      ),
+      addModuleCard(sanitizeModuleCards(prev), serverId, mod.id, helpCard),
     )
     onModulesChange(setModuleEnabled(modules, serverId, mod.id, true))
     setNewModuleName('')

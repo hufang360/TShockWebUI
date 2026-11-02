@@ -8,6 +8,7 @@ import { resetRefreshGate } from '@/lib/refreshGate'
 import { consumeEditorFocus } from '@/lib/editorFocus'
 import type { BackendTransport } from '@/lib/tshock'
 import { makeDataset } from '@/test/fixtures'
+import { closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { playerStubs } from '@/test/playerStubs'
 import type { CommandResult } from '@/types'
 import { HomePage } from './HomePage'
@@ -100,10 +101,11 @@ describe('HomePage 卡片管理', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
-    // 内置卡片行：有「内置」徽标与指令，且不可编辑。
+    // 内置卡片行：有尺寸徽标与指令，且不可编辑（没有「笔」图标就没有编辑按钮）。
     const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
-    expect(within(timeRow).getByText('内置')).toBeTruthy()
+    expect(within(timeRow).getByLabelText('左·小')).toBeTruthy()
     expect(within(timeRow).getByText('/time')).toBeTruthy()
+    expect(within(timeRow).queryByRole('button', { name: '编辑' })).toBeNull()
     expect(within(timeRow).queryByRole('textbox')).toBeNull()
     expect(within(timeRow).queryByRole('button', { name: '删除卡片' })).toBeNull()
   })
@@ -115,7 +117,12 @@ describe('HomePage 卡片管理', () => {
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
-    fireEvent.click(within(timeRow).getByRole('switch', { name: '隐藏' }))
+    // 显示 / 隐藏就是行内那个眼睛徽标。
+    fireEvent.click(within(timeRow).getByLabelText('显示中'))
+    // 行内出现闭眼图标。
+    expect(
+      within(within(dialog).getByRole('listitem', { name: '游戏时间' })).getByLabelText('已隐藏'),
+    ).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
 
     await waitFor(() => expect(screen.queryByText('游戏时间')).toBeNull())
@@ -123,14 +130,15 @@ describe('HomePage 卡片管理', () => {
     expect(screen.getByText('在线玩家')).toBeTruthy()
   })
 
-  it('自定义卡片按名称与指令渲染，并自动执行', async () => {
+  it('自定义卡片按名称与指令渲染，但默认不自动执行', async () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
     seedHomeCards({ ...DEFAULT_HOME_CARDS, order: [...DEFAULT_HOME_CARDS.order, card.id], custom: [card] })
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: ['ok'] })
     renderPage(fakeTransport(runCommand))
 
-    // 自定义卡片随首页自动执行。
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/fish 鲈鱼'))
+    // 先等内置卡片跑完，确认自定义卡片没有被自动执行。
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/alldeath'))
+    expect(runCommand).not.toHaveBeenCalledWith('/fish 鲈鱼')
 
     const cardEl = screen.getByText('钓鲈鱼').closest('[data-slot="card"]') as HTMLElement
     expect(cardEl.getAttribute('data-command')).toBe('/fish 鲈鱼')
@@ -150,9 +158,11 @@ describe('HomePage 卡片管理', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
     await waitFor(() => expect(screen.getByText('全服 公告')).toBeTruthy())
 
+    // 布局按服务器分开存：测试里 serverId = 'builtin'。
     const stored = JSON.parse(localStorage.getItem('tswui:homeCards') ?? '{}')
-    expect(stored.custom).toHaveLength(1)
-    expect(stored.custom[0]).toMatchObject({ name: '全服 公告', command: '/say hello' })
+    const prefs = stored.byServer?.builtin
+    expect(prefs.custom).toHaveLength(1)
+    expect(prefs.custom[0]).toMatchObject({ name: '全服 公告', command: '/say hello' })
   })
 
   it('自定义卡片可删除', async () => {
@@ -164,26 +174,44 @@ describe('HomePage 卡片管理', () => {
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     const row = within(dialog).getByRole('listitem', { name: '钓鲈鱼' })
-    fireEvent.click(within(row).getByRole('button', { name: '删除卡片' }))
-    fireEvent.click(within(row).getByRole('button', { name: '确认删除' }))
+    const menu = await openRowMenu(row)
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '删除卡片' }))
+    await closeRowMenu()
+    const confirm = await screen.findByRole('dialog', { name: '删除卡片' })
+    fireEvent.click(within(confirm).getByRole('button', { name: '确认删除' }))
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
 
     await waitFor(() => expect(screen.queryByText('钓鲈鱼')).toBeNull())
     const stored = JSON.parse(localStorage.getItem('tswui:homeCards') ?? '{}')
-    expect(stored.custom).toHaveLength(0)
+    expect(stored.byServer?.builtin.custom).toHaveLength(0)
   })
 
-  it('刷新按实际卡片顺序串行执行（自定义卡片在最前）', async () => {
+  it('刷新按实际卡片顺序串行执行（自定义卡片默认不参与）', async () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
     seedHomeCards({ ...DEFAULT_HOME_CARDS, order: [card.id, ...DEFAULT_HOME_CARDS.order], custom: [card] })
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    // 等最后一条内置卡片执行完，检查整体调用顺序。
+    // 等最后一条内置卡片执行完，检查整体调用顺序（v4 默认顺序：世界信息在在线玩家之前）。
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/alldeath'))
     const calls = runCommand.mock.calls.map((c) => c[0])
-    expect(calls[0]).toBe('/fish 鲈鱼')
-    expect(calls[1]).toBe('/who')
+    expect(calls[0]).toBe('/worldinfo')
+    expect(calls[1]).toBe('/lookbag Alice')
+    expect(calls[2]).toBe('/who')
+    // 自定义卡片默认手动：自动刷新不碰它。
+    expect(calls).not.toContain('/fish 鲈鱼')
+  })
+
+  it('不自动执行的卡片没结果时显示「等待执行…」', async () => {
+    // 把「游戏时间」改成手动执行（tswui:autoExec）。
+    localStorage.setItem('tswui:autoExec', JSON.stringify({ manual: { 'home:time': true } }))
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+
+    const timeCard = (await screen.findByText('游戏时间')).closest('[data-slot="card"]') as HTMLElement
+    // 手动卡片不会自己跑，空态提示「等待执行…」而不是「尚未执行」。
+    expect(within(timeCard).getByText('等待执行…')).toBeTruthy()
+    expect(await screen.findByText('在线玩家')).toBeTruthy()
   })
 
   it('2 分钟内的重复进入不会再次自动刷新卡片', async () => {
@@ -200,22 +228,36 @@ describe('HomePage 卡片管理', () => {
     expect(runCommand.mock.calls.length).toBe(callsAfterFirst)
   })
 
-  it('点击「刷新全部」会再次执行自定义卡片', async () => {
+  it('自定义卡片默认手动：刷新全部也不执行，打开「自动执行」后才跑', async () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
     seedHomeCards({ ...DEFAULT_HOME_CARDS, order: [...DEFAULT_HOME_CARDS.order, card.id], custom: [card] })
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/fish 鲈鱼'))
-    const before = runCommand.mock.calls.filter((c) => c[0] === '/fish 鲈鱼').length
-
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/alldeath'))
     // 等初始批次跑完，按钮恢复可点。
     await waitFor(() => screen.getByRole('button', { name: '刷新全部' }))
     fireEvent.click(screen.getByRole('button', { name: '刷新全部' }))
     await waitFor(() =>
-      expect(runCommand.mock.calls.filter((c) => c[0] === '/fish 鲈鱼').length).toBeGreaterThan(
-        before,
-      ),
+      expect(runCommand.mock.calls.some(([cmd]) => cmd === '/who')).toBe(true),
+    )
+    expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish 鲈鱼')).toBe(false)
+
+    // 在「管理卡片」里把它改成自动执行，再刷新全部就会跑。
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(
+      within(within(dialog).getByRole('listitem', { name: '钓鲈鱼' })).getByLabelText('不自动执行'),
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // 第二次「刷新全部」（等上一轮跑完按钮才可点）。
+    const refreshBtn = await screen.findByRole('button', { name: '刷新全部' }, { timeout: 4000 })
+    fireEvent.click(refreshBtn)
+    await waitFor(
+      () => expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish 鲈鱼')).toBe(true),
+      { timeout: 4000 },
     )
   })
 
@@ -371,8 +413,8 @@ describe('HomePage 卡片管理', () => {
     const right = screen.getByTestId('home-right')
     expect(right.contains(screen.getByText('服务器状态'))).toBe(true)
     expect(left.contains(screen.getByText('在线玩家'))).toBe(true)
-    // 右栏：服务器状态 / 服务器动态 / 最近执行；快捷入口默认隐藏，避免与侧栏重复。
-    for (const title of ['服务器状态', '服务器动态', '最近执行']) {
+    // 右栏：服务器状态 / 最新动态 / 最近执行；快捷入口默认隐藏，避免与侧栏重复。
+    for (const title of ['服务器状态', '最新动态', '最近执行']) {
       expect(within(right).getByText(title)).toBeTruthy()
     }
     expect(within(right).queryByText('快捷入口')).toBeNull()

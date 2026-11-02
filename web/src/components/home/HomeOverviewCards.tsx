@@ -8,10 +8,13 @@ import {
   RefreshCw,
   Server,
   Settings,
+  Signpost,
   Terminal,
   Users,
 } from 'lucide-react'
 import { ServerFeedList } from '@/components/ServerFeed'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { requestEditorView } from '@/lib/editorView'
 import { IconAction } from '@/components/IconAction'
 import {
   Badge,
@@ -139,6 +142,8 @@ export function EventsCard({
   onNavigate: (tab: TabId) => void
 }) {
   const { t } = useI18n()
+  // 手机端顶栏折叠、宽屏两栏同屏：所以手机上跳过去还要**切到聊天那一块**。
+  const isMobile = useIsMobile()
   return (
     <Card className="flex flex-col">
       <CardHeader className="group/header">
@@ -155,8 +160,9 @@ export function EventsCard({
               label={t('home.viewAll')}
               icon={ArrowRight}
               onClick={() => {
-                // 直接落到「聊天」页（服务器动态在那里）。
-                onNavigate('chat')
+                // 落到「指令」页：宽屏两栏同屏，聊天就在右边；手机上是上下 tab，顺手切到聊天。
+                if (isMobile) requestEditorView('chat')
+                onNavigate('editor')
               }}
             />
           )}
@@ -173,6 +179,11 @@ export function EventsCard({
           itemsById={dataset.itemsById}
           prefixesById={dataset.prefixesById}
           atlas={dataset.atlas}
+          // 紧凑版：状态 / 刷新时间放到列表底部两行小字，不画世界名（同屏其它卡片已经有）；
+          // 只显示最近 6 条，「今天 / 昨天」分隔线在这里是噪声。
+          footerVariant="text"
+          showFlags={false}
+          showDayDivider={false}
         />
       </CardBody>
     </Card>
@@ -266,7 +277,7 @@ export function QuickLinksCard({
     <Card className="flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Terminal />
+          <Signpost />
           {t('home.quick')}
         </CardTitle>
       </CardHeader>

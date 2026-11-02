@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Check, Copy, Star } from 'lucide-react'
-import { CollapseChevron } from '@/components/CollapseChevron'
+import { IconAction } from '@/components/IconAction'
+import { DetailSection } from '@/components/DetailSection'
 import { ItemIcon } from '@/components/ItemIcon'
-import { Badge, Button, Collapsible, CollapsibleContent, CollapsibleTrigger} from '@/components/ui'
+import { Badge, Button } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 import { locText } from '@/lib/loc'
 import { cn } from '@/lib/cn'
 import { recipeFavoriteKey } from '@/lib/recipeFavorites'
+import { RECIPE_SECTION_TONE } from '@/lib/sectionTones'
 import { useRecipeFavorites } from '@/lib/recipeFavoritesContext'
 import {
   ENV_ICON,
@@ -43,7 +45,7 @@ function ItemChip({
 }) {
   const item = dataset.itemsById.get(id)
   const name = label ?? item?.name ?? `#${id}`
-  // **小图标本身不可点**（避免误触弹抽屉）：要看详情就悬停出提示，点提示底部的「合成表」。
+  // **小图标本身不可点**（避免误触弹抽屉）：要看详情就悬停出提示，点提示右上角的 ⓘ「物品详情」。
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-2', className)}>
       <ItemIcon item={item} atlas={dataset.atlas} size={24} stack={stack} tooltip={tooltip} />
@@ -176,32 +178,27 @@ function RecipeRowActions({
   return (
     <span className="touch-visible absolute top-0.5 right-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/recipe:opacity-100 focus-within:opacity-100">
       {favorites && (
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={favoriteLabel}
-          aria-pressed={favorited}
-          title={favoriteLabel}
+        <IconAction
+          size="icon-xs"
+          label={favoriteLabel}
+          icon={Star}
+          iconClassName={cn(favorited && 'fill-current text-warning')}
+          pressed={favorited}
           onClick={(e) => {
             e.stopPropagation()
             favorites.toggle(key)
           }}
-        >
-          <Star className={cn(favorited && 'fill-current text-warning')} data-icon="inline-start" />
-        </Button>
+        />
       )}
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        aria-label={t('action.copy')}
-        title={copied ? t('action.copied') : t('action.copy')}
+      <IconAction
+        size="icon-xs"
+        label={copied ? t('action.copied') : t('action.copy')}
+        icon={copied ? Check : Copy}
         onClick={(e) => {
           e.stopPropagation()
           copy()
         }}
-      >
-        {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-      </Button>
+      />
     </span>
   )
 }
@@ -215,6 +212,15 @@ function pickKeyDown(onPick?: () => void) {
     onPick()
   }
 }
+
+/**
+ * 合成记录条目的统一外观：**无描边**、浅底（`bg-accent/40`）、悬停加深（`hover:bg-accent`）。
+ *
+ * 与「指令」页 / 收藏 / 历史里的条目同一套配色与圆角，三处（配方 / 反向配方 / 微光）
+ * 加上物品详情里的合成记录都用这一份，避免「有的描边有的不描边」。
+ */
+const RECIPE_ROW_CLASS =
+  'group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 rounded-control bg-accent/40 px-3 py-2 transition-colors duration-150 hover:bg-accent'
 
 export function RecipeRow({
   recipe,
@@ -259,7 +265,7 @@ export function RecipeRow({
       onClick={onPick}
       onKeyDown={pickKeyDown(onPick)}
       className={cn(
-        'group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 rounded-control border border-border/60 px-3 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10',
+        RECIPE_ROW_CLASS,
         onPick && 'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
       )}
     >
@@ -337,7 +343,8 @@ export function ReverseRecipeRow({
       onClick={onPick}
       onKeyDown={pickKeyDown(onPick)}
       className={cn(
-        'group/recipe relative flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 rounded-control border border-dashed border-border/60 px-3 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10',
+        // 反向配方只靠行内「微光」文案区分，不再用虚线边框（统一成同一种底色）。
+        RECIPE_ROW_CLASS,
         onPick && 'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
       )}
     >
@@ -380,7 +387,7 @@ export function ShimmerRow({
   return (
     <div
       data-testid="shimmer-row"
-      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 rounded-control border border-border/60 px-3 py-2 transition duration-150 hover:-translate-y-0.5 hover:bg-primary/10"
+      className={cn(RECIPE_ROW_CLASS, 'group/recipe')}
     >
       <ItemChip id={fromId} dataset={dataset} iconOnly={iconOnly} />
       <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
@@ -389,71 +396,19 @@ export function ShimmerRow({
   )
 }
 
-/** 可折叠分区（默认展开）：[固定物品图标] 标题 + 折叠箭头；内容按「短条目自动多列」网格排列。 */
-function RecipeSection({
-  title,
-  tone,
-  iconId,
-  dataset,
-  twoColumn,
-  children,
-}: {
-  title: string
-  tone: string
-  /** 固定图标（按用户指定）；不传则标题前无图标。 */
-  iconId?: number
-  dataset: Dataset
-  /** 两列视图（默认单列）。 */
-  twoColumn?: boolean
-  children: ReactNode
-}) {
-  const [open, setOpen] = useState(true)
-  return (
-    <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-1">
-      <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-sm font-medium">
-        {iconId != null && (
-          <ItemIcon
-            item={dataset.itemsById.get(iconId)}
-            atlas={dataset.atlas}
-            size={20}
-            tooltip={false}
-          />
-        )}
-        <span className={cn('truncate', tone)}>{title}</span>
-        <CollapseChevron open={open} />
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div
-          className={cn(
-            'grid gap-1',
-            // 小屏（<sm）两列太挤：即使勾选了「两列视图」也只排一列（对应开关在小屏隐藏）。
-            twoColumn ? 'grid-cols-2 max-sm:grid-cols-1' : 'grid-cols-1',
-          )}
-        >
-          {children}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  )
-}
-
 const MAX_ROWS = 60
 
 /** 配方行列表：超过 MAX_ROWS 时显示「N 条未显示」，点击再加载一批。 */
 function RecipeRows({
   rows,
-  itemId,
   dataset,
   iconOnly,
   copyTags,
-  decraft,
 }: {
   rows: Recipe[]
-  itemId: number
   dataset: Dataset
   iconOnly: boolean
   copyTags: boolean
-  decraft?: { stack: number } | null
 }) {
   const { t } = useI18n()
   const [limit, setLimit] = useState(MAX_ROWS)
@@ -464,30 +419,17 @@ function RecipeRows({
   return (
     <>
       {rows.slice(0, limit).map((r, i) => (
-        // 正向 / 反向记录放在同一个网格单元里，换列时不会被拆开。
-        <div key={i} className="flex min-w-0 flex-col gap-1">
-          <RecipeRow
-            recipe={r}
-            dataset={dataset}
-            iconOnly={iconOnly}
-            copyTags={copyTags}
-          />
-          {decraft && (
-            <ReverseRecipeRow
-              recipe={r}
-              itemId={itemId}
-              dataset={dataset}
-              iconOnly={iconOnly}
-              copyTags={copyTags}
-            />
-          )}
-        </div>
+        <RecipeRow key={i} recipe={r} dataset={dataset} iconOnly={iconOnly} copyTags={copyTags} />
       ))}
       {hidden > 0 && (
         <Button
           size="sm"
           variant="ghost"
-          className="justify-self-start text-xs text-muted-foreground"
+          // 样式与合成记录条目一致：浅底 `bg-accent/40`、悬停加深 `bg-accent`（`h-auto` 抵消 Button 的固定高度）
+          className={cn(
+            RECIPE_ROW_CLASS,
+            'h-auto w-fit shrink-0 justify-self-start text-xs text-muted-foreground md:h-auto',
+          )}
           onClick={() => setLimit((n) => n + MAX_ROWS)}
         >
           {t('recipe.more', { n: hidden })}
@@ -526,61 +468,49 @@ export function RecipePanel({
     () => (dataset.recipes.byIngredient[String(itemId)] ?? []).map((i) => dataset.recipes.recipes[i]),
     [dataset.recipes, itemId],
   )
-  // 「可丢微光分解」与「合成表」的每条记录一起显示（只挂在 make 分区）。
-  const stat = dataset.itemStats.items[String(itemId)]
-  const decraft =
-    stat?.stats?.canDecraft === true
-      ? { stack: typeof stat.stats.decraftStack === 'number' ? stat.stats.decraftStack : 1 }
-      : null
+  // 可丢微光分解（`canDecraft`，数据见 tools/gamedump）：反向记录挂在「微光嬗变」分区。
+  const decraft = dataset.itemStats.items[String(itemId)]?.stats?.canDecraft === true
   const shimmerInto = dataset.shimmerToById.get(itemId)
   const shimmerFrom = dataset.shimmerFromById.get(itemId) ?? []
   const shimmerCount = (shimmerInto != null ? 1 : 0) + shimmerFrom.length
 
-  if (make.length === 0 && use.length === 0 && shimmerCount === 0) {
+  if (make.length === 0 && use.length === 0 && shimmerCount === 0 && !decraft) {
     return <p className="mt-2 text-xs text-muted-foreground">{t('recipe.none')}</p>
   }
+
+  // 「微光分解」的反向记录（产物 @ 微光 → 原材料）挂在「微光嬗变」里：
+  // 它本来就属于微光，放在「合成来源」里会让人以为是一种合成方式。
+  const decraftRows = decraft ? make : []
+  const shimmerTotal = shimmerCount + decraftRows.length
 
   return (
     <div className="mt-3 flex flex-col gap-3">
       {make.length > 0 && (
-        <RecipeSection
+        <DetailSection
           title={t('recipe.make', { n: make.length })}
-          tone="text-success"
-          iconId={531}
-          dataset={dataset}
-          twoColumn={twoColumn}
-        >
-          <RecipeRows
-            rows={make}
-            itemId={itemId}
-            dataset={dataset}
-            iconOnly={iconOnly}
-            copyTags={copyTags}
-            decraft={decraft}
-          />
-        </RecipeSection>
-      )}
-      {use.length > 0 && (
-        <RecipeSection
-          title={t('recipe.use', { n: use.length })}
-          tone="text-warning"
+          tone={RECIPE_SECTION_TONE.make}
           iconId={36}
           dataset={dataset}
           twoColumn={twoColumn}
         >
-          <RecipeRows
-            rows={use}
-            itemId={itemId}
-            dataset={dataset}
-            iconOnly={iconOnly}
-            copyTags={copyTags}
-          />
-        </RecipeSection>
+          <RecipeRows rows={make} dataset={dataset} iconOnly={iconOnly} copyTags={copyTags} />
+        </DetailSection>
       )}
-      {shimmerCount > 0 && (
-        <RecipeSection
-          title={t('recipe.shimmer', { n: shimmerCount })}
-          tone="text-info"
+      {use.length > 0 && (
+        <DetailSection
+          title={t('recipe.use', { n: use.length })}
+          tone={RECIPE_SECTION_TONE.use}
+          iconId={9}
+          dataset={dataset}
+          twoColumn={twoColumn}
+        >
+          <RecipeRows rows={use} dataset={dataset} iconOnly={iconOnly} copyTags={copyTags} />
+        </DetailSection>
+      )}
+      {shimmerTotal > 0 && (
+        <DetailSection
+          title={t('recipe.shimmer', { n: shimmerTotal })}
+          tone={RECIPE_SECTION_TONE.shimmer}
           iconId={5362}
           dataset={dataset}
           twoColumn={twoColumn}
@@ -591,7 +521,17 @@ export function RecipePanel({
           {shimmerFrom.map((fromId) => (
             <ShimmerRow key={fromId} fromId={fromId} toId={itemId} dataset={dataset} iconOnly={iconOnly} />
           ))}
-        </RecipeSection>
+          {decraftRows.map((r, i) => (
+            <ReverseRecipeRow
+              key={`decraft-${i}`}
+              recipe={r}
+              itemId={itemId}
+              dataset={dataset}
+              iconOnly={iconOnly}
+              copyTags={copyTags}
+            />
+          ))}
+        </DetailSection>
       )}
     </div>
   )

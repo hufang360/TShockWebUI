@@ -24,6 +24,37 @@ const GOOD: FishGood = {
   comment: '备注 [i:29]',
 }
 
+// 非原生物品的典型：icon 只是借来的识别图（水桶 / 生命水晶），desc 里没有 `[i:..]`。
+const POND_GOOD: FishGood = {
+  serial: 180,
+  name: '鱼池',
+  icon: '[i:29]',
+  buyMax: 1,
+  needArgs: false,
+  map: [],
+  desc: '以你脚下为中心向下挖一个16×26的玻璃水鱼池',
+  cost: '[i/s5:73] 5 金币',
+  unlock: '',
+  comment: '',
+  // 注解图**按指令**匹配（不看名字）：/igen pond water → 鱼池图
+  cmds: ['/igen pond water'],
+}
+
+// 刷怪场：`/clip paste spawnerfarm` → 刷怪场注解图（与前三条不同的识别方式：关键字）
+const SPAWNER_GOOD: FishGood = {
+  serial: 181,
+  name: '岛牌刷怪厂',
+  icon: '[i:29]',
+  buyMax: 1,
+  needArgs: false,
+  map: [],
+  desc: '粘贴保存好的刷怪场',
+  cost: '[i/s1:73] 1 铂金',
+  unlock: '',
+  comment: '',
+  cmds: ['/wm backup', '/clip paste spawnerfarm foot'],
+}
+
 const ARG_GOOD: FishGood = {
   serial: 160,
   name: '地图上找',
@@ -108,8 +139,9 @@ describe('FishShopPage', () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
     const cell = await screen.findByRole('button', { name: '生命水晶' })
-    // 宽度上限 72（w-18），不随窗口拉伸；整格 hover 不铺底色。
-    expect(cell.className).toContain('w-18')
+    // 默认「大」：格子宽 72、不随窗口拉伸；整格 hover 不铺底色。
+    expect(cell.dataset.size).toBe('lg')
+    expect(cell.style.width).toBe('72px')
     expect(cell.className).toContain('hover:bg-transparent')
     // 子节点顺序：图标区 → #编号 → 名称（编号在名称**上面**一行）。
     const parts = [...cell.children].map((el) => el.textContent?.trim() ?? '')
@@ -119,12 +151,112 @@ describe('FishShopPage', () => {
     expect(parts[2]).toBe('生命水晶')
     // 底色只挂在 72×72 的图标区上。
     const surface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
-    expect(surface.className).toContain('size-18')
+    expect(surface.style.width).toBe('72px')
+    expect(surface.style.height).toBe('72px')
     expect(surface.className).toContain('group-hover/cell:bg-primary/10')
-    // 网格：列宽固定 72、行列间距都是 8px。
+    // 网格：列宽固定 72；大尺寸列距 16px、行距 24px（行距放宽给货架板和名称留空间）。
     const grid = cell.parentElement as HTMLElement
     expect(grid.className).toContain('grid-cols-[repeat(auto-fill,4.5rem)]')
-    expect(grid.className).toContain('gap-2')
+    expect(grid.className).toContain('gap-x-4')
+    expect(grid.className).toContain('gap-y-6')
+  })
+
+  it('原生物品的图标仍走物品提示（不再多一层「编号 + 商品名」）', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+
+    await screen.findByRole('button', { name: '生命水晶' })
+    expect(screen.queryByTestId('good-tooltip')).toBeNull()
+  })
+
+  it('鱼池 / 小房间 / 钓棚 的详情多一张建筑预览图', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
+    const dialog = await screen.findByRole('dialog')
+    const img = dialog.querySelector('img[src$="diagram-pond.png"]') as HTMLImageElement
+    expect(img).toBeTruthy()
+    // 图片本身就是标注（站哪、往上/往下几格），alt 给读屏
+    expect(img.getAttribute('alt')).toBe('「鱼池」的建造范围示意图')
+    // 标题行就是折叠开关
+    expect(within(dialog).getByText('建筑预览')).toBeTruthy()
+    // 居左：图按钮只包住图（`w-fit`），不居中（不再 `mx-auto`）
+    const imageButton = within(dialog).getByRole('button', { name: '放大建筑预览' })
+    expect(imageButton.className).toContain('w-fit')
+    expect(imageButton.className).not.toContain('mx-auto')
+    // 详情头部那个大图标不重复弹「编号 + 名称」（名字就在图下面）
+    expect(within(dialog).queryByTestId('good-tooltip')).toBeNull()
+  })
+
+  it('建筑预览可以折叠（收起后图不显示），再点就回来', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
+    const dialog = await screen.findByRole('dialog')
+    const trigger = within(dialog).getByRole('button', { name: '建筑预览' })
+
+    // 默认展开：图在
+    expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeTruthy()
+
+    fireEvent.click(trigger)
+    await waitFor(() =>
+      expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeNull(),
+    )
+
+    fireEvent.click(trigger)
+    await waitFor(() =>
+      expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeTruthy(),
+    )
+  })
+
+  it('点建筑预览弹出一层放大弹框（不关掉详情）', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
+    const sheet = await screen.findByRole('dialog')
+
+    fireEvent.click(within(sheet).getByRole('button', { name: '放大建筑预览' }))
+    // 叠一层：详情仍在（radix 把非顶层标 aria-hidden，所以查 hidden）
+    await waitFor(() => expect(screen.getAllByRole('dialog', { hidden: true })).toHaveLength(2))
+    expect(screen.getByText('商品详情')).toBeTruthy()
+
+    // jsdom 不加载图片（naturalWidth = 0），所以这里只断言放大弹框里的那张图存在；
+    // 倍率宽度的计算在浏览器里由 onLoad 拿到真实像素宽度后生效。
+    const zoomed = screen
+      .getAllByRole('dialog', { hidden: true })
+      .map((el) => el.querySelector('img[src$="diagram-pond.png"]'))
+      .filter(Boolean)
+    expect(zoomed.length).toBeGreaterThan(1)
+  })
+
+  it('放大弹框有 1/2 · 1:1 · 2× · 3× 四档，默认 1:1，切档高亮跟着变', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
+    const sheet = await screen.findByRole('dialog')
+    fireEvent.click(within(sheet).getByRole('button', { name: '放大建筑预览' }))
+
+    const group = await screen.findByRole('radiogroup', { name: '缩放倍率' })
+    const levels = ['1/2', '1:1', '2×', '3×']
+    for (const label of levels) {
+      expect(within(group).getByRole('radio', { name: label })).toBeTruthy()
+    }
+    // 默认 1:1（图片原生像素）
+    expect(within(group).getByRole('radio', { name: '1:1' }).getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.click(within(group).getByRole('radio', { name: '3×' }))
+    await waitFor(() =>
+      expect(within(group).getByRole('radio', { name: '3×' }).getAttribute('aria-checked')).toBe('true'),
+    )
+  })
+
+  it('刷怪场（cmds 含 spawnerfarm）用刷怪场预览图', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([SPAWNER_GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '岛牌刷怪厂' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.querySelector('img[src$="diagram-spawnerfarm.png"]')).toBeTruthy()
+  })
+
+  it('普通商品的详情里没有建筑预览', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.querySelector('img[src*="fishshop/diagram-"]')).toBeNull()
   })
 
   it('右侧默认只有「钓鱼信息」卡片：鱼罐 / 消费榜 / 鱼篓榜默认不显示', async () => {
@@ -139,6 +271,21 @@ describe('FishShopPage', () => {
     expect(screen.queryByText('鱼篓榜')).toBeNull()
   })
 
+  it('右侧内容全隐藏时收掉右列，左侧货架铺满', async () => {
+    // 卡片与记事本都隐藏（记事本的隐藏记在同一个 key 里，id = notepad）。
+    localStorage.setItem(
+      'tswui:fishCards:hidden',
+      JSON.stringify({ info: true, jar: true, rank: true, basket: true, notepad: true }),
+    )
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    await screen.findAllByText('生命水晶')
+
+    const side = screen.getByTestId('fish-side')
+    expect(side.className).toContain('hidden')
+    // 顶栏的「管理卡片」还在（否则没法把卡片重新打开）。
+    expect(screen.getByRole('button', { name: '管理卡片' })).toBeTruthy()
+  })
+
   it('鱼罐 / 消费榜 / 鱼篓榜默认不显示、不自动执行，在「管理卡片」里打开才出现', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), runCommand }))
@@ -148,16 +295,15 @@ describe('FishShopPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const sheet = await screen.findByRole('dialog')
     const jarRow = within(sheet).getByRole('listitem', { name: '鱼罐' })
-    // 默认：显示开关关着（文案是「显示」），自动执行也没勾。
-    const showSwitch = within(jarRow).getByRole('switch', { name: '显示' })
-    const autoBox = within(jarRow).getByRole('checkbox', { name: '鱼罐 自动执行' })
-    expect(autoBox.getAttribute('data-state')).not.toBe('checked')
+    // 默认隐藏：行内是闭眼徽标；自动执行徽标是「不自动执行」。
+    expect(within(jarRow).getByLabelText('已隐藏')).toBeTruthy()
+    expect(within(jarRow).getByLabelText('不自动执行')).toBeTruthy()
+    fireEvent.click(within(jarRow).getByLabelText('已隐藏'))
 
-    fireEvent.click(showSwitch)
-    // 打开后开关变成「隐藏」。
-    expect(within(jarRow).getByRole('switch', { name: '隐藏' })).toBeTruthy()
-
-    fireEvent.keyDown(document, { key: 'Escape' })
+    // 点过眼睛徽标后：变「显示中」。
+    const shownRow = within(sheet).getByRole('listitem', { name: '鱼罐' })
+    expect(within(shownRow).getByLabelText('显示中')).toBeTruthy()
+    fireEvent.click(within(sheet).getByRole('button', { name: '完成' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     // 卡片出现了，但仍是「手动执行」：刷新全部只跑钓鱼信息。
     expect(await screen.findByText('鱼罐')).toBeTruthy()
@@ -168,6 +314,28 @@ describe('FishShopPage', () => {
     expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish jar')).toBe(false)
   })
 
+  it('「管理卡片」的「恢复默认」把鱼罐等改回默认隐藏，并清掉自定义卡片', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    await screen.findByText('钓鱼信息')
+
+    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
+    const sheet = await screen.findByRole('dialog')
+    // 加一张自定义卡片 + 把鱼罐改成显示。
+    fireEvent.click(within(sheet).getByRole('button', { name: '添加卡片' }))
+    fireEvent.change(within(sheet).getByLabelText('卡片名称'), { target: { value: '常用购买' } })
+    fireEvent.change(within(sheet).getByLabelText('指令'), { target: { value: '/fish buy 1' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: /^添加$/ }))
+    fireEvent.click(within(within(sheet).getByRole('listitem', { name: '鱼罐' })).getByLabelText('已隐藏'))
+    expect(within(within(sheet).getByRole('listitem', { name: '鱼罐' })).getByLabelText('显示中')).toBeTruthy()
+
+    // 恢复默认：图标按钮 → 就地二次确认。
+    fireEvent.click(within(sheet).getByRole('button', { name: '恢复默认' }))
+    fireEvent.click(await within(sheet).findByRole('button', { name: '确认恢复' }))
+
+    await waitFor(() => expect(within(sheet).queryByRole('listitem', { name: '常用购买' })).toBeNull())
+    expect(within(within(sheet).getByRole('listitem', { name: '鱼罐' })).getByLabelText('已隐藏')).toBeTruthy()
+  })
+
   it('把鱼罐勾成「自动执行」后，刷新全部会执行它', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), runCommand }))
@@ -176,9 +344,11 @@ describe('FishShopPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const sheet = await screen.findByRole('dialog')
     const jarRow = within(sheet).getByRole('listitem', { name: '鱼罐' })
-    fireEvent.click(within(jarRow).getByRole('switch', { name: '显示' }))
-    fireEvent.click(within(jarRow).getByRole('checkbox', { name: '鱼罐 自动执行' }))
-    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(within(jarRow).getByLabelText('已隐藏'))
+    fireEvent.click(
+      within(within(sheet).getByRole('listitem', { name: '鱼罐' })).getByLabelText('不自动执行'),
+    )
+    fireEvent.click(within(sheet).getByRole('button', { name: '完成' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
     fireEvent.click(screen.getByRole('button', { name: '刷新全部' }))
@@ -201,16 +371,20 @@ describe('FishShopPage', () => {
     expect(JSON.parse(localStorage.getItem('tswui:fishNote') ?? '{}').default).toBe('今天鱼价 3 金')
   })
 
-  it('非原生物品（指令类，desc 无 [i:..]）悬停不显示物品提示，图标不压透明度', async () => {
+  it('非原生物品（指令类，desc 无 [i:..]）悬停只给「编号 + 名称」，不报物品属性', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([ARG_GOOD]) }))
 
     const cell = await screen.findByRole('button', { name: '地图上找' })
-    fireEvent.mouseOver(within(cell).getByRole('img'))
-    // 给提示一点渲染时间，确认不会弹出。
-    await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    const icon = within(cell).getByRole('img')
+    fireEvent.pointerMove(icon, { pointerType: 'mouse' })
+    fireEvent.pointerEnter(icon, { pointerType: 'mouse' })
+    const tip = await screen.findByRole('tooltip')
+    expect(tip.textContent).toContain('#160')
+    expect(tip.textContent).toContain('地图上找')
+    // 借来的识别图是「生命水晶」：提示里不能出现它的物品名（会让人以为买的就是那件物品）
+    expect(tip.textContent).not.toContain('生命水晶')
     // 借来的识别图按正常透明度显示（与真物品一致）。
-    expect(within(cell).getByRole('img').parentElement?.className ?? '').not.toContain('opacity-80')
+    expect(icon.parentElement?.className ?? '').not.toContain('opacity-80')
   })
 
   it('件数在输入框右侧（失焦且空时让位给 / 提示），整页滚动、工具条吸顶', async () => {
@@ -813,7 +987,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect(names.some((n) => n?.includes('重复的'))).toBe(false)
   })
 
-  it('页面设置：隐藏编号和名称 / 表格视图 / 导出表格', async () => {
+  it('页面设置：图标大小 / 隐藏编号和名称 / 表格视图', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     expect(await screen.findByText('#1')).toBeTruthy()
 
@@ -821,6 +995,9 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
     fireEvent.click(await screen.findByLabelText('隐藏编号和名称'))
     await waitFor(() => expect(screen.queryByText('#1')).toBeNull())
+    // 这个开关只影响中 / 大：先关掉，后面单独测尺寸。
+    fireEvent.click(screen.getByLabelText('隐藏编号和名称'))
+    await screen.findByText('#1')
 
     // 表格视图：换成一张表（编号 / 图标 / 名称 / 价格 / 说明）。
     fireEvent.click(screen.getByLabelText('表格视图'))
@@ -832,19 +1009,87 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     const noteCell = within(table).getByTitle('备注 [i:29]')
     expect(noteCell.className).toContain('truncate')
 
-    // 导出表格：CSV（`[i:..]` 还原成 #ID）。
-    const createObjectURL = vi.fn((_blob: Blob) => 'blob:fish')
-    const revokeObjectURL = vi.fn((_url: string) => {})
-    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true })
-    Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true })
-    fireEvent.click(screen.getByRole('button', { name: '导出表格' }))
-    expect(createObjectURL).toHaveBeenCalledTimes(1)
-    const blob = createObjectURL.mock.calls[0]![0]
-    const text = await blob.text()
-    expect(text).toContain('生命水晶')
-    // 富文本标签不原样写进 CSV：`[i/s2:73] 2 金币` → `#73x2 2 金币`。
-    expect(text).toContain('#73x2 2 金币')
-    expect(text).not.toContain('[i/s2:73]')
+    // 导出表格已经去掉（页面设置里不再有这个按钮）。
+    expect(screen.queryByRole('button', { name: '导出表格' })).toBeNull()
+  })
+
+  it('图标大小：小 32 / 中 48 / 大 64，小尺寸不显示编号与名称', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    const cell = await screen.findByRole('button', { name: '生命水晶' })
+    expect(cell.style.width).toBe('72px')
+
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+
+    // 中：图标 48、格子 56，编号与名称照常。
+    fireEvent.click(await screen.findByRole('radio', { name: '中' }))
+    await waitFor(() => expect(cell.style.width).toBe('56px'))
+    const mdSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
+    expect(mdSurface.style.width).toBe('56px')
+    expect(screen.getByText('#1')).toBeTruthy()
+    expect(screen.getByText('生命水晶')).toBeTruthy()
+
+    // 小：图标 32、格子 40，只剩图标（标题 / 名称都不显示），「隐藏编号和名称」开关也不再出现。
+    fireEvent.click(screen.getByRole('radio', { name: '小' }))
+    await waitFor(() => expect(cell.style.width).toBe('40px'))
+    const smSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
+    expect(smSurface.style.width).toBe('40px')
+    expect(screen.queryByText('#1')).toBeNull()
+    expect(screen.queryByLabelText('隐藏编号和名称')).toBeNull()
+
+    // 回到大：图标 64，编号与名称回来。
+    fireEvent.click(screen.getByRole('radio', { name: '大' }))
+    await waitFor(() => expect(cell.style.width).toBe('72px'))
+    expect(screen.getByText('#1')).toBeTruthy()
+  })
+
+  it('货架板：中 / 大尺寸才画，上沿贴图标区底部、板身盖住序号行、左右各留 4px', async () => {
+    // jsdom 没有排版：按「格子 / 图标区 / 图标 / 序号行」分别给假矩形，验证几何计算。
+    // 格子高 107、图标区底 72、图标底 68、序号行底 87 → 板上沿 72 + 1px（整块板下移）＝ 73、
+    // 板厚 87 - 73 = 14、周期 = 107 + 行距；板宽收到最后一列（jsdom 当作 1 列，即 72），左右各留 4px。
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const bottom =
+        this.tagName === 'BUTTON'
+          ? 107
+          : this.dataset.testid === 'good-icon-surface'
+            ? 72
+            : this.className.includes('font-pixel')
+              ? 87
+              : 68
+      return {
+        width: 72,
+        height: bottom,
+        top: 0,
+        left: 0,
+        right: 72,
+        bottom,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect
+    })
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    await screen.findByRole('button', { name: '生命水晶' })
+
+    const shelf = await screen.findByTestId('fish-shelf')
+    expect(shelf.className).toContain('fish-shelf')
+    expect(shelf.style.getPropertyValue('--fish-shelf-pitch')).toBe('107px')
+    expect(shelf.style.getPropertyValue('--fish-shelf-line')).toBe('73px')
+    expect(shelf.style.getPropertyValue('--fish-shelf-thickness')).toBe('14px')
+    // 板宽收到「最后一列商品的右边」再左右各留 4px：jsdom 算不出列数（当作 1 列）→ 72 - 8。
+    expect(shelf.style.left).toBe('4px')
+    expect(shelf.style.width).toBe('64px')
+
+    // 小尺寸不画（图标排得密，加板只会更乱）。
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    fireEvent.click(await screen.findByRole('radio', { name: '小' }))
+    await waitFor(() => expect(screen.queryByTestId('fish-shelf')).toBeNull())
+
+    // 表格视图也不画。
+    fireEvent.click(screen.getByRole('radio', { name: '大' }))
+    fireEvent.click(screen.getByLabelText('表格视图'))
+    await waitFor(() => expect(screen.queryByTestId('fish-shelf')).toBeNull())
   })
 
   it('顶栏「刷新全部」同时刷新货架（输入框里不再有刷新按钮）', async () => {

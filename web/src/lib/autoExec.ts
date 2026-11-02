@@ -18,7 +18,9 @@ export function sanitizeAutoExec(value: unknown): AutoExecPrefs {
   const manual: Record<string, boolean> = {}
   if (raw.manual && typeof raw.manual === 'object') {
     for (const [key, val] of Object.entries(raw.manual as Record<string, unknown>)) {
-      if (key && val === true) manual[key] = true
+      // 明确记下来的 `false` 也要留着：卡片的默认值可能是「手动」（用户添加的卡片），
+      // 只有显式 `false` 才能让它们回到「自动执行」。
+      if (key && typeof val === 'boolean') manual[key] = val
     }
   }
   return { manual }
@@ -30,9 +32,10 @@ export function isManual(prefs: AutoExecPrefs, key: string, defaultManual = fals
   return v === undefined ? defaultManual : v
 }
 
+/**
+ * 记录「是否手动执行」。两个方向都落盘（不只记 `true`）：
+ * 用户添加的卡片默认手动，删掉 key 会让它又变回手动，所以「自动执行」必须显式记 `false`。
+ */
 export function setManual(prefs: AutoExecPrefs, key: string, manual: boolean): AutoExecPrefs {
-  const next = { ...prefs.manual }
-  if (manual) next[key] = true
-  else delete next[key]
-  return { manual: next }
+  return { manual: { ...prefs.manual, [key]: manual } }
 }

@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react'
 
 /**
- * 物品提示（tips）里「合成表」入口的能力接口。
+ * 物品提示（tips）右上角 ⓘ「物品详情」入口的能力接口。
  *
  * 物品提示在**很多页面**都会出现（图鉴、指令结果、物品搜索…），但「物品详情抽屉」只属于
  * 物品图鉴。所以这里只暴露一个 `open(itemId)`：

@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { NotebookPen, Terminal } from 'lucide-react'
 import { LoginGate } from '@/components/LoginGate'
+import { PageHelp } from '@/components/PageHelp'
 import { ModuleCardsPanel, type PanelCard } from '@/components/ModuleCardsPanel'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui'
 import { useModuleCards } from '@/hooks/useModuleCards'
@@ -54,8 +56,8 @@ interface CommandModulePageProps {
   onLogin: () => void
   /** 卡片存储所属模块 id（`world` / `m:<uuid>`）。 */
   moduleId: string
-  title: string
-  desc?: string
+  /** 页面说明正文（世界管理传 `<PluginHelp>`，自定义模块传用户写的纯文本）。 */
+  desc?: ReactNode
   /** 结果 key 前缀，避免不同模块冲突。 */
   keyPrefix: string
   /** 固定卡片（不可删除）。 */
@@ -74,14 +76,15 @@ export function CommandModulePage({
   onTokenInvalid,
   onLogin,
   moduleId,
-  title,
   desc,
   keyPrefix,
   fixedCards,
   pluginName,
 }: CommandModulePageProps) {
   const { t } = useI18n()
-  const { cards, add, update, remove } = useModuleCards(serverId, moduleId)
+  const { cards, add, update, remove, reset: resetCards } = useModuleCards(serverId, moduleId)
+  // 本页卡片全被隐藏时，把「页面说明」顶出来（页面就不能关它了）。
+  const [allHidden, setAllHidden] = useState(false)
 
   const allCards: PanelCard[] = useMemo(
     () => [
@@ -89,6 +92,7 @@ export function CommandModulePage({
         id: `fixed:${c.command}`,
         name: t(c.nameKey),
         command: c.command,
+        icon: <Terminal />,
         fixed: true,
         manualKey: `${keyPrefix}fixed:${c.command}`,
         defaultManual: c.manual === true,
@@ -97,8 +101,11 @@ export function CommandModulePage({
         id: c.id,
         name: c.name,
         command: c.command,
+        icon: <Terminal />,
         custom: true,
         manualKey: `${keyPrefix}${c.id}`,
+        // 用户添加的卡片默认**不自动执行**（只能点卡片自己的按钮）。
+        defaultManual: true,
       })),
     ],
     [fixedCards, cards, t, keyPrefix],
@@ -111,28 +118,36 @@ export function CommandModulePage({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* 世界管理与自定义模块统一为两栏：左 = 指令卡片，右 = 记事本。 */}
-      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
-          <ModuleCardsPanel
-            dataset={dataset}
-            transport={transport}
-            authenticated={authenticated}
-            serverId={serverId}
-            refreshInterval={refreshInterval}
-            onTokenInvalid={onTokenInvalid}
-            keyPrefix={keyPrefix}
-            title={title}
-            desc={desc}
-            cards={allCards}
-            onAddCard={add}
-            onUpdateCard={update}
-            onRemoveCard={remove}
-            pluginName={pluginName}
-          />
-        </div>
-        <NotebookCard moduleId={moduleId} />
-      </div>
+      {/* 页面说明：顶栏 ⓘ 控制，正文里占满一行（在左右两栏上面）。 */}
+      {desc && (
+        <PageHelp scopeId={`panel:${keyPrefix}`} forceOpen={allHidden}>
+          {desc}
+        </PageHelp>
+      )}
+      {/* 世界管理与自定义模块：卡片按宽度分栏（小 / 大 在左栏，右 进右列）；
+          记事本也参与同一套排序 / 宽度（默认在右列），所以交给面板统一渲染。 */}
+      <ModuleCardsPanel
+        dataset={dataset}
+        transport={transport}
+        authenticated={authenticated}
+        serverId={serverId}
+        refreshInterval={refreshInterval}
+        onTokenInvalid={onTokenInvalid}
+        keyPrefix={keyPrefix}
+        cards={allCards}
+        onEmptyChange={setAllHidden}
+        extra={{
+          id: 'notebook',
+          name: t('modules.notebook'),
+          icon: <NotebookPen />,
+          node: <NotebookCard moduleId={moduleId} />,
+        }}
+        onAddCard={add}
+        onUpdateCard={update}
+        onRemoveCard={remove}
+        onResetCards={resetCards}
+        pluginName={pluginName}
+      />
     </div>
   )
 }

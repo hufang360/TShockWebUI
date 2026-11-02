@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Plus, Star } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { SearchInput } from '@/components/SearchInput'
@@ -14,11 +14,16 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
+import { usePanelMemory } from '@/hooks/useToolsMemory'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
-import { formatItemTag, searchItems } from '@/lib/items'
+import { formatItemTag, itemEnglishName, searchItems } from '@/lib/items'
 import type { Dataset, Item, ItemFavorite } from '@/types'
 
 type InsertKind = 'id' | 'name' | 'tag'
@@ -34,10 +39,15 @@ interface ItemSearchPanelProps {
   /** 点收藏物品：把 ID 追加到指令（**保留**收藏记录，下次还能点）。 */
   onInsertFavorite?: (id: number) => void
   /**
-   * 只插入 `[i:ID]` 标签（「聊天」页的物品弹框用）：
+   * 只插入 `[i:ID]` 标签（聊天模式用）：
    * 点一条即插入，不再展示「ID / 名称 / 标签」选择与详情确认区。
    */
   tagOnly?: boolean
+  /**
+   * 弹框里的「标签模式」开关（`CommandToolsDialog` 的 Toggle）：
+   * 开启后点条目直接插 `[i:ID]`，与 `tagOnly` 走同一条路径；关掉就是原来的「点开详情再选插入方式」。
+   */
+  tagMode?: boolean
 }
 
 /**
@@ -53,9 +63,11 @@ export function ItemSearchPanel({
   favorites = [],
   onInsertFavorite,
   tagOnly = false,
+  tagMode = false,
 }: ItemSearchPanelProps) {
   const { t } = useI18n()
-  const [query, setQuery] = useState('')
+  // 搜索词 + 滚动位置按页记忆（关掉弹框再打开还在）。
+  const { query, setQuery, scrollRef, flushScroll } = usePanelMemory('items')
   const [selected, setSelected] = useState<Item | null>(null)
   const [activeIndex, setActiveIndex] = useState(-1)
   const [insertKind, setInsertKind] = useState<InsertKind>('id')
@@ -63,6 +75,10 @@ export function ItemSearchPanel({
   const inputRef = useRef<HTMLInputElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
 
+  // 关掉弹框时把滚动位置落盘。
+  useEffect(() => flushScroll, [flushScroll])
+  // 「点一条就插标签」：聊天模式强制如此，或用户自己打开了「标签模式」。
+  const directTag = tagOnly || tagMode
   const showFavorites = !debounced.trim()
 
   const results = useMemo(
@@ -97,8 +113,8 @@ export function ItemSearchPanel({
   }
 
   const activate = (item: Item, index: number) => {
-    if (tagOnly) {
-      // 聊天里只需要标签本身：一下点完，不再走「选中 → 选插入方式 → 点插入」。
+    if (directTag) {
+      // 只需要标签本身：一下点完，不再走「选中 → 选插入方式 → 点插入」。
       onInsert(formatItemTag(item.id))
       return
     }
@@ -125,8 +141,8 @@ export function ItemSearchPanel({
       }
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (showFavorites) onInsertFavorite?.(item.id)
-      else if (tagOnly) onInsert(formatItemTag(item.id))
+      if (directTag) onInsert(formatItemTag(item.id))
+      else if (showFavorites) onInsertFavorite?.(item.id)
       else onInsert(` ${item.id} `)
     }
   }
@@ -138,6 +154,7 @@ export function ItemSearchPanel({
   }
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="flex h-full min-h-0 flex-col gap-2">
       <SearchInput
         ref={inputRef}
@@ -148,7 +165,7 @@ export function ItemSearchPanel({
         aria-label={t('items.title')}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-container bg-accent/40">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {rows.length === 0 ? (
           showFavorites ? (
             <Empty className="py-6">
@@ -169,39 +186,47 @@ export function ItemSearchPanel({
           <ul>
             {rows.map((item, index) => (
               <li key={item.id}>
-                <Button
-                  variant="ghost"
-                  ref={(el) => {
-                    itemRefs.current[index] = el
-                  }}
-                  onClick={() => activate(item, index)}
-                  onKeyDown={(e) => onResultKeyDown(e, index, item)}
-                  title={showFavorites ? t('items.insertFavoriteHint') : undefined}
-                  className={cn(
-                    'h-auto w-full cursor-pointer justify-start gap-2 rounded-none px-2 py-2 font-normal',
-                    // 选中 / 键盘高亮只用**更深的底色**表示：不要描边（默认聚焦光圈会画出一圈深色框）。
-                    'focus-visible:ring-0 focus-visible:ring-offset-0',
-                    selected?.id === item.id || activeIndex === index
-                      ? 'bg-foreground/10'
-                      : 'hover:bg-foreground/5',
-                  )}
-                >
-                  <ItemIcon item={item} atlas={dataset.atlas} size={24} />
-                  <span className="min-w-0 flex-1 text-left">
-                    <span className="block truncate text-sm text-foreground">{item.name}</span>
-                    <span className="block truncate font-pixel text-2xs text-muted-foreground">
-                      {item.key}
-                    </span>
-                  </span>
-                  <span className="font-pixel text-2xs text-muted-foreground">{item.id}</span>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      ref={(el) => {
+                        itemRefs.current[index] = el
+                      }}
+                      onClick={() => activate(item, index)}
+                      onKeyDown={(e) => onResultKeyDown(e, index, item)}
+                      className={cn(
+                        'h-auto w-full cursor-pointer justify-start gap-2 rounded-none px-2 py-2 font-normal',
+                        // 选中 / 键盘高亮只用**更深的底色**表示：不要描边（默认聚焦光圈会画出一圈深色框）。
+                        'focus-visible:ring-0 focus-visible:ring-offset-0',
+                        selected?.id === item.id || activeIndex === index
+                          ? 'bg-foreground/10'
+                          : 'hover:bg-foreground/5',
+                      )}
+                    >
+                      <ItemIcon item={item} atlas={dataset.atlas} size={24} />
+                      {/* 名称与内部名**同一行**（省一行高度），装不下就整体截断。 */}
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        <span className="text-sm text-foreground">{item.name}</span>
+                        <span className="ml-2 text-2xs text-muted-foreground">
+                          {itemEnglishName(item.key)}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-pixel text-2xs text-muted-foreground">
+                        {item.id}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  {/* 悬停提示：点这一行的效果（收藏 / 标签模式下也一样是把它塞进输入框）。 */}
+                  <TooltipContent side="right">{t('items.appendHint')}</TooltipContent>
+                </Tooltip>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      {selected && !showFavorites && !tagOnly && (
+      {selected && !showFavorites && !directTag && (
         <div className="shrink-0 rounded-control bg-accent/50 p-3">
           <div className="flex items-center gap-3">
             <ItemIcon item={selected} atlas={dataset.atlas} size={40} />
@@ -240,5 +265,6 @@ export function ItemSearchPanel({
         </div>
       )}
     </div>
+    </TooltipProvider>
   )
 }

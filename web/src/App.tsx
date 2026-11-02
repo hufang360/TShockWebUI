@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, MessageCircle, Plug, ScissorsLineDashed, ScrollText, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
+import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, ScissorsLineDashed, ScrollText, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
 import { CommandTerminal } from '@/components/CommandTerminal'
 import { TerminalTopBarButton } from '@/components/TerminalTopBarButton'
 import { AppShell, type NavItem } from '@/components/AppShell'
@@ -206,7 +206,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const [dexFocus, setDexFocus] = useState<number | null>(null)
   const consumeDexFocus = useCallback(() => setDexFocus(null), [])
   /**
-   * 物品提示里的「合成表」入口（`ItemDetailProvider`）：跳到「物品图鉴」并打开该物品详情。
+   * 物品提示右上角的 ⓘ「物品详情」入口（`ItemDetailProvider`）：跳到「物品图鉴」并打开该物品详情。
    * 图鉴页会用自己的 Provider 覆盖它（就地打开抽屉，不切页、不丢当前筛选）。
    */
   const itemDetailApi = useMemo<ItemDetailApi>(
@@ -286,7 +286,6 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       { id: 'home', label: t('nav.home'), icon: House, group: 'primary' },
       { id: 'editor', label: t('nav.editor'), icon: Terminal, group: 'primary' },
       // 聊天紧跟「指令」下一行：看服务器动态 / 网页发言，都是高频的玩家动作。
-      { id: 'chat', label: t('nav.chat'), icon: MessageCircle, group: 'primary', onPrefetch: () => preloadRoute('chat') },
       // 工具：查询类 + 纯本地文件的公开工具（都不读 TShock、不跟随模块开关）。
       { id: 'items', label: t('nav.items'), icon: BookOpen, group: 'tools', onPrefetch: preloadItems },
       { id: 'dataid', label: t('nav.dataId'), icon: LayoutGrid, group: 'tools', onPrefetch: () => preloadRoute('dataid') },
@@ -753,9 +752,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             />
           }
           headerActions={
-            // 「聊天」页把终端入口挪到了输入框发送按钮旁（见 `ChatPage`），顶栏就不再重复；
-            // 首页不放（右侧顶栏留给刷新 / 管理卡片，终端从侧栏「指令」页进）。
-            terminalAllowed && session.authenticated && activeTab !== 'chat' && activeTab !== 'home' ? (
+            // 首页与各模块都放（右侧顶栏：上次刷新 / 刷新 / 管理卡片 / 终端）。
+            terminalAllowed && session.authenticated ? (
               <TerminalTopBarButton visible />
             ) : undefined
           }

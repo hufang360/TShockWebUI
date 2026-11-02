@@ -14,7 +14,7 @@
 
 | 组件 | 文件 | 依赖 | 备注 |
 | --- | --- | --- | --- |
-| Button | `ui/Button.tsx` | radix slot + cva | 变体 `primary/secondary/outline/ghost/danger`；尺寸 `sm/md/lg/icon/icon-sm`；移动端触控尺寸更大（`sm` 36px、`icon-sm` 40px），`md` 断点恢复桌面紧凑尺寸；无 `isPending`，loading 用 `Spinner`；基础类含 `cursor-pointer`（Tailwind v4 的 button 默认是 `cursor: default`，这里改回手型） |
+| Button | `ui/Button.tsx` | radix slot + cva | 变体 `primary/secondary/outline/ghost/danger`；尺寸 `sm/md/lg/icon-xs/icon-sm/icon`；移动端触控尺寸更大（`sm` 36px、`icon-xs` 36px、`icon-sm`/`icon` 40px），`md` 断点恢复桌面紧凑尺寸；**图标按钮的尺寸只由 `size` 变体决定，调用点不要再用 `className` 覆盖**（见下节）；无 `isPending`，loading 用 `Spinner`；基础类含 `cursor-pointer`（Tailwind v4 的 button 默认是 `cursor: default`，这里改回手型） |
 | Card | `ui/Card.tsx` | — | `Card/Header/Title/Body`（项目自有命名，非 shadcn 的 Content/Footer）；`CardTitle` 自动兜底图标尺寸；`rounded-xl + border + bg-card`，不使用投影 |
 | Badge | `ui/Badge.tsx` | cva | `tone` 变体：`neutral/accent/gold/danger/success/warn/mock/purple`（语义色） |
 | Input / Kbd | `ui/Input.tsx` | — | |
@@ -44,6 +44,7 @@
 | Separator | `ui/Separator.tsx` | radix separator | 分隔线一律用它，不要 `border-t/b` div 或 `<hr>` |
 | Breadcrumb | `ui/Breadcrumb.tsx` | radix slot + lucide | 内容区顶栏只显示**当前页面**（不再带分组前缀）的 `Breadcrumb/BreadcrumbList/BreadcrumbItem/BreadcrumbPage`；纯展示，带 `aria-current="page"` |
 | Collapsible | `ui/Collapsible.tsx` | radix collapsible | 可折叠区块（玩家管理的银行 / 配装分区）；`CollapsibleTrigger` 包在自定义标题按钮上 |
+| DetailSection | `components/DetailSection.tsx` | Collapsible + `CollapseChevron` + `ItemIcon` | 物品详情里的**可折叠分区**（唯一实现）：`[固定图标] 彩色标题 + 箭头`，标题色取 `lib/sectionTones.ts` 的 `RECIPE_SECTION_TONE`。合成来源 / 用于合成 / 微光嬗变 / 词缀都走它；`twoColumn` 开关两列网格 |
 | Sidebar | `ui/Sidebar.tsx` | Sheet + Tooltip + Button + Separator + `hooks/use-mobile` | 见下 |
 
 `components/ui/index.ts` 统一再导出；业务代码从 `@/components/ui` 引入。
@@ -52,6 +53,9 @@
 
 - **状态色走语义令牌**：`success` / `warning` / `info`（定义在 `src/index.css`，明暗两套）。
   不要再拿 `chart-1..5` 冒充成功 / 警告 / 金色——chart 系列明暗含义不一致（如 chart-4 亮色是黄、暗色是紫）。
+  非状态类标记另有两个令牌：`purple`（微光 / 配方标记）与 `pink`（取自游戏稀有度 10「神级」物品名色 `#FF2864`，
+  用在物品详情「词缀」分区标题）；`wood` 是从物品 9「木材」图标里提取的木色（「合成来源 / 用于合成」标题）。
+  三者都按明暗各定义了一次，别写死色值。
 - **加载态用 `Spinner`**：`<Button disabled><Spinner aria-hidden data-icon="inline-start" />保存中…</Button>`；
   独立展示时给 `aria-label`；不要再手写 `Loader2 animate-spin` / `animate-pulse` 圆点。
 - **表单一律 `FieldGroup` + `Field`**（`FieldLabel` / `FieldDescription`），不要裸 `div` + `label` + `gap-*`；
@@ -79,12 +83,21 @@
   尺寸变体写的是 `h-10 md:h-9` / `size-10 md:size-9`，媒体查询变体在 CSS 里排在后面，
   所以 `className="h-auto"` 在 ≥768px 会被 `md:h-9` 盖回去（内容溢出、互相重叠）。
   要写 `h-auto md:h-auto`（鱼店商品格子踩过这个坑，见 `docs/插件-鱼店.md` §4）。
+- **滚动列里的卡片要 `shrink-0`**：`flex flex-col + overflow-y-auto` 的列（鱼店右列卡片）里，卡片是 flex 子项、
+  默认 `flex-shrink: 1`——卡片一多就被压扁，正文被截断、还会出现框内滚动条。列表项数量不确定时
+  **卡片高度一律跟随内容**，用列容器上的 `[&>*]:shrink-0` 把滚动交给整列，不要塞进一屏。
+  同理，富文本结果区的每一行（`<p className="min-h-5 shrink-0">`）不能被压缩：行高 `20px` 只是下限，
+  折行的行 / 含 24px 物品图标的行自然更高，被压回 20px 就会溢出行框、和下一行**叠字**。
 - **详情优先用右侧抽屉**（鱼店商品详情、数据ID的 NPC / 图格 / 墙 / Buff 详情用 `Sheet`；物品详情用可堆叠的 `Drawer`）：
   标题栏固定、中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框。
 - **抽屉里可以再开抽屉时用 `Drawer`（Base UI）**：像物品详情那样「点配方材料 → 看材料详情 → 返回」的钻取，
   `Sheet`（radix dialog）做不到——它只会并排弹出、不会把父层缩小留在后面。叠层写法：把子 `<Drawer>`
   **渲染在父 `DrawerContent` 里**（Base UI 靠 React 树判定嵌套），`open` 受控、关掉就出栈。
   root 的 `onOpenChange(false)` 只表示「这一层要关」，收起动画结束后再出栈（父层的 `--nested-drawers` 才会减）。
+- **只是「把同一份东西放大看」（图片放大）时，直接叠一层 `Dialog` 就行**：不需要换 `Drawer`，
+  Radix 允许 Dialog 套在 Dialog / Sheet 里 —— 非顶层自动 `aria-hidden`、Esc 只关最上层、
+  点内层弹框**不会**把外层关掉（鱼店「注解图」的放大弹框就是这么做的，有测试钉住）。
+  图片类放大：`width = naturalWidth × 倍率`（倍率可选 `1/2` / `1:1` / `2×` / `3×`）+ `image-rendering: pixelated`（最近邻，像素格不会糊）。
 - **带「最近搜索」的搜索框用 `SearchInput`**：历史下拉**默认聚焦时不弹、打字时弹**，另有输入框内的
   历史按钮可手动展开（`historyOnFocus` / `historyToggle`，见 `docs/功能-搜索记录.md`）。
 - **搜索框右侧只有一个位置**：失焦且没内容时显示 `kbd` `/`（`shortcut`，中点可点在框里、也可直接按 `/`）；
@@ -97,6 +110,44 @@
   放进 `text-muted-foreground` 容器时需显式覆盖颜色。**不要**裸 `<label>` 包 `Checkbox` 再重复写 `aria-label`。
 - **页面级分类导航用 `Tabs variant="line"`**：放在页面标题下方的第一行，主分类靠左；右侧可放同类工具（如页面设置 / 全屏按钮）；NPC 子分类使用胶囊 Tabs，视图类 Checkbox 收进页面设置 Popover。移动端保持单行横向滚动，不为控件另起多行。
 - **卡片管理里的“自动执行”用 `Checkbox`**，与“显示/隐藏”的 `Switch` 语义分开；新增卡片和编辑自定义卡片都按需展开，不常驻表单。
+
+## 图标按钮（`components/IconAction.tsx`）
+
+全站「只有图标」的按钮只有一个写法：
+
+```tsx
+<IconAction label={t('dex.settings')} icon={Settings2} onClick={open} />
+```
+
+它自带：`ghost` + 方形 `rounded-control`、`aria-label`（= `label`）、悬停 `Tooltip`、
+常态 `text-muted-foreground` / 悬停与选中 `text-foreground` 的**次要灰阶**、`loading` 时换 `Spinner`。
+顶栏右侧、卡片页头、抽屉标题栏、表格行因此是同一档灰——不再出现「有的纯黑、有的灰」。
+
+| `size` | 手机 <768px | 桌面 ≥768px | 用在哪 |
+| --- | --- | --- | --- |
+| `icon-xs` | 36px | 24px | 行内密集：结果卡角、表格行、tooltip 内、chips 上的删除 |
+| `icon-sm`（默认） | 40px | 28px | 顶栏、页头、工具条、抽屉标题栏、开关 |
+| `icon` | 40px | 36px | 主操作：输入条正圆发送键、Dialog × |
+
+- **不要在调用点覆盖尺寸**（`className="size-7"` / `h-7 w-7`）：`className` 只写 base 时，
+  变体带来的 `md:size-*` 仍在，实际是「手机 28 / 桌面 36」——正好和设计意图相反。
+  （`cn()` 是 twMerge，只消同修饰符组的冲突；`iconButtons.test.tsx` 会拦住这类写法。）
+- 需要更小 / 更大的图标，**用 `size` 档位**；确实要恒定尺寸时成对写 `md:`（如 `size-7 md:size-7`）。
+- 当 Popover / DropdownMenu 的触发器时，把 `<IconAction>` 套进 `asChild` 里（它会接住传下来的 `onClick` / `ref` / `aria-*`）：
+
+```tsx
+<PopoverTrigger asChild>
+  <IconAction label={t('dex.settings')} icon={Settings2} active={open} />
+</PopoverTrigger>
+```
+
+- 其它可用 props：`size` / `variant`（如 `outline`）/ `active`（选中态抬升底色）/ `pressed`（`aria-pressed`）/
+  `iconClassName`（星标 `fill-current`、箭头 `-rotate-90`）/ `tooltip={false}`（浮层内部工具条）/ `testId`。
+- **形状**：一律方形 `rounded-control`；**只有输入条里的发送键是正圆**（`CommandEditor` / `WebChatInput`）。
+- **输入框内的图标按钮**（`InputGroupAddon` 内）是唯一例外：addon 用 `[&_button]:size-7` 统一压到 28px，
+  因为它必须塞进 36px 高的输入框（`SearchInput` 的历史 / 清空按钮、物资申请的收藏入口）。
+- 不用 `IconAction` 的合法例外只有三类：`ConfirmButton`（图标按钮 + 就地二次确认）、
+  图标随态切换的文字按钮（如首页卡片的「运行 / 刷新」紧凑态）、以及游戏同款物品提示里的收藏星标（固定深色底）。
 
 ## 间距（4px 网格）
 
@@ -135,6 +186,8 @@
 | --- | --- | --- |
 | `components/ItemTooltipContent.tsx` | 大量硬编码色（`text-zinc-100` / `bg-black/85` / `text-amber-300` …） | 复刻 Terraria 游戏内物品提示的观感（名称按稀有度着色、半透明黑底、无模糊）；**不随站点明暗主题变化**，是游戏原样表现，换成语义令牌反而失真。详见 [`功能-合成表与物品提示.md`](功能-合成表与物品提示.md) |
 | `components/ItemTooltip.tsx` | `className="... z-[100]"` | 自研提示（非 shadcn `Tooltip`），会从 `Sheet` / `Dialog`（`z-50`）内部触发，portal 到 `body` 后必须盖在它们上面；没有可复用的组件堆叠机制 |
+| `components/ItemTooltipContent.tsx` | 里面那个 ⓘ「物品详情」的 shadcn `TooltipContent` 传 `className="z-[110]"` | 它挂在上面的 `z-[100]` 自研提示里，用默认 `z-50` 会被提示本体盖住 |
+| `components/ItemTooltipContent.tsx` | 右上角 ⭐ / ⓘ 是手写 `<button>`，不是 `IconAction` | 深色游戏风格提示上语义令牌不成立（`text-muted-foreground` 看不见），颜色按游戏原样写死；见上一条 |
 | `components/ui/*` 内建 `aria-label`（`Close` / `Loading` / `pagination` …） | 英文硬编码 | 这些是 shadcn 原样组件，不依赖 `lib/i18n`（避免 ui 层耦合业务 i18n）。**业务侧调用时用 `aria-label` / `title` 覆盖**（如 `AppShell` 给 `SidebarTrigger` / `SidebarRail` 传 `nav.toggleSidebar` / `nav.railToggle`） |
 | `components/ui/Card.tsx` | `Card` / `CardHeader` / `CardTitle` / `CardBody`，没有 `CardContent` / `CardFooter` | 项目自有命名（见组件清单）；布局语义一致，`CardFooter` 由 `DialogFooter` / `SheetFooter` 承担 |
 | `components/ui/Drawer.tsx` | 依赖 **Base UI**（`@base-ui/react/drawer`），项目其余组件都是 radix；类名与 CSS 变量取自 shadcn 官方 Base UI 版 | `components.json` 的 base 仍是 `radix`。选它唯一原因是**可堆叠嵌套**：radix 侧（`Sheet` / vaul）没有「父抽屉缩小留在后面」的实现，且 vaul 已停止维护。只有物品详情用它，其它浮层继续走 radix，不要混用；Drawer 的替换元素用 Base UI 的 `render`（不是 `asChild`）|
@@ -181,10 +234,15 @@
 - 首页标题下固定一张紧凑的「指令」入口卡：有草稿时显示草稿并提供「继续编辑」，没有草稿时直接打开指令页；最近指令作为卡内快捷按钮。
 - 指令卡片无结果时压成单行（标题、指令、状态、执行按钮），只在有加载 / 错误 / 输出时才展开为完整结果卡。
 - **首页为左右两栏**（`xl:grid-cols-[minmax(0,1fr)_360px]`）：
-  - 右栏（概览）：服务器状态 / 服务器动态 / 最近执行；「快捷入口」与侧栏重复，默认隐藏但保留在管理器中。
-  - 左栏（指令）：其余指令卡片 + 自定义卡片。
-  - 移动端先渲染概览列，再渲染指令列；`xl` 起恢复左右两栏。
-  - 两栏各自保持 `tswui:homeCards` 里的相对顺序（`RIGHT_COLUMN_IDS` 分栏）。
+  - **宽度决定分栏，不再有硬编码分栏**（`lib/cardLayout.ts` 的 `CardWidth`，界面文案「小 / 大 / 右」）：
+    `half`（小）= 左栏两列网格的半栏、`full`（大）= 左栏整行、`right`（右）= 右侧 360px 概览列（`xl` 起才分列）；
+    渲染顺序、指令执行顺序都跟随 `tswui:homeCards` 的 `order`（v4 起拖拽对左栏也生效）。
+  - 默认宽度（用户没改过时）：服务器状态 / 服务器动态 / 快捷入口 / 最近执行 = 右侧栏；
+    世界信息 / 我的背包 / 在线玩家 / 游戏时间 / 死亡次数 / Boss 战伤害 / 自定义卡片 = 左·小；Boss 进度 = 左·大。
+  - 「快捷入口」与侧栏重复，默认隐藏但保留在管理器里。
+  - 半宽卡片数量是奇数时，**最后一张独占整行**，不留半格空白；右栏没有卡片时**不渲染**空列（不留 360px 空白）。
+  - 窄屏（`< xl`）按 DOM 顺序叠成一列：先左栏全部卡，再右栏卡。
+  - 宽度在「管理卡片」每行行尾的「更多设置」菜单里改（左·小 / 左·大 / 右栏）。
 - 指令页空态**不画虚线框**：工作区本身就是画布，引导块（图标 + 「开始一条指令」+ 一行说明）在工作区垂直居中；
   输入框始终贴底，空态与有结果时位置不变（不跳动）。
   空态**只留图标 + 标题 + 一行说明**（`editor.emptyHint`：上面输入、回车执行，左下角有指令库 / 物品 / 收藏 / 历史，
@@ -247,12 +305,79 @@
   `text-2xs` + `tabular-nums`，与 `footerNote` 同一行（时间在左、备注在右；只有时间时不靠右）。
   其他卡片（含鱼店右侧卡片）没传这个 prop，还是只看 Tooltip，底部不占行。
 - **自动执行偏好**（`tswui:autoExec`，`lib/autoExec.ts`，key 如 `home:<id>` / `world:fixed:/relive`）：
-  关闭后该卡片不随自动刷新 /「刷新全部」执行，只能点自己的按钮。首页「管理卡片」和模块「管理卡片」都有开关；
+  关闭后该卡片不随自动刷新 /「刷新全部」执行，只能点自己的按钮。首页「管理卡片」和模块「管理卡片」都有这个开关
+  （在每行行尾的「更多设置」菜单里；关掉的卡片行内会多一个「手动」芯片）；
   首页默认开，世界管理的 `/relive`、`/cleartomb` 默认关（`ModuleCardDef.manual`）。
 - **显示 / 隐藏**（`CardManagerSheet` 的 `visibility`，需要时由页面传）：隐藏的卡片既不渲染也不参与刷新。
   首页用它（`tswui:homeCards` 的 `hidden`）；鱼店用它把「鱼罐 / 消费榜 / 鱼篓榜」默认藏起来
   （`tswui:fishCards:hidden`，没记过的按卡片的 `defaultHidden`）。
-  模块卡片的管理弹框是共享的 `ModuleCardManagerDialog`，传了 `visibility` 就出「显示 / 隐藏」开关，不传就不显示。
+  模块卡片的管理弹框是共享的 `ModuleCardManagerDialog`，传了 `visibility` 就出「显示 / 隐藏」项，不传就不显示。
+
+## 管理卡片弹层（`CardManagerSheet`）
+
+首页、模块、鱼店共用同一个 Sheet，结构固定：
+
+- **顶栏只有标题 + 关闭**，正文第一行就是卡片清单；**使用说明放在滚动区最底部**（`mt-auto` + 上方 `border-t` 分割线，
+  圆角描边卡片：`Info` 图标 + 「使用说明」+ `cards.manageDesc` 五行小字）：
+  列表短时贴在抽屉底部，列表长时跟在最后一张卡后面（滚到底才看到）。三处共用同一段文案。
+  页脚左侧 = **纯图标**「恢复默认」（`ConfirmButton size="icon-sm"`，悬停提示「恢复默认」，点一下就地二次确认；
+  模块 / 鱼店没有）+ 收起过说明后常驻的 **ⓘ**；右侧 = `添加卡片`（`outline`）+ `完成`，两者都用默认 `md` 尺寸
+  （比之前的 `sm` 大一档，手机 `h-10`）。
+- **页面级「页面说明」**（世界管理 / 自定义模块 / 鱼店 / 指令小抄）：`components/PageHelp.tsx` +
+  `components/HelpCard.tsx` + `hooks/usePageHelp.ts`。
+  - **入口在顶栏**（标题面包屑右边的 ⓘ），**内容渲染在正文顶部、左右两栏的上面一行**
+    （放在同一个网格里就传 `className="col-span-full"`）；
+  - 卡片标题固定「页面说明」——页面标题已经在面包屑里，不重复；
+  - 插件页（鱼店 / 世界管理 / 玩家管理）的正文用 `components/PluginHelp.tsx`：`插件名称：…`（名称后面挂一个
+    `ExternalLink` ↗，`target="_blank" rel="noreferrer noopener"`，地址集中在 `lib/pluginLinks.ts`）/
+    `英文名称：…` / 可选 `说明：…`，然后才是正文；
+  - **首次进入自动展开**，`✕` 关闭后按 scope 记住（`tswui:helpClosed` = `{ [scopeId]: true }`，
+    scope 形如 `panel:world:` / `panel:m:<id>:` / `store` / `tips`），之后只点 ⓘ 才出现；
+  - **本页卡片被全部隐藏时强制展开且不给 `✕`**（否则整页一片空白）：`ModuleCardsPanel` 通过 `onEmptyChange`
+    把「空」告诉页面，页面传 `forceOpen`。
+- **「使用说明」可收起**：卡片右上角 `✕` 收起；状态存本机 `tswui:cardHelp` = `{ closed, everClosed }`，
+  **首页 / 模块 / 鱼店三个抽屉共享**。收起过一次之后，页脚常驻 ⓘ 按钮（悬停提示「使用说明」，打开时高亮），
+  点它随时把说明展开回来 —— 没收起过时不显示这个按钮，避免重复入口。
+- **一行一张卡（36px 高，与指令库条目同档）**：`⠿ ⬡ 名称 指令 …[状态徽标] 尺寸 ▶ 👁 ✎ ⋮`。
+  - 卡片图标取自**页面上那张卡的页头图标**（`homeCardIcon()` / `PanelCard.icon` / 鱼店卡定义），
+    统一 `size-3.5`、`text-muted-foreground`；
+  - 名称 `text-xs font-medium` 与指令 `font-pixel text-2xs` **同一行、共用中线**（`leading-none` + `items-center`），
+    名称最多占 60% 再截断，指令吃掉剩余宽度。
+- **行内三个操作是普通按钮**（样式对齐图标按钮：ghost、`icon-xs` 高度、悬停手型；不再是胶囊徽标），
+  顺序固定 **尺寸 → 自动执行 → 是否显示**（**尺寸在手机上不显示**：窄屏卡片本来就是整行铺满）：
+  1. 尺寸：文字按钮 `左·小` / `左·大` / `右栏`，点一下**循环**；
+  2. 自动执行：`Play` / `PlayOff`，卡片有指令时才显示；
+  3. 是否显示：`Eye` / `EyeOff`。
+  之后是**编辑 ✎**（自定义卡片、未隐藏时出现；左边带一条 `h-4 w-px bg-border` 竖分隔线）和 `⋮`（tooltip 只写「更多」）。
+  更左边是调用方传的状态徽标（`缺少插件`）；「非指令」不再用徽标，而是和指令一样用灰字排在名称右边。
+  - 三个可点徽标都有 Tooltip 描述**点击会发生什么**：`点击切换成自动执行` / `点击切换成不自动执行`、
+    `点击切换尺寸：<下一个档位>`、`点击隐藏这张卡片` / `点击显示这张卡片`；`hover` 变手型。
+  - 宽度是**循环**切换（左·小 → 左·大 → 右栏 → 左·小）；只剩一个可用档位时（鱼店只有右栏）不做按钮，只显示当前值。
+  - 隐藏不再「只留闭眼徽标」：三件套始终在（否则只能进菜单才能改回来），仅**不给编辑按钮**、整行**不变灰**。
+  - **不再有「内置」徽标**：能编辑（有 ✎）的就是自己加的卡片，本身就够区分。
+- **行尾「更多设置」菜单（`⋮`）**分组：
+  1. **排序**：上移 / 下移（**不带分组标题**；保留拖拽手柄，键盘 / 触屏可达）—— 只有一件时整组不出现；
+  2. **复制指令**：把这张卡的指令（`normalizeCustomCommand` 规范化）写进剪贴板，点完菜单不关、
+     菜单项短暂变「已复制」（1.2s）；没有指令的卡片不出现这一项；剪贴板不可用时不假装成功；
+  3. **删除卡片**（自定义卡片，危险色）→ 弹二次确认 Dialog。
+  （宽度 / 自动执行 / 是否显示已在行内按钮上，菜单里不再重复。）
+- 「使用说明」上方**没有分割线**（直接跟在列表后面，`mt-auto` 顶到底）。
+- 模块 / 鱼店的抽屉在「使用说明」末尾多一句「全部隐藏后右栏自动收起，左侧铺满。」（`cards.manageDescRail`，
+  由 `ModuleCardManagerDialog` 传 `helpExtra`）——首页没有右栏，不显示这句。
+- 底部「完成」按钮带对勾（`Check`）图标。
+- 添加表单按需展开，位置在**列表末尾**（新卡片本来就是追加到最后一张后面）、使用说明之上；
+  点「添加卡片」时滚动区**自动滚到最底**，列表很长也不会「点了没反应」；按钮在底部「完成」左边；
+  新添加的卡片默认**尺寸「小」+ 不自动执行**。
+- 模块页（世界管理 / 自定义模块）与鱼店的「记事本」也是一行：没有指令、不能自动执行，
+  但**能排序 / 改宽度 / 隐藏**（id 固定 `notebook`，不挂「内置」徽标）。
+- **整行都能拖**（手柄只是视觉提示；编辑态关掉 `draggable`，否则输入框里没法选词）；
+  菜单里同时提供上移 / 下移，键盘 / 触屏可达。
+- **打开抽屉时不自动聚焦第一个按钮**：`SheetContent` 的 `onOpenAutoFocus` 里
+  `preventDefault()` 后把焦点交给滚动容器（`tabIndex={-1}`）。否则第一行的拖拽手柄会被聚焦，
+  它挂着的 `Tooltip` 会在 700ms 后自己弹出来 —— 一开抽屉就顶着「拖动排序」很怪。
+
+## 指令卡片刷新提示 / 自动执行（结果 / 权限语义）
+
 - `status === 'no_permission'` 时卡片**保留**，下方显示本地化「没有执行该指令的权限」，并隐藏后端重复的中文 message
   （与「指令不存在 → `command_not_found`」区分，见 `docs/插件-世界管理.md`）。
 - `status === 'command_not_found'`（指令不存在 = 提供该指令的插件没装）时，**首页内置指令卡片**自动隐藏、
@@ -293,7 +418,8 @@
   1. **左**：`SidebarTrigger` + `Separator` + `Breadcrumb`（只显示当前页面）+ **页面说明 ⓘ**（`TopBarActions info=…` 的 `TopBarInfoSlot`）。
      顶栏只在侧栏收起时出现「显示侧栏」（桌面）；移动端保留「打开菜单」。
   2. **右**：`上次刷新 → 刷新 → 管理卡片 / 页面设置 → 指令(>_)`，即刷新类在最左、管理类在右、终端最后
-     （**首页不放终端图标**，右侧只留刷新 / 管理卡片；聊天页把入口挑到了输入框旁）。
+     （首页同样有终端图标：`上次刷新 → 刷新 → 管理卡片 → 指令`；
+     指令 / 设置两页不放）。
      图标固定：**管理卡片 = `PlayingCardsFan`**（首页 / 自定义模块 / 鱼店三处必须一致），**页面设置 = `Settings2`**——
      两者长得像，但一个是「挑卡片」，一个是「调这个页面的显示」，别混用。
   3. **手机端**：右侧只保留 `…`（`DropdownMenu`），页面操作与终端都在菜单里，**一行一个按钮（图标 + 名称）**，`…` 永远最右。
@@ -333,8 +459,13 @@
 
 - **物品提示 `ItemTooltip`**（自研，`components/ItemTooltip.tsx` + `ItemTooltipContent.tsx`）：
   游戏同款样式（半透明黑、无模糊、名称按稀有度着色、属性行、左下角 `ID · key`），固定定位 + portal，**全项目统一**。
-- **文本提示 `SlotTooltip`**（`components/SlotTooltip.tsx`）：shadcn/Radix `Tooltip`，目前只用于玩家管理的**空格子** `#N` 提示。
+- **文本提示 `SlotTooltip`**（`components/SlotTooltip.tsx`）：shadcn/Radix `Tooltip`，`label` 可以是字符串或两行小卡片。
+  用于玩家管理的**空格子** `#N`，以及**鱼店的非原生物品图标**（`#编号` + 商品名：图标是借来的识别图，
+  弹物品属性会让人以为买的就是那件东西，见 `docs/插件-鱼店.md` §9）。
   有物品的格子仍用 `ItemIcon` 自带的 `ItemTooltip`。
+
+> `SlotTooltip` 的触发元素保留原本的标签（Radix 的 `TooltipTrigger asChild` 只合并事件，不会变成 `<button>`），
+> 所以能安全地放在已经在 `Button` / 表格行里的图标上，不会产生嵌套按钮。
 
 ## 业务组件（非 ui/）
 
@@ -349,8 +480,8 @@
 | `IconAction` | `components/IconAction.tsx` | 顶栏 / 工具条图标按钮：`ghost` + `icon-sm` + `Tooltip`，支持 `loading`（Spinner）与 `pressed`；**常态灰 `text-muted-foreground`、悬停才 `text-foreground`**（顶栏右侧 / 卡片页头一致，不再有纯黑混搭）；手机 `…` 菜单里通过 `data-action-label` 同一份 DOM 显示文字标签 |
 | `InfoPopover` | `components/InfoPopover.tsx` | 「页面说明」info 图标 + Popover，收纳原先铺在正文里的小字说明 |
 | `FullscreenDock` | `components/FullscreenDock.tsx` | 全屏结果页**右上角**操作坞：先露出，随后收成贴右边的竖条（左侧上下圆角、宽 12px）；悬停 / 聚焦 / 点击展开，展开后 4 秒无操作再收起 |
-| `CommandLine` | `components/CommandLine.tsx` | 可复制指令块：**属性名在灰框外**，下面每条指令各自一行（点整行即复制，右侧图标只是提示），一条属性名可带多条指令（数据 ID 召唤指令、物品给予指令共用） |
-| `CommandTerminal` / `TerminalTopBarButton` | `components/CommandTerminal.tsx` / `components/TerminalTopBarButton.tsx` | 浮动终端（桌面非模态浮窗 / 窄屏底部抽屉）与顶栏入口（**首页、指令、设置、聊天页不放**，其余页面登录后显示；手机在 `…` 菜单里）；开关状态在 `lib/terminalContext.tsx`。见 [`功能-浮动终端.md`](功能-浮动终端.md) |
+| `CommandLine` | `components/CommandLine.tsx` | 「相关指令」分组（数据 ID → NPC / Buff、物品详情的给予指令共用）：标题 = 149 号物品图标 + 文字（色同「合成来源」，**带条目数量** `相关指令（6）`）+ 折角箭头（可折叠），下面每条指令一行 —— 行外观同合成记录；**点条目本身什么也不做**，右侧 终端（`填充指令`：填进浮动终端并弹出，同时回调 `onOpenTerminal` 让调用方关抽屉）/ ⭐（收藏指令）/ 复制（只复制）三个按钮悬停或聚焦才出现（触屏常显）。条目可带 `note`（如 `/sb all` → 「召唤所有Boss」），悬停整行时用 Tooltip 出说明 |
+| `CommandTerminal` / `TerminalTopBarButton` | `components/CommandTerminal.tsx` / `components/TerminalTopBarButton.tsx` | 浮动终端（桌面非模态浮窗 / 窄屏底部抽屉）与顶栏入口（**首页是例外**：那里放；手机在 `…` 菜单里）；开关状态在 `lib/terminalContext.tsx`。见 [`功能-浮动终端.md`](功能-浮动终端.md) |
 
 ## 未登录的页面门控
 
@@ -416,12 +547,20 @@
 
 - 格宽 **72**、图标 **64**；列间距 **手机 8px / 桌面 16px**，行距 16px；格子默认**无底色**，hover 时只有 72×72 图标区铺 `bg-primary/10`，文字无背景，整格一起上浮。
 - 物品 ID：虚拟滚动，格宽 72 / 高 106（隐藏 ID 和名称后 72），列间距随视口切换 8/16。
-- **鱼店商品格子沿用同一套尺寸**（`components/fishshop/GoodCells.tsx` 的 `CELL_WIDTH` / `GOOD_GRID`）：
-  列宽固定 72（`grid-cols-[repeat(auto-fill,4.5rem)]`，不拉伸）、`gap-2`（行 / 列都 8px，比物品 ID 更紧）；
-  格子里从上到下是 **图标区 72×72 → `#编号` → 名称**，hover 底色只在图标区。
-- 数据 ID：Boss 分类贴图 128、格子/图标区 144（2×）；页面设置提供「隐藏 ID 和名称」；
-  召唤指令不按权限隐藏；「Boss召唤指令」一块内列两行（`/spawnboss "<sb>"` + 单字简写 `/sb eoc`），
-  下面再一行「NPC召唤指令」；属性名在灰框外，每行自带复制。
+- **鱼店商品格子默认沿用同一套尺寸**（`components/fishshop/GoodCells.tsx` 的 `GOOD_SIZES` / `GOOD_GRID_CLASS`）：
+  页面设置「图标大小」三档 —— 大 图标 64 / 格子 72（默认，与物品 ID 一致）、中 48 / 56、
+  小 32 / 40（**不显示编号和名称**）。列宽固定为格子宽（`grid-cols-[repeat(auto-fill,…)]`，不拉伸），列距 8px；
+  间距按尺寸分档：**大 = `gap-x-4` / `gap-y-6`（列 16 / 行 24px）**、**中 = `gap-x-2` / `gap-y-4`（列 8 / 行 16px）**、
+  小 = `gap-2`（行 / 列都 8px）且不画货架板；中 / 大的行距放宽，给压在序号行上的货架板（`.fish-shelf`，纯 CSS 画）留呼吸空间。
+  格子里从上到下是 **图标区（比图标大 8px）→ `#编号` → 名称**，hover 底色只在图标区。
+- 数据 ID：Boss 分类贴图 128、格子/图标区 144（2×）；页面设置提供「隐藏 ID 和名称」；NPC 格子下方是原来的两行
+  （ID 一行、名称一行，ID 不带 `#`）；**NPC 详情**里图标下方是一行 `#ID 名称`。
+- **NPC 详情的「相关指令」**：一块里按顺序列 `/spawnboss`（+ `/sb` 简写 + `/sb all`，仅 Boss 且限制在 `sbAll`）、
+  召唤物 `/give <物品> <玩家>`（登录时才有）、`/sm <ID>`、`/tpnpc <英文名>`（城镇 NPC + 379/438）、
+  `/renameNPC <ID> <newname>`（城镇 NPC）、`/setdungeon` + `/wm dungeon`（`NPC_DUNGEON_IDS`）、`/npc <ID>`；
+  不探测权限、也不隐藏。标题左侧是 **149 号物品（书）图标**、文字色同「合成来源」、**带条目数量**，标题可折叠；
+  条目外观与合成记录一致；**点条目本身不会复制**，右侧 终端 / ⭐ / 复制 三个按钮悬停或键盘聚焦才出现（触屏常显）。
+  点「填充指令」会把指令填进浮动终端并**关掉抽屉**（浮窗在抽屉下面）。
 
 ## 玩家存档（`pages/PlrPage.tsx`）
 
@@ -471,14 +610,15 @@
 
 ## 指令页
 
-- 没有顶部 tab：聊天已独立成页（见下节「聊天页」），本页只有指令编辑器。
+- 窄屏顶部有「指令结果 / 聊天」两个 tab（宽屏是左右两栏，没有 tab），见下节「聊天」。
 - **输入框是聊天式卡片**（`components/Composer.tsx`，指令输入框与网页发言共用）：
   **输入在上、工具行在下** —— 工具按钮分两边：**左下角**是指令库 / 物品（`Library/BookOpen`，
   物品图标与侧栏「物品 ID」一致），**发送键左边**是收藏 / 历史（`Star/History`）；
   工具按钮是**方形**（`size-7 rounded-control`）、图标 `size-3`（比默认 `size-4` 小一号，视觉重量贴近输入文字），
   按钮组用 `p-1 -m-1` 给聚焦光圈留余量（`overflow-x-auto` 本来会把 2px 光圈上下切掉），
-  右下一个主色圆发送键（「清空结果」在**顶栏最右**，见上节；工具行右侧只留给聊天页的发送相关按钮）。
-  - 输入保持**单行横滚**（Enter 直接执行），`compact`（浮动终端）只是内边距/字号更小；
+  右下是发送键（指令模式主色飞机 / 聊天模式次级气泡）；「展开全部 / 折叠全部 / 清空结果」在**结果栏底部、图标居右**。
+  - 输入保持**单行横滚**（Enter 直接执行）；`compact`（浮动终端）内边距/字号更小，并且外壳收成**单一一行**：
+    左工具、中输入、右发送同排（`leading` 仍可用），不再多占一行工具行；
     桌面尺寸：输入行 `h-8`、工具 / 发送键 `size-7` / `size-8`，外壳 `px-2 py-1.5`。
   - **聚焦是外发光**：`focus-within:ring-[3px] ring-ring/25` + 边框变主色（不再用 `outline` 硬描边）；
     外壳外面留 `p-1`，光圈画在边框外面也不被相邻区域切掉。错误态（只能游戏内执行）同理换成 `destructive` 光圈。
@@ -488,17 +628,17 @@
   - 工具弹框（`components/command/CommandToolsDialog.tsx`）**不占页面宽度**：指令库 / 物品 / 收藏 / 历史四个面板都在里面。
     **弹框里没有 tab 栏**（已去掉：那行 tab 与左下角四个按钮重复，还白占 36px 高度），只渲染当前那一块；
     四个面板都是**单列**：「收藏」只显示**指令收藏**（搜索 + 批量删除 / 清空），
-    物品收藏在「物品」面板（搜索为空时展示），合成记录收藏在「物品 ID → ⭐ 收藏」与聊天页（见下）。
+    物品收藏在「物品」面板（搜索为空时展示），合成记录收藏在「物品 ID → ⭐ 收藏」与「物品」弹框的「合成表」tab。
     「物品 ID → ⭐ 收藏」的结果区左上角才是 **物品 / 合成表 / 常用** 三分类切换（见 [`页面-物品图鉴.md`](页面-物品图鉴.md)）。
     打开 / 换面板时焦点直接落在该面板的搜索框，选完 / `Esc` / 关掉后焦点回到指令输入框。
     面板外包一层 `p-1`：搜索框的聚焦光圈画在框外，贴着 `overflow-hidden` 的边会被切掉（两边像被剪断）。
   - 工具面板**就是 popover**（`ui/Popover.tsx`，不是居中弹框）：**宽度统一走
     `PANEL_POPOVER_WIDTH`（`w-[min(32rem,calc(100vw-1rem))]`，`ui/Popover.tsx` 导出的常量）**，
-    与聊天页的「物品 / 合成表」弹框同宽，四个面板之间切来切去不会觉得宽窄在跳；
+    各个面板弹框同宽，来回切不会觉得宽窄在跳；
     以被点的那个工具按钮为锚点（隐形 `fixed` 锚点 = 按钮的 `getBoundingClientRect()`）`side="top" align="start"` 向上展开，
     碰撞检测会翻转 / 平移，高度吃 `--radix-popper-available-height`，不会跑出视口；
     **背景不变暗**、页面照常可操作，点外面 / `Esc` 收起（只是「挑一条指令 / 物品」，不需要打断操作）。
-  - 面板内边距统一 `p-2`（指令库 / 物品 / 收藏 / 历史四个弹框、聊天页的物品弹框、合成记录收藏弹框都一致）；
+  - 面板内边距统一 `p-2`（指令库入口的三个 tab、物品入口的两个 tab 都一致）；
     面板没有单独关闭按钮（点外面 / `Esc` 即可）。
   - **页面快捷键 `/`**：焦点不在输入框 / 弹框里时敲 `/` 直接聚焦指令输入框（空草稿顺手补一个 `/`，
     补全下拉立刻列全部指令；草稿非空则只聚焦、不改内容）。弹框开着时 `/` 留在弹框的搜索框里。
@@ -554,6 +694,12 @@
 - **吸顶 / 吸底用 `sticky`**：顶栏高度是 48px（`h-12`），页面内的工具条用 `sticky top-12`；
   再往下的 sticky（表头、分组侧栏）用 `--page-sticky-top`（`useStickyHeaderOffset()` 实测「48 + 工具条高度」写进页面根元素），
   写成 `top-[var(--page-sticky-top,0px)]`，这样工具条换行变高时表头也跟着走。
+- **表格外壳用 `overflow-clip`，不要用 `overflow-hidden`**：`overflow-hidden` 会让外壳自己成为 sticky 的
+  滚动容器（它不滚动），吸顶表头就按「外壳顶部 + `top` 偏移」定位 —— 结果是表头**整体下沉**到表格中间
+  （实测 `--page-sticky-top: 144px` 时表头比表顶低 144px，看起来像「表头跑偏」）。
+  `overflow-clip` 同样裁圆角，但不创建滚动容器，表头才能吸在页面滚动区上。
+- **`<colgroup>` 的 `<col>` 数量必须等于 `<th>` 数量**：`table-fixed` 下列宽来自 `colgroup`，
+  数量不一致会让表头横向错位（表头跟下面的单元格对不上）。
 - **虚拟化要换宿主**：网格自己不再溢出滚动，所以 `scrollTop` / 可视高度都从宿主上取
   （`usePageScroller()` 返回 `host` / `offsetTop` / `viewportHeight` / `scrollTop`），
   `main.scrollTop` 要减掉「网格顶部在页面内容里的偏移」才是列表内位置。
@@ -562,38 +708,16 @@
 - 贴底跟随 / 回到底部 / 加载更早这类「作用在滚动容器上」的逻辑都走 `useBottomList` 的 `scroller` 选项
   （`ServerFeedList` / `ResultPanel` 的 `pageScroll` 开关）。
 
-## 聊天页（`pages/ChatPage.tsx`）
+## 聊天（已并入「指令」页，v0.1.0-rc.8）
 
-- 侧边栏首组，**紧跟「指令」下一行**（图标 `MessageCircle`），地址 `#/chat`；原来是指令页顶部的「聊天」tab。
-- 整页 = **服务器动态列表（`ServerFeedTab`）+ 吸底网页发言框（`WebChatInput`）**：
-  页面**不固定高度**（`usePageHeight` 只用来给根元素 `min-height`）：内容少时刚好一屏，内容多时由 AppShell 的 `<main>`
-  整页滚动，**滚动条在浏览器右侧**（不再是嵌在列表里的那条）；输入区 `sticky bottom-0` 钉在视口底部，
-  手机端带 `env(safe-area-inset-bottom)`。规则见上节「整页滚动」。
-- 列表**不包 `Card`**（省下卡片边框与内边距），有新事件就停在最新一条（`followNewest`，滚的是 `<main>`）；
-  `ServerFeedList` 的 `pageScroll` 开关负责把贴底跟随 / 回到底部 / 加载更早全部改作用在 `<main>` 上。
-- 筛选 chips（全部 / 进服 / Boss / 事件 / 旅商 / 聊天）在**输入框正上方那一行**（靠左）；
-  世界状态徽标（困难模式 / 血月 / 日食 / 下雨 / 入侵，最多 5 个）在**它的上一行、单行靠左**。
-  刷新一簇（上次刷新文案 + 刷新按钮）与浮动终端入口都在**输入框发送按钮左边**（同一工具行）；
-  顶栏在这页不再重复放终端按钮（`App` 里 `activeTab !== 'chat'` 才显示）。
-- 发言草稿存 `tswui:chat:draft`：切到别的页面再回来，没发出去的内容还在。发言成功后立刻刷新事件流。
-- 输入框**左下角**有两个按钮（并列，弹框宽度都走 `PANEL_POPOVER_WIDTH` = `w-[min(32rem,calc(100vw-1rem))]`；
-  两者与指令页工具按钮同一套规格：`size-7 rounded-control` 方形小按钮 + `[&_svg]:size-3` 图标）：
-  - **物品**（`components/ItemPickerPopover.tsx`）：点开是搜物品的 popover
-    （`ItemSearchPanel` 的 `tagOnly` 模式，没有 tab 栏、没有「ID / 名称 / 标签」选择），
-    点一条就把 `[i:ID]` **追加到输入框末尾**，并把光标交回输入框（`focusRequest`）。搜索为空时展示物品收藏。
-  列表行**不描边**（`focus-visible:ring-0`）：键盘高亮 / 选中只用**更深的底色**（`bg-foreground/10`）表示，
-  未选中行 hover 是 `bg-foreground/5`。
-  - **合成表**（`components/RecipeFavoritesPopover.tsx`，`Hammer` 图标）：点开是收藏过的合成记录
-    （`tswui:recipeFavorites`，**最近收藏的在最上面**），**点一条就填进输入框**，用的是**只用 `[i:ID]` 标签**的文本：
-    `[i:126][i:315][i:314][i:13] @ [i:31] -> [i:296]`（材料连写、`@` 制作站、`->` 产物、不带名称与数量；
-    徒手制作没有 `@` 段，反向微光记录是 `[i:产物] @ [i:5362] -> [i:材料]…`）—— 聊天里只有标签能显示成物品图标。
-    草稿非空时自动补一个空格，填完收起弹框并把光标交回输入框。**没有「清空」按钮**；
-    是否显示物品名称跟随「物品 ID → 页面设置 → 合成记录 → 显示物品名称」，固定单列；
-    内容区外面再包一层 `p-1`，条目的 hover 光圈 / 浮起不会被裁掉。
-- **页面快捷键 `/`**：焦点不在输入框 / 浮层里时敲 `/` 直接聚焦发言框（聊天不是指令，**不补 `/` 字符**）。
-- 发言**成功**的反馈走全局 sonner 提示条（`已发送（显示为 [WebUI] hf）`，见「组件清单」的 Toaster）：
-  堆叠、可单条关闭、4 秒自动消失；**失败**仍是输入框左下角（工具行左侧）红字 + 「重试」。
-- 未登录只显示 `LoginGate`（不拉事件流）；事件流细节见 [`功能-服务器动态.md`](功能-服务器动态.md)。
+独立的聊天页（`pages/ChatPage.tsx`、`components/WebChatInput.tsx`、`#/chat`）已经删除，聊天现在是
+「指令」页的一部分：**宽屏右栏 / 窄屏顶部「聊天」tab**，输入框与指令共用（`/` 开头执行、其它文本发言）。
+结构、筛选 chips、世界状态行、刷新位置等细节见
+[`功能-服务器动态.md`](功能-服务器动态.md)「聊天并入「指令」模块」与
+[`计划-指令聊天合并.md`](计划-指令聊天合并.md) §11。旧的 `#/chat` 地址仍然可用（落到指令页并切到聊天那块）。
+
+聊天里能用的两个工具入口（物品插 `[i:ID]`、合成表插带标签的整段记录）已经并进指令页的
+「物品」弹框（`物品` / `合成表` 两个 tab）。
 
 ## 指令小抄（`pages/CommandTipsPage.tsx`）
 
@@ -615,10 +739,11 @@
 - 页面公开：不需要登录，也不依赖插件。
 - 执行失败原因显示在**富文本下方的 `Alert`**（指令不存在 = warning，权限/执行错误 = destructive）。
 
-## 物品给予指令
+## 物品详情的「相关指令」
 
-- 物品详情新增「物品给予指令」（`CommandLine` 两行样式）：`/give <物品ID> <玩家名>`；
+- 物品详情里那块「相关指令」（`CommandLine`）给的是 `/give <物品ID> <玩家名>`；
   选了词缀时 `/give <物品ID> <玩家名> 1 <词缀ID>`。未登录不显示。
+- 与数据 ID 的 NPC / Buff 详情同一套：标题可折叠、行内 ⭐ / 终端 / 复制。
 
 ## 变更记录
 

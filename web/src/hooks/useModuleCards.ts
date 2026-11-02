@@ -21,6 +21,8 @@ export function useModuleCards(
   add: (name: string, command: string) => void
   update: (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command'>>) => void
   remove: (id: string) => void
+  /** 恢复默认：清掉这个模块里用户添加的全部卡片。 */
+  reset: () => void
 } {
   const [raw, setRaw] = useLocalState(StorageKeys.moduleCards, DEFAULT_MODULE_CARDS)
   const prefs = useMemo(() => sanitizeModuleCards(raw), [raw])
@@ -28,7 +30,10 @@ export function useModuleCards(
 
   const add = useCallback(
     (name: string, command: string) => {
-      setRaw((prev) => addModuleCard(sanitizeModuleCards(prev), serverId, moduleId, createModuleCard(name, command)))
+      // 卡片对象在 updater **外面**创建：StrictMode 会把 updater 跑两次，
+      // 在里面生成 id 会一次点击加出两张卡。
+      const card = createModuleCard(name, command)
+      setRaw((prev) => addModuleCard(sanitizeModuleCards(prev), serverId, moduleId, card))
     },
     [setRaw, serverId, moduleId],
   )
@@ -45,5 +50,19 @@ export function useModuleCards(
     [setRaw, serverId, moduleId],
   )
 
-  return { cards, add, update, remove }
+  const reset = useCallback(() => {
+    setRaw((prev) => {
+      const prefs = sanitizeModuleCards(prev)
+      const forServer = prefs.byServer[serverId]
+      if (!forServer || !(moduleId in forServer)) return prefs
+      const nextForServer = { ...forServer }
+      delete nextForServer[moduleId]
+      const byServer = { ...prefs.byServer }
+      if (Object.keys(nextForServer).length > 0) byServer[serverId] = nextForServer
+      else delete byServer[serverId]
+      return { byServer }
+    })
+  }, [setRaw, serverId, moduleId])
+
+  return { cards, add, update, remove, reset }
 }

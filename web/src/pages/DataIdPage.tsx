@@ -11,6 +11,7 @@ import {
   NpcTableLayout,
   TileIconGrid,
 } from '@/components/dataid/DataIdViews'
+import { IconAction } from '@/components/IconAction'
 import { FullscreenDock } from '@/components/FullscreenDock'
 import { SearchInput } from '@/components/SearchInput'
 import {
@@ -43,7 +44,6 @@ import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
 import { readDataIdState, rememberDataIdState, type DataIdKind } from '@/lib/dataIdState'
 import { useDataset } from '@/lib/datasetContext'
-import { useMyPermissions } from '@/hooks/useMyPermissions'
 import { TopBarActions } from '@/components/TopBar'
 import { useI18n } from '@/lib/i18n'
 import {
@@ -53,7 +53,6 @@ import {
   npcCollectionName,
 } from '@/lib/npcCollections'
 import { StorageKeys } from '@/lib/storage'
-import type { BackendTransport } from '@/lib/tshock'
 import type { TileWallData, TileWallEntry } from '@/types'
 
 /** 格子里的贴图框尺寸（NPC 贴图与物品图标共用，保证两种数据源对齐；默认 64×64）。 */
@@ -68,24 +67,21 @@ const EMPTY_TILEWALL: TileWallData = {
  *
  * - 布局沿用物品图鉴：工具条一张卡片、中间是可滚动区域（不套白色卡片）；**无分页**，一次展示全部结果。
  * - 工具条：搜索框在第一行；下面一行左侧是数据源 `Tabs`（下划线样式），右侧是视图 checkbox + Wiki 链接。
- * - NPC / 图格 / Buff 支持**图标网格 / 表格**两种视图（checkbox 切换，默认图标）。
+ * - NPC / 图格 / 墙 / Buff 都支持**图标网格 / 表格**两种视图（checkbox 切换，默认图标）。
  * - 「两列表格」只在 `xl`（≥1280px）真的排成两列：小屏隐藏该开关并强制单列。
- * - NPC / Buff 详情用 **Popover**（图标 32×32）；图格 / 墙仍用右侧抽屉（`Sheet`）。
+ * - 详情统一是右侧抽屉（`Sheet`，图标放大）；表格里**整行可点**（含键盘 Enter / 空格）。
  * - 搜索框进入页面即聚焦；**聚焦时不弹「最近搜索」**，打字（或点右侧历史按钮）才弹。
  *
  * 只读页：不执行任何指令（`/sb` / `/sm` 都只能在游戏内执行）。
+ *
+ * **不探测权限**（与物品 ID 一致）：详情里的指令只按「能否拼出来」决定显示 —— `/gbuff` 需要知道
+ * 当前玩家名，所以未登录时不显示；NPC 的相关指令一律显示（能不能执行由 TShock / 插件判）。
  */
 export function DataIdPage({
-  authenticated = false,
-  serverId = 'default',
-  transport,
+  username = null,
 }: {
-  /** 是否已登录：未登录不显示需要权限的召唤 / 增益指令。 */
-  authenticated?: boolean
-  /** 当前上游 id（权限按上游缓存）。 */
-  serverId?: string
-  /** 鉴权传输层（拿当前玩家的权限节点用）。 */
-  transport?: BackendTransport
+  /** 当前登录玩家名（未登录传 null）：只用于拼 `/gbuff <玩家> <buffID>`。 */
+  username?: string | null
 }) {
   const { t, lang } = useI18n()
   const dataset = useDataset()
@@ -125,11 +121,6 @@ export function DataIdPage({
     kind === 'npc' ? npcHistory.history : kind === 'buff' ? buffHistory.history : dataHistory.history
   const removeSearchHistory =
     kind === 'npc' ? npcHistory.remove : kind === 'buff' ? buffHistory.remove : dataHistory.remove
-
-  // 当前玩家的权限节点：只用来决定 Buff 详情的 `/gbuff`（要填「你的玩家名」，未登录 / 无权限时先不给）。
-  // NPC 的召唤指令不按权限隐藏（照常显示 / 复制，能不能执行由 TShock 判定）。
-  const { username, known, has } = useMyPermissions(transport, authenticated, serverId)
-  const canSee = (permission: string) => authenticated && (!known || has(permission))
 
   const rootRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -347,13 +338,13 @@ export function DataIdPage({
     let headers: string[]
     let rows: string[][]
     if (kind === 'npc') {
-      headers = ['NPCID', 'Name', 'InternalName']
+      headers = ['ID', 'Name', 'InternalName']
       rows = filteredNpcs.map((npc) => [String(npc.id), npc.name, npc.key])
     } else if (kind === 'buff') {
-      headers = ['BuffID', 'Name', 'InternalName']
+      headers = ['ID', 'Name', 'InternalName']
       rows = filteredBuffs.map((buff) => [String(buff.id), buff.name, buff.key])
     } else {
-      headers = [kind === 'tile' ? 'TileID' : 'WallID', 'Name', 'InternalName']
+      headers = ['ID', 'Name', 'InternalName']
       if (kind === 'tile') headers.splice(2, 0, 'Size')
       rows = dataRows.map((entry) => {
         const row = [
@@ -380,21 +371,7 @@ export function DataIdPage({
   const settingsControl = (
     <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('dataId.settings')}
-          title={t('dataId.settings')}
-          className={cn(
-            'text-muted-foreground hover:bg-accent hover:text-foreground',
-            settingsOpen && 'bg-accent text-foreground',
-          )}
-        >
-          <Settings2 />
-          <span data-action-label className="hidden truncate">
-            {t('dataId.settings')}
-          </span>
-        </Button>
+        <IconAction label={t('dataId.settings')} icon={Settings2} active={settingsOpen} />
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -519,20 +496,12 @@ export function DataIdPage({
   )
 
   const fullscreenControl = (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label={resultsFullscreen ? t('dataId.exitFullscreen') : t('dataId.enterFullscreen')}
-      title={resultsFullscreen ? t('dataId.exitFullscreen') : t('dataId.enterFullscreen')}
-      aria-pressed={resultsFullscreen}
+    <IconAction
+      label={resultsFullscreen ? t('dataId.exitFullscreen') : t('dataId.enterFullscreen')}
+      icon={resultsFullscreen ? Minimize2 : Maximize2}
+      pressed={resultsFullscreen}
       onClick={() => setResultsFullscreen((value) => !value)}
-      className="text-muted-foreground hover:bg-accent hover:text-foreground"
-    >
-      {resultsFullscreen ? <Minimize2 /> : <Maximize2 />}
-      <span data-action-label className="hidden truncate">
-        {resultsFullscreen ? t('dataId.exitFullscreen') : t('dataId.enterFullscreen')}
-      </span>
-    </Button>
+    />
   )
 
   return (
@@ -736,12 +705,18 @@ export function DataIdPage({
               </SheetHeader>
               <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
                 {selectedNpc ? (
-                  <NpcDetail npc={selectedNpc} large />
+                  <NpcDetail
+                    npc={selectedNpc}
+                    large
+                    username={username}
+                    onOpenTerminal={() => setSelected(null)}
+                  />
                 ) : selectedBuff ? (
                   <BuffDetail
                     buff={selectedBuff}
                     large
-                    gbuffPlayer={canSee('tshock.buff.others') ? username : null}
+                    gbuffPlayer={username}
+                    onOpenTerminal={() => setSelected(null)}
                   />
                 ) : selectedData ? (
                   <DataDetail

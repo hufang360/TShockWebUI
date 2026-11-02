@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui'
+import { IconAction } from '@/components/IconAction'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/lib/i18n'
 
@@ -82,15 +83,7 @@ export function TopBarSlot({ extra }: { extra?: ReactNode }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('nav.moreActions')}
-          title={t('nav.moreActions')}
-        >
-          <MoreHorizontal />
-        </Button>
+        <IconAction label={t('nav.moreActions')} icon={MoreHorizontal} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"

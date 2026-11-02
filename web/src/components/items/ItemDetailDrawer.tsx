@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { ChevronLeft, X } from 'lucide-react'
+import { ChevronLeft, ExternalLink, X } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { ItemDropsPanel } from '@/components/ItemDropsPanel'
 import { ItemIcon } from '@/components/ItemIcon'
 import { ItemTooltipContent } from '@/components/ItemTooltipContent'
@@ -9,6 +10,7 @@ import {
   Button,
   Drawer,
   DrawerContent,
+  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui'
@@ -55,7 +57,7 @@ export interface ItemDetailDrawerProps {
  *
  * 用 shadcn 的 Base UI `Drawer`（见 `ui/Drawer.tsx`）替代原来的右侧 `Sheet`：
  * - 桌面从右侧滑入、移动端从底部滑入（带拖拽手柄，可下滑关闭）；
- * - 在抽屉里再打开物品（配方材料 / 产物的点击、提示里的「合成表」入口）会**叠一层新抽屉**，
+ * - 在抽屉里再打开物品（配方材料 / 产物的点击、提示右上角的 ⓘ「物品详情」入口）会**叠一层新抽屉**，
  *   父抽屉缩小留在后面，关掉子抽屉即回到上一层；
  * - 每一层是独立的 `ItemDetailDrawer`（各自维护词缀选择），根层的词缀仍记到 `DexState`。
  */
@@ -178,14 +180,6 @@ function ItemDetailPanel({
   const bestPrefixIds = new Set(
     bestVal == null ? [] : prefixRanks.filter((p) => p.val === bestVal).map((p) => p.id),
   )
-  /** 最佳词缀名（可能多个）——用于文案展示。 */
-  const bestPrefixNames = [
-    ...new Set(
-      [...bestPrefixIds]
-        .map((id) => dataset.prefixesById.get(id)?.name)
-        .filter((n): n is string => !!n),
-    ),
-  ]
   /** 当前物品是否有合成 / 用途 / 微光转换信息（没有时显示空态插画）。 */
   const hasRecipeInfo =
     (dataset.recipes.byResult[String(item.id)]?.length ?? 0) > 0 ||
@@ -216,99 +210,62 @@ function ItemDetailPanel({
       {/* 标题栏（固定）：左上角「返回」= 关当前层（叠层时才有），右上角 × = 关掉整个抽屉 */}
       <DrawerHeader className="flex-row items-center gap-1 border-b px-5 py-3">
         {depth > 0 && (
-          <Button
-            size="icon-sm"
-            variant="ghost"
+          <IconAction
+            label={t('action.back')}
+            icon={ChevronLeft}
             onClick={onBack}
-            aria-label={t('action.back')}
-            title={t('action.back')}
-            data-testid="dex-detail-back"
-          >
-            <ChevronLeft data-icon="inline-start" />
-          </Button>
+            testId="dex-detail-back"
+          />
         )}
         <DrawerTitle className="min-w-0 flex-1 truncate">{t('dex.detail')}</DrawerTitle>
-        <Button
-          size="icon-sm"
-          variant="ghost"
+        <IconAction
+          label={t('action.close')}
+          icon={X}
           onClick={onCloseAll}
-          aria-label={t('action.close')}
-          title={t('action.close')}
-          data-testid="dex-detail-close"
-        >
-          <X data-icon="inline-start" />
-        </Button>
+          testId="dex-detail-close"
+        />
       </DrawerHeader>
 
-      {/* 中间滚动区：左 = 游戏同款 tips，右 = 词缀下拉（group 样式）；下方合成表 */}
+      {/* 中间滚动区：通栏 tips（无阴影）→ 词缀（可折叠分区）→ 相关指令 → 合成 / 掉落 */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="min-w-0 flex-1">
-            {/* 抽屉里的这份 tips 就是当前物品自己：底部不再显示「合成表」入口（指向自己没意义） */}
-            <ItemTooltipContent
-              item={item}
-              atlas={dataset.atlas}
-              stat={stat}
-              prefix={prefix?.name ?? null}
-              prefixMods={prefixMods}
-              hideRecipeLink
-            />
-          </div>
-          <div data-testid="dex-detail-side" className="flex w-40 shrink-0 flex-col gap-2">
-            <div className="grid grid-cols-2 gap-1">
-              <Button
-                size="sm"
-                variant="primary"
-                className="h-8"
-                onClick={() => void copy('id')}
-                aria-label={t('dex.copyId')}
-              >
-                {copied === 'id' ? t('dex.copied') : t('dex.copyId')}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8"
-                onClick={() => void copy('name')}
-                aria-label={t('dex.copyName')}
-              >
-                {copied === 'name' ? t('dex.copied') : t('dex.copyName')}
-              </Button>
-            </div>
-            <Button size="sm" variant="outline" className="h-8 w-full bg-card" asChild>
-              <a
-                href={wikiUrl(item.name, lang)}
-                target="_blank"
-                rel="noreferrer noopener"
-                aria-label={t('dex.wiki')}
-              >
-                {t('dex.wiki')}
-              </a>
-            </Button>
-            {/* Wiki 固定在词缀选择器上方；切换词缀后 tips 属性值随之变化。 */}
-            {rollablePrefixes.length > 0 && (
-              <PrefixPicker
-                item={item}
-                prefixId={prefixId}
-                onPrefixChange={onPrefixChange}
-                prefixRanks={prefixRanks}
-                bestPrefixIds={bestPrefixIds}
-                bestPrefixNames={bestPrefixNames}
-                prefix={prefix}
-                accessory={stat?.stats?.accessory === true}
-                dataset={dataset}
-                formatTag={formatItemTag}
-              />
-            )}
-          </div>
-        </div>
+        {/* 抽屉里的这份 tips 就是当前物品自己：宽度占满一行、不要阴影，
+            右上角不再显示 ⓘ「物品详情」入口（指向自己没意义） */}
+        <ItemTooltipContent
+          item={item}
+          atlas={dataset.atlas}
+          stat={stat}
+          prefix={prefix?.name ?? null}
+          prefixMods={prefixMods}
+          className="w-full max-w-none shadow-none"
+          hideDetailLink
+        />
+
+        {/* Wiki / 复制在底部固定操作区；词缀跟着 tips 走（切换后 tips 属性值随之变化） */}
+        {rollablePrefixes.length > 0 && (
+          <PrefixPicker
+            item={item}
+            prefixId={prefixId}
+            onPrefixChange={onPrefixChange}
+            prefixRanks={prefixRanks}
+            bestPrefixIds={bestPrefixIds}
+            prefix={prefix}
+            accessory={stat?.stats?.accessory === true}
+            dataset={dataset}
+            formatTag={formatItemTag}
+          />
+        )}
 
         {giveCommand && (
-          <CommandLine label={t('dex.giveCommand')} commands={[giveCommand]} />
+          <CommandLine
+            label={t('commandLine.related')}
+            commands={[giveCommand]}
+            // 浮动终端在抽屉下面，填完就关掉**整叠抽屉**（堆叠多层时一起关）。
+            onOpenTerminal={onCloseAll}
+          />
         )}
 
         {/* 物品级标签：可丢微光分解（数据见 gamedump 的 canDecraft）
-            已融入到「合成表」的每条记录里（见 RecipePanel），这里不再单独占一行。 */}
+            已融入到「微光嬗变」分组的反向记录里（见 RecipePanel），这里不再单独占一行。 */}
 
         {/* 页面级设置已统一移到图鉴工具栏的「图鉴设置」Popover。 */}
         <RecipePanel
@@ -328,11 +285,41 @@ function ItemDetailPanel({
         />
       </div>
 
+      {/* 底部固定操作区（同「管理卡片」底部：按钮按内容宽度、带图标、不拉伸）：
+          前往 Wiki 在左，复制名称其次，复制 ID 在最右 */}
+      <DrawerFooter
+        data-testid="dex-detail-actions"
+        className="flex-row items-center justify-between gap-2 border-t px-5 py-3"
+      >
+        <Button variant="outline" asChild>
+          <a
+            href={wikiUrl(item.name, lang)}
+            target="_blank"
+            rel="noreferrer noopener"
+            aria-label={t('dex.wiki')}
+          >
+            <ExternalLink data-icon="inline-start" />
+            {t('dex.wiki')}
+          </a>
+        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void copy('name')}
+            aria-label={t('dex.copyName')}
+          >
+            {copied === 'name' ? t('dex.copied') : t('dex.copyName')}
+          </Button>
+          <Button variant="primary" onClick={() => void copy('id')} aria-label={t('dex.copyId')}>
+            {copied === 'id' ? t('dex.copied') : t('dex.copyId')}
+          </Button>
+        </div>
+      </DrawerFooter>
 
       {/* 空态插画：只有 tips、没有合成信息时，右下角放一个半透明大号工匠图标。
-          绝对定位挂在抽屉面板上（`fixed`），不随中间区域滚动。 */}
+          绝对定位挂在抽屉面板上（`fixed`），不随中间区域滚动；`bottom-20` 让开底部操作区。 */}
       {!hasRecipeInfo && (
-        <div aria-hidden className="pointer-events-none absolute right-6 bottom-16 opacity-[0.15]">
+        <div aria-hidden className="pointer-events-none absolute right-6 bottom-20 opacity-[0.15]">
           <ItemIcon
             item={dataset.itemsById.get(36)}
             atlas={dataset.atlas}

@@ -1,10 +1,19 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Amphora, Fish, PlayingCardsFan, RefreshCw, ShoppingBasket, Terminal, Trophy } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  FishingHook,
+  NotebookPen,
+  PiggyBank,
+  PlayingCardsFan,
+  Podium,
+  RefreshCw,
+  Terminal,
+} from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
 import { IconAction } from '@/components/IconAction'
 import { FishNotepad } from '@/components/fishshop/FishNotepad'
 import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
 import { TopBarActions } from '@/components/TopBar'
+import { useCardLayout } from '@/hooks/useCardLayout'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useModuleCards } from '@/hooks/useModuleCards'
 import { DEFAULT_AUTO_EXEC, isManual, sanitizeAutoExec, setManual } from '@/lib/autoExec'
@@ -36,12 +45,12 @@ interface FishCardDef {
  * 多数人只在想排行榜时才看，所以交给玩家自己在「管理卡片」里开「显示 / 自动执行」。
  */
 const CARDS: FishCardDef[] = [
-  { id: 'info', titleKey: 'fish.card.info', command: '/fish info', icon: <Fish /> },
+  { id: 'info', titleKey: 'fish.card.info', command: '/fish info', icon: <FishingHook /> },
   {
     id: 'jar',
     titleKey: 'fish.card.jar',
     command: '/fish jar',
-    icon: <Amphora />,
+    icon: <PiggyBank />,
     defaultHidden: true,
     defaultManual: true,
   },
@@ -49,7 +58,7 @@ const CARDS: FishCardDef[] = [
     id: 'rank',
     titleKey: 'fish.card.rank',
     command: '/fish rank',
-    icon: <Trophy />,
+    icon: <Podium />,
     defaultHidden: true,
     defaultManual: true,
   },
@@ -57,7 +66,7 @@ const CARDS: FishCardDef[] = [
     id: 'basket',
     titleKey: 'fish.card.basket',
     command: '/fish basket',
-    icon: <ShoppingBasket />,
+    icon: <Podium />,
     defaultHidden: true,
     defaultManual: true,
   },
@@ -79,6 +88,11 @@ interface FishCommandCardsProps {
    * 只在 `force`（人手点击）时调用，自动刷新不会触发 —— 否则进页面会重复拉一次货架。
    */
   onManualRefresh?: () => void
+  /**
+   * 「右列是否还有内容」变化时回调（卡片与记事本全被隐藏 → `false`）。
+   * 鱼店页据此把右侧一栏收掉，让左边货架铺满整行。
+   */
+  onContentChange?: (hasContent: boolean) => void
 }
 
 /**
@@ -94,6 +108,7 @@ export function FishCommandCards({
   refreshInterval,
   onTokenInvalid,
   onManualRefresh,
+  onContentChange,
 }: FishCommandCardsProps) {
   const { t, lang } = useI18n()
   const { enqueue, busy, busyPrefix } = useExecutionQueue()
@@ -180,6 +195,7 @@ export function FishCommandCards({
     add: addCard,
     update: updateCard,
     remove: removeCard,
+    reset: resetCards,
   } = useModuleCards(serverId, 'store')
   const [manageOpen, setManageOpen] = useState(false)
   // 自动执行偏好（与首页 / 模块卡片一致）。
@@ -202,12 +218,11 @@ export function FishCommandCards({
     }
     return out
   }, [rawHidden])
-  /** 某张内置卡片当前是否隐藏（自定义卡片不看这个）。 */
+  /** 某张卡片当前是否隐藏；内置卡片按 `defaultHidden` 兜底，记事本 / 自定义卡片默认显示。 */
   const isHidden = useCallback(
     (id: string) => {
       const def = CARDS.find((c) => c.id === id)
-      if (!def) return false
-      return hiddenMap[id] ?? def.defaultHidden === true
+      return hiddenMap[id] ?? def?.defaultHidden === true
     },
     [hiddenMap],
   )
@@ -218,7 +233,8 @@ export function FishCommandCards({
         for (const [key, value] of Object.entries(prev ?? {})) {
           if (typeof value === 'boolean') next[key] = value
         }
-        next[id] = !(next[id] ?? CARDS.find((c) => c.id === id)?.defaultHidden === true)
+        const def = CARDS.find((c) => c.id === id)
+        next[id] = !(next[id] ?? def?.defaultHidden === true)
         return next
       })
     },
@@ -235,6 +251,7 @@ export function FishCommandCards({
         custom: false,
         defaultManual: c.defaultManual === true,
         hidden: isHidden(c.id),
+        notepad: false,
       })),
       ...customCards.map((c) => ({
         key: c.id,
@@ -242,12 +259,29 @@ export function FishCommandCards({
         icon: <Terminal /> as ReactNode,
         command: c.command,
         custom: true,
-        defaultManual: false,
-        hidden: false,
+        // 用户添加的卡片默认**不自动执行**。
+        defaultManual: true,
+        hidden: isHidden(c.id),
+        notepad: false,
       })),
+      // 记事本也是一张「卡片」：可以排序、可以隐藏，但它没有指令、不参与执行。
+      {
+        key: 'notepad',
+        label: t('fish.notepad'),
+        icon: <NotebookPen /> as ReactNode,
+        command: '',
+        custom: false,
+        defaultManual: false,
+        hidden: isHidden('notepad'),
+        notepad: true,
+      },
     ],
     [customCards, t, isHidden],
   )
+
+  // 卡片顺序（含记事本）：鱼店只有右列，所以只排顺序，不排宽度。
+  const layoutIds = useMemo(() => entries.map((e) => e.key), [entries])
+  const { layout, move, reset: resetLayout } = useCardLayout(serverId, 'store', layoutIds)
 
   const refreshAll = useCallback(
     (force = false) => {
@@ -258,8 +292,12 @@ export function FishCommandCards({
       // 手动刷新连货架一起刷（顶栏只有一个刷新按钮 —— 输入框那边不再重复放一个）。
       if (force) onManualRefresh?.()
       // 只刷新「显示着的 + 自动执行」的卡片（隐藏的 / 手动的只能点卡片自己的按钮）。
+      // 只刷新「显示着的 + 自动执行 + 有指令」的卡片（隐藏 / 手动 / 记事本都不跑）。
       const runnable = entries.filter(
-        (e) => !e.hidden && !isManual(autoExec, `fish:${e.key}`),
+        (e) =>
+          e.command.trim().length > 0 &&
+          !e.hidden &&
+          !isManual(autoExec, `fish:${e.key}`, e.defaultManual),
       )
       if (batchMode && batchPlugin === true) {
         enqueue({
@@ -303,18 +341,42 @@ export function FishCommandCards({
 
   const refreshing = busyPrefix('fish:')
 
-  /** 显示着的卡片（隐藏的不渲染）：记事本固定贴在第一张卡（默认 = 钓鱼信息）下面。 */
-  const shownCards = useMemo(() => entries.filter((card) => !card.hidden), [entries])
+  /** 显示着的卡片（隐藏的不渲染），按「管理卡片」里排的顺序。 */
+  const shownCards = useMemo(() => {
+    const byKey = new Map(entries.map((e) => [e.key, e]))
+    return layout.order
+      .filter((id) => !isHidden(id))
+      .flatMap((id) => {
+        const entry = byKey.get(id)
+        return entry ? [entry] : []
+      })
+  }, [entries, layout.order, isHidden])
 
-  const manageable: ManageableCard[] = entries.map((e) => ({
-    id: e.key,
-    name: e.label,
-    command: e.command,
-    custom: e.custom,
-    manualKey: `fish:${e.key}`,
-    defaultManual: e.defaultManual,
-    hidden: e.hidden,
-  }))
+  // 右列空了（卡片 + 记事本都隐藏）就告诉页面收掉这一栏，左边货架铺满。
+  const hasContent = shownCards.length > 0
+  useEffect(() => {
+    onContentChange?.(hasContent)
+  }, [hasContent, onContentChange])
+
+  // 鱼店只有右侧一列，所以宽度只能是「右」；小 / 大 在菜单里置灰。
+  const widthOf = useCallback(() => 'right' as const, [])
+
+  const manageable: ManageableCard[] = layout.order.flatMap((id) => {
+    const entry = entries.find((e) => e.key === id)
+    if (!entry) return []
+    return [
+      {
+        id: entry.key,
+        icon: entry.icon,
+        name: entry.label,
+        command: entry.command,
+        custom: entry.custom,
+        manualKey: `fish:${entry.key}`,
+        defaultManual: entry.defaultManual,
+        hidden: entry.hidden,
+      },
+    ]
+  })
 
   const headerContent = (
     <TopBarActions>
@@ -344,28 +406,35 @@ export function FishCommandCards({
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       {headerContent}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
-        {shownCards.map((card, index) => (
-          <Fragment key={card.key}>
+      {/* `[&>*]:shrink-0`：卡片是这条滚动列的 flex 子项，默认 `flex-shrink: 1` ——
+          卡片一多就会被压扁（正文被截断、行与行还叠在一起）。卡片数量不确定，
+          所以**每张卡保持自身内容高度**，超出的部分交给整列滚动。 */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1 [&>*]:shrink-0">
+        {shownCards.map((card) =>
+          card.notepad ? (
+            <FishNotepad key={card.key} serverId={serverId} />
+          ) : (
             <CommandCard
+              key={card.key}
               title={card.label}
               icon={card.icon}
               command={card.command}
               result={results[`fish:${card.key}`]}
               loading={busy(`fish:${card.key}`)}
               unavailable={!authenticated}
+              emptyText={
+                isManual(autoExec, `fish:${card.key}`, card.defaultManual)
+                  ? t('home.customClickRefresh')
+                  : undefined
+              }
               collapseKey={`fish:${card.key}`}
               onRefresh={authenticated ? () => runOne(card.key, card.command) : undefined}
               itemsById={dataset?.itemsById}
               prefixesById={dataset?.prefixesById}
               atlas={dataset?.atlas}
             />
-            {/* 记事本固定贴在第一张卡（默认就是「钓鱼信息」）下面一行。 */}
-            {index === 0 && <FishNotepad serverId={serverId} />}
-          </Fragment>
-        ))}
-        {/* 一张卡都没显示（玩家把「钓鱼信息」也隐藏了）时记事本仍然在。 */}
-        {shownCards.length === 0 && <FishNotepad serverId={serverId} />}
+          ),
+        )}
       </div>
 
       <ModuleCardManagerDialog
@@ -379,8 +448,16 @@ export function FishCommandCards({
         onAdd={(name, cmd) => addCard(name, cmd)}
         onUpdate={(id, patch) => updateCard(id, patch)}
         onRemove={(id) => removeCard(id)}
-        // 鱼罐 / 消费榜 / 鱼篓榜默认隐藏，玩家在这里打开「显示」才出现。
+        // 鱼罐 / 消费榜 / 鱼篓榜 / 记事本都可以隐藏，玩家在这里打开「是否显示」才出现。
         visibility={{ isHidden, onToggle: toggleHidden }}
+        // 恢复默认：顺序 / 隐藏回到内置默认，并清掉自己加的卡片。
+        onReset={() => {
+          resetLayout()
+          setRawHidden({})
+          resetCards()
+        }}
+        ordering={{ onMove: (id, delta) => move(id, delta) }}
+        width={{ get: widthOf, set: () => {}, disabled: ['half', 'full'] }}
       />
     </div>
   )

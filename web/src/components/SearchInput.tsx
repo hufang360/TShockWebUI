@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import { History, X } from 'lucide-react'
-import { Button, InputGroup, InputGroupAddon, InputGroupInput, Kbd } from '@/components/ui'
+import { IconAction } from '@/components/IconAction'
+import { InputGroup, InputGroupAddon, InputGroupInput, Kbd } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { SEARCH_HISTORY_MAX, SEARCH_HISTORY_NARROW_MAX } from '@/lib/searchHistory'
@@ -229,37 +230,25 @@ export function SearchInput({
               <span className="px-1 text-xs text-muted-foreground tabular-nums">{resultLabel}</span>
             )}
             {!showShortcut && historyToggle && items.length > 0 && (
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className={cn(
-                  'rounded-full text-muted-foreground hover:text-foreground',
-                  showList && 'bg-accent text-foreground',
-                )}
-                aria-label={t('search.recent')}
+              <IconAction
+                label={t('search.recent')}
+                icon={History}
+                active={showList}
                 aria-expanded={showList}
-                title={t('search.recent')}
                 // 不让输入框失焦（失焦会延迟关闭下拉）。
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setOpen((v) => !v)}
-              >
-                <History data-icon="inline-start" />
-              </Button>
+              />
             )}
             {!showShortcut && value.length > 0 && (
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className="rounded-full text-muted-foreground hover:text-foreground"
-                aria-label={t('editor.clear')}
-                title={t('editor.clear')}
+              <IconAction
+                label={t('editor.clear')}
+                icon={X}
                 onClick={() => {
                   onValueChange('')
                   setOpen(false)
                 }}
-              >
-                <X data-icon="inline-start" />
-              </Button>
+              />
             )}
             {!showShortcut && trailingIcon}
           </InputGroupAddon>
@@ -299,18 +288,14 @@ export function SearchInput({
                 <span className="truncate">{h}</span>
               </button>
               {onHistoryRemove && (
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={t('search.remove')}
-                  title={t('search.remove')}
+                <IconAction
+                  size="icon-xs"
+                  label={t('search.remove')}
+                  icon={X}
+                  className="shrink-0"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => onHistoryRemove(h)}
-                  className="size-7 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  <X />
-                </Button>
+                />
               )}
             </li>
           ))}

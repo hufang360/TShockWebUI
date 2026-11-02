@@ -1,12 +1,22 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, Copy, Star, Terminal, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  ArrowDown,
+  Check,
+  ChevronDown,
+  Copy,
+  Star,
+  Terminal,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { LoadEarlier } from '@/components/LoadEarlier'
 import { RichText } from '@/components/RichText'
 import {
   Alert,
   AlertDescription,
   Badge,
-  Button,
   Card,
   CardBody,
   CardHeader,
@@ -17,10 +27,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   Spinner,
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from '@/components/ui'
 import { useBottomList } from '@/hooks/useBottomList'
 import { cn } from '@/lib/cn'
@@ -97,8 +104,10 @@ function OutputBlock({
           fill && 'min-h-0 flex-1 overflow-y-auto',
         )}
       >
+        {/* `shrink-0`：折行的行（或带 24px 物品图标的行）比 `min-h-5` 高，若被 flex 压回 20px，
+            正文就会溢出行框、和下一行叠在一起。行高只做下限，不允许压缩。 */}
         {output.map((line, index) => (
-          <p key={index} className="min-h-5">
+          <p key={index} className="min-h-5 shrink-0">
             {!line ? (
               '\u00a0'
             ) : (
@@ -108,19 +117,16 @@ function OutputBlock({
         ))}
       </div>
       {/* hover 时右上角出现复制按钮：复制富文本区域的原始文本。 */}
-      <Button
+      <IconAction
         size="icon-sm"
-        variant="ghost"
-        className="touch-visible absolute top-0.5 right-0.5 size-9 rounded-full opacity-0 transition-opacity group-hover/rich:opacity-100 focus-visible:opacity-100"
-        aria-label={t('action.copy')}
-        title={copied ? t('action.copied') : t('action.copy')}
+        label={copied ? t('action.copied') : t('action.copy')}
+        icon={copied ? Check : Copy}
         onClick={(e) => {
           e.stopPropagation()
           void copy()
         }}
-      >
-        {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-      </Button>
+        className="absolute top-0.5 right-0.5 opacity-0 transition-opacity group-hover/rich:opacity-100 focus-visible:opacity-100 touch-visible"
+      />
     </div>
   )
 }
@@ -165,17 +171,19 @@ export function CommandOutput({
   )
 }
 
-/** 结果卡片右上角的图标按钮：统一 24px、统一 hover 才出现、统一带 Tooltip。 */
+/** 结果卡片右上角的图标按钮：统一 `icon-xs`（手机 36 / 桌面 24）、统一 hover 才出现、统一带 Tooltip。 */
 function ResultAction({
   label,
   icon,
+  iconClassName,
   onClick,
   pressed,
   expanded,
   className,
 }: {
   label: string
-  icon: ReactNode
+  icon: LucideIcon
+  iconClassName?: string
   onClick: () => void
   /** 只有可切换的操作（收藏）传，读屏能读到当前状态。 */
   pressed?: boolean
@@ -184,22 +192,16 @@ function ResultAction({
   className?: string
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="icon"
-          variant="ghost"
-          className={cn('size-6 shrink-0 md:size-6', className)}
-          aria-label={label}
-          aria-pressed={pressed}
-          aria-expanded={expanded}
-          onClick={onClick}
-        >
-          {icon}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
+    <IconAction
+      size="icon-xs"
+      label={label}
+      icon={icon}
+      iconClassName={iconClassName}
+      onClick={onClick}
+      pressed={pressed}
+      aria-expanded={expanded}
+      className={cn('shrink-0', className)}
+    />
   )
 }
 
@@ -264,14 +266,15 @@ function ResultItem({
           {onFillCommand && (
             <ResultAction
               label={t('result.fill')}
-              icon={<Terminal data-icon="inline-start" />}
+              icon={Terminal}
               onClick={() => onFillCommand(command)}
             />
           )}
           {onToggleFavorite && result.status === 'ok' && (
             <ResultAction
               label={favorited ? t('editor.unfavorite') : t('editor.favorite')}
-              icon={<Star className={cn(favorited && 'fill-current')} data-icon="inline-start" />}
+              icon={Star}
+              iconClassName={cn(favorited && 'fill-current')}
               pressed={favorited}
               onClick={() => onToggleFavorite(command)}
             />
@@ -279,7 +282,7 @@ function ResultItem({
           {onRemove && (
             <ResultAction
               label={t('result.remove')}
-              icon={<Trash2 data-icon="inline-start" />}
+              icon={Trash2}
               onClick={() => onRemove(entry.seq)}
             />
           )}
@@ -287,12 +290,8 @@ function ResultItem({
         <ResultAction
           label={collapsed ? t('result.expand') : t('result.collapse')}
           expanded={!collapsed}
-          icon={
-            <ChevronDown
-              className={cn('transition-transform', collapsed && '-rotate-90')}
-              data-icon="inline-start"
-            />
-          }
+          icon={ChevronDown}
+          iconClassName={cn('transition-transform', collapsed && '-rotate-90')}
           onClick={toggleCollapsed}
           // 折叠后常显；展开时跟其它操作一起 hover / 聚焦才淡入。
           className={cn(
@@ -337,6 +336,7 @@ export function ResultPanel({
   onFillCommand,
   onToggleCollapse,
   pageScroll = false,
+  jumpSlot,
 }: {
   entries: ResultEntry[]
   running: boolean
@@ -361,6 +361,13 @@ export function ResultPanel({
    * 「指令」页用它：结果越多页面越高，贴底跟随 / 回到底部 / 加载更早全部作用在 `<main>` 上。
    */
   pageScroll?: boolean
+  /**
+   * 「↓ 最新」浮按钮的宿主（`pageScroll` 时投到吸底输入区上方）。
+   *
+   * 不传时：页面级滚动 → 不显示（按钮会落在视口外，看不见）；
+   * 自己滚动 → 浮在列表右下角（浮动终端用）。
+   */
+  jumpSlot?: HTMLElement | null
 }) {
   const { t } = useI18n()
   // 页面级滚动时真正在滚的是 `<main>`（AppShell 主内容区），列表只负责把内容铺开。
@@ -369,10 +376,11 @@ export function ResultPanel({
     setPageScroller(node?.closest('main') ?? null)
   }, [])
   // 默认停在最新一条（贴底），旧结果按批懒加载（jsdom 下赋值无副作用）。
-  const { ref, contentRef, onScroll, start, hidden, loadEarlier, step } = useBottomList(
-    entries.length,
-    { initial: RESULT_WINDOW, scroller: pageScroll ? pageScroller : null },
-  )
+  const { ref, contentRef, onScroll, start, hidden, loadEarlier, step, atBottom, scrollToBottom } =
+    useBottomList(entries.length, {
+      initial: RESULT_WINDOW,
+      scroller: pageScroll ? pageScroller : null,
+    })
   // 页面级滚动时 `<main>` 的 scroll 不会冒泡到列表上，得直接挂监听（判断用户是否还贴着底部）。
   useEffect(() => {
     if (!pageScroll || !pageScroller) return
@@ -394,11 +402,27 @@ export function ResultPanel({
       </Empty>
     )
   }
+  // 「↓ 最新」：与聊天内容区同一套手感 —— 用户往上回看时浮出来，一点回到底部并恢复跟随。
+  const jumpButton = (
+    <button
+      type="button"
+      onClick={scrollToBottom}
+      className={cn(
+        'flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-2xs text-primary-foreground shadow-md',
+        'hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        pageScroll && 'pointer-events-auto',
+      )}
+    >
+      <ArrowDown className="size-3" />
+      {t('feed.jumpLatest')}
+    </button>
+  )
+
   return (
     <TooltipProvider delayDuration={200}>
       <div
         ref={rootRef}
-        className={cn('flex min-w-0 flex-col', !pageScroll && 'min-h-0 flex-1')}
+        className={cn('relative flex min-w-0 flex-col', !pageScroll && 'min-h-0 flex-1')}
       >
         <div
           ref={ref}
@@ -435,6 +459,14 @@ export function ResultPanel({
             )}
           </div>
         </div>
+        {!atBottom &&
+          (pageScroll
+            ? jumpSlot
+              ? createPortal(jumpButton, jumpSlot)
+              : null
+            : (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2">{jumpButton}</div>
+            ))}
       </div>
     </TooltipProvider>
   )

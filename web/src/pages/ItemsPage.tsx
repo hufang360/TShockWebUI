@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ChevronDown, Download, Info, ListFilter, Maximize2, Minimize2, Search, Settings2, Star, X } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { FavoriteRecipesPanel } from '@/components/FavoriteRecipesPanel'
 import { CommonRecipes, type CommonRecipeEntry } from '@/components/items/CommonRecipes'
 import { DexCell } from '@/components/items/DexCell'
@@ -297,7 +298,7 @@ export function ItemsPage({
     const root = detail.stack[0] ?? null
     if (root !== state.selectedId) patch({ selectedId: root, prefixId: 0 })
   }, [detail.stack, state.selectedId, patch])
-  /** 物品提示里的「合成表」入口：就地打开（或叠一层）物品详情抽屉。 */
+  /** 物品提示右上角的 ⓘ「物品详情」入口：就地打开（或叠一层）物品详情抽屉。 */
   const detailApi = useMemo<ItemDetailApi>(() => ({ open: openDetail }), [openDetail])
   /** 稳定引用：让 memo 化的 DexCell 在滚动 / 搜索时不重复渲染。 */
   const selectCell = useCallback((item: Item) => openDetail(item.id), [openDetail])
@@ -736,24 +737,15 @@ export function ItemsPage({
   }
 
   const itemsSettingsControl = (
+                // 设置项里的「info」提示依赖这层 Provider（`DexSettingField` 用 Tooltip）。
                 <TooltipProvider delayDuration={150}>
                   <Popover open={settingsPopoverOpen} onOpenChange={setSettingsPopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t('dex.settings')}
-                        title={t('dex.settings')}
-                        className={cn(
-                          'text-muted-foreground hover:bg-accent hover:text-foreground',
-                          settingsPopoverOpen && 'bg-accent text-foreground',
-                        )}
-                      >
-                        <Settings2 />
-                        <span data-action-label className="hidden truncate">
-                          {t('dex.settings')}
-                        </span>
-                      </Button>
+                      <IconAction
+                        label={t('dex.settings')}
+                        icon={Settings2}
+                        active={settingsPopoverOpen}
+                      />
                     </PopoverTrigger>
                     <PopoverContent
                       align="end"
@@ -832,26 +824,18 @@ export function ItemsPage({
                           onCheckedChange={setRecipeTwoColumn}
                         />
                       </FieldGroup>
-                    </PopoverContent>
-                  </Popover>
+                  </PopoverContent>
+                </Popover>
                 </TooltipProvider>
   )
 
   const fullscreenToggle = (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label={resultsFullscreen ? t('dex.exitFullscreen') : t('dex.enterFullscreen')}
-      title={resultsFullscreen ? t('dex.exitFullscreen') : t('dex.enterFullscreen')}
-      aria-pressed={resultsFullscreen}
+    <IconAction
+      label={resultsFullscreen ? t('dex.exitFullscreen') : t('dex.enterFullscreen')}
+      icon={resultsFullscreen ? Minimize2 : Maximize2}
+      pressed={resultsFullscreen}
       onClick={() => setResultsFullscreen((value) => !value)}
-      className="text-muted-foreground hover:bg-accent hover:text-foreground"
-    >
-      {resultsFullscreen ? <Minimize2 /> : <Maximize2 />}
-      <span data-action-label className="hidden truncate">
-        {resultsFullscreen ? t('dex.exitFullscreen') : t('dex.enterFullscreen')}
-      </span>
-    </Button>
+    />
   )
 
   return (
@@ -963,16 +947,7 @@ export function ItemsPage({
                   <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
                 </Button>
                 {(collection || gameMode) && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t('dex.clearGroup')}
-                    title={t('dex.clearGroup')}
-                    onClick={clearGroup}
-                    className="text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    <X />
-                  </Button>
+                  <IconAction label={t('dex.clearGroup')} icon={X} onClick={clearGroup} />
                 )}
               </div>
 
@@ -1100,7 +1075,7 @@ export function ItemsPage({
           </div>
 
           {/* 详情：**可堆叠**抽屉（合成区域较长，抽屉比分栏弹框更好用）。
-              在抽屉里点配方材料 / 产物、或用提示里的「合成表」入口，会再叠一层，关掉即返回上一层。 */}
+              在抽屉里点配方材料 / 产物、或用提示右上角的 ⓘ「物品详情」入口，会再叠一层，关掉即返回上一层。 */}
           {detail.stack.length > 0 && (
             <ItemDetailDrawer
               dataset={dataset}

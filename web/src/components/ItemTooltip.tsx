@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { ItemTooltipContent } from '@/components/ItemTooltipContent'
+import { getActiveItemTooltip, setActiveItemTooltip } from '@/lib/itemTooltipBus'
 import type { Atlas, Item, ItemStatEntry } from '@/types'
 
 /** 提示最大宽度 384px（`max-w-96`）；贴近视口边缘时按半宽夹取。 */
@@ -12,16 +13,7 @@ const OPEN_DELAY = 350
 /** 关闭延迟：鼠标从触发元素移到提示上时不至于“穿过”空隙就消失。 */
 const CLOSE_DELAY = 150
 
-/**
- * 全局只允许一个提示存在：鼠标快速滑过多个物品时，新提示打开会**立即**关掉上一个，
- * 否则每个实例各自 150ms 延迟关闭，会出现好几个提示叠在一起。
- */
-let closeActiveTooltip: (() => void) | null = null
-
-/** 立即收起当前物品提示（点图标打开详情前调用）。 */
-export function closeItemTooltip() {
-  closeActiveTooltip?.()
-}
+/* 全局只允许一个提示存在：登记表在 `lib/itemTooltipBus.ts`（提示内容也要能关自己，避免循环依赖）。 */
 
 interface TipPosition {
   x: number
@@ -38,8 +30,8 @@ export interface ItemTooltipOptions {
   stack?: number
   /** 覆盖显示名（默认 item.name）。 */
   name?: string
-  /** 不显示提示底部的「合成表」入口（格子图标点一下就能开详情时用）。 */
-  hideRecipeLink?: boolean
+  /** 不显示右上角的「物品详情」入口（格子图标点一下就能开详情时用）。 */
+  hideDetailLink?: boolean
   /** 为 true 时不挂载提示（也没有手型指针）。 */
   disabled?: boolean
 }
@@ -65,7 +57,7 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
   prefix,
   stack,
   name,
-  hideRecipeLink,
+  hideDetailLink,
   disabled,
 }: ItemTooltipOptions): { ref: RefObject<T | null>; props: ItemTooltipHandlers; node: ReactNode } {
   const ref = useRef<T>(null)
@@ -158,8 +150,8 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
     cancelOpen()
     cancelClose()
     // 只保留一个提示：立即关掉上一个实例的提示。
-    closeActiveTooltip?.()
-    closeActiveTooltip = closeNow
+    getActiveItemTooltip()?.()
+    setActiveItemTooltip(closeNow)
     const r = el.getBoundingClientRect()
     const below = r.top < 128
     const x = Math.min(Math.max(r.left + r.width / 2, TIP_HALF_WIDTH), window.innerWidth - TIP_HALF_WIDTH)
@@ -213,7 +205,7 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
               prefix={prefix}
               stack={stack}
               name={name}
-              hideRecipeLink={hideRecipeLink}
+              hideDetailLink={hideDetailLink}
             />
           </div>,
           document.body,

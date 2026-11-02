@@ -423,8 +423,9 @@ it('收藏是独立 tab（侧栏「指令」页 → 「收藏」）', async () =
   await loginAsAlice()
 
   fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
-  // 工具是弹框：先点输入框左下角的「收藏」按钮。
-  fireEvent.click(await screen.findByRole('button', { name: '收藏' }))
+  // 工具是弹框：点左下角「指令库」入口，再切到弹框底部的「收藏」tab。
+  fireEvent.click(await screen.findByRole('button', { name: '指令库' }))
+  fireEvent.mouseDown(await screen.findByRole('tab', { name: '收藏' }))
   expect(await screen.findByPlaceholderText(/搜索收藏/)).toBeTruthy()
 })
 
@@ -436,8 +437,9 @@ it('历史并入指令编辑器（侧栏「历史」页）', async () => {
 
   // 默认打开首页，先切到指令页
   fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
-  // 工具是弹框：先点输入框左下角的「历史」按钮。
-  fireEvent.click(await screen.findByRole('button', { name: '历史' }))
+  // 工具是弹框：点左下角「指令库」入口，再切到弹框底部的「历史」tab。
+  fireEvent.click(await screen.findByRole('button', { name: '指令库' }))
+  fireEvent.mouseDown(await screen.findByRole('tab', { name: '历史' }))
   expect(await screen.findByText('暂无历史')).toBeTruthy()
 })
 
@@ -560,7 +562,7 @@ it('「终端」打开浮动终端，执行结果与指令页共享', async () =
   await screen.findByText('WebUI')
   await loginAsAlice()
 
-  // 顶栏右侧的终端入口（首页不放、未登录不渲染）：先进「物品图鉴」。
+  // 顶栏右侧的终端入口（未登录不渲染）：先进「物品 ID」。
   fireEvent.click(screen.getAllByRole('button', { name: '物品 ID' })[0])
   fireEvent.click(await screen.findByTestId('terminal-topbar'))
   const win = await screen.findByTestId('terminal-window')
@@ -577,7 +579,7 @@ it('「终端」打开浮动终端，执行结果与指令页共享', async () =
   expect(await within(screen.getByRole('main')).findByText(/世界时间/)).toBeTruthy()
 })
 
-it('顶栏「指令」入口：未登录 / 首页不显示，登录后除首页、指令、设置外都显示', async () => {
+it('顶栏「指令」入口：未登录 / 指令 / 设置不显示，其余页面（含首页）显示', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
@@ -586,9 +588,9 @@ it('顶栏「指令」入口：未登录 / 首页不显示，登录后除首页�
   expect(screen.queryByTestId('terminal-topbar')).toBeNull()
 
   await loginAsAlice()
-  // 首页：右侧顶栏只留刷新 / 管理卡片，不放终端图标。
+  // 首页：右侧顶栏 = 上次刷新 / 刷新 / 管理卡片 / 终端。
   expect(await screen.findByText('服务器状态')).toBeTruthy()
-  expect(screen.queryByTestId('terminal-topbar')).toBeNull()
+  expect(await screen.findByTestId('terminal-topbar')).toBeTruthy()
 
   // 指令页：隐藏。
   fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
@@ -654,22 +656,20 @@ it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 
   fireEvent.click(screen.getByRole('button', { name: '填入指令浮窗：/tpnpc Angler' }))
   expect(input.value).toBe('/tpnpc Angler')
 })
-it('「聊天」是独立页面：侧栏紧跟「指令」，地址 #/chat', async () => {
+it('「聊天」已并入「指令」：侧栏没有聊天，老地址 #/chat 落到指令页', async () => {
   mockFetch()
+  window.history.replaceState(null, '', '#/chat')
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
   await loginAsAlice()
 
+  // 侧栏不再有「聊天」入口。
   const sidebar = screen.getByTestId('sidebar')
-  const labels = Array.from(sidebar.querySelectorAll('[data-slot="sidebar-menu"] button')).map((b) =>
-    b.textContent?.trim(),
-  )
-  expect(labels.indexOf('聊天')).toBe(labels.indexOf('指令') + 1)
+  expect(within(sidebar).queryByRole('button', { name: '聊天' })).toBeNull()
 
-  fireEvent.click(within(sidebar).getByRole('button', { name: '聊天' }))
-  expect(await screen.findByTestId('chat-workspace')).toBeTruthy()
-  expect(screen.getByPlaceholderText('发消息给游戏内的玩家（会显示你是谁）')).toBeTruthy()
-  expect(window.location.hash).toBe('#/chat')
+  // 落到指令页；并且聊天内容（服务器动态）就在页面上。
+  expect(await screen.findByTestId('command-workspace')).toBeTruthy()
+  expect(await screen.findByText(/加入了服务器/)).toBeTruthy()
 })
 
 it('旧的「召唤NPC」地址回落到「指令小抄」', async () => {

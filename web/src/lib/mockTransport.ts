@@ -610,6 +610,40 @@ const MOCK_GOODS: FishGood[] = [
     needDay: false,
     needNight: true,
   },
+  {
+    serial: 4,
+    // 「全属性」样本：详情里能出现的字段它都有（价格含物品 / 我的进度 / 解锁 / 别名 /
+    // 限购 + 冷却 / 购买时机 / 购买前检查 / 备注 / 数量 / 建筑预览），用来一眼验收详情页的排版。
+    name: '鱼池',
+    icon: '[i:206]',
+    buyMax: 3,
+    needArgs: false,
+    map: ['建造', '挖池子'],
+    desc: '以你脚下为中心向下挖一个 16×26 的玻璃水鱼池',
+    cost: '[i/s2:73] 2 金币 + [i/s5:29] 5 生命水晶',
+    unlock: '[i:29] 击败克苏鲁之眼',
+    comment: '以你脚下为中心向下挖一个 16×26 的玻璃水鱼池，左右会有 1～4 格误差。',
+    allowGroup: ['所有用户组'],
+    allowPlayers: [],
+    denyPlayers: [],
+    id: -160,
+    stack: 1,
+    prefix: 0,
+    iconId: 206,
+    argCount: 0,
+    costMoney: 200,
+    costItems: [{ id: 29, stack: 5 }],
+    check: '需站在平坦地面，区域内有箱子或晶塔时买不了',
+    limit: 2,
+    serverLimit: 50,
+    cd: 30,
+    serverCd: 120,
+    needAlive: true,
+    needDay: false,
+    needNight: false,
+    // 有 `cmds` 才会显示「建筑预览」（/igen pond [...] → diagram-pond.png）
+    cmds: ['/igen pond water'],
+  },
 ]
 
 /** Mock 的「个人状态」（对照插件 `?self=1` 的 8 个字段）。 */

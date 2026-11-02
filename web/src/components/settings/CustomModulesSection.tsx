@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import { Button, Field, FieldLabel, Input, Switch } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -94,38 +95,26 @@ export function CustomModulesSection({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex shrink-0 items-center gap-0.5">
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
+                    <IconAction
+                      label={t('modules.custom.drag')}
+                      icon={GripVertical}
                       onMouseDown={() => setHandleArmed(mod.id)}
                       onMouseUp={() => setHandleArmed(null)}
                       onMouseLeave={() => setHandleArmed((v) => (v === mod.id ? null : v))}
-                      aria-label={t('modules.custom.drag')}
-                      title={t('modules.custom.drag')}
                       className="cursor-grab active:cursor-grabbing"
-                    >
-                      <GripVertical aria-hidden />
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
+                    />
+                    <IconAction
+                      label={t('modules.custom.moveUp')}
+                      icon={ChevronUp}
                       disabled={index === 0}
                       onClick={() => onMove(mod.id, -1)}
-                      aria-label={t('modules.custom.moveUp')}
-                      title={t('modules.custom.moveUp')}
-                    >
-                      <ChevronUp aria-hidden />
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
+                    />
+                    <IconAction
+                      label={t('modules.custom.moveDown')}
+                      icon={ChevronDown}
                       disabled={index === customModules.length - 1}
                       onClick={() => onMove(mod.id, 1)}
-                      aria-label={t('modules.custom.moveDown')}
-                      title={t('modules.custom.moveDown')}
-                    >
-                      <ChevronDown aria-hidden />
-                    </Button>
+                    />
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <Switch

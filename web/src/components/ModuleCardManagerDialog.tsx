@@ -1,5 +1,9 @@
+import type { ReactNode } from 'react'
+import { RotateCcw } from 'lucide-react'
 import { CardManagerSheet, type ManagerCard } from '@/components/CardManagerSheet'
+import { ConfirmButton } from '@/components/ConfirmButton'
 import { Badge } from '@/components/ui'
+import type { CardWidth } from '@/lib/cardLayout'
 import { useI18n } from '@/lib/i18n'
 
 export interface ManageableCard {
@@ -12,6 +16,10 @@ export interface ManageableCard {
   manualKey: string
   /** 未设置偏好时的默认值（true = 默认手动）。 */
   defaultManual?: boolean
+  /** 卡片当前是否隐藏（隐藏的卡片不渲染，但仍列在这里）。 */
+  hidden?: boolean
+  /** 卡片图标（与页面上那张卡一致）。 */
+  icon?: ReactNode
 }
 
 interface ModuleCardManagerDialogProps {
@@ -24,10 +32,20 @@ interface ModuleCardManagerDialogProps {
   /** 编辑自定义卡片的名称 / 指令（内置卡片不可编辑）。 */
   onUpdate: (id: string, patch: { name?: string; command?: string }) => void
   onRemove: (id: string) => void
+  /** 排序（拖拽 + 上移 / 下移）。 */
+  ordering?: {
+    onMove: (id: string, delta: number) => void
+  }
+  /** 宽度（小 / 大 / 右）。鱼店只有右栏，`disabled` 传 `['half', 'full']`。 */
+  width?: {
+    get: (id: string) => CardWidth
+    set: (id: string, width: CardWidth) => void
+    disabled?: CardWidth[]
+  }
   /** 固定卡片依赖的插件未安装时返回 true（置灰并标「缺少插件」）。 */
   pluginMissing?: (id: string) => boolean
   /**
-   * 内置卡片的「显示 / 隐藏」开关（不给则不显示开关，卡片恒显示）。
+   * 内置卡片的「显示 / 隐藏」开关（不给则不显示该项，卡片恒显示）。
    *
    * 鱼店用它：鱼罐 / 消费榜 / 鱼篓榜默认不显示，玩家在这里打开才出现。
    */
@@ -35,11 +53,16 @@ interface ModuleCardManagerDialogProps {
     isHidden: (id: string) => boolean
     onToggle: (id: string) => void
   }
+  /**
+   * 底部左下角「恢复默认」（不给则不显示）：
+   * 清掉本页的排序 / 宽度 / 隐藏，并清空用户添加的卡片，回到刚装上时的样子。
+   */
+  onReset?: () => void
 }
 
 /**
  * 模块「管理卡片」弹框：交互壳复用共享 `CardManagerSheet`（与首页 `HomeCardManager` 一致）。
- * 列出固定 + 自定义卡片，每张可切「自动执行」，自定义卡片可删；底部添加新卡片。
+ * 列出固定 + 自定义卡片，每张可切「自动执行」/ 宽度 / 顺序，自定义卡片可删；底部添加新卡片。
  */
 export function ModuleCardManagerDialog({
   open,
@@ -50,8 +73,11 @@ export function ModuleCardManagerDialog({
   onAdd,
   onUpdate,
   onRemove,
+  ordering,
+  width,
   pluginMissing,
   visibility,
+  onReset,
 }: ModuleCardManagerDialogProps) {
   const { t } = useI18n()
   const byId = new Map(cards.map((c) => [c.id, c]))
@@ -60,16 +86,14 @@ export function ModuleCardManagerDialog({
     const missing = card.custom ? false : pluginMissing?.(card.id) === true
     return {
       id: card.id,
+      icon: card.icon,
       name: card.name,
       command: card.command,
       custom: card.custom,
       disabled: missing,
-      badges: card.custom ? undefined : (
-        <>
-          <Badge>{t('home.manageBuiltin')}</Badge>
-          {missing && <Badge tone="warn">{t('home.managePluginMissing')}</Badge>}
-        </>
-      ),
+      hidden: card.hidden === true || visibility?.isHidden(card.id) === true,
+      // 自定义卡片有「笔」图标，能编辑 = 自己加的，所以不再需要「内置」徽标。
+      badges: missing ? <Badge tone="warn">{t('home.managePluginMissing')}</Badge> : undefined,
     }
   })
 
@@ -78,7 +102,6 @@ export function ModuleCardManagerDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={t('modules.cards.manage')}
-      description={t('modules.cards.manageDesc')}
       cards={items}
       removeLabel={t('modules.cards.remove')}
       nameLabel={t('modules.cards.namePlaceholder')}
@@ -90,10 +113,32 @@ export function ModuleCardManagerDialog({
           ? {
               isHidden: (id) => visibility.isHidden(id),
               onToggle: (id) => visibility.onToggle(id),
-              hideLabel: t('home.manageHide'),
-              showLabel: t('home.manageShow'),
             }
           : undefined
+      }
+      ordering={
+        ordering
+          ? {
+              onMove: ordering.onMove,
+              dragLabel: t('home.manageDrag'),
+              moveUpLabel: t('home.manageMoveUp'),
+              moveDownLabel: t('home.manageMoveDown'),
+            }
+          : undefined
+      }
+      width={width}
+      footerExtra={
+        onReset ? (
+          // 只留图标（悬停出「恢复默认」提示），点一下就地二次确认。
+          <ConfirmButton
+            size="icon-sm"
+            variant="ghost"
+            icon={<RotateCcw data-icon="inline-start" />}
+            aria-label={t('home.manageReset')}
+            confirmLabel={t('home.manageResetConfirm')}
+            onConfirm={onReset}
+          />
+        ) : undefined
       }
       autoExec={{
         isManual: (id) => {
@@ -115,6 +160,7 @@ export function ModuleCardManagerDialog({
         onAdd,
       }}
       doneLabel={t('modules.cards.done')}
+      helpExtra={t('cards.manageDescRail')}
     />
   )
 }

@@ -662,7 +662,6 @@ export interface UiState {
 export type TabId =
   | 'home'
   | 'editor'
-  | 'chat'
   | 'commands'
   | 'items'
   | 'dataid'

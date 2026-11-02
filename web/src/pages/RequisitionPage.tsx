@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClipboardList, PackagePlus, RefreshCw, Search, ShieldAlert, Star, X } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
 import { Notice } from '@/components/Notice'
@@ -510,16 +511,12 @@ export function RequisitionPage({
                 trailingAddon={
                   <Popover open={favoritesOpen} onOpenChange={setFavoritesOpen}>
                     <PopoverTrigger asChild>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        className="rounded-full text-muted-foreground hover:text-foreground"
-                        aria-label={t('requests.favorites')}
-                        title={t('requests.favorites')}
+                      <IconAction
+                        label={t('requests.favorites')}
+                        icon={Star}
+                        active={favoritesOpen}
                         aria-haspopup="dialog"
-                      >
-                        <Star data-icon="inline-start" />
-                      </Button>
+                      />
                     </PopoverTrigger>
                     <PopoverContent align="end" sideOffset={6} className="w-72 p-1">
                       <div className="px-2 py-1.5 text-2xs font-medium text-muted-foreground">
@@ -643,14 +640,12 @@ export function RequisitionPage({
                           onChange={(e) => setStack(it.id, Number(e.target.value))}
                           className="h-8 w-20"
                         />
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={t('requests.remove')}
+                        <IconAction
+                          size="icon-xs"
+                          label={t('requests.remove')}
+                          icon={X}
                           onClick={() => removeItem(it.id)}
-                        >
-                          <X data-icon />
-                        </Button>
+                        />
                       </li>
                     )
                   })}

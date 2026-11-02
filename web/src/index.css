@@ -38,8 +38,13 @@
   --warning-foreground: oklch(0.984 0.003 247.858);
   --info: oklch(0.546 0.245 262.881);
   --info-foreground: oklch(0.984 0.003 247.858);
-  /* 紫色（配方标记：无微光分解等） */
+  /* 紫色（配方标记：无微光分解等；物品详情「微光嬗变」分区标题） */
   --purple: oklch(0.55 0.22 300);
+  /* 粉紫（取自游戏稀有度 10「神级」物品名色 #FF2864；物品详情「词缀」分区标题） */
+  --pink: oklch(0.565 0.245 10);
+  /* 木色（从物品 9「木材」图标提取的褐色，保持图标色相/饱和度、只按主题调明度；
+     物品详情「合成来源 / 用于合成」两个分区标题） */
+  --wood: oklch(0.5 0.076 54.5);
   --sidebar: #fafafa;
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.22 0.015 264);
@@ -82,6 +87,8 @@
   --info: oklch(0.707 0.165 254.624);
   --info-foreground: oklch(0.129 0.042 264.695);
   --purple: oklch(0.72 0.2 300);
+  --pink: oklch(0.71 0.24 10);
+  --wood: oklch(0.72 0.076 54.5);
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -124,6 +131,8 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-purple: var(--purple);
+  --color-pink: var(--pink);
+  --color-wood: var(--wood);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -220,6 +229,18 @@
   border-radius: 9999px;
 }
 
+/* 指令输入框：单行、不换行，内容长了会横向滚动 —— 但**不显示**那条横向滚动条
+   （截图里那条灰条会盖住输入框底边、挤掉工具行的高度；滚动本身还在，只是看不见）。
+   只在 textarea 上关：别的滚动区仍用上面的细滚动条。 */
+textarea.editor {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+}
+textarea.editor::-webkit-scrollbar {
+  display: none; /* Chrome / Safari */
+  height: 0;
+}
+
 /* 触屏没有 hover：折叠箭头和卡片操作不能只靠悬停出现。 */
 @media (hover: none), (pointer: coarse) {
   .touch-visible {
@@ -228,7 +249,11 @@
 }
 
 /* 编辑器等宽 */
-textarea.editor {
+/* 指令输入框与它上方的「幽灵文字」层：**同一套字体度量**。
+   幽灵层是普通 div，选择器必须显式带上它 —— 只写 `textarea.editor` 的话，
+   幽灵层会退回 sans，两层宽度对不上（实测差 49px，文字错位）。 */
+textarea.editor,
+[data-slot='command-ghost'] {
   font-family: var(--font-pixel);
   line-height: 1.7;
   tab-size: 4;
@@ -247,6 +272,151 @@ textarea.editor {
 }
 .tswui-flash {
   animation: tswui-flash 0.7s ease-in-out 4;
+}
+
+/* 鱼店货架：每行商品都「站」在一块板上（纯 CSS，不用图片 / SVG）。
+   页面量出一行的实际高度、板上沿位置、板厚、板宽之后把变量写到两个装饰层上（见 `GoodGrid`）：
+   `--fish-shelf-pitch`     = 一格高度 + 行距（板在纵向上的重复周期）；
+   `--fish-shelf-line`      = 板上沿在行内的位置（图标区底部，商品看着像踩在板上）；
+   `--fish-shelf-thickness` = 板厚（盖住 `#序号` 那行，序号像货架边缘的价格标签）；
+   `--fish-shelf-rail-run`  = 两端斜线的水平跨距。
+   颜色统一取 `var(--border)`（和卡片描边同款），不另造灰色。
+   两层分工：
+   - `.fish-shelf`：板本身（2px 上沿 → 上亮下暗的板身 → 1px 下沿 → 板下投影），
+     左右两端各 14px 横向渐隐 —— 板是「化」进背景的，不会在两侧留一刀竖切；
+   - `.fish-shelf-rails`：两端的斜线，往**里、往上 60°**（从水平算），靠板端实色、往里渐隐，
+     爬到图标半高多一点的地方化掉。单独一层是因为板的那个 mask 会连伪元素一起吃掉。
+   两层都画在格子**背后**（图标 / 文字在它们上面），斜线只会从图标缝里透出来，不会盖住图标。
+   小尺寸不画（图标排得密，加板只会更乱），表格视图也没有格子。 */
+.fish-shelf,
+.fish-shelf-rails {
+  --fish-shelf-top: calc(var(--fish-shelf-line) + 2px);
+  --fish-shelf-bottom: calc(var(--fish-shelf-line) + var(--fish-shelf-thickness));
+  /* 板两端收尖的长度：和板厚一样长 → 斜切角 45°（楔形 = 上沿 + 这条斜边） */
+  --fish-shelf-taper: var(--fish-shelf-thickness);
+  --fish-shelf-straight: calc(100% - var(--fish-shelf-taper) * 2);
+  --fish-shelf-line-color: var(--border);
+  --fish-shelf-face-top: color-mix(in oklch, var(--border) 30%, transparent);
+  --fish-shelf-face-bottom: color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+.fish-shelf {
+  background-image:
+    /* —— 左端楔形（tile 只有 taper 宽，所以楔形正好收在板端）—— */
+    /* 楔形的板身：上沿是水平的，下沿斜着收到尖点 */
+    conic-gradient(
+      from 0deg at 0 var(--fish-shelf-line),
+      transparent 0deg 90deg,
+      var(--fish-shelf-face-top) 90deg,
+      var(--fish-shelf-face-bottom) 135deg,
+      transparent 135deg
+    ),
+    /* 楔形的下沿：斜边 */
+    conic-gradient(
+      from 0deg at 0 var(--fish-shelf-line),
+      transparent 0deg 133deg,
+      var(--fish-shelf-line-color) 133deg 136deg,
+      transparent 136deg
+    ),
+    /* —— 右端楔形（镜像，尖点在 tile 的右边缘）—— */
+    conic-gradient(
+      from 0deg at 100% var(--fish-shelf-line),
+      transparent 0deg 225deg,
+      var(--fish-shelf-face-bottom) 225deg,
+      var(--fish-shelf-face-top) 270deg,
+      transparent 270deg
+    ),
+    conic-gradient(
+      from 0deg at 100% var(--fish-shelf-line),
+      transparent 0deg 224deg,
+      var(--fish-shelf-line-color) 224deg 227deg,
+      transparent 227deg
+    ),
+    /* 板下投影：板浮在页面上，商品与板分得开 */
+    linear-gradient(
+      to bottom,
+      transparent var(--fish-shelf-bottom),
+      rgb(0 0 0 / 0.07) var(--fish-shelf-bottom),
+      transparent calc(var(--fish-shelf-bottom) + 8px)
+    ),
+    /* 板下沿：1px，收住板的厚度（两端让位给楔形） */
+    linear-gradient(
+      to bottom,
+      transparent var(--fish-shelf-bottom),
+      var(--fish-shelf-line-color) var(--fish-shelf-bottom),
+      var(--fish-shelf-line-color) calc(var(--fish-shelf-bottom) + 1px),
+      transparent calc(var(--fish-shelf-bottom) + 1px)
+    ),
+    /* 板身：上亮下暗的玻璃台面（两端让位给楔形） */
+    linear-gradient(
+      to bottom,
+      transparent var(--fish-shelf-top),
+      var(--fish-shelf-face-top) var(--fish-shelf-top),
+      var(--fish-shelf-face-bottom) var(--fish-shelf-bottom),
+      transparent var(--fish-shelf-bottom)
+    ),
+    /* 板上沿：2px，铺满整宽并压在楔形上面（两端一直延伸到尖点，和斜线交汇） */
+    linear-gradient(
+      to bottom,
+      transparent var(--fish-shelf-line),
+      var(--fish-shelf-line-color) var(--fish-shelf-line),
+      var(--fish-shelf-line-color) var(--fish-shelf-top),
+      transparent var(--fish-shelf-top)
+    );
+  background-size:
+    var(--fish-shelf-taper) var(--fish-shelf-pitch),
+    var(--fish-shelf-taper) var(--fish-shelf-pitch),
+    var(--fish-shelf-taper) var(--fish-shelf-pitch),
+    var(--fish-shelf-taper) var(--fish-shelf-pitch),
+    var(--fish-shelf-straight) var(--fish-shelf-pitch),
+    var(--fish-shelf-straight) var(--fish-shelf-pitch),
+    var(--fish-shelf-straight) var(--fish-shelf-pitch),
+    100% var(--fish-shelf-pitch);
+  background-position:
+    left top,
+    left top,
+    right top,
+    right top,
+    center top,
+    center top,
+    center top,
+    center top;
+  background-repeat: repeat-y;
+}
+
+.fish-shelf-rails {
+  position: absolute;
+  inset: 0;
+  background-image:
+    /* 左端：射线从板上沿左端往里、往上 60°（离竖直 30°）。圆心故意放到板的左外侧 50px 处，
+       这样可见范围里都是 2px 左右粗细的直线，而不是从尖角开始的楔形（近角处会细到看不见）。
+       圆心 = (-50px, 线下方 50·tan60° ≈ 86.6px)（射线经过线的左端，所以圆心在线下方），
+       切片 29.4°~30.6° → 半径 ~100px 处正好 2px 粗。 */
+    conic-gradient(
+      from 0deg at -50px calc(var(--fish-shelf-line) + 86.6px),
+      transparent 0deg 29.4deg,
+      var(--fish-shelf-line-color) 29.4deg 30.6deg,
+      transparent 30.6deg
+    ),
+    /* 右端：镜像（圆心在板的右外侧 50px，角度 = 360° - 30°） */
+    conic-gradient(
+      from 0deg at calc(100% + 50px) calc(var(--fish-shelf-line) + 86.6px),
+      transparent 0deg 329.4deg,
+      var(--fish-shelf-line-color) 329.4deg 330.6deg,
+      transparent 330.6deg
+    );
+  background-size: var(--fish-shelf-rail-run) var(--fish-shelf-pitch);
+  /* 斜线从板的两个端点长出来（层宽就卡的板的宽度，所以就是 left / right 两端） */
+  background-position: left top, right top;
+  background-repeat: repeat-y;
+  /* 靠板端那一小段保持实色，再往里渐隐到 0 */
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(var(--fish-shelf-rail-run) * 0.35),
+    transparent var(--fish-shelf-rail-run),
+    transparent calc(100% - var(--fish-shelf-rail-run)),
+    #000 calc(100% - var(--fish-shelf-rail-run) * 0.35)
+  );
 }
 
 /* 物品集合下拉的「点我」提示：选中集合分组后，第二级下拉出现时脉冲一圈主色阴影。 */

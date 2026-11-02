@@ -6,6 +6,7 @@ import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { resetRefreshGate } from '@/lib/refreshGate'
 import { makeDataset } from '@/test/fixtures'
+import { closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { playerStubs } from '@/test/playerStubs'
 import type { BackendTransport } from '@/lib/tshock'
 import type { CommandResult } from '@/types'
@@ -51,7 +52,7 @@ function renderPage(
               onLogin={onLogin}
               moduleId="world"
               keyPrefix="world:"
-              title="世界管理"
+              desc="世界信息 / Boss 进度（WorldModify）。"
               fixedCards={fixedCards}
               pluginName="WorldModify"
             />
@@ -103,6 +104,142 @@ describe('CommandModulePage', () => {
 
     expect((await screen.findAllByText('时间')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('/time').length).toBeGreaterThan(0)
+  })
+
+  it('「管理卡片」的使用说明多一句「全部隐藏后右栏自动收起」', async () => {
+    renderPage(fakeTransport(vi.fn().mockResolvedValue({ status: 'ok', output: [] })))
+    fireEvent.click(await screen.findByRole('button', { name: /管理卡片/ }))
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText(/全部隐藏后右栏自动收起，左侧铺满/)).toBeTruthy()
+    // 完成按钮带对勾图标。
+    const done = within(sheet).getByRole('button', { name: '完成' })
+    expect(done.querySelector('svg')).toBeTruthy()
+  })
+
+  it('记事本也出现在「管理卡片」里（可排序、默认在右侧）', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+
+    fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
+    const sheet = await screen.findByRole('dialog')
+    const row = within(sheet).getByRole('listitem', { name: '记事本' })
+    // 默认宽度「右栏」；没有指令 → 标「非指令」。
+    expect(within(row).getByLabelText('右栏')).toBeTruthy()
+    expect(within(row).getByText('非指令')).toBeTruthy()
+
+    // 排序：记事本默认排在最后，上移一格后进到倒数第二。
+    const before = within(sheet)
+      .getAllByRole('listitem')
+      .map((li) => li.getAttribute('aria-label'))
+    const menu = await openRowMenu(row)
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '上移' }))
+    await closeRowMenu()
+    const after = within(sheet)
+      .getAllByRole('listitem')
+      .map((li) => li.getAttribute('aria-label'))
+    expect(after.indexOf('记事本')).toBe(before.indexOf('记事本') - 1)
+  })
+
+  it('卡片可隐藏：隐藏后不渲染但仍列在管理里；全部隐藏时帮助自动弹出', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+    expect(await screen.findByText('世界信息')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
+    const sheet = await screen.findByRole('dialog')
+    const row = within(sheet).getByRole('listitem', { name: '世界信息' })
+    fireEvent.click(within(row).getByLabelText('显示中'))
+    // 行内出现闭眼徽标。
+    expect(within(row).getByLabelText('已隐藏')).toBeTruthy()
+    fireEvent.click(within(sheet).getByRole('button', { name: '完成' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // 卡片不再渲染（另一张还在）。
+    expect(screen.queryByText('世界信息')).toBeNull()
+    expect(screen.getByText('Boss 进度')).toBeTruthy()
+
+    // 把剩下两张也隐藏（含记事本）→ 页面没内容了，帮助自动顶出来。
+    fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
+    const sheet2 = await screen.findByRole('dialog')
+    for (const name of ['Boss 进度', '记事本']) {
+      const r = within(sheet2).getByRole('listitem', { name })
+      fireEvent.click(within(r).getByLabelText('显示中'))
+    }
+    fireEvent.click(within(sheet2).getByRole('button', { name: '完成' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // 一张卡都不剩 → 帮助自动顶出来（不用再点 ⓘ）。
+    expect(await screen.findByText(/世界信息 \/ Boss 进度（WorldModify）/)).toBeTruthy()
+  })
+
+  it('帮助默认展开、关过就不再自动弹（按模块单独记忆）', async () => {
+    renderPage(fakeTransport(vi.fn().mockResolvedValue({ status: 'ok', output: [] })))
+    const help = /世界信息 \/ Boss 进度（WorldModify）/
+    expect(await screen.findByText(help)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    await waitFor(() => expect(screen.queryByText(help)).toBeNull())
+    expect(JSON.parse(localStorage.getItem('tswui:helpClosed') ?? '{}')).toEqual({
+      'panel:world:': true,
+    })
+
+    // 再点 ⓘ 仍能打开。
+    fireEvent.click(screen.getByRole('button', { name: '页面说明' }))
+    expect(await screen.findByText(help)).toBeTruthy()
+  })
+
+  it('新添加的卡片默认「小」且不自动执行；改成「大」后占整行', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+
+    fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
+    const sheet = await screen.findByRole('dialog')
+    fireEvent.click(within(sheet).getByRole('button', { name: '添加卡片' }))
+    fireEvent.change(within(sheet).getByLabelText('卡片名称'), { target: { value: '时间' } })
+    fireEvent.change(within(sheet).getByLabelText('指令'), { target: { value: 'time' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: /^添加$/ }))
+
+    const row = within(sheet).getByRole('listitem', { name: '时间' })
+    expect(within(row).getByLabelText('左·小')).toBeTruthy()
+    expect(within(row).getByLabelText('不自动执行')).toBeTruthy()
+
+    fireEvent.click(within(row).getByLabelText('左·小'))
+    expect(within(within(sheet).getByRole('listitem', { name: '时间' })).getByLabelText('左·大')).toBeTruthy()
+
+    // 布局落到本机存储：宽度记住，顺序包含 2 张固定卡 + 新卡片 + 记事本。
+    const layout = JSON.parse(localStorage.getItem('tswui:cardLayout') ?? '{}')
+    const world = layout.byServer?.default?.['panel:world:']
+    expect(Object.values(world.width)).toContain('full')
+    expect(world.order).toHaveLength(4)
+    expect(world.order).toContain('notebook')
+  })
+
+  it('「管理卡片」左下角有「恢复默认」：清掉排序 / 宽度 / 隐藏和自己加的卡片', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+
+    fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
+    const sheet = await screen.findByRole('dialog')
+
+    // 先改出一点非默认状态：加一张卡 + 把固定卡改成「小」。
+    fireEvent.click(within(sheet).getByRole('button', { name: '添加卡片' }))
+    fireEvent.change(within(sheet).getByLabelText('卡片名称'), { target: { value: '时间' } })
+    fireEvent.change(within(sheet).getByLabelText('指令'), { target: { value: 'time' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: /^添加$/ }))
+    const infoRow = within(sheet).getByRole('listitem', { name: '世界信息' })
+    // 固定卡默认「左·大」，点一下循环到「右栏」。
+    fireEvent.click(within(infoRow).getByLabelText('左·大'))
+    expect(within(within(sheet).getByRole('listitem', { name: '世界信息' })).getByLabelText('右栏')).toBeTruthy()
+
+    // 「恢复默认」是图标按钮（悬停提示），点一下变就地二次确认，确认后清空。
+    const reset = within(sheet).getByRole('button', { name: '恢复默认' })
+    fireEvent.click(reset)
+    fireEvent.click(await within(sheet).findByRole('button', { name: '确认恢复' }))
+
+    await waitFor(() => expect(within(sheet).queryByRole('listitem', { name: '时间' })).toBeNull())
+    expect(within(within(sheet).getByRole('listitem', { name: '世界信息' })).getByLabelText('左·大')).toBeTruthy()
+    const layout = JSON.parse(localStorage.getItem('tswui:cardLayout') ?? '{}')
+    expect(layout.byServer?.default?.['panel:world:']).toBeUndefined()
   })
 
   it('手动执行的固定卡片：不自动执行、刷新全部也不执行，按钮为「执行」', async () => {

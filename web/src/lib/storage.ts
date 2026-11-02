@@ -29,8 +29,6 @@ export const StorageKeys = {
   terminal: 'terminal',
   /** 浮动终端的输入草稿。与指令页草稿分开：终端执行后清空输入，不应抹掉页面里的草稿。 */
   terminalDraft: 'terminal:draft',
-  /** 聊天页未发送的草稿（与指令草稿分开，切页不会丢）。 */
-  chatDraft: 'chat:draft',
   /** 可折叠卡片（指令结果 / 首页与模块卡片）的展开状态 { key: open }。 */
   collapsedCards: 'collapsedCards',
   /** 物品图鉴里收藏的物品 id（在「指令」模块的收藏 tab 展示）。 */
@@ -45,6 +43,10 @@ export const StorageKeys = {
   dexTableView: 'dex:tableView',
   /** 物品图鉴两列表格开关。 */
   dexTableTwoCols: 'dex:tableTwoCols',
+  /** 「物品」弹框里的「标签模式」：点物品条目插 `[i:ID]` 而不是裸 ID（默认关）。 */
+  itemTagMode: 'itemTagMode',
+  /** 工具弹框的本机记忆：上次的 tab + 每页的搜索词 / 滚动位置（见 hooks/useToolsMemory）。 */
+  toolsMemory: 'toolsMemory',
   /** 物品图鉴合成表「显示物品名称」开关（默认不勾选 = 仅图标；跨刷新记忆）。 */
   dexRecipeShowNames: 'dex:recipeShowNames',
   /** 物品图鉴合成表「两列视图-详情页」开关（详情抽屉里的合成表；默认不勾选）。 */
@@ -87,6 +89,15 @@ export const StorageKeys = {
   moduleCards: 'moduleCards',
   /** 鱼店内置卡片的显示 / 隐藏（`{ [cardId]: true = 隐藏 }`；没记过的按卡片的 `defaultHidden`）。 */
   fishHiddenCards: 'fishCards:hidden',
+  /** 模块 / 鱼店卡片的宽度与顺序（按服务器 + 模块分开，见 `lib/cardLayout.ts`）。 */
+  cardLayout: 'cardLayout',
+  /**
+   * 「管理卡片」抽屉底部「使用说明」的状态（三处共享）：
+   * `{ closed: 当前是否收起, everClosed: 是否曾经收起过（收起过一次后就一直显示 ⓘ 入口） }`。
+   */
+  cardHelp: 'cardHelp',
+  /** 页面「使用说明」弹层的关闭记忆：`{ [scopeId]: true }` = 关过，不再自动展开。 */
+  helpClosed: 'helpClosed',
   /** 鱼店记事本内容（`{ [serverId]: string }`，按服务器分开存在本机）。 */
   fishNote: 'fishNote',
   /** 指令卡片「是否手动执行」偏好（key -> true）。 */

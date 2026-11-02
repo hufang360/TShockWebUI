@@ -9,6 +9,7 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import {
   Button,
   Card,
@@ -252,46 +253,30 @@ export function SlicePanel({
 
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1">
-                  <Button
+                  <IconAction
                     variant="outline"
-                    size="icon-sm"
-                    className="size-7"
-                    aria-label={t('slice.nudgeLeft')}
-                    title={t('slice.nudgeLeft')}
+                    label={t('slice.nudgeLeft')}
+                    icon={ArrowLeft}
                     onClick={() => onNudge(-1, 0)}
-                  >
-                    <ArrowLeft />
-                  </Button>
-                  <Button
+                  />
+                  <IconAction
                     variant="outline"
-                    size="icon-sm"
-                    className="size-7"
-                    aria-label={t('slice.nudgeUp')}
-                    title={t('slice.nudgeUp')}
+                    label={t('slice.nudgeUp')}
+                    icon={ArrowUp}
                     onClick={() => onNudge(0, -1)}
-                  >
-                    <ArrowUp />
-                  </Button>
-                  <Button
+                  />
+                  <IconAction
                     variant="outline"
-                    size="icon-sm"
-                    className="size-7"
-                    aria-label={t('slice.nudgeDown')}
-                    title={t('slice.nudgeDown')}
+                    label={t('slice.nudgeDown')}
+                    icon={ArrowDown}
                     onClick={() => onNudge(0, 1)}
-                  >
-                    <ArrowDown />
-                  </Button>
-                  <Button
+                  />
+                  <IconAction
                     variant="outline"
-                    size="icon-sm"
-                    className="size-7"
-                    aria-label={t('slice.nudgeRight')}
-                    title={t('slice.nudgeRight')}
+                    label={t('slice.nudgeRight')}
+                    icon={ArrowRight}
                     onClick={() => onNudge(1, 0)}
-                  >
-                    <ArrowRight />
-                  </Button>
+                  />
                 </span>
                 <span className="text-2xs text-muted-foreground">{t('slice.nudgeHint')}</span>
               </div>

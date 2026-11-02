@@ -88,11 +88,12 @@
 
 - **只有 `/v2/token/create` 受限**；`rawcmd` 等其它端点**没有**速率限制（这点常被误解）。
 - 计数按**来源 IP**（`context.RemoteEndPoint.Address`），存 `tokenBucket[ip]`。
-- 每次尝试先 +1；**失败再额外 +1**（未知账号/密码错/缺 useapi）；达到 `RESTMaximumRequestsPerInterval` 后返回 403 并继续 +1。
+- **每次尝试固定 +2**：入口先 +1，成功 / 失败结束时再 +1（`SecureRest.cs:115-166`：未知账号 / 密码错 / 缺 useapi / **成功** 四条路径都走一次 `AddTokenToBucket`）；已满时再来一次只 +1。
+  - 实测（v6.2.1，用插件 `/webui/restlimit` 读同一个桶）：`bucket 1 → 一次错误密码 → 3`；另以 `limit=6`、`bucket=3` 起算连续 5 次：`5 → 7 → 8 → 9 → 10`（前 2 次 +2 正常处理，第 3 次起被挡、每次 +1）。
 - 定时器每 `RESTRequestBucketDecreaseIntervalMinutes`（**最小 1 分钟**）把所有 IP 计数 −1。
-- 默认 `RESTMaximumRequestsPerInterval = 5` → 约 5 次成功或 3 次失败即被挡，之后每分钟恢复 1 次。
-- 出处：`Rest.cs:237-241,320-334`、`SecureRest.cs:117-125`、`TShockConfig.cs:650,654`。
-- **装了 WebUI 信使插件后可精确/可放宽**：插件暴露只读端点 `/webui/restlimit`（返回 `limit` 与**调用者自己 IP** 的 `bucket`，源码读 public 的 `Rest.tokenBucket`），后端在密码登录前调用 → 桶满直接判 `rate_limited`；服务端还可用 `/web limit <值>|unlimited|default` 修改并保存 `RESTMaximumRequestsPerInterval`（需 `webui.admin` + `tshock.rest.cfg`）。见 `docs/插件-信使.md`。
+- 默认 `RESTMaximumRequestsPerInterval = 5` → 桶为空时**只有 3 次尝试**（0→2→4→6，第 4 次即被挡），之后每 1 分钟回 1 点（≈ 每 2 分钟 1 次尝试）。
+- 出处：`Rest.cs:237-241,320-334`、`SecureRest.cs:115-166`、`TShockConfig.cs:650,654`。
+- **装了 WebUI 信使插件后可精确/可放宽**：插件暴露只读端点 `/webui/restlimit`（返回 `limit` 与**调用者自己 IP** 的 `bucket`，源码读 public 的 `Rest.tokenBucket`），后端在密码登录前调用 → 桶满直接判 `rate_limited`；服务端可用 `/web init` 一次性把 `RestApiEnabled` / `LogRest` / 限流（50、每 10 分钟恢复 1）写好并给默认组补权限，或用 `/web limit <值>|unlimited|default` 单独调限流（均需 `webui.admin` + `tshock.rest.cfg`）。见 `docs/插件-信使.md`。
 
 ## 5. 端点清单（核心，v6.2.1）
 

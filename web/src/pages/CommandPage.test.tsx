@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { consumeEditorFocus, requestEditorFocus } from '@/lib/editorFocus'
 import type { BackendTransport } from '@/lib/tshock'
-import { makeDataset } from '@/test/fixtures'
+import { makeDataset, testCommands } from '@/test/fixtures'
 import { playerStubs } from '@/test/playerStubs'
-import type { CommandResult, Settings } from '@/types'
+import type { CommandResult, Dataset, Settings } from '@/types'
 import { CommandPage } from './CommandPage'
 
 const settings: Settings = {
@@ -44,13 +44,14 @@ function renderEditor(
   onTokenInvalid: () => Promise<boolean>,
   authenticated = true,
   onLogin: () => void = vi.fn(),
+  dataset: Dataset = makeDataset(),
 ) {
   return render(
     <I18nProvider lang="zh">
       {/* 整页滚动：滚动宿主就是 AppShell 的 `<main>`（结果区自己不再溢出滚动）。 */}
       <main data-testid="page-scroll-host">
         <CommandPage
-          dataset={makeDataset()}
+          dataset={dataset}
           transport={transport}
           authenticated={authenticated}
           settings={settings}
@@ -75,10 +76,38 @@ function composerEl() {
   ) as HTMLElement
 }
 
-/** 点对应的工具按钮：打开弹框并切到该面板（指令库 / 物品在左下角，收藏 / 历史在发送键旁）。 */
-function openTools(name: '指令库' | '物品' | '收藏' | '历史') {
+/** 输入框左下角只有两个入口：指令库（内含指令库 / 收藏 / 历史）与物品（内含物品 / 合成表）。 */
+function openTools(name: '指令库' | '物品') {
   fireEvent.click(within(composerEl()).getByRole('button', { name }))
 }
+
+/** 打开入口后，切到弹框**底部**的 tab（Radix 的 tab 靠 mousedown 激活；tab 现在是图标 + aria-label）。 */
+function switchTab(name: '指令库' | '物品' | '收藏' | '历史' | '合成表') {
+  fireEvent.mouseDown(screen.getByRole('tab', { name }))
+}
+
+/** tab 的可访问名（图标 tab 的 textContent 是空的）。 */
+const tabNames = (root: HTMLElement = document.body) =>
+  within(root)
+    .getAllByRole('tab')
+    .map((el) => el.getAttribute('aria-label'))
+
+/**
+ * 打开「指令库 / 收藏 / 历史」里的某一页。
+ *
+ * 弹框会**记忆上次的 tab**（`tswui:toolsMemory`），所以这里一律显式切一次，
+ * 不依赖「默认停在第一个 tab」——那样同一个文件里前面的用例会影响到后面的。
+ */
+function openCommandTab(name: '指令库' | '收藏' | '历史') {
+  openTools('指令库')
+  switchTab(name)
+}
+
+beforeEach(() => {
+  // 工具弹框会**记忆**上次的 tab / 搜索词 / 滚动位置（`tswui:toolsMemory`）：
+  // 不清掉的话，前面的用例搜过的词会带到后面的用例里（列表被过滤空，看着像「条目不见了」）。
+  localStorage.removeItem('tswui:toolsMemory')
+})
 
 afterEach(() => {
   localStorage.clear()
@@ -129,11 +158,11 @@ describe('CommandPage 未登录', () => {
 })
 
 describe('CommandPage 输入模式', () => {
-  it('空态不描边、引导块居中；工具弹框里不再有 tab 栏', () => {
+  it('空态不描边、引导块居中；物品弹框底部有「物品 / 合成表」tab', () => {
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
     openTools('物品')
-    // tab 栏已去掉：面板由输入框左下角的四个按钮切换。
-    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+    // 两个入口各自带一组 tab，tab 在弹框底部；tab 用图标，名字走 aria-label。
+    expect(tabNames()).toEqual(['物品', '合成表'])
 
     // 空态不再是一整块虚线占位：工作区就是画布，引导块居中，输入框在底部。
     const empty = screen.getByText('开始一条指令').closest('[data-slot="empty"]')
@@ -164,6 +193,18 @@ describe('CommandPage 补全里的指令用法', () => {
     expect(screen.getByRole('note').textContent).toContain('/time <day|night|noon|midnight|hh:mm>')
   })
 
+  it('幽灵文字与已输入内容之间留一个空格（`/accountinfo h` 不粘成 `h<username>`）', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    const editor = () => screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
+    const ghost = () => document.querySelector('[data-slot="command-ghost"]') as HTMLElement | null
+
+    // 数量参数已经敲了半截（本地没有候选）→ 提示「下一个参数长什么样」。
+    fireEvent.change(editor(), { target: { value: '/give 29 Alice 1' } })
+    await waitFor(() => expect(ghost()?.textContent).toContain('[item amount]'))
+    // 完整串是「已输入 + 空格 + 占位符」，不是 `1[item amount]`。
+    expect(ghost()?.textContent).toBe('/give 29 Alice 1 [item amount] ')
+  })
+
   it('没有候选时按下 ↓ 不会清空草稿（用法以幽灵文字补在输入框里）', async () => {
     localStorage.setItem(
       'tswui:history',
@@ -188,7 +229,7 @@ describe('CommandPage 补全里的指令用法', () => {
 })
 
 describe('CommandPage 工具弹框', () => {
-  it('左下角是「指令库 / 物品」，收藏 / 历史在发送键旁边', () => {
+  it('左下角只有「指令库 / 物品」两个入口，发送键旁边没有别的按钮', () => {
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
     expect(
       within(toolsGroup())
@@ -198,42 +239,47 @@ describe('CommandPage 工具弹框', () => {
 
     const card = composerEl()
     const send = within(card).getByRole('button', { name: '执行' })
-    const trailing = send.parentElement as HTMLElement
-    expect(
-      within(trailing)
-        .getAllByRole('button')
-        .map((el) => el.getAttribute('aria-label')),
-    ).toEqual(['收藏', '历史', '执行'])
+    // 收藏 / 历史 / 合成表都搬进弹框的 tab 了：发送键旁边只剩它自己。
+    expect(within(send.parentElement as HTMLElement).getAllByRole('button')).toHaveLength(1)
   })
 
-  it('工具是弹框：没有 tab 栏，打开后焦点落在当前面板的搜索框', async () => {
+  it('工具是弹框：tab 在底部，打开后焦点落在当前面板的搜索框', async () => {
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
     openTools('指令库')
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).queryAllByRole('tab')).toHaveLength(0)
+    expect(tabNames(dialog)).toEqual(['指令库', '收藏', '历史'])
+    // tab 栏排在内容之后（在弹框底部）。
+    const search = within(dialog).getByPlaceholderText('搜索指令（名称 / 别名 / 帮助）')
+    expect(
+      search.compareDocumentPosition(within(dialog).getByRole('tablist')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     // 打开即聚焦当前面板的搜索框：不用先点一下就能打字筛选。
     expect(document.activeElement).toBe(within(dialog).getByPlaceholderText(/搜索指令/))
   })
 
-  it('点另一个工具按钮直接换面板，焦点跟着落到新面板的搜索框', async () => {
+  it('点另一个入口直接换入口，焦点跟着落到新面板的搜索框', async () => {
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
     openTools('指令库')
     const dialog = await screen.findByRole('dialog')
 
     openTools('物品')
-    expect(
-      within(dialog).getByPlaceholderText('搜索物品（ID / 名称）'),
-    ).toBeTruthy()
-    expect(document.activeElement).toBe(
-      within(dialog).getByPlaceholderText('搜索物品（ID / 名称）'),
+    expect(within(dialog).getByPlaceholderText('搜索物品（ID / 名称）')).toBeTruthy()
+    // 换入口后焦点交回新面板的搜索框（Radix 的关闭 / 重开有一拍延迟）。
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(dialog).getByPlaceholderText('搜索物品（ID / 名称）'),
+      ),
     )
   })
 
   it('指令库 tab：列出全部指令，点一条填进输入框并收起弹框', async () => {
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
     openTools('指令库')
-    fireEvent.click(await screen.findByText('/help'))
+    // 页脚「常用指令」徽标里也有一个 /help，这里点列表里的那一条。
+    const list = await screen.findByRole('listbox', { name: '' }).catch(() => null)
+    fireEvent.click(within(list ?? screen.getByRole('dialog')).getAllByText('/help')[0])
     expect((screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement).value).toBe('/help ')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
@@ -308,9 +354,11 @@ describe('CommandPage 输入框（聊天式外壳）', () => {
     // 发光画在边框外面（ring），不再用 `outline` 硬描边。
     expect(card.className).toContain('focus-within:ring-[3px]')
     expect(card.className).not.toContain('outline-2')
-    // 缩小后的输入行 / 发送键尺寸。
+    // 缩小后的输入行；发送键走 `icon` 档（手机 40 / 桌面 36），不再手写 size-*。
     expect((card.querySelector('textarea') as HTMLElement).className).toContain('h-8')
-    expect(within(card).getByRole('button', { name: '执行' }).className).toContain('size-8')
+    const send = within(card).getByRole('button', { name: '执行' }).className
+    expect(send).toContain('size-10 md:size-9')
+    expect(send).not.toMatch(/\bsize-[678]\b/)
   })
 
   it('工具按钮悬停 / 聚焦出 Tooltip；面板是贴在按钮上的 popover（无遮罩）', async () => {
@@ -337,18 +385,20 @@ describe('CommandPage 输入框（聊天式外壳）', () => {
     expect(anchor.style.top).toBe('700px')
   })
 
-  it('点工具按钮打开对应 tab 的弹框；再点一次收起', async () => {
+  it('点入口按钮打开弹框；再点一次收起', async () => {
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
-    // 收藏按钮在发送键旁边（不在左下角那个组里）。
-    const favorites = within(composer()).getByRole('button', { name: '收藏' })
+    const commands = within(composer()).getByRole('button', { name: '指令库' })
 
-    fireEvent.click(favorites)
-    expect(favorites.getAttribute('aria-pressed')).toBe('true')
-    await screen.findByRole('dialog')
-    // 弹框里就是「收藏」面板（没有 tab 栏）。
+    fireEvent.click(commands)
+    expect(commands.getAttribute('aria-pressed')).toBe('true')
+    const dialog = await screen.findByRole('dialog')
+    // 默认停在该入口的第一个 tab。
+    expect(within(dialog).getByRole('tab', { name: '指令库' }).getAttribute('data-state')).toBe(
+      'active',
+    )
 
-    fireEvent.click(favorites)
-    expect(favorites.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(commands)
+    expect(commands.getAttribute('aria-pressed')).toBe('false')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
@@ -613,10 +663,9 @@ describe('CommandPage 物品收藏', () => {
     localStorage.setItem('tswui:favorites', JSON.stringify([{ cmd: '/time 12:00', ts: 1 }]))
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('收藏')
+    openCommandTab('收藏')
     expect(await screen.findByText('/time 12:00')).toBeTruthy()
-    expect(screen.getByText('指令（1）')).toBeTruthy()
-    // 没有分类按钮：收藏面板就只有指令收藏。
+    // 没有分类按钮：收藏面板就只有指令收藏（物品收藏在「物品」入口、合成记录在「合成表」tab）。
     expect(screen.queryByTestId('favorites-kind-items')).toBeNull()
     expect(screen.queryByTestId('favorites-kind-recipes')).toBeNull()
     expect(screen.queryByText('生命水晶')).toBeNull()
@@ -629,7 +678,7 @@ describe('CommandPage 物品收藏', () => {
     )
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('收藏')
+    openCommandTab('收藏')
     expect(await screen.findByText('/time 12:00')).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('搜索收藏指令（指令名 / 参数）'), {
       target: { value: 'give' },
@@ -638,15 +687,17 @@ describe('CommandPage 物品收藏', () => {
     expect(screen.queryByText('/time 12:00')).toBeNull()
   })
 
-  it('清空收藏清空指令收藏', async () => {
+  it('收藏面板没有「清空」「删除」按钮：取消收藏只在行内星标', async () => {
     localStorage.setItem('tswui:favorites', JSON.stringify([{ cmd: '/time 12:00', ts: 1 }]))
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('收藏')
-    // 清空需要二次确认：先点「清空」，再点「确认清空」。
-    fireEvent.click(await screen.findByRole('button', { name: '清空' }))
-    fireEvent.click(await screen.findByRole('button', { name: '确认清空' }))
+    openCommandTab('收藏')
+    expect(await screen.findByText('/time 12:00')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '清空' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '删除' })).toBeNull()
 
+    // 行内星标取消收藏。
+    fireEvent.click(screen.getByRole('button', { name: '取消收藏' }))
     await waitFor(() =>
       expect(JSON.parse(localStorage.getItem('tswui:favorites') ?? '[]')).toEqual([]),
     )
@@ -658,7 +709,7 @@ describe('CommandPage 物品收藏', () => {
     const runCommand = vi.fn()
     renderEditor(fakeTransport(runCommand), vi.fn().mockResolvedValue(true))
 
-    openTools('收藏')
+    openCommandTab('收藏')
     fireEvent.click(await screen.findByRole('button', { name: '/time 12:00' }))
 
     await waitFor(() =>
@@ -667,18 +718,19 @@ describe('CommandPage 物品收藏', () => {
     expect(runCommand).not.toHaveBeenCalled()
   })
 
-  it('批量删除指令收藏', async () => {
+  it('收藏行悬停才出行内星标，没有批量删除模式', async () => {
     localStorage.setItem('tswui:favorites', JSON.stringify([{ cmd: '/time 12:00', ts: 1 }]))
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('收藏')
-    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
-    fireEvent.click(screen.getByRole('button', { name: '/time 12:00' }))
-    fireEvent.click(screen.getByRole('button', { name: '删除（1）' }))
-
-    await waitFor(() =>
-      expect(JSON.parse(localStorage.getItem('tswui:favorites') ?? '[]')).toEqual([]),
-    )
+    openCommandTab('收藏')
+    const row = await screen.findByRole('button', { name: '/time 12:00' })
+    // 每行只有「载入」与「取消收藏」两个按钮，没有多选 / 删除（1）。
+    const item = row.closest('li') as HTMLElement
+    expect(within(item).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
+      null,
+      '取消收藏',
+    ])
+    expect(screen.queryByRole('button', { name: /删除（/ })).toBeNull()
   })
 })
 
@@ -711,7 +763,7 @@ describe('CommandPage 执行后清空输入框', () => {
 })
 
 describe('CommandPage 历史', () => {
-  it('批量删除：进入删除状态后可多选删除', async () => {
+  it('逐条删除：悬停行尾出 ✕；底部垃圾桶清空全部（没有批量模式）', async () => {
     localStorage.setItem(
       'tswui:history',
       JSON.stringify([
@@ -721,15 +773,21 @@ describe('CommandPage 历史', () => {
     )
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('历史')
-    // 工具弹框不是模态的（背景不变暗、照常可访问），断言都限定在弹框里。
+    openCommandTab('历史')
     const dialog = await screen.findByRole('dialog')
-    // 默认逐行不显示删除图标，只有一个「删除」入口。
-    fireEvent.click(within(dialog).getByRole('button', { name: '删除' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /\/time 12:00/ }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /\/time 13:00/ }))
-    fireEvent.click(within(dialog).getByRole('button', { name: '删除（2）' }))
+    // 没有「删除」批量模式入口。
+    expect(within(dialog).queryByRole('button', { name: '删除' })).toBeNull()
 
+    // 每行一个 ✕（平时透明，悬停才出现）。
+    const removeRow = within(dialog).getAllByRole('button', { name: '删除这条历史' })[0]
+    fireEvent.click(removeRow)
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:history') ?? '[]')).toHaveLength(1),
+    )
+
+    // 底部垃圾桶 = 清空全部（悬停有提示）。
+    fireEvent.click(within(dialog).getByRole('button', { name: '清空历史' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认清空' }))
     await waitFor(() =>
       expect(JSON.parse(localStorage.getItem('tswui:history') ?? '[]')).toEqual([]),
     )
@@ -743,7 +801,7 @@ describe('CommandPage 历史', () => {
     )
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('历史')
+    openCommandTab('历史')
     fireEvent.click(await screen.findByRole('button', { name: '清空历史' }))
     // 首次点击只展开确认，不直接清空。
     expect(JSON.parse(localStorage.getItem('tswui:history') ?? '[]')).toHaveLength(1)
@@ -765,7 +823,7 @@ describe('CommandPage 历史', () => {
     )
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('历史')
+    openCommandTab('历史')
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByPlaceholderText('搜索历史指令'), {
       target: { value: 'give' },
@@ -775,28 +833,48 @@ describe('CommandPage 历史', () => {
     expect(within(dialog).queryByText('/time 12:00')).toBeNull()
   })
 
-  it('去重保留最新、删除较旧的重复记录', async () => {
+  it('「最多 100 条」与清空按钮在 tab 栏右侧（不再单独占一行）', async () => {
+    localStorage.setItem(
+      'tswui:history',
+      JSON.stringify([{ cmd: '/seed', ts: 1, ok: true, status: 'ok' }]),
+    )
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openCommandTab('历史')
+    const dialog = await screen.findByRole('dialog')
+
+    const note = within(dialog).getByText('最多 100 条')
+    const clear = within(dialog).getByRole('button', { name: '清空历史' })
+    // 两者在同一个容器里，靠右（`ml-auto`），并且与 tab 栏同一行。
+    const cluster = note.parentElement as HTMLElement
+    expect(cluster.className).toContain('ml-auto')
+    expect(cluster.contains(clear)).toBe(true)
+    const tabRow = within(dialog).getAllByRole('tab')[0].parentElement?.parentElement as HTMLElement
+    expect(tabRow.contains(cluster)).toBe(true)
+    // 说明在清空按钮左边。
+    expect(note.compareDocumentPosition(clear) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // 点两次才真的清空（就地确认，不弹框）。
+    fireEvent.click(clear)
+    fireEvent.click(await screen.findByRole('button', { name: '确认清空' }))
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:history') ?? '[]')).toEqual([]),
+    )
+  })
+
+  it('历史面板没有「去重」按钮（重复记录只能逐条删）', async () => {
     localStorage.setItem(
       'tswui:history',
       JSON.stringify([
         { cmd: '/time 12:00', ts: 3, ok: true, status: 'ok' },
-        { cmd: '/give 29 Alice', ts: 2, ok: true, status: 'ok' },
         { cmd: '/time 12:00', ts: 1, ok: true, status: 'ok' },
       ]),
     )
     renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
 
-    openTools('历史')
-    fireEvent.click(await screen.findByRole('button', { name: '去重' }))
-    fireEvent.click(await screen.findByRole('button', { name: '确认去重' }))
-
-    await waitFor(() => {
-      const after = JSON.parse(localStorage.getItem('tswui:history') ?? '[]') as Array<{
-        cmd: string
-      }>
-      expect(after).toHaveLength(2)
-      expect(after.map((h) => h.cmd)).toEqual(['/time 12:00', '/give 29 Alice'])
-    })
+    openCommandTab('历史')
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findAllByText('/time 12:00')).toHaveLength(2)
+    expect(within(dialog).queryByRole('button', { name: /去重/ })).toBeNull()
   })
 })
 
@@ -915,3 +993,208 @@ describe('CommandPage `/` 快捷键', () => {
     expect(editor().value).toBe('')
   })
 })
+
+describe('CommandPage 工具弹框：记忆与常用指令', () => {
+  it('tab 用图标（terminal / star / rotate-ccw-clock 语义），名字走 aria-label', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('指令库')
+    const dialog = await screen.findByRole('dialog')
+    expect(tabNames(dialog)).toEqual(['指令库', '收藏', '历史'])
+    // 图标 tab：没有可见文字，只靠 svg + aria-label。
+    for (const tab of within(dialog).getAllByRole('tab')) {
+      expect(tab.querySelector('svg')).toBeTruthy()
+      expect(tab.textContent?.trim()).toBe('')
+      // 悬停图标出 Tooltip：触发器是**图标外的 span**（不是 tab 本身，避免两个 Radix 组件抢 `data-state`）。
+      const icon = tab.querySelector('svg') as SVGElement
+      const trigger = icon.parentElement as HTMLElement
+      fireEvent.pointerMove(icon, { pointerType: 'mouse' })
+      fireEvent.pointerEnter(icon, { pointerType: 'mouse' })
+      // `instant-open` / `delayed-open` 都表示「开了」。
+      await waitFor(() => expect(trigger.getAttribute('data-state')).toMatch(/open$/))
+      // tab 自己的选中态没被 Tooltip 覆盖。
+      expect(tab.getAttribute('aria-label')).toBeTruthy()
+    }
+  })
+
+  it('底部常用指令徽标：/help /who /bossdamage，悬停出官方说明，点了填进输入框', async () => {
+    // `/who` 在真实数据里是 `playing` 的别名；fixture 里补上它，说明文案才有出处。
+    const dataset = makeDataset({
+      commands: [
+        ...testCommands,
+        {
+          name: 'playing',
+          aliases: ['online', 'who'],
+          permission: null,
+          help: 'Shows the currently connected players.',
+          helpZh: '显示当前在线的玩家。',
+          allowServer: true,
+          doLog: false,
+        },
+      ],
+    })
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true), true, vi.fn(), dataset)
+    openTools('指令库')
+    const dialog = await screen.findByRole('dialog')
+
+    for (const token of ['/help', '/who', '/bossdamage']) {
+      expect(within(dialog).getByRole('button', { name: token })).toBeTruthy()
+    }
+    // 说明取自 data/commands.json（`/who` 是 `playing` 的别名）。
+    // jsdom 里 Radix 的 Tooltip 内容不会真正挂到 DOM（真浏览器里已实测可显示），
+    // 这里断言「悬停→延迟打开」这条链路 + 说明文案来源本身。
+    const who = within(dialog).getByRole('button', { name: '/who' })
+    fireEvent.pointerMove(who, { pointerType: 'mouse' })
+    fireEvent.pointerEnter(who, { pointerType: 'mouse' })
+    await waitFor(() => expect(who.getAttribute('data-state')).toBe('delayed-open'))
+    expect(who.getAttribute('aria-describedby')).toBeTruthy()
+    // 文案就是官方 helpZh（不是前端另写的）：同一份数据在指令列表里也是这句。
+    expect(within(dialog).getAllByText('显示当前在线的玩家。').length).toBeGreaterThan(0)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '/help' }))
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:draft') ?? '""')).toBe('/help'),
+    )
+  })
+
+  it('记住上次停的 tab：关掉再打开还是那一页', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('指令库')
+    switchTab('历史')
+    await screen.findByPlaceholderText('搜索历史指令')
+    // 收起弹框。
+    fireEvent.click(within(composerEl()).getByRole('button', { name: '指令库' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    openTools('指令库')
+    expect(await screen.findByPlaceholderText('搜索历史指令')).toBeTruthy()
+  })
+
+  it('记住每页的搜索词与滚动位置（关掉再打开还在）', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('物品')
+    const search = await screen.findByPlaceholderText('搜索物品（ID / 名称）')
+    fireEvent.change(search, { target: { value: '铁' } })
+
+    fireEvent.click(within(composerEl()).getByRole('button', { name: '物品' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    openTools('物品')
+    expect((await screen.findByPlaceholderText('搜索物品（ID / 名称）') as HTMLInputElement).value).toBe(
+      '铁',
+    )
+  })
+})
+
+describe('CommandPage 物品弹框：「标签模式」开关', () => {
+  it('只在物品入口的「物品」tab 右侧出现，切到合成表就没有', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('物品')
+    const dialog = await screen.findByRole('dialog')
+    // 按钮文字直接写「点下去做什么」：默认（关）是「插入ID」。
+    const toggle = within(dialog).getByRole('button', { name: '插入ID' })
+    // 与 tab 栏同一行，且在右侧（`ml-auto`）。
+    expect(toggle.closest('.ml-auto')).toBeTruthy()
+
+    switchTab('合成表')
+    expect(within(dialog).queryByRole('button', { name: '插入ID' })).toBeNull()
+  })
+
+  it('关掉时：点物品进详情（插裸 ID）；开启后：点一条直接插 [i:ID]', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('物品')
+    const dialog = await screen.findByRole('dialog')
+
+    // 搜到「生命水晶」（id 29）。
+    fireEvent.change(within(dialog).getByPlaceholderText('搜索物品（ID / 名称）'), {
+      target: { value: '生命水晶' },
+    })
+    const row = await within(dialog).findByRole('button', { name: /生命水晶/ })
+
+    // 默认（关）：只是选中，出现详情区，输入框不变。
+    fireEvent.click(row)
+    expect(JSON.parse(localStorage.getItem('tswui:draft') ?? '""')).toBe('')
+    expect(within(dialog).getByRole('button', { name: '插入' })).toBeTruthy()
+
+    // 打开「插入标签」再点：直接追加 [i:29]（按钮文字随之变成「插入标签」）。
+    fireEvent.click(within(dialog).getByRole('button', { name: '插入ID' }))
+    const on = within(dialog).getByRole('button', { name: '插入标签' })
+    expect(on.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(await within(dialog).findByRole('button', { name: /生命水晶/ }))
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:draft') ?? '""')).toBe('[i:29]'),
+    )
+    // 标签模式下不再弹「插入方式」详情区。
+    expect(within(dialog).queryByRole('button', { name: '插入' })).toBeNull()
+  })
+
+  it('开关状态记在本机（下次打开还是开的）', async () => {
+    localStorage.setItem('tswui:itemTagMode', 'true')
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('物品')
+    const dialog = await screen.findByRole('dialog')
+    expect(
+      within(dialog).getByRole('button', { name: '插入标签' }).getAttribute('aria-pressed'),
+    ).toBe('true')
+  })
+})
+
+describe('CommandPage 常用指令徽标', () => {
+  it('四个常用指令都在，样式是 ghost（安静的入口，不抢列表）', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('指令库')
+    const dialog = await screen.findByRole('dialog')
+
+    for (const token of ['/help', '/who', '/bossdamage', '/alldeath']) {
+      const badge = within(dialog)
+        .getAllByRole('button')
+        .find((b) => b.textContent?.trim() === token) as HTMLElement
+      expect(badge, token).toBeTruthy()
+      // ghost：没有 secondary 的底色。
+      expect(badge.className).not.toContain('bg-secondary')
+    }
+  })
+
+  it('点徽标把指令填进输入框，不自动执行', async () => {
+    const runCommand = vi.fn()
+    renderEditor(fakeTransport(runCommand), vi.fn().mockResolvedValue(true))
+    openTools('指令库')
+    const dialog = await screen.findByRole('dialog')
+
+    const badge = within(dialog)
+      .getAllByRole('button')
+      .find((b) => b.textContent?.trim() === '/help') as HTMLElement
+    fireEvent.click(badge)
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('tswui:draft') ?? '""')).toBe('/help'),
+    )
+    expect(runCommand).not.toHaveBeenCalled()
+  })
+
+  it('切到收藏 / 历史时右侧不显示常用指令', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('指令库')
+    const dialog = await screen.findByRole('dialog')
+    const badge = () =>
+      within(dialog)
+        .queryAllByRole('button')
+        .find((b) => b.textContent?.trim() === '/alldeath')
+    // 默认在「指令库」页：徽标在。
+    expect(badge()).toBeTruthy()
+
+    switchTab('收藏')
+    expect(badge()).toBeUndefined()
+    switchTab('历史')
+    expect(badge()).toBeUndefined()
+    // 切回指令库又回来。
+    switchTab('指令库')
+    expect(badge()).toBeTruthy()
+  })
+
+  it('不再有「常用指令设置」按钮', async () => {
+    renderEditor(fakeTransport(vi.fn()), vi.fn().mockResolvedValue(true))
+    openTools('指令库')
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: /常用指令设置/ })).toBeNull()
+  })
+})
+

@@ -19,6 +19,7 @@ import {
   rangeTabLabel,
   type ItemCollection,
 } from '@/lib/collections'
+import { IconAction } from '@/components/IconAction'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/cn'
 
@@ -89,14 +90,7 @@ export function DexGroupDrawer({
       >
         <DrawerHeader className="flex-row items-center border-b px-4 py-3">
           <DrawerTitle className="min-w-0 flex-1">{t('dex.collectionGroup')}</DrawerTitle>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            aria-label={t('action.close')}
-          >
-            <X />
-          </Button>
+          <IconAction label={t('action.close')} icon={X} onClick={() => onOpenChange(false)} />
         </DrawerHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-3">

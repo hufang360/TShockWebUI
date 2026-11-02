@@ -1,5 +1,18 @@
 import type { ReactNode } from 'react'
-import { Backpack, Clock, Crown, Globe2, Skull, Swords, Users } from 'lucide-react'
+import {
+  Activity,
+  Backpack,
+  Clock,
+  Crown,
+  Globe2,
+  History,
+  Server,
+  Signpost,
+  Skull,
+  Swords,
+  Terminal,
+  Users,
+} from 'lucide-react'
 import type { BuiltinCardId } from '@/lib/homeCards'
 
 /**
@@ -36,3 +49,20 @@ export const COMMAND_CARDS: CommandCardDef[] = [
 ]
 
 export const COMMAND_CARD_BY_ID = new Map(COMMAND_CARDS.map((c) => [c.id, c]))
+
+/**
+ * 每张首页卡片在「管理卡片」列表里显示的小图标 —— 与页面上那张卡的页头图标保持一致
+ * （概览卡用它们 `HomeOverviewCards` 里的图标，指令卡用 `COMMAND_CARDS` 的图标）。
+ */
+const OVERVIEW_CARD_ICONS: Partial<Record<BuiltinCardId, ReactNode>> = {
+  server: <Server />,
+  events: <Activity />,
+  recent: <History />,
+  quick: <Signpost />,
+}
+
+export function homeCardIcon(id: string): ReactNode {
+  const command = COMMAND_CARD_BY_ID.get(id as CommandCardId)
+  if (command) return command.icon
+  return OVERVIEW_CARD_ICONS[id as BuiltinCardId] ?? <Terminal />
+}

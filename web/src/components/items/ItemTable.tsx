@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Eye } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
-import { Button } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 import { cn } from '@/lib/cn'
+import { selectableRow } from '@/lib/rowSelect'
 import type { Atlas, Item } from '@/types'
 
 function splitRows(rows: Item[], twoCols: boolean): [Item[], Item[]] {
@@ -65,24 +64,20 @@ function ItemTable({
 
   const shown = rows.slice(0, limit)
   return (
-    <div className="overflow-hidden rounded-control border border-border/60">
+    <div className="overflow-clip rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
           <col className="w-16" />
           <col className="w-10" />
           <col />
           <col />
-          <col className="w-9" />
         </colgroup>
         <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
           <tr>
-            <th className="px-3 py-2 text-right font-medium">ID</th>
+            <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.name')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.key')}</th>
-            <th className="w-9 px-1 py-2">
-              <span className="sr-only">{t('dex.detail')}</span>
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -90,8 +85,10 @@ function ItemTable({
             <tr
               key={item.id}
               title={`${item.name} #${item.id}`}
+              tabIndex={0}
+              {...selectableRow(() => onSelect(item))}
               className={cn(
-                'group/row border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10',
+                'cursor-pointer border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-none',
                 selectedId === item.id && 'bg-primary/10',
               )}
             >
@@ -99,8 +96,9 @@ function ItemTable({
                 {item.id}
               </td>
               <td className="px-1 py-0.5">
+                {/* 图标列悬停出物品提示（行本身可点开详情，两者不冲突：提示右上角有 ⓘ「物品详情」入口） */}
                 <span data-testid="item-table-icon" className="inline-flex items-center justify-center">
-                  <ItemIcon item={item} atlas={atlas} size={24} tooltip={false} />
+                  <ItemIcon item={item} atlas={atlas} size={24} />
                 </span>
               </td>
               <td className="truncate px-3 py-2 text-foreground" title={item.name}>
@@ -112,23 +110,12 @@ function ItemTable({
               >
                 {item.key}
               </td>
-              <td className="px-1 py-1">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={t('dex.detail')}
-                  onClick={() => onSelect(item)}
-                  className="opacity-100 md:opacity-0 md:group-hover/row:opacity-100 md:group-focus-within/row:opacity-100"
-                >
-                  <Eye />
-                </Button>
-              </td>
             </tr>
           ))}
           {hasMore && (
             <tr ref={sentinelRef}>
               <td
-                colSpan={5}
+                colSpan={4}
                 className="border-t border-border/50 px-3 py-2 text-center text-xs text-muted-foreground"
               >
                 {t('dex.table.moreHint', { shown: shown.length, total: rows.length })}

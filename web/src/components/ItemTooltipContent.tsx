@@ -1,12 +1,14 @@
 import type { CSSProperties } from 'react'
 import { useMemo } from 'react'
-import { Hammer, Star } from 'lucide-react'
+import { Info, Star } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n, type I18n } from '@/lib/i18n'
 import { useItemDetail } from '@/lib/itemDetailContext'
 import { useItemFavorites } from '@/lib/itemFavoritesContext'
 import { rarityColor } from '@/lib/items'
+import { closeItemTooltip } from '@/lib/itemTooltipBus'
 import { prefixDeltaLines } from '@/lib/prefixes'
 import type { Atlas, Item, ItemStatEntry, PrefixMods } from '@/types'
 
@@ -95,10 +97,10 @@ interface ItemTooltipContentProps {
   className?: string
   style?: CSSProperties
   /**
-   * 不显示底部「合成表」入口。**物品详情抽屉里的那份 tips 要传 true**——
+   * 不显示右上角的「物品详情」入口。**物品详情抽屉里的那份 tips 要传 true**——
    * 它本来就指向自己，点了再开一层没有意义。
    */
-  hideRecipeLink?: boolean
+  hideDetailLink?: boolean
 }
 
 export function ItemTooltipContent({
@@ -113,10 +115,11 @@ export function ItemTooltipContent({
   hideHeader = false,
   className,
   style,
-  hideRecipeLink = false,
+  hideDetailLink = false,
 }: ItemTooltipContentProps) {
   const { t } = useI18n()
   const favorites = useItemFavorites()
+  const detail = useItemDetail()
   const favorited = favorites ? favorites.isFavorited(item.id) : false
   // tip 行在载入数据集时已按当前界面语言解析好。
   const baseLines = stat?.tip ?? EMPTY_LINES
@@ -169,11 +172,19 @@ export function ItemTooltipContent({
         {showBaseNote && (
           <p className="text-xs text-muted-foreground">{t('tooltip.baseStatsNote')}</p>
         )}
-        <IdKeyFooter item={item} className="text-muted-foreground" showLink={!hideRecipeLink} />
+        <IdKeyFooter item={item} className="text-muted-foreground" />
       </div>
     )
   }
 
+  // 右上角的两个图标按钮：这是游戏同款物品提示（固定深色底、模仿游戏观感），**不能用 `IconAction`**：
+  // 语义色令牌在这个深色底上不成立（`text-muted-foreground` 会看不见），所以颜色照游戏原样写死。
+  // 尺寸对齐 `icon-xs` 的桌面值（24px），形状与聚焦环仍走项目令牌。
+  const iconBtnClass = cn(
+    'grid size-6 shrink-0 cursor-pointer place-items-center rounded-control transition-colors',
+    'text-zinc-500 hover:bg-white/10',
+    'focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none',
+  )
   const favoriteButton = favorites ? (
     <button
       type="button"
@@ -184,15 +195,44 @@ export function ItemTooltipContent({
       aria-label={favorited ? t('tooltip.unfavorite') : t('tooltip.favorite')}
       aria-pressed={favorited}
       title={favorited ? t('tooltip.unfavorite') : t('tooltip.favorite')}
-      className={cn(
-        'ml-auto grid size-6 shrink-0 cursor-pointer place-items-center rounded-control transition-colors',
-        'text-zinc-500 hover:bg-white/10 hover:text-amber-300',
-        'focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none',
-      )}
+      className={cn(iconBtnClass, 'hover:text-amber-300')}
     >
       <Star className={cn('size-4', favorited && 'fill-current text-warning')} />
     </button>
   ) : null
+  /** 「物品详情」入口（替代原先藏在底部的「合成表」文字链接）：悬停出 Tooltip，点一下开详情。 */
+  const detailButton = detail && !hideDetailLink ? (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => {
+              // 提示可能挂在可点击的格子上：别把点击冒泡成「选中格子」。
+              e.stopPropagation()
+              // 先收起提示：它是 z-[100]，会浮在随后打开的抽屉（z-50）上面。
+              closeItemTooltip()
+              detail.open(item.id)
+            }}
+            aria-label={t('dex.detail')}
+            className={cn(iconBtnClass, 'hover:text-zinc-100')}
+          >
+            <Info className="size-4" aria-hidden />
+          </button>
+        </TooltipTrigger>
+        {/* 提示本体是 z-[100] 的自研浮层，内层 Tooltip 必须再高一层才看得见（与 `ItemTooltip` 同一类例外） */}
+        <TooltipContent className="z-[110]">{t('dex.detail')}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  ) : null
+  /** 右上角操作区：⭐ 收藏 + ⓘ 物品详情。 */
+  const tipActions =
+    favoriteButton || detailButton ? (
+      <span className="ml-auto flex shrink-0 items-center gap-0.5">
+        {favoriteButton}
+        {detailButton}
+      </span>
+    ) : null
 
   return (
     <div
@@ -212,10 +252,10 @@ export function ItemTooltipContent({
             {name ?? item.name}
           </span>
           {showStack ? <span className="font-pixel text-sm font-bold text-zinc-300">x{stack}</span> : null}
-          {favoriteButton}
+          {tipActions}
         </div>
       )}
-      {hideHeader && favoriteButton && <div className="mb-1 flex items-center">{favoriteButton}</div>}
+      {hideHeader && tipActions && <div className="mb-1 flex items-center">{tipActions}</div>}
       {(lines.length > 0 || deltaLines.length > 0) && (
         <div
           className={cn(
@@ -236,24 +276,13 @@ export function ItemTooltipContent({
       {showBaseNote && (
         <p className="mt-1 text-xs text-zinc-400/90">{t('tooltip.baseStatsNote')}</p>
       )}
-      <IdKeyFooter item={item} className="text-zinc-400/90" showLink={!hideRecipeLink} />
+      <IdKeyFooter item={item} className="text-zinc-400/90" />
     </div>
   )
 }
 
-/** 所有物品提示的左下角都显示「ID · key」，后面跟一个「合成表」入口（有 Provider 时）。 */
-function IdKeyFooter({
-  item,
-  className,
-  showLink = true,
-}: {
-  item: Item
-  className?: string
-  /** 为 false 时不渲染「合成表」入口（详情抽屉里那份 tips 指向自己）。 */
-  showLink?: boolean
-}) {
-  const { t } = useI18n()
-  const detail = useItemDetail()
+/** 所有物品提示的左下角都显示「ID · key」（打开详情的入口在右上角 ⓘ）。 */
+function IdKeyFooter({ item, className }: { item: Item; className?: string }) {
   return (
     <p
       className={cn(
@@ -264,22 +293,6 @@ function IdKeyFooter({
       <span className="break-all">
         {item.id} · {item.key}
       </span>
-      {detail && showLink && (
-        <button
-          type="button"
-          onClick={(e) => {
-            // 提示可能挂在可点击的格子上：别把点击冒泡成「选中格子」。
-            e.stopPropagation()
-            detail.open(item.id)
-          }}
-          aria-label={t('tooltip.recipes')}
-          title={t('tooltip.recipes')}
-          className="inline-flex cursor-pointer items-center gap-0.5 rounded underline decoration-dotted underline-offset-2 transition-colors hover:no-underline focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
-        >
-          <Hammer className="size-3" aria-hidden />
-          {t('tooltip.recipes')}
-        </button>
-      )}
     </p>
   )
 }

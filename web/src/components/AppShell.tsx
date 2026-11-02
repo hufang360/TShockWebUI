@@ -1,9 +1,9 @@
 import { PanelLeftClose, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
+import { IconAction } from '@/components/IconAction'
 import { TopBarInfoSlot, TopBarProvider, TopBarSlot } from '@/components/TopBar'
 import {
   Breadcrumb,
-  Button,
   BreadcrumbItem,
   BreadcrumbList,
   BreadcrumbPage,
@@ -173,16 +173,12 @@ export function AppShell({
                 <h1 className="min-w-0 truncate text-sm font-semibold">{t('app.title')}</h1>
                 <div className="flex shrink-0 items-center gap-1">
                   {headerExtra}
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
+                  <IconAction
+                    label={t('nav.hideSidebar')}
+                    icon={PanelLeftClose}
                     className="max-md:hidden"
                     onClick={onToggleSidebar}
-                    aria-label={t('nav.hideSidebar')}
-                    title={t('nav.hideSidebar')}
-                  >
-                    <PanelLeftClose />
-                  </Button>
+                  />
                 </div>
               </div>
             </SidebarHeader>

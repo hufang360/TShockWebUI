@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { ItemIcon } from '@/components/ItemIcon'
-import { closeItemTooltip } from '@/components/ItemTooltip'
+import { closeItemTooltip } from '@/lib/itemTooltipBus'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { Atlas, Item } from '@/types'
@@ -60,7 +60,7 @@ export const DexCell = memo(function DexCell({
       style={{ width, height }}
     >
       <span data-testid="dex-icon-surface" className={ICON_SURFACE_CLASS}>
-        <ItemIcon item={item} atlas={atlas} size={ICON_SIZE} hideRecipeLink />
+        <ItemIcon item={item} atlas={atlas} size={ICON_SIZE} hideDetailLink />
       </span>
       {!hideMeta && (
         <span className="font-pixel text-2xs leading-none text-muted-foreground">{item.id}</span>

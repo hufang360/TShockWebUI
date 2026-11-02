@@ -10,20 +10,21 @@
  * 这里只保存与展示/编排有关的元数据。
  */
 
-// 默认顺序即「服务器状态 → 服务器动态 → 快捷入口 → 在线玩家 → …」。
+// 默认顺序 = 屏幕上的默认观感（v4 起顺序就是渲染顺序，右栏卡片按宽度分栏后排在右列）：
+// 右栏（服务器状态 → 服务器动态 → 快捷入口 → 最近执行）之后是左栏的两列卡，最后是整行卡。
 // 快捷入口默认隐藏：它与侧栏导航重复，仍可在「管理卡片」中重新显示。
 export const BUILTIN_CARD_IDS = [
   'server',
   'events',
   'quick',
-  'online',
-  'bossinfo',
+  'recent',
   'world',
   'lookbag',
+  'online',
   'time',
-  'bossdamage',
   'alldeath',
-  'recent',
+  'bossdamage',
+  'bossinfo',
 ] as const
 
 export type BuiltinCardId = (typeof BUILTIN_CARD_IDS)[number]
@@ -65,6 +66,25 @@ export function isBuiltinCardId(id: string): id is BuiltinCardId {
   return Object.prototype.hasOwnProperty.call(BUILTIN_CARD_META, id)
 }
 
+import { isCardWidth, type CardWidth } from './cardLayout'
+
+// 宽度档位（小 / 大 / 右）与模块页共用一份定义，见 `lib/cardLayout.ts`。
+export type { CardWidth } from './cardLayout'
+export { CARD_WIDTHS, isCardWidth } from './cardLayout'
+
+/** 概览卡默认在右栏。 */
+const RIGHT_RAIL_DEFAULT_IDS = new Set<string>(['server', 'events', 'quick', 'recent'])
+/** 指令卡里默认占整行的（Boss 进度内容宽，半栏挤）。 */
+const FULL_WIDTH_DEFAULT_IDS = new Set<string>(['bossinfo'])
+
+/** 卡片的默认宽度（用户没改过时用它，等价于 v3 的硬编码分栏）。 */
+export function defaultCardWidth(id: string): CardWidth {
+  if (RIGHT_RAIL_DEFAULT_IDS.has(id)) return 'right'
+  if (FULL_WIDTH_DEFAULT_IDS.has(id)) return 'full'
+  // 内置指令卡默认「小」（两列并排）；用户自己添加的卡片也默认「小」。
+  return 'half'
+}
+
 /** 自定义卡片 id 前缀，避免与内置 id 冲突。 */
 const CUSTOM_PREFIX = 'c:'
 
@@ -85,7 +105,7 @@ export interface CustomHomeCard {
  * 老的本机布局（`tswui:homeCards` 无 `layoutVersion` 或版本更旧）会自动升级，
  * 只把「服务器动态」「快捷入口」挪到第 2 / 第 3 位，其余卡片与隐藏态、自定义卡片都保留。
  */
-export const HOME_CARDS_LAYOUT_VERSION = 3
+export const HOME_CARDS_LAYOUT_VERSION = 4
 
 /** 「服务器动态」「快捷入口」的默认落位（0 基索引，见 docs/功能-服务器动态.md）。 */
 const PINNED_CARD_POSITIONS: { id: BuiltinCardId; index: number }[] = [
@@ -93,11 +113,32 @@ const PINNED_CARD_POSITIONS: { id: BuiltinCardId; index: number }[] = [
   { id: 'quick', index: 2 },
 ]
 
+/**
+ * v3 及以前的本机默认顺序（这些版本里左栏顺序由代码写死，用户拖拽只影响自定义卡片位置）。
+ * v4 迁移时拿它判断「顺序是不是原封未动」：原封未动 → 换成 v4 的视觉默认；
+ * 用户自己排过 → 保留他的顺序（v4 起拖拽才真正生效，别把他的排版弄乱）。
+ */
+const LEGACY_DEFAULT_ORDER: string[] = [
+  'server',
+  'events',
+  'quick',
+  'online',
+  'bossinfo',
+  'world',
+  'lookbag',
+  'time',
+  'bossdamage',
+  'alldeath',
+  'recent',
+]
+
 export interface HomeCardsPrefs {
-  /** 全部卡片 id 的展示顺序（内置 + 自定义）。 */
+  /** 全部卡片 id 的展示顺序（内置 + 自定义）；v4 起它就是渲染顺序，也是指令执行顺序。 */
   order: string[]
   /** id -> 是否隐藏。 */
   hidden: Record<string, boolean>
+  /** id -> 宽度（缺省走 `defaultCardWidth`）。 */
+  width: Record<string, CardWidth>
   /** 用户自定义卡片。 */
   custom: CustomHomeCard[]
   /** 本机布局对应的内置默认版本，用于一次性升级默认顺序。 */
@@ -107,8 +148,49 @@ export interface HomeCardsPrefs {
 export const DEFAULT_HOME_CARDS: HomeCardsPrefs = {
   order: [...BUILTIN_CARD_IDS],
   hidden: { quick: true },
+  width: {},
   custom: [],
   layoutVersion: HOME_CARDS_LAYOUT_VERSION,
+}
+
+/**
+ * 本机存储形态（v5 起）：**按服务器分开**存首页布局。
+ *
+ * `{ byServer: { [serverId]: HomeCardsPrefs } }` —— 不同服务器的指令卡片本来就不一样，
+ * 自定义卡片 / 顺序 / 隐藏 / 宽度各记各的。
+ */
+export interface HomeCardsStore {
+  byServer: Record<string, HomeCardsPrefs>
+}
+
+export const DEFAULT_HOME_CARDS_STORE: HomeCardsStore = { byServer: {} }
+
+/**
+ * 兼容旧数据：v4 及以前整个对象就是一份 `HomeCardsPrefs`（没有 `byServer`）。
+ * 迁移策略：老数据当作「所有服务器的初始值」——第一次在某台服务器上打开时以它为底。
+ */
+export function readHomeCardsStore(value: unknown): {
+  store: HomeCardsStore
+  legacy: HomeCardsPrefs | null
+} {
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  const byServerRaw = raw.byServer
+  if (byServerRaw && typeof byServerRaw === 'object') {
+    const byServer: Record<string, HomeCardsPrefs> = {}
+    for (const [serverId, prefs] of Object.entries(byServerRaw as Record<string, unknown>)) {
+      byServer[serverId] = sanitizeHomeCards(prefs)
+    }
+    return { store: { byServer }, legacy: null }
+  }
+  // 老形态：顶层就是一份布局。
+  const legacy = sanitizeHomeCards(value)
+  const looksLegacy = Array.isArray(raw.order) || Array.isArray(raw.custom)
+  return { store: { byServer: {} }, legacy: looksLegacy ? legacy : null }
+}
+
+/** 卡片当前宽度（用户设置优先，其次默认）。 */
+export function cardWidth(prefs: HomeCardsPrefs, id: string): CardWidth {
+  return prefs.width[id] ?? defaultCardWidth(id)
 }
 
 /** 取指令的第一条非空行、去首尾空白；缺前导 / 时补上。返回 '' 表示空。 */
@@ -184,12 +266,22 @@ export function sanitizeHomeCards(value: unknown): HomeCardsPrefs {
     }
   }
 
+  const width: Record<string, CardWidth> = {}
+  const rawWidth = (raw as { width?: unknown }).width
+  if (rawWidth && typeof rawWidth === 'object') {
+    for (const [key, val] of Object.entries(rawWidth as Record<string, unknown>)) {
+      if (valid.has(key) && isCardWidth(val)) {
+        width[key] = val
+      }
+    }
+  }
+
   const layoutVersion =
     typeof raw.layoutVersion === 'number' && Number.isFinite(raw.layoutVersion)
       ? raw.layoutVersion
       : 0
 
-  return { order, hidden, custom, layoutVersion }
+  return { order, hidden, width, custom, layoutVersion }
 }
 
 /**
@@ -199,16 +291,28 @@ export function sanitizeHomeCards(value: unknown): HomeCardsPrefs {
  */
 export function upgradeHomeCardsLayout(prefs: HomeCardsPrefs): HomeCardsPrefs {
   if (prefs.layoutVersion >= HOME_CARDS_LAYOUT_VERSION) return prefs
+
+  // 先补上 v3 的「服务器动态第 2 / 快捷入口第 3」。
   const pinned = new Set<string>(PINNED_CARD_POSITIONS.map((p) => p.id))
-  const order = prefs.order.filter((id) => !pinned.has(id))
+  let order = prefs.order.filter((id) => !pinned.has(id))
   for (const { id, index } of PINNED_CARD_POSITIONS) {
     order.splice(Math.min(index, order.length), 0, id)
   }
+
+  // v4：左栏顺序不再写死，改由 order + 每张卡的宽度决定。
+  // 顺序若仍是老默认（用户没自己排过），换成 v4 的视觉默认；排过则原样保留。
+  const customs = order.filter((id) => !isBuiltinCardId(id))
+  const builtins = order.filter((id) => isBuiltinCardId(id))
+  if (builtins.join() === LEGACY_DEFAULT_ORDER.join()) {
+    order = [...BUILTIN_CARD_IDS, ...customs]
+  }
+
   // v3：快捷入口与侧栏重复，升级时默认隐藏；用户仍可在卡片管理中重新打开。
   return {
     ...prefs,
     order,
     hidden: { ...prefs.hidden, quick: true },
+    width: prefs.width ?? {},
     layoutVersion: HOME_CARDS_LAYOUT_VERSION,
   }
 }

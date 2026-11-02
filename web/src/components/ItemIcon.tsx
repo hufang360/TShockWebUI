@@ -30,8 +30,8 @@ interface ItemIconProps {
   maxStackSize?: number
   /** 悬停时显示富提示（图标 + 词缀 + 名称 + 数量）。默认开启；提示内部的图标会关闭以避免递归。 */
   tooltip?: boolean
-  /** 隐藏提示底部的「合成表」入口（点击图标本身就能打开详情时用）。 */
-  hideRecipeLink?: boolean
+  /** 隐藏提示右上角的「物品详情」入口（点击图标本身就能打开详情时用）。 */
+  hideDetailLink?: boolean
 }
 
 /**
@@ -55,7 +55,7 @@ export function ItemIcon({
   stack,
   maxStackSize,
   tooltip = true,
-  hideRecipeLink,
+  hideDetailLink,
 }: ItemIconProps) {
   const { t } = useI18n()
   const stat = useItemStat(item?.id)
@@ -140,7 +140,7 @@ export function ItemIcon({
     prefix,
     stack,
     name,
-    hideRecipeLink,
+    hideDetailLink,
     disabled: !canTip,
   })
 

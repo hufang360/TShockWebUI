@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { ExternalLink, Terminal, Trash2, X } from 'lucide-react'
+import { ExternalLink, Terminal, X } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import { CommandEditor } from '@/components/CommandEditor'
-import { ConfirmButton } from '@/components/ConfirmButton'
 import { LoginGate } from '@/components/LoginGate'
 import { ResultPanel } from '@/components/ResultPanel'
 import {
-  Button,
-  Separator,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -89,7 +87,7 @@ export function CommandTerminal({
 
   // 草稿 / 结果 / 历史与指令页的关系见组件注释。
   const [text, setText] = useLocalState(StorageKeys.terminalDraft, '')
-  const { results, append, remove, toggleCollapse, clear } = useCommandResultsList(serverId)
+  const { results, append, remove, toggleCollapse } = useCommandResultsList(serverId)
   const { history, push: pushHistory } = useCommandHistory()
   const { running, run } = useCommandRunner({
     dataset,
@@ -269,46 +267,22 @@ export function CommandTerminal({
       <div className="flex shrink-0 items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <ConfirmButton
-                size="icon-sm"
-                onConfirm={clear}
-                disabled={results.length === 0}
-                confirmLabel={t('action.clearConfirm')}
-                icon={<Trash2 data-icon="inline-start" />}
-                aria-label={t('result.clear')}
-                title={t('result.clear')}
-              />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{t('result.clear')}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon-sm"
-              variant="ghost"
+            <IconAction
+              label={t('terminal.openInCommand')}
+              icon={ExternalLink}
               onClick={openInCommandPage}
-              aria-label={t('terminal.openInCommand')}
-              title={t('terminal.openInCommand')}
-            >
-              <ExternalLink />
-            </Button>
+            />
           </TooltipTrigger>
           <TooltipContent>{t('terminal.openInCommand')}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              size="icon-sm"
-              variant="ghost"
+            <IconAction
+              label={t('terminal.close')}
+              icon={X}
               className="max-md:hidden"
               onClick={close}
-              aria-label={t('terminal.close')}
-              title={t('terminal.close')}
-            >
-              <X />
-            </Button>
+            />
           </TooltipTrigger>
           <TooltipContent>{t('terminal.close')}</TooltipContent>
         </Tooltip>
@@ -344,7 +318,6 @@ export function CommandTerminal({
           }}
         />
       </div>
-      <Separator />
       <div className="shrink-0 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {authenticated ? (
           <CommandEditor

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { ArrowDown, ArrowUp, Download, ImageUp, Trash2, Upload } from 'lucide-react'
+import { IconAction } from '@/components/IconAction'
 import {
   Alert,
   AlertDescription,
@@ -307,38 +308,24 @@ export function MergeWorkspace() {
                 <span className="shrink-0 text-2xs text-muted-foreground tabular-nums">
                   {image.sheet.width}×{image.sheet.height}
                 </span>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="size-7"
-                  aria-label={t('merge.up')}
-                  title={t('merge.up')}
+                <IconAction
+                  label={t('merge.up')}
+                  icon={ArrowUp}
                   disabled={index === 0}
                   onClick={() => move(index, -1)}
-                >
-                  <ArrowUp />
-                </Button>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="size-7"
-                  aria-label={t('merge.down')}
-                  title={t('merge.down')}
+                />
+                <IconAction
+                  label={t('merge.down')}
+                  icon={ArrowDown}
                   disabled={index === images.length - 1}
                   onClick={() => move(index, 1)}
-                >
-                  <ArrowDown />
-                </Button>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  className="size-7 text-destructive"
-                  aria-label={t('merge.remove')}
-                  title={t('merge.remove')}
+                />
+                <IconAction
+                  label={t('merge.remove')}
+                  icon={Trash2}
+                  className="text-destructive hover:text-destructive"
                   onClick={() => removeAt(index)}
-                >
-                  <Trash2 />
-                </Button>
+                />
               </div>
             ))}
           </CardBody>

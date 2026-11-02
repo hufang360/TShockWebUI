@@ -1,5 +1,12 @@
 import { useState, type ReactNode } from 'react'
-import { Button, type ButtonProps } from '@/components/ui'
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  type ButtonProps,
+} from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 
@@ -51,7 +58,7 @@ export function ConfirmButton({
   const confirmSize = size === 'icon' || size === 'icon-sm' ? 'sm' : size
 
   if (!confirming) {
-    return (
+    const button = (
       <Button
         size={size}
         variant={variant}
@@ -64,6 +71,19 @@ export function ConfirmButton({
         {icon}
         {children}
       </Button>
+    )
+    // 纯图标按钮（如结果区右下角的垃圾桶）：用 shadcn Tooltip 显示 `title` 文案 ——
+    // 原生 `title` 在触屏 / 快速划过时几乎不出现，和 `IconAction` 的手感也不一致。
+    // 有文字内容的按钮不加（文字已经说明了用途）。
+    const tip = title ?? ariaLabel
+    if (children || !tip) return button
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
+          <TooltipContent>{tip}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
 

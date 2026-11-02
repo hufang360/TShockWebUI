@@ -1,30 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   AlertTriangle,
-  Download,
   Droplets,
   Fish,
+  Maximize2,
+  Minimize2,
   RefreshCw,
   Search,
   Settings2,
   ShieldAlert,
   ShoppingCart,
 } from 'lucide-react'
-import { InfoPopover } from '@/components/InfoPopover'
+import { IconAction } from '@/components/IconAction'
+import { PageHelp } from '@/components/PageHelp'
+import { PluginHelp } from '@/components/PluginHelp'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
 import { SearchInput } from '@/components/SearchInput'
 import { Notice } from '@/components/Notice'
 import { CommandOutput } from '@/components/ResultPanel'
 import { FishCommandCards } from '@/components/FishCommandCards'
-import { TopBarActions } from '@/components/TopBar'
-import { CELL_ICON_SIZE, GOOD_GRID, GoodCell, GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
+import {
+  CELL_ICON_SIZE,
+  DEFAULT_GOOD_ICON_SIZE,
+  GOOD_GRID_CLASS,
+  GOOD_SIZES,
+  GoodThumb,
+  goodPrefixName,
+  type GoodIconSize,
+} from '@/components/fishshop/GoodCells'
+import { GoodDiagram } from '@/components/fishshop/GoodDiagram'
+import { GoodGrid } from '@/components/fishshop/GoodGrid'
 import { GoodsTable } from '@/components/fishshop/GoodsTable'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
-import { parseRichText } from '@/lib/richtext'
 import { cn } from '@/lib/cn'
 import { splitFishArgs } from '@/lib/fishArgs'
+import { diagramUrl } from '@/lib/fishDiagram'
 import { isDegradedGood } from '@/lib/fishGood'
+import { PLUGIN_LINKS } from '@/lib/pluginLinks'
 import {
   Alert,
   AlertDescription,
@@ -41,7 +54,6 @@ import {
   FieldGroup,
   FieldLabel,
   Input,
-  Kbd,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -51,6 +63,8 @@ import {
   SheetTitle,
   Skeleton,
   Spinner,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '@/components/ui'
 import { useModuleState } from '@/hooks/useModuleState'
 import { useDataset } from '@/lib/datasetContext'
@@ -88,6 +102,8 @@ interface FishUiState extends Record<string, unknown> {
   query: string
   /** 「页面设置 → 隐藏编号和名称」：只显示图标（与物品 ID 的同一开关同义）。 */
   hideMeta?: boolean
+  /** 「页面设置 → 图标大小」：小 / 中 / 大（32 / 48 / 64）。 */
+  iconSize?: GoodIconSize
   /** 「页面设置 → 表格视图」。 */
   tableView?: boolean
   /** 最近购买的 5 件商品（去重、最新在前）：本机记忆，买完还能一键找回。 */
@@ -95,6 +111,11 @@ interface FishUiState extends Record<string, unknown> {
 }
 
 const DEFAULT_STATE: FishUiState = { query: '' }
+
+/** 本机存的「图标大小」可能是旧版本写坏的值：认不出来就回到默认的「大」。 */
+function resolveIconSize(value: unknown): GoodIconSize {
+  return value === 'sm' || value === 'md' || value === 'lg' ? value : DEFAULT_GOOD_ICON_SIZE
+}
 
 /** 「最近购买」最多记几件。 */
 const RECENT_BUYS_MAX = 5
@@ -135,6 +156,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   // `selected`（同一 serial 的最新货架数据）——这样刷新货架后「我的进度」「能不能买」
   // 会自动跟着变，而货架暂时为空（加载失败）时仍能显示上一次的快照。
   const [selectedSnapshot, setSelected] = useState<FishGood | null>(null)
+  // 右列（指令卡片 / 记事本）是否还有内容：全隐藏时左栏铺满整行。
+  const [cardsVisible, setCardsVisible] = useState(true)
   const selected = useMemo(() => {
     if (!selectedSnapshot) return null
     return shop?.goods.find((g) => g.serial === selectedSnapshot.serial) ?? selectedSnapshot
@@ -310,6 +333,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const blocked = selected?.canBuy === false
   // 降级条目：商品自身配置有误时插件只回基础字段（其余为空），点进去也买不了。
   const degraded = isDegradedGood(selected)
+  // 建造类商品（鱼池 / 小房间 / 钓棚）多一张注解图：站哪个位置、上下几格、左右误差多少。
+  const diagram = diagramUrl(selected)
   const personalNotes: string[] = []
   if (hasSelfState) {
     if ((selected?.myRemain ?? -1) >= 0) {
@@ -437,58 +462,38 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
   const hideMeta = ui.hideMeta === true
   const tableView = ui.tableView === true
+  const iconSize = resolveIconSize(ui.iconSize)
+  const sizeSpec = GOOD_SIZES[iconSize]
+  // 小尺寸本来就只有图标：中 / 大的「隐藏编号和名称」在它上面没有意义，不显示这个开关。
+  const metaToggleVisible = sizeSpec.showMeta
+  const showMeta = sizeSpec.showMeta && !hideMeta
+  // 货架线：表格视图没有格子；小尺寸格子排得密又没两行字，这两种情况都不画。
+  const shelfLines = !tableView && iconSize !== 'sm'
   const recentBuys = useMemo(() => sanitizeRecentBuys(ui.recentBuys), [ui.recentBuys])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // 「货架全屏」：只留货架区铺满整屏（与「物品 ID」的全屏同一套做法）。
+  const [shelfFullscreen, setShelfFullscreen] = useState(false)
 
-  /** 导出当前筛选结果（CSV）：`[i:..]` 这类富文本标签还原成 `#ID`，Excel 打开不乱。 */
-  const exportGoods = useCallback(() => {
-    const plain = (text: string | undefined) =>
-      parseRichText(text ?? '')
-        .map((token) =>
-          token.kind === 'item'
-            ? `#${token.itemId}${token.stack && token.stack > 1 ? `x${token.stack}` : ''}`
-            : token.text,
-        )
-        .join('')
-    const escape = (value: string) => `"${value.replaceAll('"', '""')}"`
-    const csv = [
-      ['Serial', 'Name', 'Cost', 'Tags', 'Comment', 'Description'],
-      ...goods.map((good) => [
-        String(good.serial),
-        good.name,
-        plain(good.cost),
-        good.map.join(' / '),
-        plain(good.comment),
-        plain(good.desc),
-      ]),
-    ]
-      .map((row) => row.map(escape).join(','))
-      .join('\r\n')
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'tswui-fish.csv'
-    anchor.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
-  }, [goods])
+  // 全屏时 Esc 退出，并禁止背景页面继续滚（与「物品 ID」一致）。
+  useEffect(() => {
+    if (!shelfFullscreen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShelfFullscreen(false)
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [shelfFullscreen])
 
-  /** 页面设置（与物品 ID 同规）：隐藏编号和名称 / 表格视图 / 导出表格。 */
+  /** 页面设置（与物品 ID 同规）：图标大小 / 隐藏编号和名称 / 表格视图。 */
   const fishSettingsControl = (
     <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('fish.settings')}
-          title={t('fish.settings')}
-          className={cn(
-            'text-muted-foreground hover:bg-accent hover:text-foreground',
-            settingsOpen && 'bg-accent text-foreground',
-          )}
-        >
-          <Settings2 />
-        </Button>
+        <IconAction label={t('fish.settings')} icon={Settings2} active={settingsOpen} />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] p-0" data-testid="fish-settings-popover">
         <div className="border-b px-4 py-3 text-sm font-semibold text-foreground">
@@ -498,17 +503,43 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           <div className="px-2 py-1 text-2xs font-medium text-muted-foreground">
             {t('dex.viewSection')}
           </div>
-          <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
-            <Checkbox
-              id="fish-hide-meta"
-              checked={hideMeta}
-              onCheckedChange={(value) => setUi({ hideMeta: value === true })}
-              className="mt-0.5"
-            />
-            <FieldLabel htmlFor="fish-hide-meta" className="cursor-pointer font-medium text-foreground">
-              {t('fish.hideMeta')}
-            </FieldLabel>
-          </Field>
+          <div className="flex flex-col gap-1.5 px-2 py-2">
+            <span className="text-xs font-medium text-foreground">{t('fish.iconSize')}</span>
+            <ToggleGroup
+              type="single"
+              size="sm"
+              value={iconSize}
+              onValueChange={(value) => {
+                // 再点一下已选中的档位会传空字符串：保持原档，不要退回默认。
+                if (value) setUi({ iconSize: value as GoodIconSize })
+              }}
+              aria-label={t('fish.iconSize')}
+              className="w-full"
+            >
+              <ToggleGroupItem value="sm" title="32×32" data-testid="fish-icon-size-sm">
+                {t('fish.iconSize.sm')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="md" title="48×48" data-testid="fish-icon-size-md">
+                {t('fish.iconSize.md')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="lg" title="64×64" data-testid="fish-icon-size-lg">
+                {t('fish.iconSize.lg')}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          {metaToggleVisible && (
+            <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
+              <Checkbox
+                id="fish-hide-meta"
+                checked={hideMeta}
+                onCheckedChange={(value) => setUi({ hideMeta: value === true })}
+                className="mt-0.5"
+              />
+              <FieldLabel htmlFor="fish-hide-meta" className="cursor-pointer font-medium text-foreground">
+                {t('fish.hideMeta')}
+              </FieldLabel>
+            </Field>
+          )}
           <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
             <Checkbox
               id="fish-table-view"
@@ -520,19 +551,18 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               {t('fish.tableView')}
             </FieldLabel>
           </Field>
-          <Button
-            size="sm"
-            variant="outline"
-            className="mx-2 mt-1 w-[calc(100%-1rem)]"
-            onClick={exportGoods}
-            disabled={goods.length === 0}
-          >
-            <Download />
-            {t('fish.exportTable')}
-          </Button>
         </FieldGroup>
       </PopoverContent>
     </Popover>
+  )
+
+  const fullscreenToggle = (
+    <IconAction
+      label={shelfFullscreen ? t('dex.exitFullscreen') : t('fish.enterFullscreen')}
+      icon={shelfFullscreen ? Minimize2 : Maximize2}
+      pressed={shelfFullscreen}
+      onClick={() => setShelfFullscreen((value) => !value)}
+    />
   )
 
   /** 「重新检测」：刚装好 / 刚重启插件时 REST 端点会晚几秒才注册，点了不用切页面。 */
@@ -550,13 +580,11 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   )
 
   const pageActions = (
-    <TopBarActions
-      info={
-        <InfoPopover label={t('home.pageInfo')} title={t('page.store.title')}>
-          {t('page.store.desc')}
-        </InfoPopover>
-      }
-    />
+    <PageHelp scopeId="store" className="col-span-full" forceOpen={!cardsVisible}>
+      <PluginHelp plugin={t('plugin.store.name')} en="FishShop" href={PLUGIN_LINKS.fishShop}>
+        {t('page.store.desc')}
+      </PluginHelp>
+    </PageHelp>
   )
 
   if (!authenticated) {
@@ -583,13 +611,25 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
         ref={rootRef}
         // 整页滚动（与指令 / 物品 ID / 数据 ID 一致）：左货架 / 右指令卡片都跟着页面走，
         // 滚动条是浏览器右侧那条；搜索工具条吸在顶栏下面（`sticky top-12`）。
-        className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_360px]"
-        style={{ '--page-sticky-top': `${stickyTop}px` } as CSSProperties}
+        className={cn(
+          'grid gap-2',
+          // 右列没内容（卡片与记事本都隐藏）时收成一栏，左边货架铺满。
+          cardsVisible && !shelfFullscreen && 'xl:grid-cols-[minmax(0,1fr)_360px]',
+        )}
+        style={
+          { '--page-sticky-top': `${shelfFullscreen ? 0 : stickyTop}px` } as CSSProperties
+        }
       >
         {pageActions}
 
-        {/* 左：货架（REST API 不可用时只影响左侧，右侧指令卡片仍可用） */}
-        <div className="flex min-w-0 flex-col gap-2 xl:min-h-0">
+        {/* 左：货架（REST API 不可用时只影响左侧，右侧指令卡片仍可用）。
+            全屏时这一栏自己变成滚动区（`fixed inset-0`），右栏收起。 */}
+        <div
+          className={cn(
+            'flex min-w-0 flex-col gap-2 xl:min-h-0',
+            shelfFullscreen && 'fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-4',
+          )}
+        >
       {checking && (
         <Card>
           <CardBody className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
@@ -629,7 +669,11 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               货架（页面）往上滚时它留在顶栏下面，不用滚回顶部找搜索框。 */}
           <div
             ref={toolbarRef}
-            className="sticky top-12 z-20 flex flex-col gap-2 bg-background py-1.5"
+            className={cn(
+              'sticky z-20 flex flex-col gap-2 bg-background py-1.5',
+              // 全屏时没有顶栏，工具条直接贴顶。
+              shelfFullscreen ? 'top-0' : 'top-12',
+            )}
           >
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <div className="w-full max-w-sm min-w-0">
@@ -665,7 +709,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   ))}
                 </div>
               )}
-              <div className="ml-auto flex shrink-0 items-center gap-1">{fishSettingsControl}</div>
+              <div className="ml-auto flex shrink-0 items-center gap-1">
+                {fishSettingsControl}
+                {fullscreenToggle}
+              </div>
             </div>
             {error && !selected && (
               <Alert variant="destructive">
@@ -674,53 +721,73 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             )}
           </div>
 
-          {loading && !shop ? (
-            <div className={GOOD_GRID} role="status" aria-busy="true" aria-label={t('fish.loading')}>
-              {Array.from({ length: 12 }, (_, i) => (
-                <div key={i} className="grid place-items-center gap-1">
-                  <Skeleton className="size-18 rounded-control" />
-                  {!hideMeta && <Skeleton className="h-2.5 w-8" />}
-                  {!hideMeta && <Skeleton className="h-3 w-12" />}
-                </div>
-              ))}
-            </div>
-          ) : goods.length === 0 ? (
-            // 拉货架失败（如「商店打烊」）时错误已在工具条提示，这里不再说「没有匹配的商品」（会让人以为搜错了）。
-            error ? null : (
-              <Empty className="min-h-40 border border-dashed">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Fish />
-                  </EmptyMedia>
-                  <EmptyTitle>{t('fish.empty')}</EmptyTitle>
-                  <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )
-          ) : tableView ? (
-            <GoodsTable rows={goods} dataset={dataset} onSelect={openDetail} />
-          ) : (
-            <div className={GOOD_GRID}>
-              {goods.map((good) => (
-                <GoodCell
-                  key={good.serial}
-                  good={good}
-                  dataset={dataset}
-                  hideMeta={hideMeta}
-                  onSelect={openDetail}
-                />
-              ))}
-            </div>
-          )}
+          {/* 货架区留一圈内边距（`p-2`）：最后一行的板线 / 板下投影不会被容器下沿切掉。 */}
+          <div className="p-2">
+            {loading && !shop ? (
+              <div
+                className={GOOD_GRID_CLASS[iconSize]}
+                role="status"
+                aria-busy="true"
+                aria-label={t('fish.loading')}
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <div key={i} className="grid place-items-center gap-1">
+                    <Skeleton
+                      className="rounded-control"
+                      style={{ width: sizeSpec.surface, height: sizeSpec.surface }}
+                    />
+                    {showMeta && <Skeleton className="h-2.5 w-8" />}
+                    {showMeta && <Skeleton className="h-3 w-12" />}
+                  </div>
+                ))}
+              </div>
+            ) : goods.length === 0 ? (
+              // 拉货架失败（如「商店打烊」）时错误已在工具条提示，这里不再说「没有匹配的商品」（会让人以为搜错了）。
+              error ? null : (
+                <Empty className="min-h-40 border border-dashed">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Fish />
+                    </EmptyMedia>
+                    <EmptyTitle>{t('fish.empty')}</EmptyTitle>
+                    <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )
+            ) : tableView ? (
+              <GoodsTable rows={goods} dataset={dataset} onSelect={openDetail} />
+            ) : (
+              <GoodGrid
+                goods={goods}
+                dataset={dataset}
+                size={iconSize}
+                hideMeta={hideMeta}
+                onSelect={openDetail}
+                shelf={shelfLines}
+              />
+            )}
+          </div>
         </>
       )}
         </div>
 
         {/* 右列：指令卡片（只依赖 rawcmd，不依赖鱼店 REST API）。
             整页滚动只滚**左侧货架**：右列 `xl:sticky` 钉在顶栏下面，内容比一屏高时自己内部滚，
-            这样往下翻商品时右侧的「钓鱼信息」不会跟着一起滚走。 */}
-        <div className="min-w-0 xl:sticky xl:top-12 xl:flex xl:h-[calc(100dvh-4rem)] xl:flex-col xl:self-start">
+            这样往下翻商品时右侧的「钓鱼信息」不会跟着一起滚走。
+            卡片与记事本全隐藏时不渲染这一栏（只剩隐藏的容器，管理卡片从顶栏图标进）。 */}
+        <div
+          data-testid="fish-side"
+          className={cn(
+            'min-w-0',
+            shelfFullscreen && 'hidden',
+            cardsVisible &&
+              !shelfFullscreen &&
+              'xl:sticky xl:top-12 xl:flex xl:h-[calc(100dvh-4rem)] xl:flex-col xl:self-start',
+            !cardsVisible && 'hidden',
+          )}
+        >
           <FishCommandCards
+            onContentChange={setCardsVisible}
             dataset={dataset}
             transport={transport}
             authenticated={authenticated}
@@ -748,9 +815,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           {selected && (
             <>
               <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
-                <SheetTitle>{t('fish.detail')}</SheetTitle>
-                <div className="mt-2 flex flex-col items-center gap-2">
-                  <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} />
+                {/* 标题只留给读屏：弹框顶部已经是大图标 + 名称，再写一行「商品详情」是多余的。 */}
+                <SheetTitle className="sr-only">{t('fish.detail')}</SheetTitle>
+                <div className="flex flex-col items-center gap-2">
+                  <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} tooltip={false} />
                   <p className="text-center text-base font-semibold text-foreground">
                     #{selected.serial}{' '}
                     {goodPrefixName(selected, dataset) ? (
@@ -886,6 +954,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                     </AlertDescription>
                   </Alert>
                 )}
+
+                {/* 建筑预览固定在最下面（在「已售完 / 已购买」这些状态提示之后）：
+                    它是「怎么做」的参考图，不是要先看的价格信息。居左 / 可折叠 / 点图放大。 */}
+                {diagram && <GoodDiagram src={diagram} name={selected.name} />}
               </div>
 
               {/* 底部操作区 */}
@@ -911,10 +983,13 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   </>
                 ) : (
                   <>
-                    {/* 快捷关闭（弹框右上角也有 X） */}
-                    <Button variant="outline" className="h-8 bg-card" onClick={closeDetail}>
+                    {/* 快捷关闭（弹框右上角也有 X）：轻量文字按钮，不抢「购买」的位置 */}
+                    <Button
+                      variant="ghost"
+                      className="h-8 text-muted-foreground hover:text-foreground"
+                      onClick={closeDetail}
+                    >
                       {t('action.close')}
-                      <Kbd>Esc</Kbd>
                     </Button>
                     <Button
                       ref={buyRef}

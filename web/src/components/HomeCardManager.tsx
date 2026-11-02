@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { CardManagerSheet, type ManagerCard } from '@/components/CardManagerSheet'
 import { ConfirmButton } from '@/components/ConfirmButton'
@@ -10,9 +10,11 @@ import { StorageKeys } from '@/lib/storage'
 import {
   BUILTIN_CARD_META,
   DEFAULT_HOME_CARDS,
+  cardWidth,
   createCustomCard,
   isBuiltinCardId,
   isCustomCardId,
+  type CardWidth,
   type HomeCardsPrefs,
 } from '@/lib/homeCards'
 import type { FavoriteEntry } from '@/types'
@@ -26,6 +28,8 @@ interface HomeCardManagerProps {
   pluginMissing?: (id: string) => boolean
   /** 该卡片是否为「手动执行」（不随自动/刷新全部执行）。 */
   isManual?: (id: string) => boolean
+  /** 卡片图标（与页面上那张卡一致）。 */
+  cardIcon?: (id: string) => ReactNode
   onToggleManual?: (id: string, manual: boolean) => void
 }
 
@@ -42,6 +46,7 @@ export function HomeCardManager({
   pluginMissing,
   isManual,
   onToggleManual,
+  cardIcon,
 }: HomeCardManagerProps) {
   const { t } = useI18n()
 
@@ -66,17 +71,14 @@ export function HomeCardManager({
 
     return {
       id,
+      icon: cardIcon?.(id),
       name: custom ? custom.name : label,
       command: custom ? custom.command : (meta?.command ?? ''),
       custom: custom != null,
       hidden,
       disabled: missing,
-      badges: meta ? (
-        <>
-          <Badge>{t('home.manageBuiltin')}</Badge>
-          {missing && <Badge tone="warn">{t('home.managePluginMissing')}</Badge>}
-        </>
-      ) : undefined,
+      // 自定义卡片有「笔」图标（能编辑），所以内置卡片不再挂「内置」徽标；只留缺插件警告。
+      badges: missing ? <Badge tone="warn">{t('home.managePluginMissing')}</Badge> : undefined,
     }
   })
 
@@ -95,7 +97,6 @@ export function HomeCardManager({
       open={open}
       onOpenChange={onOpenChange}
       title={t('home.manageTitle')}
-      description={t('home.manageDesc')}
       cards={cards}
       removeLabel={t('home.manageDelete')}
       nameLabel={t('home.manageNamePlaceholder')}
@@ -136,8 +137,11 @@ export function HomeCardManager({
         isHidden: (id) => prefs.hidden[id] === true,
         onToggle: (id) =>
           onChange({ ...prefs, hidden: { ...prefs.hidden, [id]: !prefs.hidden[id] } }),
-        hideLabel: t('home.manageHide'),
-        showLabel: t('home.manageShow'),
+      }}
+      width={{
+        get: (id) => cardWidth(prefs, id),
+        set: (id: string, width: CardWidth) =>
+          onChange({ ...prefs, width: { ...prefs.width, [id]: width } }),
       }}
       add={{
         nameLabel: t('home.manageNamePlaceholder'),
@@ -155,23 +159,25 @@ export function HomeCardManager({
         },
       }}
       footerExtra={
+        // 只留图标（悬停出「恢复默认」提示），点一下就地二次确认。
         <ConfirmButton
+          size="icon-sm"
+          variant="ghost"
           icon={<RotateCcw data-icon="inline-start" />}
+          aria-label={t('home.manageReset')}
           confirmLabel={t('home.manageResetConfirm')}
           onConfirm={() =>
             onChange({
               order: [...DEFAULT_HOME_CARDS.order],
               hidden: {},
+              width: {},
               custom: [],
               layoutVersion: DEFAULT_HOME_CARDS.layoutVersion,
             })
           }
-        >
-          {t('home.manageReset')}
-        </ConfirmButton>
+        />
       }
       doneLabel={t('home.manageDone')}
-      note={t('home.manageNote')}
     />
   )
 }

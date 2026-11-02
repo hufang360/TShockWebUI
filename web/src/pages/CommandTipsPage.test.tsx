@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandTerminal } from '@/components/CommandTerminal'
 import { makeDataset } from '@/test/fixtures'
@@ -131,11 +131,20 @@ afterEach(() => {
 })
 
 describe('CommandTipsPage', () => {
-  it('顶部提示权限与「不会自动执行」', () => {
+  it('权限提示收进标题旁的 ⓘ（首次自动展开，可关闭）', async () => {
     renderPage()
-    const alert = screen.getByRole('alert')
-    expect(within(alert).getByText(/需要权限/)).toBeTruthy()
-    expect(within(alert).getByText(/不会自动执行/)).toBeTruthy()
+    const help = /各指令权限不同，由服务器判定/
+    // 默认展开：说明就在正文顶部。
+    expect(await screen.findByText(help)).toBeTruthy()
+    expect(screen.getByText(/不会自动执行/)).toBeTruthy()
+    // 关闭后不再自动显示（状态记在本机）。
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    await waitFor(() => expect(screen.queryByText(help)).toBeNull())
+    expect(JSON.parse(localStorage.getItem('tswui:helpClosed') ?? '{}')).toEqual({ tips: true })
+
+    // 再点标题旁的 ⓘ 又能打开。
+    fireEvent.click(screen.getByRole('button', { name: '页面说明' }))
+    expect(await screen.findByText(help)).toBeTruthy()
   })
 
   it('没有顶部 tab：左边搜索框，右边分组栏', () => {

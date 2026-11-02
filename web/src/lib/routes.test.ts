@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { consumeEditorView } from '@/lib/editorView'
 import { readTabFromHash, tabHash } from '@/lib/routes'
 import type { CustomModule } from '@/lib/customModules'
 
@@ -23,7 +24,6 @@ const mods = [clip, chest]
 describe('routes', () => {
   it('内置页面使用短名 hash', () => {
     expect(tabHash('editor')).toBe('#/cmd')
-    expect(tabHash('chat')).toBe('#/chat')
     expect(tabHash('save')).toBe('#/plr')
     expect(tabHash('players')).toBe('#/pm')
     expect(tabHash('world')).toBe('#/wm')
@@ -34,14 +34,23 @@ describe('routes', () => {
     expect(tabHash('settings')).toBe('#/settings')
   })
 
+  it('老地址 #/chat 落到「指令」页（聊天已并入指令）', () => {
+    withHash('#/chat')
+    expect(readTabFromHash([])).toBe('editor')
+    // 并且要求页面一进来就停在聊天那一块。
+    expect(consumeEditorView()).toBe('chat')
+    // 一次性：再读一次就没有了。
+    withHash('#/cmd')
+    readTabFromHash([])
+    expect(consumeEditorView()).toBeNull()
+  })
+
   it('自定义模块用「主指令」派生的 ext- 路由', () => {
     expect(tabHash(clip.id, mods)).toBe('#/ext-clip')
     expect(tabHash(chest.id, mods)).toBe('#/ext-chest')
   })
 
   it('短名 / ext 路由能解析回 tab', () => {
-    withHash('#/chat')
-    expect(readTabFromHash([])).toBe('chat')
     withHash('#/plr')
     expect(readTabFromHash([])).toBe('save')
     withHash('#/pm')

@@ -185,6 +185,62 @@ describe('ServerFeedList', () => {
     }
   })
 
+  it('紧凑版（首页卡片）：状态 + 上次刷新两行小字，不带世界名', () => {
+    render(
+      <I18nProvider lang="zh">
+        <ServerFeedList
+          events={[{ seq: 1, type: 'join', text: 'Alice 加入了服务器', time: '' }]}
+          extra={
+            { name: 'MockWorld', dayTime: true, time: 3600, hardMode: true, raining: true } as never
+          }
+          refreshedAt={new Date(2026, 0, 2, 3, 19, 9).getTime()}
+          footerVariant="text"
+          showFlags={false}
+        />
+      </I18nProvider>,
+    )
+
+    // 状态行：纯文字、用 ` · ` 分隔，**不写世界名**（同屏其它卡片已经有了）。
+    const status = screen.getByTitle('困难模式 · 下雨')
+    expect(status.textContent).toBe('困难模式 · 下雨')
+    // 刷新行换成「上次刷新 HH:MM:SS · 游戏内 HH:MM」。
+    const refresh = status.nextElementSibling as HTMLElement
+    expect(refresh.textContent).toContain('上次刷新')
+    expect(refresh.textContent).toContain('03:19:09')
+    expect(refresh.textContent).toContain('游戏内 05:30')
+    expect(screen.queryByText(/刷新于/)).toBeNull()
+    expect(screen.queryByText(/MockWorld/)).toBeNull()
+  })
+
+  it('showDayDivider={false} 时不画「今天 / 昨天」分隔线', () => {
+    const now = new Date(2026, 9, 24, 12, 0, 0).getTime()
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+    try {
+      render(
+        <I18nProvider lang="zh">
+          <ServerFeedList
+            events={[
+              {
+                seq: 1,
+                type: 'join',
+                text: 'Alice 加入了服务器',
+                time: new Date(now - 26 * 3600_000).toISOString(),
+              },
+              { seq: 2, type: 'join', text: 'Bob 加入了服务器', time: new Date(now).toISOString() },
+            ]}
+            extra={null}
+            showDayDivider={false}
+          />
+        </I18nProvider>,
+      )
+      expect(screen.queryByText('今天')).toBeNull()
+      expect(screen.queryByText('昨天')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('插件缺失时显示提示而不是列表', () => {
     render(
       <I18nProvider lang="zh">

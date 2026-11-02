@@ -1,4 +1,5 @@
 import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
+import { requestEditorView } from '@/lib/editorView'
 import { readJson, StorageKeys } from '@/lib/storage'
 import type { TabId } from '@/types'
 
@@ -13,7 +14,6 @@ import type { TabId } from '@/types'
 /** 内置 tab → hash 片段。 */
 const TAB_SEGMENT: Record<string, string> = {
   editor: 'cmd',
-  chat: 'chat',
   commands: 'commands',
   save: 'plr',
   worldview: 'wld',
@@ -27,7 +27,8 @@ const TAB_SEGMENT: Record<string, string> = {
 const SEGMENT_TAB: Record<string, TabId> = {
   cmd: 'editor',
   editor: 'editor',
-  chat: 'chat',
+  // 「聊天」页已经并入「指令」：老地址仍然能用，落到指令页并自动切到聊天那一块。
+  chat: 'editor',
   plr: 'save',
   save: 'save',
   wld: 'worldview',
@@ -94,6 +95,8 @@ export function readTabFromHash(
   if (decoded.startsWith('m:')) {
     return customModules.some((item) => item.id === decoded) ? decoded : null
   }
+  // 老的「聊天」地址（`#/chat`）：除了落到指令页，还要让页面一进来就停在聊天那一块。
+  if (segment === 'chat') requestEditorView('chat')
   return SEGMENT_TAB[segment] ?? (decoded as TabId)
 }
 

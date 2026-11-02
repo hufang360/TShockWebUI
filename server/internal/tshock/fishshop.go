@@ -113,6 +113,9 @@ type FishGood struct {
 	CostItems []FishCostItem `json:"costItems"`
 	// Check 是购买前检查（check）的说明文本，空串 = 无检查。
 	Check string `json:"check"`
+	// Cmds 是购买后实际执行的指令（指令类商品才有，原版物品 / 降级条目为空）。
+	// 只用于展示判断（如 /igen pond → 鱼池建造注解图），不参与本地校验。
+	Cmds []string `json:"cmds"`
 	// Limit / ServerLimit：每人限购次数 / 全服限购总数（0 = 不限）。**这是配置值**，
 	// 「你还剩几次」与调用者绑定，list/ask 拿不到，只能靠 buy 的报错。
 	Limit       int `json:"limit"`

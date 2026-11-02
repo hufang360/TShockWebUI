@@ -112,6 +112,20 @@ describe('CommandTerminal', () => {
     expect(shell.className).not.toContain('py-2')
   })
 
+  it('输入区收成一行：输入框与发送键同排，且没有分割线 / 清空按钮', () => {
+    renderTerminal()
+    const win = openTerminal()
+    const shell = win.querySelector('[data-slot=composer]') as HTMLElement
+    // 紧凑外壳只有一个直接子节点（输入 + 发送所在的那一行），不再有单独的工具行。
+    expect(shell.children).toHaveLength(1)
+    const row = shell.firstElementChild as HTMLElement
+    expect(row.contains(within(win).getByPlaceholderText(/输入指令/))).toBe(true)
+    expect(row.contains(within(win).getByRole('button', { name: '执行' }))).toBe(true)
+    // 结果区与输入框之间不再有分割线；清空只在指令页的结果栏做。
+    expect(win.querySelector('[data-slot=separator]')).toBeNull()
+    expect(within(win).queryByRole('button', { name: '清空' })).toBeNull()
+  })
+
   it('Ctrl + ` 可开关终端', () => {
     renderTerminal()
     fireEvent.keyDown(window, { key: '`', ctrlKey: true })

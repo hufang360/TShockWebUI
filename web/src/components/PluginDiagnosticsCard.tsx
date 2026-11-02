@@ -106,6 +106,9 @@ export function PluginDiagnosticsCard({ transport, serverId }: PluginDiagnostics
               {t('plugins.capabilities', { list: status.capabilities.join(', ') })}
             </p>
           )}
+          {status.installed && status.compatible && !status.legacy && (
+            <p className="text-2xs text-muted-foreground">{t('plugins.initHint')}</p>
+          )}
         </>
       )}
     </CollapsibleCard>

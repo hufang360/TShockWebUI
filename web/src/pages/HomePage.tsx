@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { PlayingCardsFan, RefreshCw, Terminal } from 'lucide-react'
-import { COMMAND_CARD_BY_ID, type CommandCardId } from '@/components/home/commandCards'
+import { COMMAND_CARD_BY_ID, homeCardIcon, type CommandCardId } from '@/components/home/commandCards'
 import { IconAction } from '@/components/IconAction'
 import {
   EventsCard,
@@ -10,6 +10,7 @@ import {
   ServerStatusCard,
 } from '@/components/home/HomeOverviewCards'
 import { HomeCardManager } from '@/components/HomeCardManager'
+import { CardLayoutGrid, type CardLayoutItem } from '@/components/CardLayoutGrid'
 import { CommandCard } from '@/components/CommandCard'
 import { LoginGate } from '@/components/LoginGate'
 import { TopBarActions } from '@/components/TopBar'
@@ -20,7 +21,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui'
-import { cn } from '@/lib/cn'
 import { requestEditorFocus } from '@/lib/editorFocus'
 import { useLocalState } from '@/hooks/useLocalState'
 import {
@@ -36,13 +36,17 @@ import { useExecutionQueue } from '@/lib/executionQueue'
 import {
   BUILTIN_CARD_META,
   DEFAULT_HOME_CARDS,
+  cardWidth,
   customCardCommand,
   isBuiltinCardId,
   isCustomCardId,
+  readHomeCardsStore,
   sanitizeHomeCards,
   upgradeHomeCardsLayout,
+  DEFAULT_HOME_CARDS_STORE,
   type BuiltinCardId,
   type HomeCardsPrefs,
+  type HomeCardsStore,
 } from '@/lib/homeCards'
 import { useI18n } from '@/lib/i18n'
 import { formatClock, formatClockWithDate } from '@/lib/clock'
@@ -51,18 +55,8 @@ import { readJson, StorageKeys, writeJson } from '@/lib/storage'
 import { resultFromError, TshockRequestError, type BackendTransport, type ServerStatus } from '@/lib/tshock'
 import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
 
-/** 右栏「概览」卡片（固定放在右列，顺序：服务器状态 / 服务器动态 / 快捷入口 / 最近执行）。 */
-const RIGHT_COLUMN_IDS = new Set<string>(['server', 'events', 'quick', 'recent'])
 /** 「最近执行」最多展示几条（去重后）。 */
 const RECENT_LIMIT = 5
-
-/**
- * 首页左栏的展示顺序：世界信息 / 我的背包 一组，在线玩家 + 游戏时间、死亡次数 + Boss 战伤害各一组，
- * Boss 进度放最后；自定义卡片插在 Boss 进度之前。
- */
-const LEFT_ORDER = ['world', 'lookbag', 'online', 'time', 'alldeath', 'bossdamage'] as const
-/** 这些卡片占半栏；其余（Boss 进度 / 自定义）占整行。 */
-const HALF_WIDTH_IDS = new Set<string>(LEFT_ORDER)
 
 interface HomePageProps {
   dataset: Dataset
@@ -134,15 +128,30 @@ export function HomePage({
     onTokenInvalid,
   })
 
-  // 卡片布局：顺序 / 隐藏 / 自定义卡片（tswui:homeCards）。
-  const [rawPrefs, setPrefs] = useLocalState<HomeCardsPrefs>(StorageKeys.homeCards, DEFAULT_HOME_CARDS)
+  // 卡片布局：顺序 / 隐藏 / 宽度 / 自定义卡片（tswui:homeCards，**按服务器分开**）。
+  const [rawStore, setStore] = useLocalState<HomeCardsStore>(
+    StorageKeys.homeCards,
+    DEFAULT_HOME_CARDS_STORE,
+  )
+  const { store, legacy } = useMemo(() => readHomeCardsStore(rawStore), [rawStore])
+  const storedPrefs = store.byServer[serverId] ?? legacy ?? DEFAULT_HOME_CARDS
   // sanitize 后再做一次默认布局升级（服务器动态第 2、快捷入口第 3）。
-  const prefs = useMemo(() => upgradeHomeCardsLayout(sanitizeHomeCards(rawPrefs)), [rawPrefs])
+  const prefs = useMemo(() => upgradeHomeCardsLayout(sanitizeHomeCards(storedPrefs)), [storedPrefs])
+  /** 写回当前服务器的布局（老数据不动，下次读还会作为兜底）。 */
+  const setPrefs = useCallback(
+    (next: HomeCardsPrefs) => {
+      setStore((prev) => {
+        const { store: current } = readHomeCardsStore(prev)
+        return { byServer: { ...current.byServer, [serverId]: next } }
+      })
+    },
+    [setStore, serverId],
+  )
   // 老布局升级后写回本机，避免每次进入首页都重复迁移。
   useEffect(() => {
-    const sanitized = sanitizeHomeCards(rawPrefs)
+    const sanitized = sanitizeHomeCards(storedPrefs)
     if (prefs.layoutVersion !== sanitized.layoutVersion) setPrefs(prefs)
-  }, [prefs, rawPrefs, setPrefs])
+  }, [prefs, storedPrefs, setPrefs])
   // 卡片「手动执行」偏好（tswui:autoExec）；默认全部自动。
   const [rawAutoExec, setAutoExec] = useLocalState(StorageKeys.autoExec, DEFAULT_AUTO_EXEC)
   const autoExec = useMemo(() => sanitizeAutoExec(rawAutoExec), [rawAutoExec])
@@ -282,7 +291,7 @@ export function HomePage({
     for (const id of order) {
       if (hidden[id]) continue
       if (skipMissing && pluginMissingRef.current(id)) continue
-      if (isManual(autoExec, `home:${id}`)) continue
+      if (cardIsManual(id)) continue
       if (isBuiltinCardId(id)) {
         const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
         if (!def) continue
@@ -307,7 +316,7 @@ export function HomePage({
     for (const id of order) {
       if (hidden[id]) continue
       if (skipMissing && pluginMissingRef.current(id)) continue
-      if (isManual(autoExec, `home:${id}`)) continue
+      if (cardIsManual(id)) continue
       if (isBuiltinCardId(id)) {
         const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
         if (!def) continue
@@ -468,6 +477,11 @@ export function HomePage({
   )
 
   const customById = useMemo(() => new Map(prefs.custom.map((c) => [c.id, c])), [prefs.custom])
+  // 卡片是否「不自动执行」：内置卡默认自动，用户添加的卡片默认手动（只能点卡片自己的按钮跑）。
+  const cardIsManual = useCallback(
+    (id: string) => isManual(autoExec, `home:${id}`, isCustomCardId(id)),
+    [autoExec],
+  )
   // 首页有指令在排队 / 执行中（或状态正在刷新）时禁用「刷新」。
   const refreshingAll = loadingStatus || busyPrefix('home:')
 
@@ -497,9 +511,12 @@ export function HomePage({
       loading={opts.loading}
       unavailable={opts.unavailable}
       unavailableText={opts.unavailableText}
-      emptyText={opts.emptyText}
       footerNote={opts.footerNote}
-      action={isManual(autoExec, `home:${opts.id}`) ? 'run' : 'refresh'}
+      action={cardIsManual(opts.id) ? 'run' : 'refresh'}
+      // 不自动执行的卡片：还没跑过就提示「等待执行…」（它不会自己跑，等你点）。
+      emptyText={
+        opts.emptyText ?? (cardIsManual(opts.id) ? t('home.customClickRefresh') : undefined)
+      }
       collapseKey={`home:${opts.id}`}
       showLastRunAt={opts.showLastRunAt}
       onRefresh={opts.onRefresh}
@@ -603,20 +620,13 @@ export function HomePage({
     if (isBuiltinCardId(id)) return true
     return isCustomCardId(id) && customById.has(id)
   })
-  // 两栏：左 = 指令卡片 + 自定义卡片；右 = 概览卡片（服务器状态 / 动态 / 快捷入口 / 最近执行）。
-  // 各自保持 `prefs.order` 里的相对顺序。
-  const visibleSet = new Set(visibleCards)
-  const leftCards = [
-    ...LEFT_ORDER.filter((id) => visibleSet.has(id)),
-    ...visibleCards.filter(
-      (id) => !RIGHT_COLUMN_IDS.has(id) && !HALF_WIDTH_IDS.has(id) && id !== 'bossinfo',
-    ),
-    ...(visibleSet.has('bossinfo') ? ['bossinfo'] : []),
-  ]
-  const rightCards = visibleCards.filter((id) => RIGHT_COLUMN_IDS.has(id))
-  // 半宽卡片是奇数时，最后一个独占整行，避免留下半格空白。
-  const halfCards = leftCards.filter((id) => HALF_WIDTH_IDS.has(id))
-  const loneHalf = halfCards.length % 2 === 1 ? halfCards[halfCards.length - 1] : null
+  // 宽度决定去哪一栏（`right` → 右栏概览，`half` / `full` → 左栏两列网格），
+  // 两边都按 `prefs.order` 的原顺序渲染。
+  const layoutItems: CardLayoutItem[] = visibleCards.map((id) => ({
+    id,
+    width: cardWidth(prefs, id),
+    node: renderCard(id),
+  }))
 
   // 未登录：隐藏首页所有卡片（数据都要 token 才能拉取），只留登录提示。
   if (!authenticated) {
@@ -647,30 +657,7 @@ export function HomePage({
         />
       </TopBarActions>
 
-      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_360px]">
-        {/* 左栏：指令卡片（两列；同一行的两张卡**等高**，视觉上成行成列）。
-            拉高后多出来的高度由卡片里的灰底正文区吸收（`CommandOutput fill`），
-            所以正文与卡片底部 / 页脚（备注、上次刷新）之间的间距仍然紧，不会出现一条裸空白。 */}
-        <div data-testid="home-left" className="grid gap-2 sm:grid-cols-2">
-          {leftCards.map((id) => (
-            <div
-              key={id}
-              className={cn(
-                'min-w-0',
-                (!HALF_WIDTH_IDS.has(id) || id === loneHalf) && 'sm:col-span-2',
-                // 同一行的半宽卡片互相等高（网格行高 = 该行最高卡片）。
-                HALF_WIDTH_IDS.has(id) && id !== loneHalf && '[&>[data-slot=card]]:h-full',
-              )}
-            >
-              {renderCard(id)}
-            </div>
-          ))}
-        </div>
-        {/* 右栏：概览卡片（服务器状态 / 服务器动态 / 快捷入口 / 最近执行） */}
-        <div data-testid="home-right" className="flex flex-col gap-2">
-          {rightCards.map((id) => renderCard(id))}
-        </div>
-      </div>
+      <CardLayoutGrid items={layoutItems} leftTestId="home-left" rightTestId="home-right" />
 
       {transport.mock && (
         <p className="text-center text-2xs text-muted-foreground">{t('home.mockNote')}</p>
@@ -682,8 +669,9 @@ export function HomePage({
         prefs={prefs}
         onChange={(next) => setPrefs(next)}
         pluginMissing={pluginMissing}
-        isManual={(id) => isManual(autoExec, `home:${id}`)}
+        isManual={cardIsManual}
         onToggleManual={setCardManual}
+        cardIcon={homeCardIcon}
       />
     </div>
   )

@@ -50,3 +50,12 @@ export function removeFavorite(list: FavoriteEntry[], cmd: string): FavoriteEntr
   const key = normalizeFavorite(cmd)
   return list.filter((f) => f.cmd !== key)
 }
+
+/**
+ * 收藏指令的读写接口：任何「一条指令 + ⭐」的地方（结果卡片、详情页里的指令条目）都用它。
+ * 状态唯一来源是 `tswui:favorites`（见 `hooks/useCommandFavoritesState.ts`）。
+ */
+export interface CommandFavoritesApi {
+  isFavorited: (cmd: string) => boolean
+  toggle: (cmd: string) => void
+}

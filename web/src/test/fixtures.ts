@@ -218,11 +218,12 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
     items,
     prefixes: [{ id: 81, key: 'Legendary', name: '传奇' }],
     npcs: [
-      { id: 1, key: 'BlueSlime', name: '蓝史莱姆' },
+      { id: 1, key: 'BlueSlime', name: '蓝史莱姆', en: 'Blue Slime' },
       {
         id: 4,
         key: 'EyeOfCthulhu',
         name: '克苏鲁之眼',
+        en: 'Eye of Cthulhu',
         sb: 'eye of cthulhu',
         sbAliases: ['eoc', 'eye'],
         sbAll: true,
@@ -296,13 +297,14 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
     itemsById,
     prefixesById: new Map([[81, { id: 81, key: 'Legendary', name: '传奇' }]]),
     npcsById: new Map([
-      [1, { id: 1, key: 'BlueSlime', name: '蓝史莱姆' }],
+      [1, { id: 1, key: 'BlueSlime', name: '蓝史莱姆', en: 'Blue Slime' }],
       [
         4,
         {
           id: 4,
           key: 'EyeOfCthulhu',
           name: '克苏鲁之眼',
+          en: 'Eye of Cthulhu',
           sb: 'eye of cthulhu',
           sbAliases: ['eoc', 'eye'],
           sbAll: true,
