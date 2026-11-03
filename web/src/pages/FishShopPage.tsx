@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Droplets,
   Fish,
+  Footprints,
   Maximize2,
   Minimize2,
   RefreshCw,
@@ -10,10 +11,12 @@ import {
   Settings2,
   ShieldAlert,
   ShoppingCart,
+  Star,
 } from 'lucide-react'
 import { IconAction } from '@/components/IconAction'
 import { PageHelp } from '@/components/PageHelp'
 import { PluginHelp } from '@/components/PluginHelp'
+import { TopBarActions } from '@/components/TopBar'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
 import { SearchInput } from '@/components/SearchInput'
@@ -37,6 +40,15 @@ import { cn } from '@/lib/cn'
 import { splitFishArgs } from '@/lib/fishArgs'
 import { diagramUrl } from '@/lib/fishDiagram'
 import { isDegradedGood } from '@/lib/fishGood'
+import {
+  findLiveGood,
+  fishGoodKey,
+  migrateRecentBuys,
+  resolveStamps,
+  sanitizeStamps,
+  stampGood,
+  type FishGoodStamp,
+} from '@/lib/fishGoodKey'
 import { PLUGIN_LINKS } from '@/lib/pluginLinks'
 import {
   Alert,
@@ -61,6 +73,11 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   Spinner,
   ToggleGroup,
@@ -106,9 +123,21 @@ interface FishUiState extends Record<string, unknown> {
   iconSize?: GoodIconSize
   /** 「页面设置 → 表格视图」。 */
   tableView?: boolean
-  /** 最近购买的 5 件商品（去重、最新在前）：本机记忆，买完还能一键找回。 */
+  /** 「页面设置 → 货架层板」：默认显示（关掉就是纯网格，没有板线）。 */
+  shelf?: boolean
+  /** 工具条页签：全部 / 买过 / 收藏。 */
+  tab?: FishTab
+  /** 买过的商品（**按内容指纹去重、最新在前**，不存 serial）。 */
+  buys?: FishGoodStamp[]
+  /** 收藏的商品（同上）。 */
+  favorites?: FishGoodStamp[]
+  /** @deprecated 旧版本的「最近购买」（没有指纹），首次读到会迁移进 `buys`。 */
   recentBuys?: FishGood[]
 }
+
+/** 货架页签（全部 / 买过 / 收藏）。 */
+const FISH_TABS = ['all', 'bought', 'favorite'] as const
+type FishTab = (typeof FISH_TABS)[number]
 
 const DEFAULT_STATE: FishUiState = { query: '' }
 
@@ -117,27 +146,12 @@ function resolveIconSize(value: unknown): GoodIconSize {
   return value === 'sm' || value === 'md' || value === 'lg' ? value : DEFAULT_GOOD_ICON_SIZE
 }
 
-/** 「最近购买」最多记几件。 */
-const RECENT_BUYS_MAX = 5
+/** 「买过 / 收藏」各存多少条（本机 localStorage；一个服通常也就几十到几百件商品）。 */
+const SAVED_MAX = 80
 
-/**
- * 本机记忆的数据可能被改坏 / 版本升级后形状不对：只保留结构对得上的条目，
- * 按 `serial` 去重（同一件商品只留最新的一条），最多 `RECENT_BUYS_MAX` 条。
- */
-function sanitizeRecentBuys(value: unknown): FishGood[] {
-  if (!Array.isArray(value)) return []
-  const seen = new Set<number>()
-  const out: FishGood[] = []
-  for (const good of value) {
-    if (!good || typeof (good as FishGood).serial !== 'number') continue
-    if (typeof (good as FishGood).name !== 'string') continue
-    const entry = good as FishGood
-    if (seen.has(entry.serial)) continue
-    seen.add(entry.serial)
-    out.push(entry)
-    if (out.length >= RECENT_BUYS_MAX) break
-  }
-  return out
+/** 本机存的页签可能被改坏：认不出来就回到「全部」。 */
+function resolveTab(value: unknown): FishTab {
+  return value === 'bought' || value === 'favorite' ? value : 'all'
 }
 
 /** 网格图标尺寸：与「物品图鉴」一致（64px）。 */
@@ -158,10 +172,13 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const [selectedSnapshot, setSelected] = useState<FishGood | null>(null)
   // 右列（指令卡片 / 记事本）是否还有内容：全隐藏时左栏铺满整行。
   const [cardsVisible, setCardsVisible] = useState(true)
-  const selected = useMemo(() => {
-    if (!selectedSnapshot) return null
-    return shop?.goods.find((g) => g.serial === selectedSnapshot.serial) ?? selectedSnapshot
-  }, [selectedSnapshot, shop])
+  // 货架上的「同款」：按**内容指纹**找，不按 serial —— 服主增删商品后 serial 会整体错位，
+  // 按 serial 找会把「收藏的那件」打开成後面另一件商品。
+  const selectedLive = useMemo(
+    () => (selectedSnapshot ? findLiveGood(selectedSnapshot, shop?.goods ?? []) : null),
+    [selectedSnapshot, shop],
+  )
+  const selected = selectedLive ?? selectedSnapshot
   const [amount, setAmount] = useState('1')
   const [args, setArgs] = useState('')
   const [confirming, setConfirming] = useState(false)
@@ -293,22 +310,44 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     setError(null)
   }, [])
 
-  /** 买成功就记一笔（去重 + 最多 5 条，最新在前）。 */
+  /** 买过 / 收藏：都按内容指纹存（不存 serial，见 `lib/fishGoodKey.ts`）。 */
+  const boughtStamps = useMemo(() => {
+    if (Array.isArray(ui.buys)) return sanitizeStamps(ui.buys, SAVED_MAX)
+    // 旧版本只记了 `recentBuys`：先按快照显示，下面的 effect 再落成正式记录。
+    return migrateRecentBuys(ui.recentBuys) ?? []
+  }, [ui.buys, ui.recentBuys])
+  const favoriteStamps = useMemo(() => sanitizeStamps(ui.favorites, SAVED_MAX), [ui.favorites])
+
+  // 旧数据迁移（只做一次）：`recentBuys` → `buys`，然后把旧字段清掉。
+  useEffect(() => {
+    if (Array.isArray(ui.buys) || !Array.isArray(ui.recentBuys) || ui.recentBuys.length === 0) return
+    const migrated = migrateRecentBuys(ui.recentBuys)
+    if (migrated) setUi({ buys: migrated, recentBuys: undefined })
+  }, [ui.buys, ui.recentBuys, setUi])
+
+  /** 买成功就记一笔「买过」。 */
   const rememberPurchase = useCallback(
-    (good: FishGood) => {
-      const current = sanitizeRecentBuys(ui.recentBuys).filter((g) => g.serial !== good.serial)
-      setUi({ recentBuys: [good, ...current].slice(0, RECENT_BUYS_MAX) })
-    },
-    [setUi, ui.recentBuys],
+    (good: FishGood) => setUi({ buys: stampGood(boughtStamps, good, SAVED_MAX) }),
+    [setUi, boughtStamps],
   )
 
-  /** 点「最近购买」：货架上还在就打开最新的那条（能直接再买），已经下架就用快照。 */
-  const openRecent = useCallback(
-    (good: FishGood) => {
-      const live = shop?.goods.find((g) => g.serial === good.serial)
-      openDetail(live ?? good)
+  /**
+   * 收藏 / 取消收藏。
+   * `alias` 是「打开详情时存的那份快照」：商品被改名后货架数据与快照的指纹不同，
+   * 取消收藏时两个指纹都要能匹配上，否则点了没反应。
+   */
+  const toggleFavorite = useCallback(
+    (good: FishGood, alias?: FishGood | null) => {
+      const keys = new Set([fishGoodKey(good)])
+      if (alias) keys.add(fishGoodKey(alias))
+      const already = favoriteStamps.some((stamp) => keys.has(stamp.key))
+      setUi({
+        favorites: already
+          ? favoriteStamps.filter((stamp) => !keys.has(stamp.key))
+          : stampGood(favoriteStamps, good, SAVED_MAX),
+      })
     },
-    [shop, openDetail],
+    [setUi, favoriteStamps],
   )
 
 
@@ -333,6 +372,15 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const blocked = selected?.canBuy === false
   // 降级条目：商品自身配置有误时插件只回基础字段（其余为空），点进去也买不了。
   const degraded = isDegradedGood(selected)
+  // 从「买过 / 收藏」打开、但货架上已经没有这件：只能看快照，不能买。
+  const offShelf = selectedSnapshot !== null && selectedLive === null
+  // ⭐ 是否已收藏：货架数据与打开时的快照两个指纹都算（商品被改名后两者不同）。
+  const favorited = useMemo(() => {
+    if (!selected) return false
+    const keys = new Set([fishGoodKey(selected)])
+    if (selectedSnapshot) keys.add(fishGoodKey(selectedSnapshot))
+    return favoriteStamps.some((stamp) => keys.has(stamp.key))
+  }, [selected, selectedSnapshot, favoriteStamps])
   // 建造类商品（鱼池 / 小房间 / 钓棚）多一张注解图：站哪个位置、上下几格、左右误差多少。
   const diagram = diagramUrl(selected)
   const personalNotes: string[] = []
@@ -430,9 +478,22 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     return () => clearTimeout(timer)
   }, [buyCooldown])
 
+  // 页签：全部 = 当前货架；买过 / 收藏 = 本机记录（已下架的用快照占位）。
+  const tab = resolveTab(ui.tab)
   const keyword = ui.query.trim().toLowerCase()
+  const shelfGoods = useMemo(() => shop?.goods ?? [], [shop])
+  const boughtRows = useMemo(() => resolveStamps(boughtStamps, shelfGoods), [boughtStamps, shelfGoods])
+  const favoriteRows = useMemo(
+    () => resolveStamps(favoriteStamps, shelfGoods),
+    [favoriteStamps, shelfGoods],
+  )
   const goods = useMemo(() => {
-    const list = shop?.goods ?? []
+    const list =
+      tab === 'bought'
+        ? boughtRows.map((row) => row.good)
+        : tab === 'favorite'
+          ? favoriteRows.map((row) => row.good)
+          : shelfGoods
     if (!keyword) return list
     return list.filter(
       (g) =>
@@ -441,7 +502,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
         g.desc.toLowerCase().includes(keyword) ||
         g.map.some((m) => m.toLowerCase().includes(keyword)),
     )
-  }, [shop, keyword])
+  }, [tab, boughtRows, favoriteRows, shelfGoods, keyword])
 
   /** 富文本渲染（价格 / 解锁 / 别名 / 限购 / 备注都可能含 [i:..] 物品图标）。 */
   const renderRichLines = (lines: string[]) => (
@@ -467,14 +528,13 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   // 小尺寸本来就只有图标：中 / 大的「隐藏编号和名称」在它上面没有意义，不显示这个开关。
   const metaToggleVisible = sizeSpec.showMeta
   const showMeta = sizeSpec.showMeta && !hideMeta
-  // 货架线：表格视图没有格子；小尺寸格子排得密又没两行字，这两种情况都不画。
-  const shelfLines = !tableView && iconSize !== 'sm'
-  const recentBuys = useMemo(() => sanitizeRecentBuys(ui.recentBuys), [ui.recentBuys])
+  // 货架板：表格视图没有格子、小尺寸格子又密，这两种情况本来就不画，所以开关也不显示。
+  const shelfToggleVisible = !tableView && iconSize !== 'sm'
+  const shelfLines = shelfToggleVisible && ui.shelf !== false
   const [settingsOpen, setSettingsOpen] = useState(false)
-  // 「货架全屏」：只留货架区铺满整屏（与「物品 ID」的全屏同一套做法）。
+  // 「货架全屏」：顶栏以外的区域全部让给货架（与「物品 ID」同一套做法，Esc 退出）。
   const [shelfFullscreen, setShelfFullscreen] = useState(false)
 
-  // 全屏时 Esc 退出，并禁止背景页面继续滚（与「物品 ID」一致）。
   useEffect(() => {
     if (!shelfFullscreen) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -503,29 +563,29 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           <div className="px-2 py-1 text-2xs font-medium text-muted-foreground">
             {t('dex.viewSection')}
           </div>
-          <div className="flex flex-col gap-1.5 px-2 py-2">
-            <span className="text-xs font-medium text-foreground">{t('fish.iconSize')}</span>
-            <ToggleGroup
-              type="single"
-              size="sm"
+          <div className="flex flex-col gap-1 px-2 py-1.5">
+            <FieldLabel htmlFor="fish-icon-size" className="font-medium text-foreground">
+              {t('fish.iconSize')}
+            </FieldLabel>
+            <Select
               value={iconSize}
-              onValueChange={(value) => {
-                // 再点一下已选中的档位会传空字符串：保持原档，不要退回默认。
-                if (value) setUi({ iconSize: value as GoodIconSize })
-              }}
-              aria-label={t('fish.iconSize')}
-              className="w-full"
+              onValueChange={(value) => setUi({ iconSize: value as GoodIconSize })}
             >
-              <ToggleGroupItem value="sm" title="32×32" data-testid="fish-icon-size-sm">
-                {t('fish.iconSize.sm')}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="md" title="48×48" data-testid="fish-icon-size-md">
-                {t('fish.iconSize.md')}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="lg" title="64×64" data-testid="fish-icon-size-lg">
-                {t('fish.iconSize.lg')}
-              </ToggleGroupItem>
-            </ToggleGroup>
+              <SelectTrigger id="fish-icon-size" size="sm" className="w-full" aria-label={t('fish.iconSize')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lg" data-testid="fish-icon-size-lg">
+                  {t('fish.iconSize.lg')}
+                </SelectItem>
+                <SelectItem value="md" data-testid="fish-icon-size-md">
+                  {t('fish.iconSize.md')}
+                </SelectItem>
+                <SelectItem value="sm" data-testid="fish-icon-size-sm">
+                  {t('fish.iconSize.sm')}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {metaToggleVisible && (
             <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
@@ -551,6 +611,19 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               {t('fish.tableView')}
             </FieldLabel>
           </Field>
+          {shelfToggleVisible && (
+            <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
+              <Checkbox
+                id="fish-shelf-lines"
+                checked={ui.shelf !== false}
+                onCheckedChange={(value) => setUi({ shelf: value === true })}
+                className="mt-0.5"
+              />
+              <FieldLabel htmlFor="fish-shelf-lines" className="cursor-pointer font-medium text-foreground">
+                {t('fish.shelfLines')}
+              </FieldLabel>
+            </Field>
+          )}
         </FieldGroup>
       </PopoverContent>
     </Popover>
@@ -622,12 +695,12 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       >
         {pageActions}
 
-        {/* 左：货架（REST API 不可用时只影响左侧，右侧指令卡片仍可用）。
-            全屏时这一栏自己变成滚动区（`fixed inset-0`），右栏收起。 */}
+        {/* 左：货架。REST API 不可用时只影响左侧，右侧指令卡片仍可用。 */}
         <div
           className={cn(
             'flex min-w-0 flex-col gap-2 xl:min-h-0',
-            shelfFullscreen && 'fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-4',
+            // 顶栏留着（退出全屏的按钮在顶栏），其余铺满。
+            shelfFullscreen && 'fixed inset-x-0 top-12 bottom-0 z-40 overflow-y-auto bg-background p-3 sm:p-4',
           )}
         >
       {checking && (
@@ -665,18 +738,18 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
       {canUse && (
         <>
-          {/* 吸顶工具条：搜索（结果数在框内）+ 最近购买 + 页面设置。
-              货架（页面）往上滚时它留在顶栏下面，不用滚回顶部找搜索框。 */}
+          {/* 吸顶工具条：搜索（结果数在框内）+ 右侧「全部 / 买过 / 收藏」页签。
+              货架（页面）往上滚时它留在顶栏下面，不用滚回顶部找搜索框。
+              页面设置与刷新一样在顶栏右侧（`TopBarActions`）。 */}
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky z-20 flex flex-col gap-2 bg-background py-1.5',
-              // 全屏时没有顶栏，工具条直接贴顶。
+              'sticky z-20 flex flex-col gap-2 bg-background p-1 sm:flex-row sm:flex-wrap sm:items-center',
               shelfFullscreen ? 'top-0' : 'top-12',
             )}
           >
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <div className="w-full max-w-sm min-w-0">
+            <div className="flex w-full min-w-0 items-center gap-2 sm:flex-1">
+              <div className="w-full max-w-sm">
                 <SearchInput
                   value={ui.query}
                   onValueChange={(query) => setUi({ query })}
@@ -688,30 +761,40 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   shortcut
                 />
               </div>
-              {recentBuys.length > 0 && (
-                <div
-                  data-testid="fish-recent-buys"
-                  aria-label={t('fish.recentBuys')}
-                  className="flex min-w-0 flex-wrap items-center gap-1"
+            </div>
+            {/* 手机上搜索独占第一行；页签从下一行开始、靠右（与「物品 ID」一致）。 */}
+            <div className="ml-0 flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground sm:ml-auto sm:w-auto">
+              <div className="flex min-w-0 items-center rounded-container bg-accent p-0.5">
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  variant="outline"
+                  value={tab}
+                  onValueChange={(value) => {
+                    // 再点一下当前页签会传空串：保持原样。
+                    if (value) setUi({ tab: value as FishTab })
+                  }}
+                  aria-label={t('fish.tabs')}
+                  className="flex-wrap"
                 >
-                  {recentBuys.map((good) => (
-                    <Button
-                      key={good.serial}
-                      variant="secondary"
-                      size="sm"
-                      className="h-7 max-w-40 gap-1 px-1.5"
-                      title={`${t('fish.recentBuys')}：#${good.serial} ${good.name}`}
-                      onClick={() => openRecent(good)}
-                    >
-                      <GoodThumb good={good} dataset={dataset} size={18} />
-                      <span className="truncate text-2xs">{good.name}</span>
-                    </Button>
-                  ))}
-                </div>
-              )}
-              <div className="ml-auto flex shrink-0 items-center gap-1">
-                {fishSettingsControl}
-                {fullscreenToggle}
+                  <ToggleGroupItem value="all" data-testid="fish-tab-all">
+                    {t('fish.tab.all')}
+                    <span className="tabular-nums opacity-70">{shelfGoods.length}</span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="bought" data-testid="fish-tab-bought">
+                    <Footprints data-icon="inline-start" />
+                    {t('fish.tab.bought')}
+                    <span className="tabular-nums opacity-70">{boughtStamps.length}</span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="favorite" data-testid="fish-tab-favorite">
+                    <Star
+                      className={cn(tab === 'favorite' && 'fill-current')}
+                      data-icon="inline-start"
+                    />
+                    {t('fish.tab.favorite')}
+                    <span className="tabular-nums opacity-70">{favoriteStamps.length}</span>
+                  </ToggleGroupItem>
+                </ToggleGroup>
               </div>
             </div>
             {error && !selected && (
@@ -749,8 +832,18 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                     <EmptyMedia variant="icon">
                       <Fish />
                     </EmptyMedia>
-                    <EmptyTitle>{t('fish.empty')}</EmptyTitle>
-                    <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
+                    <EmptyTitle>
+                      {keyword
+                        ? t('fish.empty')
+                        : tab === 'bought'
+                          ? t('fish.emptyBought')
+                          : tab === 'favorite'
+                            ? t('fish.emptyFavorite')
+                            : t('fish.empty')}
+                    </EmptyTitle>
+                    {tab === 'all' && !keyword && (
+                      <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
+                    )}
                   </EmptyHeader>
                 </Empty>
               )
@@ -796,7 +889,15 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             onTokenInvalid={onTokenInvalid}
             // 顶栏那个「刷新全部」同时刷新货架（输入框里不再单独放刷新按钮）。
             onManualRefresh={() => void loadShop()}
+            // 执行 `/fish reload` 之后货架已经变了：重新拉一次，别让页面停在旧价格上。
+            onConfigReloaded={() => void loadShop()}
           />
+          {/* 顶栏挂载顺序 = 显示顺序：卡片那组（上次刷新 / 刷新全部 / 管理卡片）之后、
+              全局动作（浮动终端）之前，所以「页面设置 / 全屏」正好夹在两者中间。 */}
+          <TopBarActions>
+            {fishSettingsControl}
+            {fullscreenToggle}
+          </TopBarActions>
         </div>
       </div>
       </div>
@@ -815,12 +916,12 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           {selected && (
             <>
               <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
-                {/* 标题只留给读屏：弹框顶部已经是大图标 + 名称，再写一行「商品详情」是多余的。 */}
-                <SheetTitle className="sr-only">{t('fish.detail')}</SheetTitle>
-                <div className="flex flex-col items-center gap-2">
+                <SheetTitle>{t('fish.detail')}</SheetTitle>
+                <div className="mt-2 flex flex-col items-center gap-2">
                   <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} tooltip={false} />
                   <p className="text-center text-base font-semibold text-foreground">
-                    #{selected.serial}{' '}
+                    {/* 已下架的商品不再显示编号：编号是插件配置里的下标，早就不指向它了。 */}
+                    {offShelf ? null : <>#{selected.serial} </>}
                     {goodPrefixName(selected, dataset) ? (
                       <span className="text-warning">{goodPrefixName(selected, dataset)} </span>
                     ) : null}
@@ -857,6 +958,11 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 </dl>
 
                 {/* 上游已判定不能买（限购满了 / 售完 / 冷却中 / 死了 / 昼夜不对）：先说清楚，别让玩家白点 */}
+                {offShelf && !confirming && (
+                  <Alert>
+                    <AlertDescription>{t('fish.offShelf')}</AlertDescription>
+                  </Alert>
+                )}
                 {blocked && !confirming && (
                   <Alert>
                     <AlertDescription>{selected?.blockReason || t('fish.cannotBuy')}</AlertDescription>
@@ -960,8 +1066,18 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 {diagram && <GoodDiagram src={diagram} name={selected.name} />}
               </div>
 
-              {/* 底部操作区 */}
+              {/* 底部操作区：⭐ 收藏在最左，右侧是关闭 / 购买 */}
               <div className="flex shrink-0 items-center justify-end gap-2 border-t px-5 py-3">
+                <div className="mr-auto">
+                  <IconAction
+                    label={favorited ? t('fish.unfavorite') : t('fish.favorite')}
+                    icon={Star}
+                    pressed={favorited}
+                    testId="fish-favorite"
+                    iconClassName={cn(favorited && 'fill-current text-warning')}
+                    onClick={() => toggleFavorite(selected, selectedSnapshot)}
+                  />
+                </div>
                 {confirming ? (
                   <>
                     <Button
@@ -984,18 +1100,14 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 ) : (
                   <>
                     {/* 快捷关闭（弹框右上角也有 X）：轻量文字按钮，不抢「购买」的位置 */}
-                    <Button
-                      variant="ghost"
-                      className="h-8 text-muted-foreground hover:text-foreground"
-                      onClick={closeDetail}
-                    >
+                    <Button variant="outline" className="h-8 bg-card" onClick={closeDetail}>
                       {t('action.close')}
                     </Button>
                     <Button
                       ref={buyRef}
                       variant="primary"
                       className="h-8"
-                      disabled={!argsReady || buyCooldown > 0 || blocked || degraded}
+                      disabled={!argsReady || buyCooldown > 0 || blocked || degraded || offShelf}
                       onClick={() => setConfirming(true)}
                     >
                       <ShoppingCart data-icon="inline-start" />

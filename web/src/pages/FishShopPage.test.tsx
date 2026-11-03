@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { TopBarProvider, TopBarSlot } from '@/components/TopBar'
 import { CommandResultsProvider } from '@/lib/commandResults'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { DatasetProvider } from '@/lib/datasetContext'
@@ -13,6 +14,7 @@ import { FishShopPage } from './FishShopPage'
 
 const GOOD: FishGood = {
   serial: 1,
+  id: 29,
   name: '生命水晶',
   icon: '[i:29]',
   buyMax: 999,
@@ -269,6 +271,7 @@ describe('FishShopPage', () => {
     expect(screen.queryByText('鱼罐')).toBeNull()
     expect(screen.queryByText('消费榜')).toBeNull()
     expect(screen.queryByText('鱼篓榜')).toBeNull()
+    expect(screen.queryByText('重载配置')).toBeNull()
   })
 
   it('右侧内容全隐藏时收掉右列，左侧货架铺满', async () => {
@@ -931,6 +934,12 @@ describe('FishShopPage 右侧指令卡片', () => {
   })
 })
 
+/** 页面设置里的「图标大小」是 Select：点开下拉再点选项。 */
+async function pickIconSize(label: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: '图标大小' }))
+  fireEvent.click(await screen.findByRole('option', { name: label }))
+}
+
 describe('FishShopPage 最近购买 / 页面设置', () => {
   const seedRecent = (goods: unknown[]) => {
     localStorage.setItem(
@@ -939,7 +948,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     )
   }
 
-  it('买成功就在搜索框旁边显示「最近购买」徽标', async () => {
+  it('买成功后记进「买过」页签（不再有「最近购买」徽标）', async () => {
     const fishBuy = vi.fn(async () => ({
       serial: 1,
       name: '生命水晶',
@@ -954,37 +963,30 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
     await waitFor(() => expect(fishBuy).toHaveBeenCalled())
 
-    // 关掉详情再查徽标：弹框开着时背景是 aria-hidden，按 role 查不到里面的按钮。
+    // 关掉详情再查页签：弹框开着时背景是 aria-hidden，按 role 查不到里面的按钮。
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    const recent = await screen.findByTestId('fish-recent-buys')
-    expect(within(recent).getAllByRole('button')).toHaveLength(1)
-    expect(within(recent).getByText('生命水晶')).toBeTruthy()
-    // 点徽标能重新打开详情（货架上还在时用最新货架数据）。
-    fireEvent.click(within(recent).getByRole('button'))
-    expect(await screen.findByRole('dialog')).toBeTruthy()
+    // 搜索框旁边不再挂徽标（记录只在「买过」页签里）
+    expect(screen.queryByTestId('fish-recent-buys')).toBeNull()
+    expect(screen.getByTestId('fish-tab-bought').textContent).toContain('1')
+    fireEvent.click(screen.getByTestId('fish-tab-bought'))
+    expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
   })
 
-  it('最近购买按编号去重、最多 5 件', async () => {
+  it('「买过」按内容指纹去重（旧版 recentBuys 也能迁移过来）', async () => {
     seedRecent([
       { ...GOOD, serial: 1 },
-      { ...GOOD, serial: 1, name: '重复的' },
+      // 同款、编号不同 → 只留一条
+      { ...GOOD, serial: 7 },
       { ...GOOD, serial: 2, name: '二号' },
-      { ...GOOD, serial: 3, name: '三号' },
-      { ...GOOD, serial: 4, name: '四号' },
-      { ...GOOD, serial: 5, name: '五号' },
-      { ...GOOD, serial: 6, name: '六号' },
     ])
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
-    const recent = await screen.findByTestId('fish-recent-buys')
-    const names = within(recent)
-      .getAllByRole('button')
-      .map((el) => el.textContent)
-    expect(names).toHaveLength(5)
-    expect(names[0]).toContain('生命水晶')
-    expect(names.some((n) => n?.includes('重复的'))).toBe(false)
+    expect((await screen.findByTestId('fish-tab-bought')).textContent).toContain('2')
+    fireEvent.click(screen.getByTestId('fish-tab-bought'))
+    expect(await screen.findAllByRole('button', { name: '生命水晶' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '二号' })).toBeTruthy()
   })
 
   it('页面设置：图标大小 / 隐藏编号和名称 / 表格视图', async () => {
@@ -1021,7 +1023,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
 
     // 中：图标 48、格子 56，编号与名称照常。
-    fireEvent.click(await screen.findByRole('radio', { name: '中' }))
+    await pickIconSize('中')
     await waitFor(() => expect(cell.style.width).toBe('56px'))
     const mdSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
     expect(mdSurface.style.width).toBe('56px')
@@ -1029,7 +1031,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect(screen.getByText('生命水晶')).toBeTruthy()
 
     // 小：图标 32、格子 40，只剩图标（标题 / 名称都不显示），「隐藏编号和名称」开关也不再出现。
-    fireEvent.click(screen.getByRole('radio', { name: '小' }))
+    await pickIconSize('小')
     await waitFor(() => expect(cell.style.width).toBe('40px'))
     const smSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
     expect(smSurface.style.width).toBe('40px')
@@ -1037,7 +1039,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect(screen.queryByLabelText('隐藏编号和名称')).toBeNull()
 
     // 回到大：图标 64，编号与名称回来。
-    fireEvent.click(screen.getByRole('radio', { name: '大' }))
+    await pickIconSize('大')
     await waitFor(() => expect(cell.style.width).toBe('72px'))
     expect(screen.getByText('#1')).toBeTruthy()
   })
@@ -1083,13 +1085,228 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
 
     // 小尺寸不画（图标排得密，加板只会更乱）。
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
-    fireEvent.click(await screen.findByRole('radio', { name: '小' }))
+    await pickIconSize('小')
     await waitFor(() => expect(screen.queryByTestId('fish-shelf')).toBeNull())
 
     // 表格视图也不画。
-    fireEvent.click(screen.getByRole('radio', { name: '大' }))
+    await pickIconSize('大')
     fireEvent.click(screen.getByLabelText('表格视图'))
     await waitFor(() => expect(screen.queryByTestId('fish-shelf')).toBeNull())
+  })
+
+  it('页面设置：「货架层板」可以手动关掉 / 打开，开关记在本机', async () => {
+    // 同上：jsdom 不排版，货架板要假矩形才画得出来。
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const bottom =
+        this.tagName === 'BUTTON'
+          ? 107
+          : this.dataset.testid === 'good-icon-surface'
+            ? 72
+            : this.className.includes('font-pixel')
+              ? 87
+              : 68
+      return {
+        width: 72,
+        height: bottom,
+        top: 0,
+        left: 0,
+        right: 72,
+        bottom,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect
+    })
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    expect(await screen.findByTestId('fish-shelf')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    fireEvent.click(await screen.findByLabelText('货架层板'))
+    await waitFor(() => expect(screen.queryByTestId('fish-shelf')).toBeNull())
+
+    fireEvent.click(screen.getByLabelText('货架层板'))
+    await waitFor(() => expect(screen.queryByTestId('fish-shelf')).toBeTruthy())
+  })
+
+  it('页签：收藏 ⭐ 后出现在「收藏」，再点取消就没了', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    let dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByTestId('fish-favorite'))
+    // 按钮变成「取消收藏」
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '取消收藏' })).toBeTruthy())
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    fireEvent.click(screen.getByTestId('fish-tab-favorite'))
+    expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
+
+    // 取消收藏 → 收藏页签空掉
+    fireEvent.click(screen.getByRole('button', { name: '生命水晶' }))
+    dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByTestId('fish-favorite'))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(await screen.findByText('还没有收藏商品')).toBeTruthy()
+  })
+
+  it('货架增删商品后编号整体错位：收藏仍指向同一件（按内容认，不按 serial）', async () => {
+    // 先把「生命水晶」收藏（它在 #1）。
+    let goods: FishGood[] = [GOOD]
+    const fishList = vi.fn(async () => shopOf(goods))
+    renderPage(fakeTransport({ fishList }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByTestId('fish-favorite'))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // 服主在前面插了一件新商品：生命水晶 的 serial 从 1 变成 5，而 #1 现在是别的东西。
+    goods = [
+      { ...GOOD, serial: 1, id: 30, name: '别的东西', desc: '[i:30] 别的东西' },
+      { ...GOOD, serial: 5 },
+    ]
+    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
+
+    fireEvent.click(screen.getByTestId('fish-tab-favorite'))
+    const cell = await screen.findByRole('button', { name: '生命水晶' })
+    fireEvent.click(cell)
+    const sheet = await screen.findByRole('dialog')
+    // 打开的是 #5 的生命水晶，不是 #1 的「别的东西」
+    expect(within(sheet).getByText(/生命水晶/)).toBeTruthy()
+    expect(within(sheet).getByText('#5', { exact: false })).toBeTruthy()
+  })
+
+  it('收藏的商品已下架：仍能看快照，但提示已下架且不能买', async () => {
+    let goods: FishGood[] = [GOOD]
+    const fishList = vi.fn(async () => shopOf(goods))
+    renderPage(fakeTransport({ fishList }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    let dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByTestId('fish-favorite'))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // 货架上没有这件了
+    goods = [{ ...GOOD, serial: 9, id: 30, name: '别的商品', desc: '[i:30] 别的商品' }]
+    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
+
+    fireEvent.click(screen.getByTestId('fish-tab-favorite'))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/已不在当前货架/)).toBeTruthy()
+    expect((within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+  })
+
+  it('「买过」页签列出买过的商品（买完即出现）', async () => {
+    const fishBuy = vi.fn(async () => ({
+      serial: 1,
+      name: '生命水晶',
+      amount: 1,
+      cost: '[i/s1:73] 2 金币',
+    }))
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]), fishBuy }))
+
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    let dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '购买' }))
+    fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
+    await waitFor(() => expect(fishBuy).toHaveBeenCalled())
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    fireEvent.click(screen.getByTestId('fish-tab-bought'))
+    expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
+  })
+
+  it('详情抽屉顶栏：显示「商品详情」标题 + 居中图标与编号名称，⭐ 在底栏最左', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const sheet = await screen.findByRole('dialog')
+
+    // 顶栏：可见标题（不是 sr-only）
+    const title = within(sheet).getByText('商品详情')
+    expect(title.getAttribute('class') ?? '').not.toContain('sr-only')
+    expect(within(sheet).getByText(/#1/)).toBeTruthy()
+    // ⭐ 在底栏，且是底栏的第一个元素（左下角）
+    const favorite = within(sheet).getByTestId('fish-favorite')
+    const bottomBar = favorite.closest('.border-t') as HTMLElement
+    expect((bottomBar.firstElementChild as HTMLElement).contains(favorite)).toBe(true)
+  })
+
+  it('顶栏顺序：刷新全部 / 管理卡片 → 页面设置 / 全屏 → 浮动终端', async () => {
+    render(
+      <I18nProvider lang="zh">
+        <TopBarProvider>
+          <TopBarSlot extra={<span data-testid="terminal" />} />
+          <DatasetProvider value={makeDataset()}>
+            <ExecutionQueueProvider interval={0}>
+              <CommandResultsProvider serverId="default">
+                <FishShopPage
+                  serverId="default"
+                  transport={fakeTransport({ fishList: async () => shopOf([GOOD]) })}
+                  authenticated
+                  refreshInterval={120000}
+                  onTokenInvalid={vi.fn()}
+                  onLogin={vi.fn()}
+                />
+              </CommandResultsProvider>
+            </ExecutionQueueProvider>
+          </DatasetProvider>
+        </TopBarProvider>
+      </I18nProvider>,
+    )
+    await screen.findByRole('button', { name: '生命水晶' })
+
+    // 顶栏右侧插槽的 DOM 顺序 = 视觉顺序
+    const row = (await screen.findByTestId('terminal')).parentElement as HTMLElement
+    const order = [...row.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label'))
+    expect(order).toEqual(['刷新全部', '管理卡片', '页面设置', '全屏查看货架'])
+    // 终端图标在最后
+    expect(row.lastElementChild).toBe(screen.getByTestId('terminal'))
+  })
+
+  it('页签收在工具条里，页面设置 / 全屏在顶栏', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    await screen.findByRole('button', { name: '生命水晶' })
+
+    expect(screen.getByTestId('fish-tab-all')).toBeTruthy()
+    expect(screen.getByTestId('fish-tab-bought')).toBeTruthy()
+    expect(screen.getByTestId('fish-tab-favorite')).toBeTruthy()
+    // 搜索框旁边不再有「最近购买」徽标（记录在「买过」页签里）
+    expect(screen.queryByTestId('fish-recent-buys')).toBeNull()
+
+    // 全屏：点开铺满（右列收起），Esc 退出
+    fireEvent.click(screen.getByRole('button', { name: '全屏查看货架' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy())
+    expect(screen.getByTestId('fish-side').className).toContain('hidden')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.getByRole('button', { name: '全屏查看货架' })).toBeTruthy())
+  })
+
+  it('执行「重载配置」卡片后自动重拉一次货架', async () => {
+    localStorage.setItem('tswui:fishCards:hidden', JSON.stringify({ reload: false }))
+    const fishList = vi.fn(async () => shopOf([GOOD]))
+    const runCommand = vi.fn(async () => ({ status: 'ok' as const, output: ['[fishshop]鱼店配置已重载'] }))
+    renderPage(fakeTransport({ fishList, runCommand }))
+    await screen.findByRole('button', { name: '生命水晶' })
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(1))
+
+    // 卡片自己那个按钮（手动执行的卡片不会被「刷新全部」带上，按钮是 ▶「执行」）
+    const title = await screen.findByText('重载配置')
+    let card = title.parentElement
+    while (card && !within(card).queryByRole('button', { name: '执行' })) card = card.parentElement
+    fireEvent.click(within(card as HTMLElement).getByRole('button', { name: '执行' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/fish reload'))
+    // 重载完货架已经变了：自动再拉一次，不用手点刷新
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
   })
 
   it('顶栏「刷新全部」同时刷新货架（输入框里不再有刷新按钮）', async () => {

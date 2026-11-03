@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   FishingHook,
+  ListRestart,
   NotebookPen,
   PiggyBank,
   PlayingCardsFan,
@@ -41,9 +42,12 @@ interface FishCardDef {
 /**
  * 鱼店指令卡片。它们的输出都没有 REST 端点，只能靠 rawcmd 取回（不依赖鱼店 REST，老插件也能用）。
  *
- * 「钓鱼信息」常显；「鱼罐 / 消费榜 / 鱼篓榜」默认**不显示、也不自动执行** —— 这三张的输出较长、
- * 多数人只在想排行榜时才看，所以交给玩家自己在「管理卡片」里开「显示 / 自动执行」。
+ * 「钓鱼信息」常显；「鱼罐 / 消费榜 / 鱼篓榜 / 重载配置」默认**不显示、也不自动执行** —— 输出较长或不必常看，
+ * 所以交给玩家自己在「管理卡片」里开「显示 / 自动执行」。
  */
+/** 重载配置卡片 id：执行成功后鱼店页要重新拉一次货架。 */
+const CONFIG_RELOAD_CARD = 'reload'
+
 const CARDS: FishCardDef[] = [
   { id: 'info', titleKey: 'fish.card.info', command: '/fish info', icon: <FishingHook /> },
   {
@@ -70,6 +74,16 @@ const CARDS: FishCardDef[] = [
     defaultHidden: true,
     defaultManual: true,
   },
+  // `/fish reload` 重载插件配置，需要 `fishshop.reload` 权限（插件 `FishShop.cs` 的 `case "reload"`）；
+  // 普通玩家点了会得到「你无权执行重载操作！」。默认隐藏 + 不自动执行（不刷屏）。
+  {
+    id: CONFIG_RELOAD_CARD,
+    titleKey: 'fish.card.reload',
+    command: '/fish reload',
+    icon: <ListRestart />,
+    defaultHidden: true,
+    defaultManual: true,
+  },
 ]
 
 interface FishCommandCardsProps {
@@ -88,6 +102,11 @@ interface FishCommandCardsProps {
    * 只在 `force`（人手点击）时调用，自动刷新不会触发 —— 否则进页面会重复拉一次货架。
    */
   onManualRefresh?: () => void
+  /**
+   * 「重载配置」执行成功后回调：服主改完货架，重载完就该重新拉一次货架，
+   * 否则页面上还是旧的价格 / 旧的商品。
+   */
+  onConfigReloaded?: () => void
   /**
    * 「右列是否还有内容」变化时回调（卡片与记事本全被隐藏 → `false`）。
    * 鱼店页据此把右侧一栏收掉，让左边货架铺满整行。
@@ -108,6 +127,7 @@ export function FishCommandCards({
   refreshInterval,
   onTokenInvalid,
   onManualRefresh,
+  onConfigReloaded,
   onContentChange,
 }: FishCommandCardsProps) {
   const { t, lang } = useI18n()
@@ -158,8 +178,9 @@ export function FishCommandCards({
         if (reauthed) res = await runOnce()
       }
       setResult(`fish:${key}`, res)
+      if (key === CONFIG_RELOAD_CARD && res.status === 'ok') onConfigReloaded?.()
     },
-    [transport, onTokenInvalid, setResult],
+    [transport, onTokenInvalid, setResult, onConfigReloaded],
   )
 
   /** 一次请求执行全部卡片（批量插件），把结果分发回各卡片。 */
@@ -181,12 +202,14 @@ export function FishCommandCards({
         entries.forEach((entry, i) => {
           setResult(`fish:${entry.key}`, list[i] ?? { status: 'bad_response', output: [], message: '' })
         })
+        const reloaded = entries.findIndex((entry) => entry.key === CONFIG_RELOAD_CARD)
+        if (reloaded >= 0 && list[reloaded]?.status === 'ok') onConfigReloaded?.()
       } catch (err) {
         const res = resultFromError(err)
         entries.forEach((entry) => setResult(`fish:${entry.key}`, res))
       }
     },
-    [transport, onTokenInvalid, setResult],
+    [transport, onTokenInvalid, setResult, onConfigReloaded],
   )
 
   // 用户为鱼店追加的指令卡片（存 tswui:moduleCards，模块 id = store）。
@@ -410,8 +433,10 @@ export function FishCommandCards({
           卡片一多就会被压扁（正文被截断、行与行还叠在一起）。卡片数量不确定，
           所以**每张卡保持自身内容高度**，超出的部分交给整列滚动。 */}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1 [&>*]:shrink-0">
-        {shownCards.map((card) =>
-          card.notepad ? (
+        {shownCards.map((card) => {
+          // 手动执行的卡片：按钮是 ▶「执行」（不是「刷新」），左下角常显「执行于 …」。
+          const manual = isManual(autoExec, `fish:${card.key}`, card.defaultManual)
+          return card.notepad ? (
             <FishNotepad key={card.key} serverId={serverId} />
           ) : (
             <CommandCard
@@ -422,19 +447,16 @@ export function FishCommandCards({
               result={results[`fish:${card.key}`]}
               loading={busy(`fish:${card.key}`)}
               unavailable={!authenticated}
-              emptyText={
-                isManual(autoExec, `fish:${card.key}`, card.defaultManual)
-                  ? t('home.customClickRefresh')
-                  : undefined
-              }
+              action={manual ? 'run' : 'refresh'}
+              emptyText={manual ? t('home.customClickRefresh') : undefined}
               collapseKey={`fish:${card.key}`}
               onRefresh={authenticated ? () => runOne(card.key, card.command) : undefined}
               itemsById={dataset?.itemsById}
               prefixesById={dataset?.prefixesById}
               atlas={dataset?.atlas}
             />
-          ),
-        )}
+          )
+        })}
       </div>
 
       <ModuleCardManagerDialog

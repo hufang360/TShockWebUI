@@ -76,12 +76,9 @@ export function GoodGrid({
       const serialBottom = serial ? serial.getBoundingClientRect().bottom - cellRect.top : 0
       // 隐藏编号和名称时没有序号行：板就薄薄一条（4px），别让「厚度」变成负数 / 0。
       const thickness = serialBottom > line ? serialBottom - line : 4
-      // 板的右端收到**最后一列商品**的右边，而不是网格的右边：`auto-fill` 的网格末尾常带一截
-      // 放不满一列的空位，板顶到那里就会多出一段「没有商品的板」。
-      const cells = Array.from(grid.children) as HTMLElement[]
-      const columns = Math.max(1, getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length)
-      const lastInRow = cells[Math.min(columns, cells.length) - 1] ?? cell
-      const width = Math.max(0, lastInRow.getBoundingClientRect().right - cellRect.left)
+      // 板的右端就是**整行**的右边（哪怕这一行只摆了一件商品）：板是一整条货架，
+      // 不会因为商品少就缩短（用户定的）。
+      const width = grid.getBoundingClientRect().width
       setShelf({ pitch: cellRect.height + gap, line, thickness, width })
     }
     measure()
