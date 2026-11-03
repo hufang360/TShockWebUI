@@ -25,6 +25,11 @@ export const StorageKeys = {
   favorites: 'favorites',
   /** 指令页最近几条结果卡片（含输出内容）。 */
   commandResults: 'commandResults',
+  /**
+   * 首页 / 模块 / 鱼店卡片每条指令的**最近一次**执行结果（按服务器 + 卡片 key，含 `ts`）。
+   * 手动执行的卡片不会自己跑，刷新浏览器后「执行于 …」不该丢。
+   */
+  cardResults: 'cardResults',
   /** 浮动终端的窗口位置与尺寸 `{ x, y, w, h }`（桌面端；每次拖动 / 缩放后写入）。 */
   terminal: 'terminal',
   /** 浮动终端的输入草稿。与指令页草稿分开：终端执行后清空输入，不应抹掉页面里的草稿。 */

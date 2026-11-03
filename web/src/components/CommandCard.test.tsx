@@ -70,6 +70,48 @@ describe('CommandCard 刷新按钮提示', () => {
     expect(screen.getByText(/执行于/).textContent).toContain('13:32:50')
   })
 
+  it('手动执行卡（action="run"）不传 showLastRunAt 也常显「执行于 …」，超过一天标 warning', async () => {
+    const view = (ts: number, command = '/who') => (
+      <I18nProvider lang="zh">
+        <CommandCard
+          title="在线玩家"
+          command={command}
+          action="run"
+          result={{ status: 'ok', output: ['在线玩家 (1): hf'], ts }}
+        />
+      </I18nProvider>
+    )
+    const fresh = render(view(Date.now() - 60 * 60_000))
+    expect(screen.getByText(/执行于/).className).not.toContain('text-warning')
+    fresh.unmount()
+
+    // 25 小时前的快照：超过了「一天」的阈值，时间变警告色，悬停说明原因。
+    render(view(Date.now() - 25 * 60 * 60_000))
+    const label = screen.getByText(/执行于/)
+    expect(label.className).toContain('text-warning')
+    fireEvent.focus(label)
+    expect((await screen.findByRole('tooltip')).textContent).toContain('可能已过时')
+  })
+
+  it('带 help 字样的指令不算过时（教程 / 指令列表不会随时间变旧）', () => {
+    render(
+      <I18nProvider lang="zh">
+        <CommandCard
+          title="帮助"
+          command="/help Fishing"
+          action="run"
+          result={{ status: 'ok', output: ['用法: /help'], ts: Date.now() - 3 * 24 * 60 * 60_000 }}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText(/执行于/).className).not.toContain('text-warning')
+  })
+
+  it('自动刷新的卡片默认不占底部时间行（只看 Tooltip）', () => {
+    renderCard({ status: 'ok', output: ['ok'], ts: Date.now() - 60 * 60_000 })
+    expect(screen.queryByText(/执行于|上次刷新/)).toBeNull()
+  })
+
   it('点击整个表头折叠 / 展开卡片', () => {
     renderCard({ status: 'ok', output: ['结果内容'], ts: Date.now() })
     expect(screen.getByText('结果内容')).toBeTruthy()

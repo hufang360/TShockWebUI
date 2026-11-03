@@ -101,6 +101,22 @@ describe('ResultPanel', () => {
     expect(screen.getByText('/cmd 1')).toBeTruthy()
   })
 
+  it('结果超过 20 行时在灰底框里自己滚（幽灵滚动条平时透明）', () => {
+    // 高度封顶是 CSS（`.result-output` 的 max-height）的事，jsdom 算不出来，
+    // 这里只钉住契约：灰底框始终是可滚动的 `result-output` + `scrollbar-ghost`。
+    const output = Array.from({ length: 25 }, (_, i) => `第${i + 1}行`)
+    render(
+      <I18nProvider lang="zh">
+        <ResultPanel entries={[entry('/who', { status: 'ok', output })]} running={false} />
+      </I18nProvider>,
+    )
+    const box = document.querySelector('[data-slot="result-output"]')
+    expect(box?.className).toContain('result-output')
+    expect(box?.className).toContain('scrollbar-ghost')
+    expect(box?.className).toContain('overflow-y-auto')
+    expect(screen.getByText('第25行')).toBeTruthy()
+  })
+
   it('多次执行追加展示，不覆盖上一次结果', () => {
     render(
       <I18nProvider lang="zh">

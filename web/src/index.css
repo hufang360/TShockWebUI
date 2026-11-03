@@ -229,6 +229,39 @@
   border-radius: 9999px;
 }
 
+/* 幽灵滚动条：滑轨永远透明、滑块平时也透明，鼠标悬停到滚动区才浮出来。
+   用于「内容可能很长、但多数时候不该被一条灰条提醒」的地方（指令结果富文本框）。 */
+.scrollbar-ghost {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.scrollbar-ghost:hover,
+.scrollbar-ghost:focus-within {
+  scrollbar-color: color-mix(in oklab, var(--foreground) 20%, transparent) transparent;
+}
+.scrollbar-ghost::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-ghost::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-ghost::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+.scrollbar-ghost:hover::-webkit-scrollbar-thumb,
+.scrollbar-ghost:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--foreground) 20%, transparent);
+}
+
+/* 指令结果富文本框（`ResultPanel.tsx` 的 `OutputBlock`）：超过 20 行就自己滚，
+   不再把卡片一路撑高。用 CSS 高度兜住而不是 `output.length > 20`：
+   一条长文本折行后同样会撑高（行高 20px = `leading-5`、行距 4px = `gap-1`、上下内边距 8px×2 = `p-2`）。 */
+.result-output {
+  max-height: calc(20 * 20px + 19 * 4px + 8px * 2);
+}
+
 /* 指令输入框：单行、不换行，内容长了会横向滚动 —— 但**不显示**那条横向滚动条
    （截图里那条灰条会盖住输入框底边、挤掉工具行的高度；滚动本身还在，只是看不见）。
    只在 textarea 上关：别的滚动区仍用上面的细滚动条。 */

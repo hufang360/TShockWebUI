@@ -17,12 +17,22 @@ import {
   TooltipTrigger,
 } from '@/components/ui'
 import { useCollapsed } from '@/hooks/useCollapsed'
+import { useNow } from '@/hooks/useNow'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { formatClock } from '@/lib/clock'
 
 import { hasTextSelection } from '@/lib/selection'
 import type { Atlas, CommandResult, Item, Prefix } from '@/types'
+
+/**
+ * 手动执行的卡片「多久算过时」：超过就把「执行于 09:12:03」标成 warning 色。
+ *
+ * 自动刷新的卡片有刷新间隔兜底，手动卡可能好几天没人点也完全合法 —— 颜色只负责提醒「这份快照可能不是现在的」。
+ */
+const STALE_AFTER_MS = 24 * 60 * 60 * 1000
+/** 带 help 字样的指令（`/help`、`/help Fishing`…）输出是教程 / 指令列表，不会随时间过时。 */
+const HELP_COMMAND = /help/i
 
 export interface CommandCardProps {
   title: ReactNode
@@ -47,11 +57,11 @@ export interface CommandCardProps {
   /** 折叠状态记忆 key（不传则不持久化）；如 `home:status` / `world:relive` / `fish:rank`。 */
   collapseKey?: string
   /**
-   * 卡片底部**左下角**是否常显「上次刷新 13:32:50」。
+   * 卡片底部**左下角**是否显示「上次刷新 13:32:50」。
    *
-   * 目前只有首页「游戏时间」用（`lib/homeCards` 里的 `time` 卡片）：游戏内时间一直在走，
-   * 看到现实里的刷新时刻才能判断卡片里的「当前时间是…」是不是已经过时了。
-   * 时间以前只藏在刷新按钮的 Tooltip 里（要 hover 才知道数据新旧）。
+   * `action="run"`（手动执行）的卡片**自动开启**：它不会自己跑，不给时间就无从判断这份数据是刚才的还是上次打开页面时的。
+   * 自动刷新的卡片默认不显示（只看刷新按钮的 Tooltip）；目前只有首页「游戏时间」额外传 `true`：
+   * 游戏内时间一直在走，看到现实里的刷新时刻才能判断卡片里的「当前时间是…」是不是已经过时了。
    */
   showLastRunAt?: boolean
   /** 结果里 [i:ID] 渲染图标所需的索引。 */
@@ -89,9 +99,18 @@ export function CommandCard({
   // 展开 / 折叠状态按卡片记忆（切换模块回来仍保持）。
   const [open, setOpen] = useCollapsed(collapseKey)
   const lastRun = result?.ts ? new Date(result.ts) : null
+  // 页面久开着不做任何事时，「过时」也要自己变红灯，不能等用户点一下才刷新配色。
+  const now = useNow(30_000)
+  // 手动执行的卡片（含用户加的自定义卡片）左下角常显执行时间。
+  const showTime = showLastRunAt || action === 'run'
+  const stale =
+    action === 'run' &&
+    lastRun != null &&
+    !HELP_COMMAND.test(command ?? '') &&
+    now - lastRun.getTime() > STALE_AFTER_MS
   // 底部那行时间：自动刷新的卡说「上次刷新」，手动执行的卡说「执行于」。
   const lastRunLabel =
-    showLastRunAt && lastRun
+    showTime && lastRun
       ? t(action === 'run' ? 'home.lastRun' : 'home.lastRefresh', {
           time: formatClock(lang, lastRun),
         })
@@ -220,9 +239,26 @@ export function CommandCard({
             {(footerNote || lastRunLabel) && (
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 text-2xs text-muted-foreground">
                 {/* 时间在左：只有一项时 `justify-between` 不会把它推到右边。 */}
-                {lastRunLabel && (
-                  <span className="shrink-0 tabular-nums">{lastRunLabel}</span>
-                )}
+                {lastRunLabel &&
+                  (stale ? (
+                    // 变黄要能解释为什么：悬停 / 聚焦给出「可能已过时」，不另加一行文案。
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            tabIndex={0}
+                            data-stale="true"
+                            className="shrink-0 cursor-help rounded-chip tabular-nums text-warning focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          >
+                            {lastRunLabel}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('home.maybeStale')}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <span className="shrink-0 tabular-nums">{lastRunLabel}</span>
+                  ))}
                 {footerNote}
               </div>
             )}

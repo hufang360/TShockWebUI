@@ -355,6 +355,8 @@ const zh: Dict = {
   'home.empty': '暂无数据',
   'home.notRun': '尚未执行',
   'home.lastRun': '执行于 {time}',
+  /** 手动执行卡的时间超过一天变黄后，悬停给出的原因。 */
+  'home.maybeStale': '可能已过时',
   'home.neverRun': '尚未执行',
   'home.run': '执行',
   'home.autoExec': '自动执行',
@@ -1768,6 +1770,7 @@ const en: Dict = {
   'home.empty': 'No data',
   'home.notRun': 'Not run yet',
   'home.lastRun': 'Ran at {time}',
+  'home.maybeStale': 'May be out of date',
   'home.neverRun': 'Never run',
   'home.run': 'Run',
   'home.autoExec': 'Auto-run',

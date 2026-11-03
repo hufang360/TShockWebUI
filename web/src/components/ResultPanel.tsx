@@ -98,10 +98,13 @@ function OutputBlock({
     <div className={cn('group/rich relative', fill && 'flex min-h-0 flex-1 flex-col')}>
       {/* 富文本正文 text-xs（12px 字号 / 20px 行高）：只缩字号，行内物品图标仍是 24px（游戏聊天占位框） */}
       <div
+        data-slot="result-output"
         className={cn(
-          'flex flex-col gap-1 rounded-control bg-accent/60 p-2 pr-9 font-pixel text-xs leading-5 break-words whitespace-pre-wrap text-foreground',
+          // `result-output` 封顶 20 行 + `scrollbar-ghost` 幽灵滚动条（见 index.css）：
+          // 长结果不再把卡片撑到一屏高，滚动条平时隐形，悬停才浮出。
+          'result-output scrollbar-ghost flex flex-col gap-1 overflow-y-auto rounded-control bg-accent/60 p-2 pr-9 font-pixel text-xs leading-5 break-words whitespace-pre-wrap text-foreground',
           // 撑满时把多出来的高度留在灰底里（内容多则自己内部滚动），卡片底部就不会空一条。
-          fill && 'min-h-0 flex-1 overflow-y-auto',
+          fill && 'min-h-0 flex-1',
         )}
       >
         {/* `shrink-0`：折行的行（或带 24px 物品图标的行）比 `min-h-5` 高，若被 flex 压回 20px，
