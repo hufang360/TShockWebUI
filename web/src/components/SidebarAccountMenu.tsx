@@ -30,7 +30,7 @@ interface SidebarAccountMenuProps {
   servers: ServerTarget[]
   activeId: string
   info: ServerInfo
-  /** 用于「切换服务器」弹框逐行探测连通性。 */
+  /** 用于「切换TShock服务器」弹框逐行探测连通性。 */
   transport: BackendTransport
   onSelectServer: (id: string) => void
   onAddServer: (target: ServerTarget) => void
@@ -42,7 +42,7 @@ interface SidebarAccountMenuProps {
 
 /**
  * 侧栏底部账号卡片（NavUser 风格）：头像 + 用户名 + 服务器地址 + 展开箭头。
- * 点击展开菜单：切换服务器 / 登录·退出。
+ * 点击展开菜单：切换TShock服务器 / 登录·退出。
  * 头像联动「玩家管理」——查到当前登录账号本人时用其全身图。
  */
 export function SidebarAccountMenu({

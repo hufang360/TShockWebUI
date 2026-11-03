@@ -439,7 +439,7 @@
 - **「设置」是导航项且固定排在末尾**（`App.tsx` 的 `nav` 在遍历模块后 `push({ id: 'settings' })`）：新增内置 / 自定义模块都插在它前面。原页脚里的 `SettingsMenu` 已移除。
   `SidebarInset`（`<main>`）是滚动容器（图鉴等页面用 `closest('main')` 量高度）。
 - 侧栏底部账号区是 `SidebarAccountMenu`（NavUser 风格，`DropdownMenu`）：头像 + 用户名 + 服务器地址（**不再显示「服务器默认」**）+ 展开箭头；
-  菜单项为「切换服务器」（`ServerSwitcherDialog`）与「登录 / 退出」。头像会联动玩家管理——查到当前登录账号本人时用其全身图（`lib/selfAvatar.ts`，内存、按服务器分开）。
+  菜单项为「切换TShock服务器」（`ServerSwitcherDialog`）与「登录 / 退出」。头像会联动玩家管理——查到当前登录账号本人时用其全身图（`lib/selfAvatar.ts`，内存、按服务器分开）。
 - **未登录时**在账号卡片**上方**多渲染一条通栏主色登录按钮（`Button variant="primary"`），点击**直接打开登录框**（不必先进菜单）；已登录时不渲染该按钮。账号卡片本身保持原样（菜单里仍可切换服务器 / 退出）。
 - 测试定位：`data-testid="sidebar"`，收起状态读 `data-collapsed`（`data-state` 同义）；顶栏按钮名为 `nav.toggleSidebar`（「收起 / 展开侧栏」），`SidebarRail` 用 `nav.railToggle`，避免两个同名按钮。
 
@@ -519,14 +519,17 @@
 - **登录失败提示**：TShock 对「密码错 / 组缺 `tshock.rest.useapi` / 建令牌限流」返回**同一条 403**（`SecureRest.cs:117-176`），后端无法区分；密码登录失败时前端不再透出后端那句中文长句，而是渲染**逐条可核对的清单**（`login.failedTitle` / `login.failedWhy` / `login.cause.credentials|permission|rateLimit`），下方仍是可复制的赋权命令。英文界面也随之正确本地化。
 - **帮助浮层**：模式相关帮助 + 注册提示收进该 `Popover`（`login.help`，图标 + 文字），**hover 或点击**展开（hover 关闭有 150ms 延迟）；默认不占版面。
   - hover 打开不抢焦点（`onOpenAutoFocus` preventDefault），关闭也不把焦点弹回触发按钮（`onCloseAutoFocus` preventDefault）——避免「点输入框→闪一下→又弹回来」的死循环；点到浮层外面（如输入框）会关闭并聚焦目标（`onFocusOutside` / `onInteractOutside`）。
-- **切换服务器弹框**（标题现为「后端服务器」）：见下。
+- **切换服务器弹框**（标题现为「TShock服务器」）：见下。
 
-## 后端服务器弹框（`components/ServerSwitcher.tsx`）
+## TShock服务器弹框（`components/ServerSwitcher.tsx`）
 
 侧栏账号卡片与登录框都会打开它。
 
 - **列表行**：整行（地址 + 操作按钮）共用背景/hover；每行显示**完整 URL**（`scheme://host:port`，`lib/servers.ts` 的 `targetUrl()`），不再单列 http/https 标签；账号卡片 / 登录框等「外面」仍用 `hostPortLabel()` 的 `host:port` 简略形式。
 - **连通性检测**：每行一个**图标按钮**（在垃圾桶左边；内置项没有垃圾桶，就这一个）。图标随状态：已连通 = `Wifi`（绿）、无法连接 = `WifiOff`（红）、检测中 = `LoaderCircle` 转圈。点击该行按钮重新检测（`transport.serverStatus(header)`，内置项传空串）。打开 / 列表变化时自动全量探测一次。
+  - **图标左侧并排延迟**：已连通时显示这次探测的往返毫秒数（`text-2xs` + `font-pixel` + `tabular-nums`，不足 1ms 写 `<1 ms`），
+    数值进按钮的可读名称（`重新检测连通性: 已连通 · 42 ms`），视觉那一次用 `aria-hidden` 避免重复朗读。
+    口径是**浏览器 → 该上游**的整趟往返（含后端转发与 TShock 应答），不是单条 REST 的耗时；不可达 / 检测中不显示数字。
 - **新增**：默认收起表单，列表下方一个通栏 `variant="outline"` 「添加服务器」按钮；点开才出现「协议（只读）+ 主机 + 端口 + HTTPS 勾选」一行。**新增只入库、不自动切换**（`App.addServer` 不再调 `selectServer`）。
 - **修改**：每行（内置项除外）有铅笔按钮，点开预填表单，保存调 `onEdit(oldId, target)`（`lib/servers.ts` 的 `updateServerTarget()`）；改的是当前上游时会走一次切换并要求重新登录。
 - **测试定位**：`getByRole('button', { name: /添加服务器/ })`、`编辑` / `删除` / `保存`。

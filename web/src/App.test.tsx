@@ -33,7 +33,7 @@ function openAccountMenu() {
   fireEvent.keyDown(screen.getByRole('button', { name: '账号与服务器' }), { key: 'ArrowDown' })
 }
 
-/** 打开账号菜单并点选一项（如 '登录' / '退出登录' / '切换服务器'）。 */
+/** 打开账号菜单并点选一项（如 '登录' / '退出登录' / '切换TShock服务器'）。 */
 async function clickAccountItem(name: string) {
   // 先等 login / 确认框之类关闭，避免模态遮罩挡住菜单。
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -404,7 +404,7 @@ it('可新增自定义 TShock 上游（新增不自动切换）', async () => {
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
 
-  await clickAccountItem('切换服务器')
+  await clickAccountItem('切换TShock服务器')
   fireEvent.click(await screen.findByRole('button', { name: /添加服务器/ }))
   fireEvent.change(await screen.findByLabelText('IP / 域名'), { target: { value: '1.2.3.4' } })
   fireEvent.change(screen.getByLabelText('端口'), { target: { value: '9999' } })

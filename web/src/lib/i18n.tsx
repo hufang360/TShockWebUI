@@ -111,8 +111,8 @@ const zh: Dict = {
   'settings.note': '偏好仅保存在本机，不会上传。',
   'settings.loginNeeded': '激活模块、数据刷新与在线账户需要登录服务器后才能用（上面的界面偏好不需要）。',
 
-  'servers.title': '后端服务器',
-  'servers.switch': '切换服务器',
+  'servers.title': 'TShock服务器',
+  'servers.switch': '切换TShock服务器',
   'servers.host': 'IP / 域名',
   'servers.hostPlaceholder': '127.0.0.1',
   'servers.port': '端口',
@@ -1536,8 +1536,8 @@ const en: Dict = {
   'settings.loginNeeded':
     'Activating modules, data refresh and the online account need a server login — the interface preferences above do not.',
 
-  'servers.title': 'Backend servers',
-  'servers.switch': 'Switch server',
+  'servers.title': 'TShock servers',
+  'servers.switch': 'Switch TShock server',
   'servers.host': 'IP / host',
   'servers.hostPlaceholder': '127.0.0.1',
   'servers.port': 'Port',

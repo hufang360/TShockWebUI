@@ -49,12 +49,12 @@ function renderDialog(overrides: Partial<Parameters<typeof LoginDialog>[0]> = {}
   return { onSuccess, onSelectServer }
 }
 
-it('显示当前服务器；点击服务器一行打开「切换服务器」弹框', () => {
+it('显示当前服务器；点击服务器一行打开「切换TShock服务器」弹框', () => {
   const { onSelectServer } = renderDialog()
   expect(screen.getByText('127.0.0.*.*:7878')).toBeTruthy()
 
   fireEvent.click(screen.getByRole('button', { name: /^服务器/ }))
-  expect(screen.getByText('后端服务器')).toBeTruthy()
+  expect(screen.getByText('TShock服务器')).toBeTruthy()
   expect(screen.getByRole('button', { name: /添加服务器/ })).toBeTruthy()
 
   // 选中内置服务器 → 回调（由 App 切换上游并保留登录框）。

@@ -55,10 +55,10 @@ describe('SidebarAccountMenu', () => {
     expect(screen.queryByText('服务器默认')).toBeNull()
   })
 
-  it('菜单含「切换服务器」与「退出」', async () => {
+  it('菜单含「切换TShock服务器」与「退出」', async () => {
     const { onLogout } = renderMenu()
     openMenu()
-    expect(await screen.findByRole('menuitem', { name: '切换服务器' })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: '切换TShock服务器' })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: '退出' }))
     expect(onLogout).toHaveBeenCalledTimes(1)
   })
@@ -92,10 +92,10 @@ describe('SidebarAccountMenu', () => {
     expect(screen.getByRole('img', { name: 'Alice' })).toBeTruthy()
   })
 
-  it('打开「切换服务器」弹出服务器弹框', async () => {
+  it('打开「切换TShock服务器」弹出服务器弹框', async () => {
     renderMenu()
     openMenu()
-    fireEvent.click(await screen.findByRole('menuitem', { name: '切换服务器' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '切换TShock服务器' }))
     expect(await screen.findByRole('dialog')).toBeTruthy()
     // 表单默认收起，点「添加服务器」才出现 IP 输入框。
     expect(screen.queryByLabelText('IP / 域名')).toBeNull()

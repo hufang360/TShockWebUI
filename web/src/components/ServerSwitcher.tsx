@@ -35,7 +35,7 @@ export interface ServerSwitcherDialogProps {
   servers: ServerTarget[]
   activeId: string
   info: ServerInfo
-  /** 用于逐行探测「后端服务器」连通情况。 */
+  /** 用于逐行探测「TShock服务器」连通情况。 */
   transport: BackendTransport
   onSelect: (id: string) => void
   onAdd: (target: ServerTarget) => void
@@ -46,6 +46,11 @@ export interface ServerSwitcherDialogProps {
 
 /** 单行连通性探测状态。 */
 type ProbeState = 'checking' | 'online' | 'offline'
+
+/** 毫秒展示：不足 1ms 写 `<1 ms`，四舍五入成 0 会被误读成「没测到」。 */
+function formatLatency(ms: number): string {
+  return ms < 1 ? '<1 ms' : `${Math.round(ms)} ms`
+}
 
 /**
  * 管理 / 切换 TShock 上游的**受控弹框**（host 与 port 分开）。
@@ -76,6 +81,8 @@ export function ServerSwitcherDialog({
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [status, setStatus] = useState<Record<string, ProbeState>>({})
+  // 每行最近一次探测的往返延迟（毫秒）；不可达时不留旧值。
+  const [latency, setLatency] = useState<Record<string, number>>({})
 
   const resetForm = useCallback(() => {
     setHost('')
@@ -96,8 +103,19 @@ export function ServerSwitcherDialog({
   const probe = useCallback(
     async (id: string, header: string) => {
       setStatus((prev) => ({ ...prev, [id]: 'checking' }))
+      // 延迟量的是「浏览器 → 该上游」整趟往返（含后端转发与 TShock 应答），
+      // 也就是玩家实际感知的那一段；用 performance.now 避免系统时钟跳变。
+      const startedAt = performance.now()
       const res = await transport.serverStatus(header)
+      const ms = performance.now() - startedAt
       setStatus((prev) => ({ ...prev, [id]: res.reachable ? 'online' : 'offline' }))
+      setLatency((prev) => {
+        if (res.reachable) return { ...prev, [id]: ms }
+        if (!(id in prev)) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
     },
     [transport],
   )
@@ -151,27 +169,38 @@ export function ServerSwitcherDialog({
       selected ? 'bg-primary/15' : 'hover:bg-accent',
     )
 
-  // 每行一个「连通性检测」图标按钮（放在垃圾桶左边；内置项无垃圾桶，就它一个）。
+  // 每行一个「连通性检测」图标按钮（放在垃圾桶左边；内置项无垃圾桶，就它一个），
+  // 左边并排显示本次往返延迟（仅已连通时有意义）。
   const probeButton = (id: string, header: string) => {
     const s = status[id]
-    const label =
+    const ms = s === 'online' ? latency[id] : undefined
+    const state =
       s === 'online'
         ? t('servers.online')
         : s === 'offline'
           ? t('servers.offline')
           : t('servers.checking')
     return (
-      <IconAction
-        label={`${t('servers.probe')}: ${label}`}
-        icon={s === 'online' ? Wifi : s === 'offline' ? WifiOff : LoaderCircle}
-        iconClassName={cn(
-          s === 'online' && 'text-success',
-          s === 'offline' && 'text-destructive',
-          s === 'checking' && 'animate-spin',
-        )}
-        className="shrink-0"
-        onClick={() => void probe(id, header)}
-      />
+      <div className="flex shrink-0 items-center">
+        {/* 槽位始终占位（不可达时为空）且定宽：多行的信号图标才能竖着对齐，
+            重测时 URL 的截断位置也不跟着数字长短跳。 */}
+        <span
+          aria-hidden
+          className="w-12 shrink-0 text-right font-pixel text-2xs tabular-nums text-muted-foreground"
+        >
+          {ms === undefined ? '' : formatLatency(ms)}
+        </span>
+        <IconAction
+          label={`${t('servers.probe')}: ${state}${ms === undefined ? '' : ` · ${formatLatency(ms)}`}`}
+          icon={s === 'online' ? Wifi : s === 'offline' ? WifiOff : LoaderCircle}
+          iconClassName={cn(
+            s === 'online' && 'text-success',
+            s === 'offline' && 'text-destructive',
+            s === 'checking' && 'animate-spin',
+          )}
+          onClick={() => void probe(id, header)}
+        />
+      </div>
     )
   }
 

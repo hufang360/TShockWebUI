@@ -72,6 +72,24 @@ describe('ServerSwitcherDialog', () => {
     expect(await screen.findByRole('button', { name: /无法连接/ })).toBeTruthy()
   })
 
+  it('已连通时在信号图标旁显示往返延迟（毫秒）', async () => {
+    renderDialog()
+    // 只认那一小段文本（按钮内的隐藏标签里也有同样的「… 42 ms」）。
+    expect(await screen.findByText(/^(\d+|<1) ms$/)).toBeTruthy()
+    // 延迟也进按钮的可读名称，避免只靠视觉。
+    expect(screen.getByRole('button', { name: /已连通 · .*ms/ })).toBeTruthy()
+  })
+
+  it('无法连接时不显示延迟', async () => {
+    renderDialog({
+      transport: {
+        serverStatus: async () => ({ reachable: false }),
+      } as unknown as BackendTransport,
+    })
+    await screen.findByRole('button', { name: /无法连接/ })
+    expect(screen.queryByText(/\d+ ms/)).toBeNull()
+  })
+
   it('默认不显示新增表单，点「添加服务器」后聚焦 IP 输入框', () => {
     renderDialog()
     expect(screen.queryByLabelText('IP / 域名')).toBeNull()

@@ -470,7 +470,7 @@ export function LoginDialog({
                 </div>
               )}
 
-              {/* 当前服务器：点击打开「切换服务器」弹框（放在次要登录方式下面一行）。 */}
+              {/* 当前服务器：点击打开「切换TShock服务器」弹框（放在次要登录方式下面一行）。 */}
               {serverRow}
 
               {/* 登录帮助：`mt-auto` 推到左栏左下角（不再用带底色的 DialogFooter）。 */}
