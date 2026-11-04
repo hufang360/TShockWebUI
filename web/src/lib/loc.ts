@@ -3,7 +3,22 @@ import type { LocalizationBundle } from '@/types'
 const BASE = import.meta.env.BASE_URL
 
 /**
- * 解析配方组这类「官方本地化 key」：
+ * 把语言材质包的覆盖层叠到官方本地化表上（不修改入参）。
+ * 只处理覆盖层里出现的分类与 key；同一 key 以覆盖层为准。
+ */
+export function mergeLocBundle(
+  base: LocalizationBundle,
+  overrides: LocalizationBundle,
+): LocalizationBundle {
+  const merged: LocalizationBundle = { ...base }
+  for (const [category, entries] of Object.entries(overrides)) {
+    if (!entries) continue
+    merged[category] = { ...(base[category] ?? {}), ...entries }
+  }
+  return merged
+}
+
+/** 解析配方组这类「官方本地化 key」：
  * - `Category.Key`（如 `ItemName.Wood` / `NPCName.Turtle` / `Misc.Macaw`）
  * - `Lang.misc[N]`（旧式 misc）→ `LegacyMisc.N`
  */

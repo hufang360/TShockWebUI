@@ -14,10 +14,12 @@ import { LoginGate } from '@/components/LoginGate'
 import { useI18n } from '@/lib/i18n'
 import { APP_VERSION } from '@/lib/version'
 import { useCommandResults } from '@/lib/commandResults'
+import { NO_LANGUAGE_PACKS, type LanguagePacksController } from '@/lib/languagePack/useLanguagePacks'
 import { useLocalState } from '@/hooks/useLocalState'
 import { PluginDiagnosticsCard } from '@/components/PluginDiagnosticsCard'
 import { WebAccountSection } from '@/components/WebAccountSection'
 import { CustomModulesSection } from '@/components/settings/CustomModulesSection'
+import { LanguagePackSection } from '@/components/settings/LanguagePackSection'
 import { PreferencesCards } from '@/components/settings/PreferencesCards'
 import {
   MODULE_BY_ID,
@@ -59,6 +61,8 @@ interface SettingsPageProps {
   onCustomModulesChange: (next: CustomModule[]) => void
   onTokenInvalid: () => void
   onLogin: () => void
+  /** 语言材质包（浏览器本地；设置页里上传 / 排序 / 启用）。 */
+  languagePacks?: LanguagePacksController
 }
 
 /** 单个模块依赖插件的探测结果。 */
@@ -106,6 +110,7 @@ export function SettingsPage({
   onCustomModulesChange,
   onTokenInvalid,
   onLogin,
+  languagePacks = NO_LANGUAGE_PACKS,
 }: SettingsPageProps) {
   const { t } = useI18n()
   const [caps, setCaps] = useState<Record<ModuleId, CapState>>({
@@ -388,6 +393,7 @@ export function SettingsPage({
             setBatchModeSet(true)
           }}
         />
+        <LanguagePackSection controller={languagePacks} />
         <LoginGate onLogin={onLogin} hint={t('settings.loginNeeded')} />
         <p className="pt-1 text-center text-2xs text-muted-foreground">TShockWebUI {APP_VERSION}</p>
       </div>
@@ -413,6 +419,7 @@ export function SettingsPage({
           setBatchModeSet(true)
         }}
       />
+      <LanguagePackSection controller={languagePacks} />
       <CollapsibleCard
         title={t('modules.activate')}
         icon={<Plug />}

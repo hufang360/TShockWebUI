@@ -41,10 +41,17 @@ function dataDirPlugin(): Plugin {
     closeBundle() {
       const outDir = join(webDir, 'dist', 'data')
       mkdirSync(outDir, { recursive: true })
-      for (const name of readdirSync(dataDir)) {
-        const src = join(dataDir, name)
-        if (statSync(src).isFile()) copyFileSync(src, join(outDir, name))
+      // 递归复制：`data/langpacks/` 里的内置语言材质包也要一起进产物。
+      const copyTree = (srcDir: string, destDir: string) => {
+        mkdirSync(destDir, { recursive: true })
+        for (const name of readdirSync(srcDir)) {
+          const src = join(srcDir, name)
+          const dest = join(destDir, name)
+          if (statSync(src).isDirectory()) copyTree(src, dest)
+          else if (statSync(src).isFile()) copyFileSync(src, dest)
+        }
       }
+      copyTree(dataDir, outDir)
     },
   }
 }

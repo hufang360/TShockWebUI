@@ -24,6 +24,8 @@ import type {
   PermissionsData,
 } from '@/types'
 import { ATLAS_JSON_FETCH } from './atlas'
+import { mergeLocBundle } from './loc'
+import { composeItemTip } from './itemTips'
 import { readJson, removeKey, StorageKeys, writeJson } from './storage'
 import { extraParamSetsFor } from './commandMeta'
 import { resolveTileName } from './tiles'
@@ -78,13 +80,18 @@ function withCommandMeta(base: Dataset): Dataset {
  * 载入指定语言的数据集。
  *
  * 语言相关数据一律只在运行期取当前语言那一份：
- * - `loc.<culture>.json`：官方本地化（物品名 / 词缀名 / 配方组名），游戏原生两级格式；
+ * - `loc.<culture>.json`：官方本地化（物品名 / 词缀名 / 提示文案…），游戏原生两级格式；
  * - `item-tips.<culture>.json`：物品提示行。
  * 与语言无关的 `items.json` / `item-stats.json` / `recipes.json` 只加载一次。
+ *
+ * `overrides` 是**语言材质包**的合并结果（只含被改写的分类 / key）。
+ * 有覆盖时物品提示改为用合并后的本地化表重算（`lib/itemTips.ts`），
+ * 否则用构建期算好的 `item-tips.<culture>.json`（行为与以前完全一致）。
  */
-export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
+export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBundle): Promise<Dataset> {
   const culture = cultureOf(lang)
-  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, loc, tiles, walls, drops, tileNames, permissions] = await Promise.all([
+  const overrideActive = overrides != null && Object.keys(overrides).length > 0
+  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, baseLoc, tiles, walls, drops, tileNames, permissions] = await Promise.all([
     fetchJson<{ items: Omit<Item, 'name'>[] }>('items.json'),
     fetchJson<{ prefixes: Omit<Prefix, 'name'>[] }>('prefixes.json'),
     fetchJson<{ npcs: Omit<Npc, 'name'>[] }>('npcs.json'),
@@ -94,7 +101,8 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     fetchJson<Atlas>('items-atlas.json', ATLAS_JSON_FETCH),
     fetchJson<RecipesData>('recipes.json'),
     fetchJson<ItemStatsBaseData>('item-stats.json'),
-    fetchJson<ItemTipsData>(`item-tips.${culture}.json`),
+    // 材质包生效时提示会按合并后的本地化表重算，不需要再取构建期结果。
+    overrideActive ? Promise.resolve(null) : fetchJson<ItemTipsData>(`item-tips.${culture}.json`),
     fetchJson<ItemGroupsData>('item-groups.json'),
     fetchJson<ShimmerData>('shimmer.json'),
     fetchJson<PrefixModsData>('prefix-mods.json'),
@@ -106,6 +114,8 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     fetchJson<TileNamesData>('tile-names.json'),
     fetchJson<PermissionsData>('permissions.json'),
   ])
+
+  const loc: LocalizationBundle = overrideActive ? mergeLocBundle(baseLoc, overrides) : baseLoc
 
   // 名字从官方本地化解析（不再落在 items.json / prefixes.json 里）。
   const itemName = loc.ItemName ?? {}
@@ -123,8 +133,19 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
   for (const [id, entry] of Object.entries(stats.items)) {
     itemStats.items[id] = entry.stats ? { stats: entry.stats } : {}
   }
-  for (const [id, tip] of Object.entries(tips.items)) {
-    itemStats.items[id] = { ...(itemStats.items[id] ?? {}), tip }
+  // 物品 id → 物品（`tileWand` 提示行要用目标物品名；下面的 tips 重算也要用）。
+  const itemsById = new Map(items.map((it) => [it.id, it]))
+  if (overrideActive) {
+    const nameOf = (id: number) => itemsById.get(id)?.name
+    for (const it of items) {
+      const entry = (itemStats.items[String(it.id)] ||= {})
+      const lines = composeItemTip({ id: it.id, key: it.key, stats: entry.stats }, loc, nameOf)
+      if (lines.length > 0) entry.tip = lines
+    }
+  } else if (tips) {
+    for (const [id, tip] of Object.entries(tips.items)) {
+      itemStats.items[id] = { ...(itemStats.items[id] ?? {}), tip }
+    }
   }
 
   // 微光转换：正向 + 反向索引
@@ -146,9 +167,6 @@ export async function loadDataset(lang: Lang = 'zh'): Promise<Dataset> {
     const set = prefixSets.sets[idx]
     if (set) rollablePrefixesById.set(Number(id), set)
   }
-
-  // 物品 id → 物品（`tileNameById` 与 dataset 自己都用这一份，别建两遍 6195 条的 Map）
-  const itemsById = new Map(items.map((it) => [it.id, it]))
 
   // 图格显示名（口径同游戏地图图例）：MapObject → 图例物品 → 代表物品 → 常量名。
   // 放进 dataset 预计算，页面/搜索/导出都能直接用（754 条，成本可忽略）。

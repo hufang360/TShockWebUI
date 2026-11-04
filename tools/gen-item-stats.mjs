@@ -28,8 +28,22 @@ const parseJsonLoose = (p) => JSON.parse(readFileSync(p, 'utf8').replace(/,(\s*[
 // ── 本地化 ──────────────────────────────────────────────────
 // 键位占位符（游戏用当前绑定替换；这里给固定、可读的展示名）
 const INPUT_SUBS = {
-  zh: { InputTrigger_Healing: '快速治疗', InputTrigger_ManaHealing: '快速回蓝', InputTrigger_QuickBuff: '快速增益', InputTrigger_Mount: '骑乘', InputTrigger_UseOrAttack: '使用/攻击', InputTrigger_InteractWithTile: '交互', InputTrigger_ToggleOrOpen: '开启/切换' },
-  en: { InputTrigger_Healing: 'Quick Heal', InputTrigger_ManaHealing: 'Quick Mana', InputTrigger_QuickBuff: 'Quick Buff', InputTrigger_Mount: 'Mount', InputTrigger_UseOrAttack: 'Use/Attack', InputTrigger_InteractWithTile: 'Interact', InputTrigger_ToggleOrOpen: 'Open/Toggle' },
+  zh: {
+    InputTrigger_Healing: '快速治疗', InputTrigger_ManaHealing: '快速回蓝', InputTrigger_QuickBuff: '快速增益',
+    InputTrigger_Mount: '骑乘', InputTrigger_UseOrAttack: '使用/攻击', InputTrigger_InteractWithTile: '交互',
+    InputTrigger_ToggleOrOpen: '开启/切换', InputTrigger_Grapple: '抓钩', InputTrigger_Jump: '跳跃',
+    InputTrigger_LockOn: '锁定', InputTrigger_QuickEquip: '快速装备', InputTrigger_SmartCursor: '智能光标',
+    InputTrigger_SmartSelect: '智能选择', InputTrigger_RadialHotbar: '径向热键栏+',
+    InputTrigger_RadialQuickbar: '径向快捷栏+', InputTrigger_InteractWithTileUI: '交互',
+  },
+  en: {
+    InputTrigger_Healing: 'Quick Heal', InputTrigger_ManaHealing: 'Quick Mana', InputTrigger_QuickBuff: 'Quick Buff',
+    InputTrigger_Mount: 'Mount', InputTrigger_UseOrAttack: 'Use/Attack', InputTrigger_InteractWithTile: 'Interact',
+    InputTrigger_ToggleOrOpen: 'Open/Toggle', InputTrigger_Grapple: 'Grapple', InputTrigger_Jump: 'Jump',
+    InputTrigger_LockOn: 'Lock On', InputTrigger_QuickEquip: 'Quick Equip', InputTrigger_SmartCursor: 'Smart Cursor',
+    InputTrigger_SmartSelect: 'Smart Select', InputTrigger_RadialHotbar: 'Radial Hotbar+',
+    InputTrigger_RadialQuickbar: 'Radial Quickbar+', InputTrigger_InteractWithTileUI: 'Interact',
+  },
 };
 
 function makeLoc(culture) {
@@ -201,12 +215,16 @@ try {
   }
 } catch { /* 可选 */ }
 
-const NUM_KEYS = ['damage', 'crit', 'knockBack', 'useAnimation', 'defense', 'pick', 'axe', 'hammer',
+const NUM_KEYS = ['damage', 'crit', 'knockBack', 'useAnimation', 'useStyle', 'defense', 'pick', 'axe', 'hammer',
   'tileBoost', 'fishingPole', 'bait', 'mana', 'healLife', 'healMana', 'manaIncrease', 'lifeRegen',
   'buffType', 'buffTime', 'rare', 'value', 'ammo', 'useAmmo', 'createTile', 'createWall', 'shoot', 'shootSpeed',
-  'decraftStack'];
+  'decraftStack', 'tileWand', 'tooltipDamageMultiplier', 'headSlot', 'bodySlot', 'legSlot'];
+// 这几个字段 ``0 / 1 / -1`` 的含义与「缺席」不同，前端按这些默认值还原（见 web/src/lib/itemTips.ts）。
 const BOOL_KEYS = ['autoReuse', 'melee', 'ranged', 'magic', 'summon', 'sentry', 'accessory', 'vanity',
-  'material', 'consumable', 'questItem', 'expert', 'whip', 'hook', 'canDecraft'];
+  'material', 'consumable', 'questItem', 'expert', 'whip', 'hook', 'canDecraft',
+  // 材质包需要在运行期重算 tip 时用到的字段（gen-item-stats 的 composeTip 输入）。
+  'social', 'hasVanityEffects', 'mountCart', 'placeTileOnAltUse', 'notAmmo',
+  'chlorophyteExtractinatorConsumable', 'wireable', 'container', 'wireTrigger'];
 
 const items = {};
 const tipsZh = {};
@@ -221,13 +239,25 @@ for (const [idStr, it] of Object.entries(raw.items)) {
   const stats = {};
   for (const k of NUM_KEYS) {
     const v = it[k];
+    // createTile 的 0 是真实图格（泥土），-1 才是「不能放置」，不能用 falsy 判断。
+    if (k === 'createTile') { if (typeof v === 'number' && v >= 0) stats[k] = v; continue; }
+    // 槽位 / 魔杖默认 -1，只记有效值。
+    if (k === 'headSlot' || k === 'bodySlot' || k === 'legSlot' || k === 'tileWand') {
+      if (v > 0) stats[k] = v;
+      continue;
+    }
     if (!v) continue;
-    if ((k === 'createTile' || k === 'damage' || k === 'shoot' || k === 'ammo' || k === 'useAmmo') && v < 0) continue;
+    if ((k === 'damage' || k === 'shoot' || k === 'ammo' || k === 'useAmmo') && v < 0) continue;
     if (k === 'createWall' && v < 0) continue;
+    // 默认值 1（绝大多数物品），只记例外。
+    if (k === 'tooltipDamageMultiplier' && v === 1) continue;
     stats[k] = v;
   }
   for (const k of BOOL_KEYS) if (it[k]) stats[k] = true;
-  if (it.mountType > 0) stats.mountType = it.mountType;
+  // mountType 默认 -1；0 也是有效坐骑，不能丢（否则「可装备」行会少）。
+  if (it.mountType !== -1) stats.mountType = it.mountType;
+  const isPet = it.buffType > 0 && (PETS.vanity.has(it.buffType) || PETS.light.has(it.buffType));
+  if (isPet) stats.pet = true;
   if (Object.keys(stats).length) items[id] = { stats };
   if (zh.length) { tipsZh[id] = zh; tipCount++; }
   if (en.length) tipsEn[id] = en;

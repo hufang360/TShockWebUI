@@ -13,6 +13,9 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
 
 数据对应 **Terraria 1.4.5.8**。版本不匹配时必须重新生成，否则物品 ID / 名称 / 图标可能错位。
 
+> `data/langpacks/` **不是生成物**：内置 Terraria 语言材质包（创意工坊 zip 原样）。
+> 用途与解析规则见 [`docs/计划-语言材质包.md`](../docs/计划-语言材质包.md)。
+
 ## 仓库策略（是否入库）
 
 `data/` 由脚本生成，但**全部提交进仓库**（含图集 `items-atlas.png` / `player-atlas.png`，约 8.7MB），
@@ -27,9 +30,12 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
 
 语言相关数据**按界面语言各存一份**，运行期只加载当前语言那一份（`loadDataset(lang)`）：
 
-- `loc.<culture>.json`：官方本地化（物品名 / 词缀名 / 配方组名），保持游戏原生两级格式
-  `{分类:{key:值}}`，值逐字取自官方 JSON（仅收录运行期用到的分类）。
-- `item-tips.<culture>.json`：物品提示行（按语言）。
+- `loc.<culture>.json`：官方本地化（物品名 / 词缀名 / 配方组名 / 物品提示文案 / Buff 描述 / 图例名…），保持游戏原生两级格式
+  `{分类:{key:值}}`，值逐字取自官方 JSON（仅收录运行期用到的分类；
+  其中 `ItemTooltip` / `CommonItemTooltip` / `LegacyTooltip` / `GameUI` / `LegacyInterface` / `PaintingArtist` /
+  `BuffDescription` 供语言材质包在运行期重算提示用）。`InputTrigger` 是按键触发器的固定展示名（中英各一份）。
+- `item-tips.<culture>.json`：物品提示行（按语言）。**没有语言材质包时的默认结果**；
+  有材质包时 `loadDataset(lang, overrides)` 会用 `item-stats + 合并后的 loc` 重算（规则见 `web/src/lib/itemTips.ts`）。
 
 与语言无关的数据（`items.json` / `item-stats.json` / `recipes.json` / 图集 / 元信息）只加载一次。
 `culture` 为 `zh-Hans` 或 `en-US`。
@@ -149,7 +155,12 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
   伤害/暴击为**物品基础值**（暴击已按无装备玩家 +4% 基础值处理），不含前缀与玩家/世界状态相关行。
   游戏内这几行会按当前角色属性重算，所以图鉴会对含这些行的物品显示一句「基础值 · 不含角色属性加成」。
 - 金币（ID 71–74）按「背包里没有 Coin Gun(905)」的默认行为处理：只显示「可放置」，不显示伤害/暴击行。
-- `stats` 只保留非默认字段，供详情面板/筛选使用。其中 `canDecraft` / `decraftStack` 是「可微分」相关：
+- `stats` 只保留非默认字段，供详情面板/筛选使用，以及**语言材质包生效时重算提示**
+  （`web/src/lib/itemTips.ts` 需要 `social` / `useStyle` / `tileWand` / `tooltipDamageMultiplier` / `mountCart` /
+  `placeTileOnAltUse` / `notAmmo` / `chlorophyteExtractinatorConsumable` / `wireable` / `container` /
+  `wireTrigger` / 槽位 / `createTile`（含 0）/ `pet` 等；`itemTips.realdata.test.ts` 保证重算结果与
+  `item-tips.<culture>.json` 逐行一致）。
+- `canDecraft` / `decraftStack` 是「可微分」相关：
   `canDecraft` = 该物品丢进微光会走「分解还原材料」分支（严格复刻 `WorldItem.GetShimmered` 的分支顺序：
   金币 / 有微光转换 / 4986·560 / `makeNPC` 优先，其余才看 `ShimmerTransforms.GetDecraftingRecipeIndex`）；
   `decraftStack` = 分解所用的配方一次产出多少（>1 时要凑够这么多才能分解，如平台×2、箭矢×10）。

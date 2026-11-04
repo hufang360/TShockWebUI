@@ -191,7 +191,8 @@ export interface ItemStatsData {
 
 /**
  * 官方本地化文件（游戏原生两级格式 `{分类:{key:值}}`）。
- * 当前只收录运行期用到的分类：ItemName / Prefix / Misc / LegacyMisc / NPCName。
+ * 运行期用到的分类：物品名 / 词缀 / 配方组名 / NPC / Buff / 图格图例 / 物品提示文案 / 按键触发器展示名等
+ * （完整清单见 `tools/gen-data.mjs` 的 `LOC_CATEGORIES` 与 `docs/功能-语言材质包.md`）。
  */
 export type LocalizationBundle = Record<string, Record<string, string>>
 
