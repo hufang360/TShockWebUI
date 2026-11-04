@@ -1,7 +1,7 @@
 {
  "meta": {
   "source": "TShockAPI/Commands.cs (核心指令, best-effort 解析) + i18n/zh_CN/TShockAPI.po",
-  "tshockVersion": "6.1.0",
+  "tshockVersion": "6.2.1",
   "note": "插件指令和运行时别名不在此文件中，实际可用指令以目标服务器为准",
   "paramNote": "paramSets 为 best-effort：仅来自 TShock 源码里可信的用法串/枚举常量或方法体不引用 args.Parameters 的机械判定；没有 paramSets 的指令请自由输入",
   "count": 95,

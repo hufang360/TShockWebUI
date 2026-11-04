@@ -23,9 +23,8 @@
 ## 1. 版本
 
 - **Terraria 1.4.5.8**：`tr-code-1458/Properties/AssemblyInfo.cs` → `AssemblyFileVersion("1.4.5.8")`。
-- **TShock v6.2.1**：远程 `origin` 存在 tag `v6.2.1`（commit `b25b3e5`）。
-  本地开发检出为 `v6.1.0-43`（`TShockAPI.csproj <Version>6.1.0</Version>`）。
-  已 `git diff v6.1.0..v6.2.1` 比对 REST 相关文件：
+- **TShock v6.2.1**：tag `v6.2.1`（commit `b25b3e5`），本地 `general-devel` 已更新到该提交（`TShockAPI.csproj <Version>6.2.1</Version>`）。
+  从 v6.1.0 升上来时已 `git diff v6.1.0..v6.2.1` 比对 REST 相关文件：
   - `RestManager.cs`：仅 `/v3|/v4 players/read` 的物品过滤由 `p.active` 改为 `!p.IsAir`。
   - `rawcmd`、`token/create`、`tokentest`、权限判定逻辑**无变化**。
 - 正式联调前仍需在目标服务器执行 `version` 指令确认运行时版本。

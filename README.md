@@ -60,7 +60,7 @@ TShock 伴侣，面向服主，也面向玩家！
 **网页端**
 
 - 添加tshock服务器，中间填写你的联机IP，旁边的 `7878` 是 REST API 端口，一般不用改。
-- 登录TShock，需要用到你在TShock服务器里的 玩家名和密码，如果使用了自动注册插件，玩家可以进游戏后输入`/pwd`查看自己的密码，服主可以执行 `/ar look 玩家名` 帮玩家查询，也可以重置玩家的密码`/user password 用户名 新密码`。
+- 登录TShock，需要用到你在TShock服务器里的 玩家名和密码。如果忘了密码，请联系服主重置：`/user password 用户名 新密码`。
 
 ---
 
@@ -79,6 +79,9 @@ docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.8
 
 # 启动容器
 # http://服务器ip:18080
+# Linux 上如果解析不了 host.docker.internal，加
+#   --add-host host.docker.internal:host-gateway
+# 或把 TSHOCK_URL 换成宿主机 IP。
 docker run -d --name tswui -p 18080:8080 \
   -e TSHOCK_URL=http://host.docker.internal:7878 \
   -e TSHOCK_ALLOW_CUSTOM_TARGETS=true \

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "tshockVersion": "6.1.0",
+    "tshockVersion": "6.2.1",
     "permissionCount": 175,
     "groupCount": 8,
     "source": "TShockAPI/Permissions.cs + TShockAPI/Rest/RestPermissions.cs（含注解 [Description]）、TShockAPI/DB/GroupManager.cs、TShockAPI/Configuration/TShockConfig.cs",
