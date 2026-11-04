@@ -47,7 +47,7 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
 ### 验证强度（实测：一次全量测试 = 118 个 worker、CPU 约 150s，默认并发会把 10 核打满）
 
 - **迭代期只跑相关文件**：`npx vitest run src/pages/XxxPage.test.tsx`（<3s，单核）；全量只在收尾跑一次。
-  中途必须全量就限并发：`npx vitest run --maxWorkers=25`。
+  中途必须全量就限并发：`npx vitest run --maxWorkers=10`。
 - **`tsc -b` 可常跑**（~4s）；**`vite build` 只在交付前**跑一次。
 - **不启浏览器、不留后台进程**：收尾 `ps` 确认一遍（vite / 无头 Chrome / vitest）。
 - **只在不确定的情况才截图查看界面**（改布局没把握时）；能靠代码或测试判断的不要开浏览器，
