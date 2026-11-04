@@ -296,6 +296,7 @@ describe('ResultPanel', () => {
     const tip = await screen.findByRole('tooltip')
     expect(within(tip).getByText('传奇')).toBeTruthy()
     expect(within(tip).getByText('生命水晶')).toBeTruthy()
-    expect(within(tip).getByText('x5')).toBeTruthy()
+    // 数量画在 tips 的图标右下角（canvas 里的数字），不再写 `x5` 文字
+    expect(within(tip).queryByText(/^x\d+$/)).toBeNull()
   })
 })

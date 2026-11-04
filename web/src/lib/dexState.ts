@@ -25,6 +25,8 @@ export interface DexState {
   selectedId: number | null
   /** 详情里预览的词缀 id（0 = 无词缀）。 */
   prefixId: number
+  /** 详情里预览的堆叠数量（1 = 不显示；从带 `sN` 的标签打开详情时才有）。 */
+  stack: number
 }
 
 /** 默认游戏分组页签：默认落到「工具」（「全部」数据量太大）。 */
@@ -49,6 +51,7 @@ export function readDexState(): DexState {
       scrollTop: 0,
       selectedId: null,
       prefixId: 0,
+      stack: 1,
     }
   )
 }

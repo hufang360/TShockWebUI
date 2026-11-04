@@ -79,8 +79,35 @@ export function NpcCell({
 }
 
 /** NPC 表格视图：ID / 贴图 / 名称 / 内部名；整行可点（含键盘 Enter / 空格），打开详情抽屉。 */
-export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc: Npc) => void }) {
-  const { t } = useI18n()
+export function NpcTableLayout({
+  rows,
+  twoCols = false,
+  onSelect,
+}: {
+  rows: Npc[]
+  /** 是否允许排成两列（与图格 / 墙 / Buff 共用同一个 checkbox）。 */
+  twoCols?: boolean
+  onSelect: (npc: Npc) => void
+}) {
+  const [left, right] = splitRows(rows, twoCols)
+  return (
+    <div className={cn('grid gap-x-6 gap-y-3', right.length > 0 && 'xl:grid-cols-2')}>
+      <NpcTable rows={left} onSelect={onSelect} />
+      {right.length > 0 && <NpcTable rows={right} onSelect={onSelect} />}
+    </div>
+  )
+}
+
+/**
+ * 单张 NPC 表：ID / 图标 / 名称 / 英文名（英文界面下这一列是内部名）。
+ *
+ * 为什么要英文名而不是内部名：内部名（`EyeofCthulhu`）对人没用，而英文名（`Eye of Cthulhu`）
+ * 是 `/sb`、`/tpnpc` 等指令认的那个名字（`Npc.en`，来源 `loc.en-US` 的 `NPCName`）。
+ */
+function NpcTable({ rows, onSelect }: { rows: Npc[]; onSelect: (npc: Npc) => void }) {
+  const { t, lang } = useI18n()
+  /** 英文界面下「名称」已经是英文，这一列改回内部名（指令里的枚举名）。 */
+  const secondary = (npc: Npc) => (lang === 'en' ? npc.key : (npc.en ?? npc.key))
   return (
     <div className="overflow-clip rounded-control border border-border/60">
       <table className="w-full table-fixed border-collapse text-sm">
@@ -95,7 +122,9 @@ export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc
             <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
             <th className="px-3 py-2 text-left font-medium">{t('dataId.table.name')}</th>
-            <th className="px-3 py-2 text-left font-medium">{t('dataId.table.key')}</th>
+            <th className="px-3 py-2 text-left font-medium">
+              {lang === 'en' ? t('dataId.table.key') : t('dataId.table.english')}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -120,9 +149,9 @@ export function NpcTableLayout({ rows, onSelect }: { rows: Npc[]; onSelect: (npc
               </td>
               <td
                 className="truncate px-3 py-2 font-mono text-xs text-muted-foreground"
-                title={npc.key}
+                title={secondary(npc)}
               >
-                {npc.key}
+                {secondary(npc)}
               </td>
             </tr>
           ))}

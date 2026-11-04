@@ -84,6 +84,8 @@ interface ItemTooltipContentProps {
   atlas?: Atlas
   stat?: ItemStatEntry
   prefix?: string | null
+  /** 当前词缀 id（0 / 缺省 = 无）；从带修饰符的标签打开详情时交给它。 */
+  prefixId?: number
   /** 词缀数值修正（有则在提示里重算伤害/暴击/速度/击退）。 */
   prefixMods?: PrefixMods
   stack?: number
@@ -108,6 +110,7 @@ export function ItemTooltipContent({
   atlas,
   stat,
   prefix,
+  prefixId,
   prefixMods,
   stack,
   name,
@@ -148,14 +151,12 @@ export function ItemTooltipContent({
     return (
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <ItemIcon item={item} atlas={atlas} size={28} tooltip={false} />
+          {/* 堆叠数直接画在图标右下角（游戏观感），不再在后面写 `x10`。 */}
+          <ItemIcon item={item} atlas={atlas} size={28} stack={showStack ? stack : undefined} tooltip={false} />
           <span className="text-[15px] font-semibold" style={{ color: rarityColor(rare) }}>
             {prefix ? <span className="text-amber-300">{prefix} </span> : null}
             {name ?? item.name}
           </span>
-          {showStack ? (
-            <span className="font-pixel text-sm text-muted-foreground">x{stack}</span>
-          ) : null}
         </div>
         {(lines.length > 0 || deltaLines.length > 0) && (
           <div className="flex flex-col gap-0.5 text-sm leading-5 text-foreground/80">
@@ -212,7 +213,11 @@ export function ItemTooltipContent({
               e.stopPropagation()
               // 先收起提示：它是 z-[100]，会浮在随后打开的抽屉（z-50）上面。
               closeItemTooltip()
-              detail.open(item.id)
+              // 带上标签里的词缀 / 堆叠：详情 tips 与词缀下拉会直接对得上。
+              detail.open(item.id, {
+                prefixId: prefixId && prefixId > 0 ? prefixId : undefined,
+                stack: stack != null && stack > 1 ? stack : undefined,
+              })
             }}
             aria-label={t('dex.detail')}
             className={cn(iconBtnClass, 'hover:text-zinc-100')}
@@ -246,12 +251,11 @@ export function ItemTooltipContent({
     >
       {!hideHeader && (
         <div className="flex items-center gap-2 whitespace-nowrap">
-          <ItemIcon item={item} atlas={atlas} size={28} tooltip={false} />
+          <ItemIcon item={item} atlas={atlas} size={28} stack={showStack ? stack : undefined} tooltip={false} />
           {prefix ? <span className="text-amber-300">{prefix}</span> : null}
           <span className="text-[15px] leading-6 font-semibold" style={{ color: rarityColor(rare) }}>
             {name ?? item.name}
           </span>
-          {showStack ? <span className="font-pixel text-sm font-bold text-zinc-300">x{stack}</span> : null}
           {tipActions}
         </div>
       )}

@@ -44,7 +44,7 @@
 | Separator | `ui/Separator.tsx` | radix separator | 分隔线一律用它，不要 `border-t/b` div 或 `<hr>` |
 | Breadcrumb | `ui/Breadcrumb.tsx` | radix slot + lucide | 内容区顶栏只显示**当前页面**（不再带分组前缀）的 `Breadcrumb/BreadcrumbList/BreadcrumbItem/BreadcrumbPage`；纯展示，带 `aria-current="page"` |
 | Collapsible | `ui/Collapsible.tsx` | radix collapsible | 可折叠区块（玩家管理的银行 / 配装分区）；`CollapsibleTrigger` 包在自定义标题按钮上 |
-| DetailSection | `components/DetailSection.tsx` | Collapsible + `CollapseChevron` + `ItemIcon` | 物品详情里的**可折叠分区**（唯一实现）：`[固定图标] 彩色标题 + 箭头`，标题色取 `lib/sectionTones.ts` 的 `RECIPE_SECTION_TONE`。合成来源 / 用于合成 / 微光嬗变 / 词缀都走它；`twoColumn` 开关两列网格 |
+| DetailSection | `components/DetailSection.tsx` | Collapsible + `CollapseChevron` + `ItemIcon` | 物品详情里的**可折叠分区**（唯一实现）：`[固定图标] 彩色标题 + 箭头`，标题色取 `lib/sectionTones.ts` 的 `RECIPE_SECTION_TONE`。「合成」/「作为材料」/「微光嬗变」/「词缀」都走它；`twoColumn` 开关两列网格 |
 | Sidebar | `ui/Sidebar.tsx` | Sheet + Tooltip + Button + Separator + `hooks/use-mobile` | 见下 |
 
 `components/ui/index.ts` 统一再导出；业务代码从 `@/components/ui` 引入。
@@ -54,7 +54,7 @@
 - **状态色走语义令牌**：`success` / `warning` / `info`（定义在 `src/index.css`，明暗两套）。
   不要再拿 `chart-1..5` 冒充成功 / 警告 / 金色——chart 系列明暗含义不一致（如 chart-4 亮色是黄、暗色是紫）。
   非状态类标记另有两个令牌：`purple`（微光 / 配方标记）与 `pink`（取自游戏稀有度 10「神级」物品名色 `#FF2864`，
-  用在物品详情「词缀」分区标题）；`wood` 是从物品 9「木材」图标里提取的木色（「合成来源 / 用于合成」标题）。
+  用在物品详情「词缀」分区标题）；`wood` 是从物品 9「木材」图标里提取的木色（「合成」/「作为材料」标题）。
   三者都按明暗各定义了一次，别写死色值。
 - **加载态用 `Spinner`**：`<Button disabled><Spinner aria-hidden data-icon="inline-start" />保存中…</Button>`；
   独立展示时给 `aria-label`；不要再手写 `Loader2 animate-spin` / `animate-pulse` 圆点。
@@ -488,7 +488,7 @@
 | `IconAction` | `components/IconAction.tsx` | 顶栏 / 工具条图标按钮：`ghost` + `icon-sm` + `Tooltip`，支持 `loading`（Spinner）与 `pressed`；**常态灰 `text-muted-foreground`、悬停才 `text-foreground`**（顶栏右侧 / 卡片页头一致，不再有纯黑混搭）；手机 `…` 菜单里通过 `data-action-label` 同一份 DOM 显示文字标签 |
 | `InfoPopover` | `components/InfoPopover.tsx` | 「页面说明」info 图标 + Popover，收纳原先铺在正文里的小字说明 |
 | `FullscreenDock` | `components/FullscreenDock.tsx` | 全屏结果页**右上角**操作坞：先露出，随后收成贴右边的竖条（左侧上下圆角、宽 12px）；悬停 / 聚焦 / 点击展开，展开后 4 秒无操作再收起 |
-| `CommandLine` | `components/CommandLine.tsx` | 「相关指令」分组（数据 ID → NPC / Buff、物品详情的给予指令共用）：标题 = 149 号物品图标 + 文字（色同「合成来源」，**带条目数量** `相关指令（6）`）+ 折角箭头（可折叠），下面每条指令一行 —— 行外观同合成记录；**点条目本身什么也不做**，右侧 终端（`填充指令`：填进浮动终端并弹出，同时回调 `onOpenTerminal` 让调用方关抽屉）/ ⭐（收藏指令）/ 复制（只复制）三个按钮悬停或聚焦才出现（触屏常显）。条目可带 `note`（如 `/sb all` → 「召唤所有Boss」），悬停整行时用 Tooltip 出说明 |
+| `CommandLine` | `components/CommandLine.tsx` | 「相关指令」分组（数据 ID → NPC / Buff、物品详情的给予指令共用）：标题 = 149 号物品图标 + 文字（绿色 `text-success`，**带条目数量** `相关指令（6）`）+ 折角箭头（可折叠），下面每条指令一行 —— 行外观同合成记录；**点条目本身什么也不做**，右侧 终端（`填充指令`：填进浮动终端并弹出，同时回调 `onOpenTerminal` 让调用方关抽屉）/ ⭐（收藏指令）/ 复制（只复制）三个按钮悬停或聚焦才出现（触屏常显）。条目可带 `note`（如 `/sb all` → 「召唤所有Boss」），悬停整行时用 Tooltip 出说明 |
 | `CommandTerminal` / `TerminalTopBarButton` | `components/CommandTerminal.tsx` / `components/TerminalTopBarButton.tsx` | 浮动终端（桌面非模态浮窗 / 窄屏底部抽屉）与顶栏入口（**首页是例外**：那里放；手机在 `…` 菜单里）；开关状态在 `lib/terminalContext.tsx`。见 [`功能-浮动终端.md`](功能-浮动终端.md) |
 
 ## 未登录的页面门控
@@ -572,7 +572,7 @@
 - **NPC 详情的「相关指令」**：一块里按顺序列 `/spawnboss`（+ `/sb` 简写 + `/sb all`，仅 Boss 且限制在 `sbAll`）、
   召唤物 `/give <物品> <玩家>`（登录时才有）、`/sm <ID>`、`/tpnpc <英文名>`（城镇 NPC + 379/438）、
   `/renameNPC <ID> <newname>`（城镇 NPC）、`/setdungeon` + `/wm dungeon`（`NPC_DUNGEON_IDS`）、`/npc <ID>`；
-  不探测权限、也不隐藏。标题左侧是 **149 号物品（书）图标**、文字色同「合成来源」、**带条目数量**，标题可折叠；
+  不探测权限、也不隐藏。标题左侧是 **149 号物品（书）图标**、文字绿色 `text-success`、**带条目数量**，标题可折叠；
   条目外观与合成记录一致；**点条目本身不会复制**，右侧 终端 / ⭐ / 复制 三个按钮悬停或键盘聚焦才出现（触屏常显）。
   点「填充指令」会把指令填进浮动终端并**关掉抽屉**（浮窗在抽屉下面）。
 
@@ -710,6 +710,12 @@
 - **吸顶 / 吸底用 `sticky`**：顶栏高度是 48px（`h-12`），页面内的工具条用 `sticky top-12`；
   再往下的 sticky（表头、分组侧栏）用 `--page-sticky-top`（`useStickyHeaderOffset()` 实测「48 + 工具条高度」写进页面根元素），
   写成 `top-[var(--page-sticky-top,0px)]`，这样工具条换行变高时表头也跟着走。
+- **`sticky` 的包含块是它的父元素**：父元素只有两行高的话，滚过父元素就不再吸附。
+  所以「谁吸、谁滚走」只能靠**平级兄弟**决定：数据 ID 的主 Tabs 跟着页面滚走、
+  搜索行 `sticky`，两者必须是同一个父元素（页面根）下的兄弟节点，**不能**套一层 wrapper。
+- **工具条是条件渲染时必须把条件传给 `useStickyHeaderOffset(ref, deps)`**：
+  挂载那一刻 `ref.current` 还是 `null`，高度量不到，offset 会永久停在 48px，表头就吸在 48px
+  被工具条盖住（鱼店曾是这个症状：货架工具条要等能力探测才出现）。
 - **表格外壳用 `overflow-clip`，不要用 `overflow-hidden`**：`overflow-hidden` 会让外壳自己成为 sticky 的
   滚动容器（它不滚动），吸顶表头就按「外壳顶部 + `top` 偏移」定位 —— 结果是表头**整体下沉**到表格中间
   （实测 `--page-sticky-top: 144px` 时表头比表顶低 144px，看起来像「表头跑偏」）。

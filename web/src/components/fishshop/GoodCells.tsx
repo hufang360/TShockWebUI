@@ -62,7 +62,7 @@ const CELL_CLASS =
 const ICON_SURFACE_CLASS =
   'relative flex items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10 group-focus-visible/cell:bg-primary/10'
 
-interface GoodItemTag {
+export interface GoodItemTag {
   itemId: number
   stack?: number
   prefix?: number
@@ -87,8 +87,10 @@ function goodIsNativeItem(good: FishGood): boolean {
 /**
  * 商品对应的物品标签：优先 `icon` 字段，其次插件的 `iconId`，最后 `desc`。
  * `iconId` 是插件给的结构化图标 id（`0` = 没配图标），不用解析 `[i:..]` 字符串。
+ *
+ * 导出给「广告到游戏内」用：那个功能也要商户图标标签里的词缀 / 数量。
  */
-function goodIcon(good: FishGood): GoodItemTag | null {
+export function goodIcon(good: FishGood): GoodItemTag | null {
   const tag = firstItemTag(good.icon) ?? firstItemTag(good.desc)
   if (tag) return tag
   return good.iconId ? { itemId: good.iconId } : null
@@ -181,6 +183,7 @@ export function GoodThumb({
       size={size}
       stack={icon?.stack}
       prefix={goodPrefixName(good, dataset)}
+      prefixId={icon?.prefix}
       tooltip={native}
     />
   ) : (

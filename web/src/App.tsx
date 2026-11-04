@@ -32,7 +32,7 @@ import { DatasetProvider } from '@/lib/datasetContext'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { I18nProvider, translate } from '@/lib/i18n'
 import { TerminalProvider } from '@/lib/terminalContext'
-import { ItemDetailProvider, type ItemDetailApi } from '@/lib/itemDetailContext'
+import { ItemDetailProvider, type DetailEntry, type ItemDetailApi } from '@/lib/itemDetailContext'
 import { ItemFavoritesStoreProvider } from '@/lib/itemFavoritesContext'
 import { RecipeFavoritesStoreProvider } from '@/lib/recipeFavoritesProviders'
 import {
@@ -202,8 +202,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
-  // 「指令 → 物品」里点「前往物品图鉴」时带上要展示的物品 id；物品图鉴消费后清空。
-  const [dexFocus, setDexFocus] = useState<number | null>(null)
+  // 「指令 → 物品」里点「前往物品图鉴」时带上要展示的物品；物品图鉴消费后清空。
+  const [dexFocus, setDexFocus] = useState<DetailEntry | null>(null)
   const consumeDexFocus = useCallback(() => setDexFocus(null), [])
   /**
    * 物品提示右上角的 ⓘ「物品详情」入口（`ItemDetailProvider`）：跳到「物品图鉴」并打开该物品详情。
@@ -211,8 +211,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
    */
   const itemDetailApi = useMemo<ItemDetailApi>(
     () => ({
-      open: (itemId) => {
-        setDexFocus(itemId)
+      open: (itemId, opts) => {
+        setDexFocus({ id: itemId, prefixId: opts?.prefixId, stack: opts?.stack })
         navigate('items')
       },
     }),
@@ -809,7 +809,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             onTokenInvalid={handleTokenInvalid}
             onFocusConsumed={consumeDexFocus}
             onOpenInDex={(itemId) => {
-              setDexFocus(itemId)
+              setDexFocus({ id: itemId })
               navigate('items')
             }}
             onModulesChange={setModules}

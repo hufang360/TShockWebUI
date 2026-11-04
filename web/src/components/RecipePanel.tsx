@@ -479,7 +479,7 @@ export function RecipePanel({
   }
 
   // 「微光分解」的反向记录（产物 @ 微光 → 原材料）挂在「微光嬗变」里：
-  // 它本来就属于微光，放在「合成来源」里会让人以为是一种合成方式。
+  // 它本来就属于微光，放在「合成」里会让人以为是一种合成方式。
   const decraftRows = decraft ? make : []
   const shimmerTotal = shimmerCount + decraftRows.length
 

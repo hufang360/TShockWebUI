@@ -27,6 +27,8 @@ export interface ItemTooltipOptions {
   atlas?: Atlas
   stat?: ItemStatEntry
   prefix?: string | null
+  /** 词缀数值 id（只给提示里的「物品详情」入口用）。 */
+  prefixId?: number
   stack?: number
   /** 覆盖显示名（默认 item.name）。 */
   name?: string
@@ -55,6 +57,7 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
   atlas,
   stat,
   prefix,
+  prefixId,
   stack,
   name,
   hideDetailLink,
@@ -203,6 +206,7 @@ export function useItemTooltip<T extends HTMLElement = HTMLElement>({
               atlas={atlas}
               stat={stat}
               prefix={prefix}
+              prefixId={prefixId}
               stack={stack}
               name={name}
               hideDetailLink={hideDetailLink}

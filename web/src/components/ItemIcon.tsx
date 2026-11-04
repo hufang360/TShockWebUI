@@ -24,6 +24,8 @@ interface ItemIconProps {
   name?: string
   /** 词缀显示名（如「传奇」）；有则在提示中名称前展示。 */
   prefix?: string | null
+  /** 词缀数值 id：只用于提示里的「物品详情」入口（打开后自动选中该词缀）。 */
+  prefixId?: number
   /** 堆叠数量；>1 时在方框右下角显示数量（仿 Terraria）。 */
   stack?: number
   /** 数量字号上限（CSS px）；默认字号随**图标**实际大小缩放（9–18px），此值再封顶。 */
@@ -52,6 +54,7 @@ export function ItemIcon({
   className,
   name,
   prefix,
+  prefixId,
   stack,
   maxStackSize,
   tooltip = true,
@@ -138,6 +141,7 @@ export function ItemIcon({
     atlas,
     stat,
     prefix,
+    prefixId,
     stack,
     name,
     hideDetailLink,

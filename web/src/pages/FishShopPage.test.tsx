@@ -1319,3 +1319,38 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
   })
 })
+
+describe('FishShopPage 表格视图与广告', () => {
+  // 词缀 81 = 传奇（测试数据集里唯一的词缀）
+  const PREFIXED: FishGood = {
+    ...GOOD,
+    serial: 78,
+    id: 1569,
+    name: '吸血鬼刀',
+    icon: '[i/p81:1569]',
+    desc: '[i/p81:1569] 吸血鬼刀',
+  }
+
+  it('表格视图：名称列带词缀（琥珀色 + 商品名）', async () => {
+    // 货架视图偏好存在 `moduleState` 里（key = serverId → moduleId → 状态）
+    localStorage.setItem(
+      'tswui:moduleState',
+      JSON.stringify({ default: { store: { tableView: true } } }),
+    )
+    renderPage(fakeTransport({ fishList: async () => shopOf([PREFIXED]) }))
+    const row = (await screen.findByText('吸血鬼刀')).closest('tr')!
+    // 词缀写在商品名前面、warning 色（与网格格子同一套）
+    expect(within(row).getByText('传奇').className).toContain('text-warning')
+  })
+
+  it('详情左下角「广告到游戏内」：发 `#序号 [tag] = [价格]`', async () => {
+    const sendChat = vi.fn().mockResolvedValue({ name: 'Alice', text: 'x', line: '[WebUI] Alice: x' })
+    renderPage(fakeTransport({ fishList: async () => shopOf([PREFIXED]), sendChat }))
+    fireEvent.click(await screen.findByRole('button', { name: '吸血鬼刀' }))
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: '广告到游戏内' }))
+    await waitFor(() =>
+      expect(sendChat).toHaveBeenCalledWith('#78 [i/p81:1569] = [i/s2:73] 2 金币'),
+    )
+  })
+})

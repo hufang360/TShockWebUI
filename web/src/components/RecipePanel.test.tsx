@@ -124,9 +124,9 @@ describe('RecipePanel 合成记录收藏', () => {
 })
 
 describe('RecipePanel', () => {
-  it('渲染合成来源 / 微光嬗变，数量以图标角标展示（不再有 ×N 文字）', () => {
+  it('渲染合成 / 微光嬗变，数量以图标角标展示（不再有 ×N 文字）', () => {
     renderPanel()
-    expect(screen.getByText('合成来源（1）')).toBeTruthy()
+    expect(screen.getByText('合成（1）')).toBeTruthy()
     expect(screen.getByText('微光嬗变（1）')).toBeTruthy()
     expect(screen.getAllByText('铁矿').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('铁锭').length).toBeGreaterThanOrEqual(1)
@@ -266,9 +266,9 @@ describe('RecipePanel', () => {
     expect(reverse.textContent).toContain('铁锭')
     expect(reverse.textContent).toContain('铁矿')
     expect(reverse.textContent).toContain('微光')
-    // 它属于「微光嬗变」分组（计数把反向记录也算进去），不再挂在「合成来源」下面。
+    // 它属于「微光嬗变」分组（计数把反向记录也算进去），不再挂在「合成」下面。
     expect(screen.getByText('微光嬗变（1）')).toBeTruthy()
-    expect(screen.getByText('合成来源（1）').parentElement?.textContent).not.toContain('微光')
+    expect(screen.getByText('合成（1）').parentElement?.textContent).not.toContain('微光')
     // 第一条记录不再额外挂「可丢微光分解」标记
     expect(screen.queryByText('可丢微光分解')).toBeNull()
   })

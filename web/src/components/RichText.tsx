@@ -56,6 +56,7 @@ export function RichText({
                 stack={token.stack}
                 maxStackSize={11}
                 prefix={prefix}
+                prefixId={token.prefixId}
               />
             </span>
           )

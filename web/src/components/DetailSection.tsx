@@ -8,7 +8,7 @@ import type { Dataset } from '@/types'
 /**
  * 物品详情里的**可折叠分区**（唯一实现）：[固定图标] 彩色标题 + 折叠箭头，内容默认单列网格。
  *
- * 「合成来源 / 用于合成 / 微光嬗变」与「词缀」共用这一份，标题色取自 `lib/sectionTones.ts`，
+ * 「合成 / 作为材料 / 微光嬗变 / 词缀」共用这一份，标题色取自 `lib/sectionTones.ts`，
  * 所以点标题折叠的交互、箭头位置、配色永远一致。
  */
 export function DetailSection({
@@ -37,12 +37,15 @@ export function DetailSection({
     <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-1">
       <CollapsibleTrigger className="group/title flex w-full cursor-pointer items-center gap-2 text-sm font-medium">
         {iconId != null && (
-          <ItemIcon
-            item={dataset.itemsById.get(iconId)}
-            atlas={dataset.atlas}
-            size={20}
-            tooltip={false}
-          />
+          // `data-icon-id`：图标只是装饰（对读屏隐藏），但测试要能断言分区用的是哪张图。
+          <span data-icon-id={iconId} aria-hidden className="flex shrink-0">
+            <ItemIcon
+              item={dataset.itemsById.get(iconId)}
+              atlas={dataset.atlas}
+              size={20}
+              tooltip={false}
+            />
+          </span>
         )}
         <span className={cn('truncate', tone)}>{title}</span>
         <CollapseChevron open={open} />

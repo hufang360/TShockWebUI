@@ -122,7 +122,7 @@ describe('ItemsPage 图鉴', () => {
     render(
       <I18nProvider lang="zh">
         <main>
-          <ItemsPage dataset={dataset} focusItemId={3} onFocusConsumed={onFocusConsumed} />
+          <ItemsPage dataset={dataset} focusItemId={{ id: 3 }} onFocusConsumed={onFocusConsumed} />
         </main>
       </I18nProvider>,
     )
@@ -776,7 +776,7 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.queryByTestId('common-recipe-group')).toBeNull()
     const rows = within(screen.getByTestId('common-recipes')).getAllByTestId('recipe-row')
     expect(rows).toHaveLength(5)
-    expect(screen.queryByText('用于合成')).toBeNull()
+    expect(screen.queryByText('作为材料')).toBeNull()
 
     // 搜索只按物品名过滤这份清单（搜索框有 180ms 防抖）。
     fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: 'Item5000' } })
@@ -893,20 +893,26 @@ describe('ItemsPage 图鉴', () => {
     )
     fireEvent.click(cell('物品1'))
     fireEvent.click(screen.getByLabelText('词缀'))
-    // 下拉里带评分；并列最佳标 ⭐
+    // 下拉条目 = `名称` + `ID · 评分`；评分最高的那条用琥珀色 + 加粗（不再画 ⭐ 图标）
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
       '无词缀',
-      '传奇1.760',
+      '传奇81 · 1.760',
     ])
-    fireEvent.click(screen.getByRole('option', { name: /传奇/ }))
+    // 只有词缀名用琥珀色（评分最高那条）+ 加粗；ID · 评分始终灰
+    const option = screen.getByRole('option', { name: /传奇/ })
+    expect(within(option).getByText('传奇').className).toContain('text-warning')
+    expect(within(option).getByText('传奇').className).toContain('font-semibold')
+    expect(within(option).getByText('81 · 1.760').className).toContain('text-muted-foreground')
+    fireEvent.click(option)
     // 标签条目与「相关指令」同款：浅底 + `py-2`，悬停才出复制按钮
     let tag = screen.getByTestId('prefix-tag')
     expect(within(tag).getByText('[i/p81:1]')).toBeTruthy()
     expect(within(tag).getByRole('button', { name: '复制' })).toBeTruthy()
     expect(tag.className).toContain('bg-accent/40')
     expect(tag.className).toContain('py-2')
-    // 分区标题粉色（游戏「神级」物品名色），左边是 1513 图标
+    // 分区标题粉色（游戏「神级」物品名色）：有词缀时是 1513 +「词缀」
     expect(screen.getByText('词缀').className).toContain('text-pink')
+    expect(document.querySelector('[data-icon-id="1513"]')).toBeTruthy()
     // 下拉 + ⚡ 融合成一块：桌面占半行宽，高度跟右侧标签条目一样（`items-stretch`）
     const group = screen.getByTestId('prefix-group')
     expect(group.className).toContain('sm:w-1/2')
@@ -916,7 +922,12 @@ describe('ItemsPage 图鉴', () => {
     const best = screen.getByRole('button', { name: '最佳词缀' })
     fireEvent.click(screen.getByLabelText('词缀'))
     fireEvent.click(screen.getByRole('option', { name: '无词缀' }))
-    expect(screen.queryByTestId('prefix-tag')).toBeNull()
+    // 裸标签也留着（能复制 / 广播）；这件物品**能有**词缀，所以标题仍是「词缀」+ 1513
+    expect(screen.getByTestId('prefix-tag').textContent).toContain('[i:1]')
+    expect(screen.getByText('词缀')).toBeTruthy()
+    expect(document.querySelector('[data-icon-id="1513"]')).toBeTruthy()
+    // 选回「无词缀」时 tag 框里只有裸标签（按钮的无障碍名会跟在后面，所以用 startsWith）
+    expect(screen.getByTestId('prefix-tag').textContent?.startsWith('[i:1]')).toBe(true)
     fireEvent.click(best)
     tag = screen.getByTestId('prefix-tag')
     expect(within(tag).getByText('[i/p81:1]')).toBeTruthy()
@@ -982,8 +993,9 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(cb)
     expect(cb.getAttribute('data-state')).toBe('checked')
     fireEvent.click(cell('物品1'))
-    // 两个合成分区标题都用木色（取自 9 号木材图标）
-    expect(within(detail()).getByText('合成来源（1）').className).toContain('text-wood')
+    // 合成分区标题用木色（取自 9 号木材图标）；「相关指令」用绿色
+    expect(within(detail()).getByText('合成（1）').className).toContain('text-wood')
+    expect(screen.queryByText(/相关指令/)?.className).toContain('text-success')
     expect(detail().querySelector('.grid.grid-cols-2')).toBeTruthy()
   })
 
@@ -1008,7 +1020,7 @@ describe('ItemsPage 图鉴', () => {
     expect(within(dialog).queryByLabelText('两列视图-收藏页')).toBeNull()
   })
 
-  it('饰品不显示「最佳词缀」按钮（下拉里已带 ⭐ 与效果）', () => {
+  it('饰品不显示「最佳词缀」按钮（下拉里已带效果）', () => {
     renderPage(
       makeDataset({
         items: makeItems(3),
@@ -1037,5 +1049,124 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.change(input, { target: { value: '' } })
     fireEvent.click(screen.getByTestId('search-history-item'))
     expect((input as HTMLInputElement).value).toBe('木匣')
+  })
+})
+
+describe('ItemsPage 详情：标签带来的词缀 / 堆叠', () => {
+  beforeEach(() => {
+    resetDexState()
+    localStorage.clear()
+  })
+
+  const datasetWithPrefix = () =>
+    makeDataset({
+      items: makeItems(3),
+      rollablePrefixesById: new Map([[1, [81]]]),
+      prefixModsById: new Map([[81, { dmg: 1.15, val: 1.760248 }]]),
+    })
+
+  it('从带词缀与数量的标签进来：tips 顶部带词缀、图标带数量、tag 框是 [i/pXX,sN:ID]', () => {
+    render(
+      <I18nProvider lang="zh">
+        <main>
+          <ItemsPage
+            dataset={datasetWithPrefix()}
+            focusItemId={{ id: 1, prefixId: 81, stack: 5 }}
+            onFocusConsumed={() => {}}
+          />
+        </main>
+      </I18nProvider>,
+    )
+    const dialog = detail()
+    // tips 顶部与词缀下拉都带上了这个词缀（下拉自动选中 = 触发器上就写着它）
+    expect(within(dialog).getAllByText('传奇').length).toBeGreaterThan(0)
+    // 数量画在图标上，不再有 `x5` 文字
+    expect(within(dialog).queryByText('x5')).toBeNull()
+    // 词缀下拉自动选中该词缀，tag 框把词缀 + 数量都写进去
+    expect(screen.getByTestId('prefix-tag').textContent).toContain('[i/p81,s5:1]')
+  })
+
+  it('只有堆叠没有词缀：仍显示「词缀和标签」分组，但只有 tag 框（没有下拉）', () => {
+    render(
+      <I18nProvider lang="zh">
+        <main>
+          <ItemsPage
+            dataset={makeDataset({ items: makeItems(3) })}
+            focusItemId={{ id: 1, stack: 2 }}
+            onFocusConsumed={() => {}}
+          />
+        </main>
+      </I18nProvider>,
+    )
+    const dialog = detail()
+    expect(within(dialog).getByText('物品标签')).toBeTruthy()
+    expect(screen.queryByTestId('prefix-group')).toBeNull()
+    expect(screen.getByTestId('prefix-tag').textContent).toContain('[i/s2:1]')
+  })
+
+  it('能有词缀但当前没选（铁斧这种）：标题仍显示「词缀」+ 1513', () => {
+    renderPage(
+      makeDataset({
+        items: makeItems(3),
+        rollablePrefixesById: new Map([[1, [81]]]),
+        prefixModsById: new Map([[81, { dmg: 1.15, val: 1.760248 }]]),
+      }),
+    )
+    fireEvent.click(cell('物品1'))
+    const dialog = detail()
+    // 默认没有任何词缀：标题与图标按「词缀」这一档走（不是「物品标签」）
+    expect(within(dialog).getByText('词缀')).toBeTruthy()
+    expect(document.querySelector('[data-icon-id="1513"]')).toBeTruthy()
+    expect(within(dialog).queryByText('物品标签')).toBeNull()
+    // 下拉在（可选「无词缀」），tag 是裸标签
+    expect(screen.getByTestId('prefix-group')).toBeTruthy()
+    expect(screen.getByTestId('prefix-tag').textContent?.startsWith('[i:1]')).toBe(true)
+  })
+
+  it('不可滚词缀的物品：分区只有「物品标签」+ 裸 [i:ID]，照样能广播', async () => {
+    const sendChat = vi.fn().mockResolvedValue({ name: 'Alice', text: 'x', line: '[WebUI] Alice: x' })
+    render(
+      <I18nProvider lang="zh">
+        <main>
+          <ItemsPage
+            dataset={makeDataset({ items: makeItems(3) })}
+            transport={{ sendChat } as unknown as never}
+            authenticated
+            focusItemId={{ id: 2 }}
+            onFocusConsumed={() => {}}
+          />
+        </main>
+      </I18nProvider>,
+    )
+    const dialog = detail()
+    // 标题 = 154 +「物品标签」；没有下拉，只有标签框
+    expect(within(dialog).getByText('物品标签')).toBeTruthy()
+    expect(document.querySelector('[data-icon-id="154"]')).toBeTruthy()
+    expect(screen.queryByTestId('prefix-group')).toBeNull()
+    expect(screen.getByTestId('prefix-tag').textContent).toContain('[i:2]')
+
+    fireEvent.click(screen.getByRole('button', { name: '广播到游戏内' }))
+    await waitFor(() => expect(sendChat).toHaveBeenCalledWith('[i:2]物品2(2)'))
+  })
+
+  it('tag 框旁有「广播到游戏内」：把 `[tag]词缀 名称(id) xN` 发到网页发言通道', async () => {
+    const sendChat = vi.fn().mockResolvedValue({ name: 'Alice', text: 'x', line: '[WebUI] Alice: x' })
+    render(
+      <I18nProvider lang="zh">
+        <main>
+          <ItemsPage
+            dataset={datasetWithPrefix()}
+            transport={{ sendChat } as unknown as never}
+            authenticated
+            focusItemId={{ id: 1, prefixId: 81, stack: 5 }}
+            onFocusConsumed={() => {}}
+          />
+        </main>
+      </I18nProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '广播到游戏内' }))
+    await waitFor(() =>
+      expect(sendChat).toHaveBeenCalledWith('[i/p81,s5:1]传奇 物品1(1) x5'),
+    )
   })
 })

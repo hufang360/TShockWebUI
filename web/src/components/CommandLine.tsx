@@ -59,7 +59,7 @@ export function CommandLine({
         {iconItem && dataset && (
           <ItemIcon item={iconItem} atlas={dataset.atlas} size={20} tooltip={false} />
         )}
-        <span className={cn('truncate', RECIPE_SECTION_TONE.use)}>
+        <span className={cn('truncate', RECIPE_SECTION_TONE.command)}>
           {t('commandLine.withCount', { label, n: items.length })}
         </span>
         <CollapseChevron open={open} />

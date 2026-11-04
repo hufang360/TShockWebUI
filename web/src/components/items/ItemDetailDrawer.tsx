@@ -19,6 +19,8 @@ import { useI18n } from '@/lib/i18n'
 import { CommandLine } from '@/components/CommandLine'
 import { formatItemTag, wikiUrl } from '@/lib/items'
 import { rankPrefixes } from '@/lib/prefixes'
+import type { DetailEntry } from '@/lib/itemDetailContext'
+import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset, Item } from '@/types'
 
 /** 合成表 / 掉落列表的只读显示选项；编辑入口在页面工具栏的「图鉴设置」Popover。 */
@@ -32,7 +34,7 @@ export interface ItemDetailRecipeOptions {
 export interface ItemDetailDrawerProps {
   dataset: Dataset
   /** 抽屉栈：`[根物品, 子物品, 孙物品…]`。每层渲染一个 `Drawer`，父层留在原位。 */
-  stack: number[]
+  stack: DetailEntry[]
   /** 当前层下标（0 = 根）。 */
   index: number
   /** 当前登录玩家名（`/give` 指令用）；未登录为 null。 */
@@ -41,6 +43,10 @@ export interface ItemDetailDrawerProps {
   rootPrefixId: number
   onRootPrefixChange: (prefixId: number) => void
   recipe: ItemDetailRecipeOptions
+  /** 网页发言（词缀分组里的「广播到游戏内」）；未提供则不渲染该按钮。 */
+  transport?: BackendTransport | null
+  /** 已登录才允许广播。 */
+  authenticated?: boolean
   /**
    * 「正在关闭」的层下标：该层及以上开始收起动画（等动画结束再真正出栈，避免瞬间消失）。
    * `null` = 没有正在关闭的层。
@@ -69,16 +75,19 @@ export function ItemDetailDrawer({
   rootPrefixId,
   onRootPrefixChange,
   recipe,
+  transport,
+  authenticated = false,
   closingFrom,
   onCloseFrom,
   onClosed,
 }: ItemDetailDrawerProps) {
-  const item = dataset.itemsById.get(stack[index]) ?? null
+  const entry = stack[index]
+  const item = dataset.itemsById.get(entry.id) ?? null
   const isMobile = useIsMobile()
   /** 本层是否展开（父层开始关闭时，子层一起收起）。 */
   const open = closingFrom == null || index < closingFrom
   // 子层（index > 0）的词缀选择是本层局部状态；根层的走 DexState。
-  const [localPrefixId, setLocalPrefixId] = useState(0)
+  const [localPrefixId, setLocalPrefixId] = useState(entry.prefixId ?? 0)
   const prefixId = index === 0 ? rootPrefixId : localPrefixId
   const setPrefixId = index === 0 ? onRootPrefixChange : setLocalPrefixId
 
@@ -110,7 +119,10 @@ export function ItemDetailDrawer({
           username={username}
           prefixId={prefixId}
           onPrefixChange={setPrefixId}
+          stack={entry.stack}
           recipe={recipe}
+          transport={transport}
+          authenticated={authenticated}
           onBack={() => onCloseFrom(index)}
           onCloseAll={() => onCloseFrom(0)}
         />
@@ -124,6 +136,8 @@ export function ItemDetailDrawer({
             rootPrefixId={rootPrefixId}
             onRootPrefixChange={onRootPrefixChange}
             recipe={recipe}
+            transport={transport}
+            authenticated={authenticated}
             closingFrom={closingFrom}
             onCloseFrom={onCloseFrom}
             onClosed={onClosed}
@@ -141,8 +155,11 @@ function ItemDetailPanel({
   depth,
   prefixId,
   onPrefixChange,
+  stack,
   recipe,
   username,
+  transport,
+  authenticated,
   onBack,
   onCloseAll,
 }: {
@@ -152,7 +169,11 @@ function ItemDetailPanel({
   username: string | null
   prefixId: number
   onPrefixChange: (prefixId: number) => void
+  /** 堆叠数量（1 / undefined = 无；从带 `sN` 的标签进来时才有）。 */
+  stack?: number
   recipe: ItemDetailRecipeOptions
+  transport?: BackendTransport | null
+  authenticated?: boolean
   /** 左上角「返回」：只关当前这层，回到上一层。 */
   onBack: () => void
   /** 右上角 ×：直接关掉整个抽屉（所有层）。 */
@@ -165,10 +186,8 @@ function ItemDetailPanel({
   /** 预览的词缀（0 = 无词缀）。 */
   const prefix = prefixId ? dataset.prefixesById.get(prefixId) ?? null : null
   const prefixMods = prefixId ? dataset.prefixModsById.get(prefixId) : undefined
-  /** 该物品**可滚的词缀**（严格按游戏规则；盔甲等没有）。 */
-  const rollablePrefixes = (dataset.rollablePrefixesById.get(item.id) ?? [])
-    .map((id) => dataset.prefixesById.get(id))
-    .filter((p): p is NonNullable<typeof p> => !!p)
+  /** 预览的堆叠（1 / undefined = 无）。 */
+  const stackSize = stack != null && stack > 1 ? stack : undefined
   /** 可滚词缀按游戏评分（`prefix-mods.json` 的 `val`）从高到低排序（无效词缀已剔除）。 */
   const prefixRanks = rankPrefixes(
     dataset.rollablePrefixesById.get(item.id) ?? [],
@@ -235,25 +254,29 @@ function ItemDetailPanel({
           atlas={dataset.atlas}
           stat={stat}
           prefix={prefix?.name ?? null}
+          prefixId={prefixId}
           prefixMods={prefixMods}
+          stack={stackSize}
           className="w-full max-w-none shadow-none"
           hideDetailLink
         />
 
-        {/* Wiki / 复制在底部固定操作区；词缀跟着 tips 走（切换后 tips 属性值随之变化） */}
-        {rollablePrefixes.length > 0 && (
-          <PrefixPicker
-            item={item}
-            prefixId={prefixId}
-            onPrefixChange={onPrefixChange}
-            prefixRanks={prefixRanks}
-            bestPrefixIds={bestPrefixIds}
-            prefix={prefix}
-            accessory={stat?.stats?.accessory === true}
-            dataset={dataset}
-            formatTag={formatItemTag}
-          />
-        )}
+        {/* Wiki / 复制在底部固定操作区；词缀与标签跟着 tips 走（切换后 tips 属性值 / 名称随之变化）。
+            分区**总是**显示：没有可滚词缀时只有标签框（裸 `[i:ID]` 也能复制 / 广播）。 */}
+        <PrefixPicker
+          item={item}
+          prefixId={prefixId}
+          onPrefixChange={onPrefixChange}
+          prefixRanks={prefixRanks}
+          bestPrefixIds={bestPrefixIds}
+          prefix={prefix}
+          accessory={stat?.stats?.accessory === true}
+          stack={stackSize}
+          dataset={dataset}
+          formatTag={formatItemTag}
+          transport={transport}
+          authenticated={authenticated}
+        />
 
         {giveCommand && (
           <CommandLine

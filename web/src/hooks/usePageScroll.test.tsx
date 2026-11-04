@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   APP_HEADER_HEIGHT,
   usePageScrollReset,
@@ -143,5 +143,36 @@ describe('useStickyHeaderOffset', () => {
     render(<Page />)
     // jsdom 量到的工具条高度是 0 → 只剩顶栏 48px。
     expect(screen.getByTestId('toolbar').dataset.offset).toBe(String(APP_HEADER_HEIGHT))
+  })
+
+  it('工具条条件渲染（挂载时还没有）：条件变化后会重新量高度', () => {
+    // 鱼店的真实 bug：`canUse &&` 的工具条首帧不存在，offset 永久停在 48px，表头被工具条盖住。
+    function Page({ show }: { show: boolean }) {
+      const ref = useRef<HTMLDivElement>(null)
+      const offset = useStickyHeaderOffset(ref, [show])
+      return show ? (
+        <div ref={ref} data-testid="toolbar" data-offset={offset} />
+      ) : (
+        <span data-testid="empty" data-offset={offset} />
+      )
+    }
+    // jsdom 没有布局：把工具条高度伪装成 56px，才能看出「重新量过」
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      height: 56,
+      width: 0,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    const { rerender } = render(<Page show={false} />)
+    expect(screen.getByTestId('empty').dataset.offset).toBe(String(APP_HEADER_HEIGHT))
+    rerender(<Page show />)
+    // 48 + 56：工具条出现后重量到了，表头才会吸在工具条下面
+    expect(screen.getByTestId('toolbar').dataset.offset).toBe(String(APP_HEADER_HEIGHT + 56))
+    spy.mockRestore()
   })
 })

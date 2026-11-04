@@ -5,6 +5,7 @@ import {
   Fish,
   Footprints,
   Maximize2,
+  MessageSquare,
   Minimize2,
   RefreshCw,
   Search,
@@ -29,17 +30,20 @@ import {
   GOOD_GRID_CLASS,
   GOOD_SIZES,
   GoodThumb,
+  goodIcon,
   goodPrefixName,
   type GoodIconSize,
 } from '@/components/fishshop/GoodCells'
 import { GoodDiagram } from '@/components/fishshop/GoodDiagram'
 import { GoodGrid } from '@/components/fishshop/GoodGrid'
 import { GoodsTable } from '@/components/fishshop/GoodsTable'
+import { useChatSend } from '@/hooks/useChatSend'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { cn } from '@/lib/cn'
 import { splitFishArgs } from '@/lib/fishArgs'
 import { diagramUrl } from '@/lib/fishDiagram'
 import { isDegradedGood } from '@/lib/fishGood'
+import { formatItemTag } from '@/lib/items'
 import {
   findLiveGood,
   fishGoodKey,
@@ -310,6 +314,32 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     setError(null)
   }, [])
 
+  // 网页发言（`POST /api/chat`）：带 `[WebUI] 玩家名:` 前缀播到游戏内聊天，失败直接 toast。
+  const { send: sendChat, sending: advertising } = useChatSend({
+    transport,
+    toastOnError: true,
+  })
+
+  /**
+   * 「广告到游戏内」：`#2 [i:29] = [i/s2:73]`。
+   *
+   * - 商品段用标准物品标签（带词缀 / 数量），服务类商品（`id < 0`）没有物品，退化用商品名；
+   * - 价格段直接用插件给的 `cost` 原文（它本来就是「tag + 文字」的富文本）；为空则说「免费」。
+   */
+  const advertise = useCallback(
+    (good: FishGood) => {
+      // 词缀优先取结构化字段 `prefix`，没有再取图标标签里写的（服主常只在图标上写 `[i/p60:..]`）。
+      const icon = goodIcon(good)
+      const prefixId = (good.prefix || icon?.prefix) ?? 0
+      const tag =
+        good.id != null && good.id > 0
+          ? formatItemTag(good.id, { prefixId, stack: good.stack ?? icon?.stack })
+          : good.name
+      return sendChat(`#${good.serial} ${tag} = ${good.cost.trim() || t('fish.free')}`)
+    },
+    [sendChat, t],
+  )
+
   /** 买过 / 收藏：都按内容指纹存（不存 serial，见 `lib/fishGoodKey.ts`）。 */
   const boughtStamps = useMemo(() => {
     if (Array.isArray(ui.buys)) return sanitizeStamps(ui.buys, SAVED_MAX)
@@ -516,9 +546,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const renderRich = (text: string) => renderRichLines([text])
 
   // 整页滚动（与指令 / 物品 ID / 数据 ID 一致）：货架跟着页面走，工具条吸在顶栏下面。
+  // 工具条是 `canUse &&` 条件渲染的（要等能力探测 / 登录态），所以实测高度必须跟 `canUse` 重跑一次。
   const rootRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
-  const stickyTop = useStickyHeaderOffset(toolbarRef)
+  const stickyTop = useStickyHeaderOffset(toolbarRef, [canUse])
   usePageScrollReset(rootRef)
 
   const hideMeta = ui.hideMeta === true
@@ -1068,7 +1099,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
               {/* 底部操作区：⭐ 收藏在最左，右侧是关闭 / 购买 */}
               <div className="flex shrink-0 items-center justify-end gap-2 border-t px-5 py-3">
-                <div className="mr-auto">
+                <div className="mr-auto flex items-center gap-1">
                   <IconAction
                     label={favorited ? t('fish.unfavorite') : t('fish.favorite')}
                     icon={Star}
@@ -1076,6 +1107,13 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                     testId="fish-favorite"
                     iconClassName={cn(favorited && 'fill-current text-warning')}
                     onClick={() => toggleFavorite(selected, selectedSnapshot)}
+                  />
+                  <IconAction
+                    label={t('fish.advertise')}
+                    icon={MessageSquare}
+                    testId="fish-advertise"
+                    disabled={advertising}
+                    onClick={() => void advertise(selected)}
                   />
                 </div>
                 {confirming ? (

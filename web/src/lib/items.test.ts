@@ -65,7 +65,7 @@ describe('formatItemTag', () => {
     expect(formatItemTag(29)).toBe('[i:29]')
   })
   it('数量与词缀', () => {
-    expect(formatItemTag(4956, { stack: 21, prefixId: 81 })).toBe('[i/p81/s21:4956]')
+    expect(formatItemTag(4956, { stack: 21, prefixId: 81 })).toBe('[i/p81,s21:4956]')
   })
   it('数量为 1 时省略', () => {
     expect(formatItemTag(29, { stack: 1 })).toBe('[i:29]')

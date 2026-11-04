@@ -350,7 +350,8 @@ describe('DataIdPage', () => {
   it('NPC 表格视图：列名是 ID，整行可点打开抽屉', () => {
     renderPage()
     enableTable()
-    expect(headers()).toEqual(['ID', '图标', '名称', '内部名'])
+    // 最后一列是**英文名**（`/sb`、`/tpnpc` 认的名字），不是对人没用的内部名
+    expect(headers()).toEqual(['ID', '图标', '名称', '英文名'])
     expect(columnCount()).toBe(4)
     expect(screen.getByRole('table')).toBeTruthy()
     // 表格视图图标不加背景框（网格视图仍保留）。
@@ -653,6 +654,28 @@ describe('DataIdPage', () => {
     expect(screen.getAllByRole('table')).toHaveLength(2)
     fireEvent.click(cb)
     expect(screen.getAllByRole('table')).toHaveLength(1)
+  })
+
+  it('NPC 两列表格：受同一个「两列表格」开关控制（行数够多才分两张表）', () => {
+    const npcs = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      key: `Npc${i + 1}`,
+      name: `NPC${i + 1}`,
+      en: `Npc ${i + 1}`,
+    }))
+    renderPage(makeDataset({ npcs }))
+    enableTable()
+    expect(screen.getAllByRole('table')).toHaveLength(2)
+    fireEvent.click(within(openSettings()).getByTestId('dataid-two-cols'))
+    expect(screen.getAllByRole('table')).toHaveLength(1)
+  })
+
+  it('NPC 表格最后一列是英文名（英文界面下改显示内部名）', () => {
+    renderPage()
+    enableTable()
+    const row = screen.getByTitle('克苏鲁之眼 #4')
+    expect(within(row).getByText('Eye of Cthulhu')).toBeTruthy()
+    expect(within(row).queryByText('EyeOfCthulhu')).toBeNull()
   })
 
   it('小屏（<1280px）隐藏「两列表格」开关，表格也只排一列', () => {

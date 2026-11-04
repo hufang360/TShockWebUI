@@ -28,11 +28,17 @@ export interface ChatSend {
  * 调用方负责把文本清空与刷新事件流（见 `onSent`）。
  */
 export function useChatSend(opts: {
-  transport: BackendTransport
+  /** 没有传输层（未登录 / 页面未提供）时传 null：`send` 直接 resolve(false)，不会发请求。 */
+  transport: BackendTransport | null
   /** 发送成功后（刷新事件流，让刚发的话立刻上屏）。 */
   onSent?: () => void
+  /**
+   * 失败时直接 toast 提示（不分页面自己渲染 `error` 的场景，如物品详情的「广播」按钮）。
+   * 指令页的聊天模式不用它：那里把错误写在输入框下方。
+   */
+  toastOnError?: boolean
 }): ChatSend {
-  const { transport, onSent } = opts
+  const { transport, onSent, toastOnError = false } = opts
   const { t } = useI18n()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -41,7 +47,7 @@ export function useChatSend(opts: {
   const send = useCallback(
     async (text: string): Promise<boolean> => {
       const value = text.trim()
-      if (!value || sending) return false
+      if (!value || sending || !transport) return false
       setSending(true)
       setError('')
       try {
@@ -53,22 +59,25 @@ export function useChatSend(opts: {
         onSent?.()
         return true
       } catch (err) {
+        let message: string
         if (
           err instanceof TshockRequestError &&
           (err.kind === 'plugin_outdated' || err.kind === 'plugin_protocol')
         ) {
-          setError(t('feed.chatOutdated'))
+          message = t('feed.chatOutdated')
         } else if (err instanceof TshockRequestError && err.kind === 'plugin_missing') {
-          setError(t('feed.chatPluginMissing'))
+          message = t('feed.chatPluginMissing')
         } else {
-          setError(err instanceof Error ? err.message : t('feed.chatFailed'))
+          message = err instanceof Error ? err.message : t('feed.chatFailed')
         }
+        setError(message)
+        if (toastOnError) toast.error(message)
         return false
       } finally {
         setSending(false)
       }
     },
-    [onSent, sending, t, transport],
+    [onSent, sending, t, toastOnError, transport],
   )
 
   return { sending, error, prefix, send }

@@ -1,5 +1,5 @@
 import { RichText } from '@/components/RichText'
-import { GoodThumb } from '@/components/fishshop/GoodCells'
+import { GoodThumb, goodPrefixName } from '@/components/fishshop/GoodCells'
 import { useI18n } from '@/lib/i18n'
 import type { FishGood } from '@/lib/tshock'
 import type { Dataset } from '@/types'
@@ -61,7 +61,13 @@ export function GoodsTable({
             <td className="px-2 py-1.5">
               <GoodThumb good={good} dataset={dataset} size={24} />
             </td>
-            <td className="px-2 py-1.5 text-foreground">{good.name}</td>
+            <td className="px-2 py-1.5 text-foreground">
+              {/* 词缀写在名称前面（与网格格子同一套：琥珀色 + 商品名），如「恶魔 吸血鬼刀」 */}
+              {goodPrefixName(good, dataset) ? (
+                <span className="text-warning">{goodPrefixName(good, dataset)} </span>
+              ) : null}
+              {good.name}
+            </td>
             <td className="hidden px-2 py-1.5 text-muted-foreground sm:table-cell">
               <RichText
                 text={good.cost}

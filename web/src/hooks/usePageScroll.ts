@@ -163,8 +163,14 @@ export function usePageScrollReset(ref?: RefObject<HTMLElement | null>) {
  *
  * 整页滚动后表头要吸在**工具条下面**，而工具条高度随搜索框 / 换行变化，所以实测。
  * 把返回值设成页面根元素的 `--page-sticky-top`，再让 `thead` 用 `top-[var(--page-sticky-top)]`。
+ *
+ * `deps`：工具条是**条件渲染**时（如鱼店要等能力探测才出现）一定要把那个条件传进来 ——
+ * 否则挂载那一刻 `ref.current` 还是 null，量不到高度，表头会吸在 48px（被工具条盖住）。
  */
-export function useStickyHeaderOffset(ref: RefObject<HTMLElement | null>): number {
+export function useStickyHeaderOffset(
+  ref: RefObject<HTMLElement | null>,
+  deps: readonly unknown[] = [],
+): number {
   const [offset, setOffset] = useState(APP_HEADER_HEIGHT)
   useLayoutEffect(() => {
     const el = ref.current
@@ -182,6 +188,8 @@ export function useStickyHeaderOffset(ref: RefObject<HTMLElement | null>): numbe
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [ref])
+    // deps 由调用方提供（见上）：eslint 不知道它是依赖来源
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ref, ...deps])
   return offset
 }

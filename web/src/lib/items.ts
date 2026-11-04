@@ -65,14 +65,18 @@ export interface ItemTagOptions {
 }
 
 /**
- * 生成标准 TShock 物品标签。
+ * 生成标准物品标签（聊天里能渲染成图标）。
  * 注意：这只影响聊天显示，不等于指令的物品参数（设计原则与约束 §6）。
+ *
+ * 分隔符用**逗号**（`[i/p81,s21:4956]`）：这是游戏自己生成的写法（vanilla `ItemTagHandler`
+ * 按 `,` 拆 options，见 docs/功能-富文本解析.md §2）。斜杠版 `[i/s21/p81:4956]` 只有
+ * TShock 的指令参数解析器认，聊天里会被当成一个非法 option 丢掉。
  */
 export function formatItemTag(itemId: number, options: ItemTagOptions = {}): string {
   const parts: string[] = []
-  if (options.prefixId != null) parts.push(`p${options.prefixId}`)
+  if (options.prefixId != null && options.prefixId > 0) parts.push(`p${options.prefixId}`)
   if (options.stack != null && options.stack > 1) parts.push(`s${options.stack}`)
-  return parts.length > 0 ? `[i/${parts.join('/')}:${itemId}]` : `[i:${itemId}]`
+  return parts.length > 0 ? `[i/${parts.join(',')}:${itemId}]` : `[i:${itemId}]`
 }
 
 /**

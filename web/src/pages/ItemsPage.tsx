@@ -39,6 +39,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useStickyHeaderOffset, usePageScroller } from '@/hooks/usePageScroll'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
+import type { BackendTransport } from '@/lib/tshock'
 import {
   COLLECTIONS_BY_ID,
   ITEM_COLLECTIONS,
@@ -49,7 +50,7 @@ import {
 import { useI18n } from '@/lib/i18n'
 import { readDexState, rememberDexState, DEFAULT_GAME_TAB, type DexMode, type DexState } from '@/lib/dexState'
 import { ItemFavoritesProvider } from '@/lib/itemFavoritesContext'
-import { ItemDetailProvider, type ItemDetailApi } from '@/lib/itemDetailContext'
+import { ItemDetailProvider, type ItemDetailApi, type DetailEntry, type ItemDetailOptions } from '@/lib/itemDetailContext'
 import { searchItems } from '@/lib/items'
 import {
   COMMON_RECIPE_EXCLUDED_RESULT_IDS,
@@ -126,13 +127,19 @@ type FavoriteKind = 'items' | 'recipes' | 'common'
 
 export function ItemsPage({
   dataset,
+  transport = null,
+  authenticated = false,
   focusItemId,
   onFocusConsumed,
   username = null,
 }: {
   dataset: Dataset
-  /** 从「指令 → 前往物品图鉴」带来的物品 id：挂载后选中并弹出详情。 */
-  focusItemId?: number | null
+  /** 网页发言（物品详情里的「广播到游戏内」）；不传则不渲染该按钮。 */
+  transport?: BackendTransport | null
+  /** 已登录才允许广播。 */
+  authenticated?: boolean
+  /** 从「指令 → 前往物品图鉴」带来的物品（可带词缀 / 堆叠）：挂载后选中并弹出详情。 */
+  focusItemId?: DetailEntry | null
   /** 消费完 focusItemId 后回调（父级清空，避免再次切回时重复弹出）。 */
   onFocusConsumed?: () => void
   /** 当前登录玩家名（物品详情里的 `/give` 指令用）；未登录为 null。 */
@@ -164,8 +171,9 @@ export function ItemsPage({
    * 物品详情抽屉栈：`[根物品, 子物品, 孙物品…]`。
    * 根物品同时就是 `DexState.selectedId`（切模块回来会重新打开一次），子层只在本次停留期间有效。
    */
-  const [detail, setDetail] = useState<{ stack: number[]; closingFrom: number | null }>(() => ({
-    stack: state.selectedId != null ? [state.selectedId] : [],
+  const [detail, setDetail] = useState<{ stack: DetailEntry[]; closingFrom: number | null }>(() => ({
+    stack:
+      state.selectedId != null ? [{ id: state.selectedId, prefixId: state.prefixId || undefined, stack: state.stack }] : [],
     // 正在收起的那一层（>= 它的层一起关）：等收起动画结束才出栈，避免抽屉瞬间消失。
     closingFrom: null,
   }))
@@ -271,15 +279,29 @@ export function ItemsPage({
   /**
    * 打开物品详情：没开抽屉时开根抽屉；已经开着时**叠一层**（可堆叠 drawer）。
    * 点自己正在看的那件物品不重复叠。
+   * `opts`：从带修饰符的物品标签（`[i/p60,s2:1569]`）进来的词缀 / 堆叠，直接落到详情里。
    */
-  const openDetail = useCallback((itemId: number) => {
+  const openDetail = useCallback((itemId: number, opts?: ItemDetailOptions) => {
+    const entry: DetailEntry = {
+      id: itemId,
+      prefixId: opts?.prefixId || undefined,
+      stack: opts?.stack && opts.stack > 1 ? opts.stack : undefined,
+    }
     setDetail((d) => {
       // 收起动画进行中还点了别的物品：先把要关的几层丢掉，避免「关掉的层又被救活」。
-      const stack =
-        d.closingFrom != null ? d.stack.slice(0, d.closingFrom) : d.stack
+      const stack = d.closingFrom != null ? d.stack.slice(0, d.closingFrom) : d.stack
       const last = stack[stack.length - 1]
-      if (last === itemId) return { stack, closingFrom: null }
-      return { stack: [...stack, itemId], closingFrom: null }
+      // 点的是自己正在看的那件：不叠层，但允许用新标签带来的修饰符刷新这一层
+      // （同一个物品可能带着不同词缀 / 数量出现）。
+      if (last?.id === itemId) {
+        const merged: DetailEntry = {
+          id: itemId,
+          prefixId: entry.prefixId ?? last.prefixId,
+          stack: entry.stack ?? last.stack,
+        }
+        return { stack: [...stack.slice(0, -1), merged], closingFrom: null }
+      }
+      return { stack: [...stack, entry], closingFrom: null }
     })
   }, [])
   /** 关掉第 `index` 层及以上的抽屉（0 = 全部关闭，回到网格）：先放收起动画。 */
@@ -293,11 +315,15 @@ export function ItemsPage({
   const commitDetailClose = useCallback((index: number) => {
     setDetail((d) => ({ stack: d.stack.slice(0, index), closingFrom: null }))
   }, [])
-  // 抽屉栈根物品 ↔ DexState.selectedId（跳页 / 切模块回来时靠它还原）
+  // 抽屉栈根物品 ↔ DexState.selectedId / prefixId / stack（跳页 / 切模块回来时靠它还原）
+  const syncedRootRef = useRef<DetailEntry | null>(null)
   useEffect(() => {
     const root = detail.stack[0] ?? null
-    if (root !== state.selectedId) patch({ selectedId: root, prefixId: 0 })
-  }, [detail.stack, state.selectedId, patch])
+    // 同一层（对象没换）不重复同步：用户手动换词缀时不能被这里改回去
+    if (root === syncedRootRef.current) return
+    syncedRootRef.current = root
+    patch({ selectedId: root?.id ?? null, prefixId: root?.prefixId ?? 0, stack: root?.stack ?? 1 })
+  }, [detail.stack, patch])
   /** 物品提示右上角的 ⓘ「物品详情」入口：就地打开（或叠一层）物品详情抽屉。 */
   const detailApi = useMemo<ItemDetailApi>(() => ({ open: openDetail }), [openDetail])
   /** 稳定引用：让 memo 化的 DexCell 在滚动 / 搜索时不重复渲染。 */
@@ -306,8 +332,22 @@ export function ItemsPage({
   // 「前往物品图鉴」：选中指定物品并弹出详情（清空筛选，保证它出现在结果里）。
   useEffect(() => {
     if (focusItemId == null) return
-    setDetail({ stack: [focusItemId], closingFrom: null })
-    patch({ query: '', mode: 'all', favoritesOnly: false, collectionId: '', groupTab: '', prefixId: 0 })
+    const entry: DetailEntry = {
+      id: focusItemId.id,
+      prefixId: focusItemId.prefixId || undefined,
+      stack: focusItemId.stack && focusItemId.stack > 1 ? focusItemId.stack : undefined,
+    }
+    setDetail({ stack: [entry], closingFrom: null })
+    patch({
+      query: '',
+      mode: 'all',
+      favoritesOnly: false,
+      collectionId: '',
+      groupTab: '',
+      selectedId: entry.id,
+      prefixId: entry.prefixId ?? 0,
+      stack: entry.stack ?? 1,
+    })
     resetScroll()
     onFocusConsumed?.()
   }, [focusItemId, patch, onFocusConsumed, resetScroll])
@@ -1085,6 +1125,8 @@ export function ItemsPage({
               rootPrefixId={state.prefixId}
               onRootPrefixChange={(prefixId) => patch({ prefixId })}
               recipe={detailRecipe}
+              transport={transport}
+              authenticated={authenticated}
               closingFrom={detail.closingFrom}
               onCloseFrom={closeDetailFrom}
               onClosed={commitDetailClose}

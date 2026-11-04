@@ -6,6 +6,7 @@ import { PluginHelp } from '@/components/PluginHelp'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import type { CustomModule } from '@/lib/customModules'
 import { useI18n } from '@/lib/i18n'
+import type { DetailEntry } from '@/lib/itemDetailContext'
 import { PLUGIN_LINKS } from '@/lib/pluginLinks'
 import { MODULE_BY_ID, isModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
 import type { BackendTransport } from '@/lib/tshock'
@@ -105,7 +106,7 @@ export interface AppRoutesProps {
   /** 运行时补全数据（区域 / 传送点）。 */
   runtimeValues: { regions?: string[]; warps?: string[] }
   customModules: CustomModule[]
-  dexFocus: number | null
+  dexFocus: DetailEntry | null
   onNavigate: (tab: TabId) => void
   onLogin: () => void
   onTokenInvalid: () => Promise<boolean>
@@ -186,6 +187,8 @@ export function AppRoutes({
       {activeTab === 'items' && (
         <ItemsPage
           dataset={dataset}
+          transport={transport}
+          authenticated={authenticated}
           focusItemId={dexFocus}
           onFocusConsumed={onFocusConsumed}
           username={username}

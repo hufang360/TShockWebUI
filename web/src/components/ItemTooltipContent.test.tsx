@@ -185,7 +185,8 @@ describe('ItemTooltipContent', () => {
     )
     const button = screen.getByRole('button', { name: '物品详情' })
     fireEvent.click(button)
-    expect(open).toHaveBeenCalledWith(4956)
+    // 没有词缀 / 数量时只传 id（opts 里两项都是 undefined）
+    expect(open).toHaveBeenCalledWith(4956, { prefixId: undefined, stack: undefined })
     // 底部「ID · key」一行只剩 ID 与内部名（旧的小锤子 + 「合成表」文字已去掉）
     expect(screen.getByText('4956 · Zenith')).toBeTruthy()
     expect(screen.queryByText('合成表')).toBeNull()

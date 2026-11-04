@@ -127,7 +127,8 @@ export function DataIdPage({
   const searchRef = useRef<HTMLInputElement>(null)
   // 工具条（数据源 Tab + 搜索 / 筛选）吸在顶栏下面，表头再吸在它下面。
   const toolbarRef = useRef<HTMLDivElement>(null)
-  const stickyTop = useStickyHeaderOffset(toolbarRef)
+  // 搜索行是 `!resultsFullscreen` 条件渲染的：全屏进出要重量一次（否则表头偏移会停在旧值）。
+  const stickyTop = useStickyHeaderOffset(toolbarRef, [resultsFullscreen])
 
   // 整页滚动：滚动条是浏览器右侧那条，网格自己不再溢出滚动。
   // 全屏查看时页面本身变成滚动区（不全屏时滚动区是 AppShell 的 `<main>`）。
@@ -338,8 +339,13 @@ export function DataIdPage({
     let headers: string[]
     let rows: string[][]
     if (kind === 'npc') {
-      headers = ['ID', 'Name', 'InternalName']
-      rows = filteredNpcs.map((npc) => [String(npc.id), npc.name, npc.key])
+      // 与界面列一致：英文界面导内部名，其他界面导英文名（`/sb`、`/tpnpc` 认的那个）。
+      headers = ['ID', 'Name', lang === 'en' ? 'InternalName' : 'EnglishName']
+      rows = filteredNpcs.map((npc) => [
+        String(npc.id),
+        npc.name,
+        lang === 'en' ? npc.key : (npc.en ?? npc.key),
+      ])
     } else if (kind === 'buff') {
       headers = ['ID', 'Name', 'InternalName']
       rows = filteredBuffs.map((buff) => [String(buff.id), buff.name, buff.key])
@@ -529,16 +535,14 @@ export function DataIdPage({
         </FullscreenDock>
       ) : (
         <>
-          {/* 数据源 Tab + 搜索 / 筛选：整页滚动时吸在顶栏下面，不跟着列表滚走。 */}
-          <div
-            ref={toolbarRef}
-            className="sticky top-12 z-20 flex flex-col gap-2 bg-background py-1.5"
+          {/* 数据源 Tab：**跟着页面滚走**（表格视图里才有地方让表头吸在顶栏下面）。
+              它和下面的搜索行必须是**平级兄弟**：套一层 wrapper 会成为 sticky 的包含块，
+              滚过 wrapper 后搜索行就吸不住了（见 docs/UI组件.md §吸顶栈）。 */}
+          <Tabs
+            value={kind}
+            onValueChange={(v) => switchKind(v as DataIdKind)}
+            className="w-full shrink-0 gap-0 pt-1.5"
           >
-            <Tabs
-              value={kind}
-              onValueChange={(v) => switchKind(v as DataIdKind)}
-              className="w-full shrink-0 gap-0"
-            >
               <TabsList aria-label={t('dataId.tabs')} variant="line" className="w-full justify-start">
                 <TabsTrigger value="npc" variant="line" className="flex-none">
                   {t('dataId.tab.npc')}
@@ -555,6 +559,11 @@ export function DataIdPage({
               </TabsList>
             </Tabs>
 
+          {/* 搜索 + 筛选行：吸在顶栏下面；表头再吸在它下面（偏移由它实测）。 */}
+          <div
+            ref={toolbarRef}
+            className="sticky top-12 z-20 flex flex-col gap-2 bg-background py-1.5"
+          >
             {/* 工具行：不再套卡片，直接铺在页面上 */}
             <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 p-1">
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -631,7 +640,11 @@ export function DataIdPage({
           </Empty>
         ) : kind === 'npc' ? (
           tableView ? (
-            <NpcTableLayout rows={filteredNpcs} onSelect={(npc) => setSelected({ kind: 'npc', id: npc.id })} />
+            <NpcTableLayout
+              rows={filteredNpcs}
+              twoCols={effectiveTwoCols}
+              onSelect={(npc) => setSelected({ kind: 'npc', id: npc.id })}
+            />
           ) : (
             <div
               className={cn(
