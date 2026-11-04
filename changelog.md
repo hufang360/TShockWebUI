@@ -1,5 +1,7 @@
 # 更新日志
 
+> 这里是**全量历史**。每个版本的详细更新与对外发布说明分别见 `docs/changelog/<版本>.md`、`docs/release/<版本>.md`。
+
 ## 20261104（v0.1.0-rc.8）
 
 - **设置里可以套用 Terraria「语言材质包」**（创意工坊 Resource Pack）
