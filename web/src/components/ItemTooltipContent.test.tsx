@@ -221,3 +221,33 @@ describe('rarityColor', () => {
     expect(rarityColor(11)).toBe('#B428FF')
   })
 })
+
+describe('ItemTooltipContent 富文本提示行（材质包文本）', () => {
+  it('颜色标签按原值渲染，不露出 [c/...]', () => {
+    render(
+      <I18nProvider lang="zh">
+        <ItemTooltipContent
+          item={item}
+          stat={{ tip: ['获得[c/ff0000:混沌]状态'], stats: { rare: 10 } }}
+        />
+      </I18nProvider>,
+    )
+    const colored = screen.getByText('混沌')
+    // tooltip 底色恒为深色：颜色按原值，不套 `ts-chat-color`（浅色主题会压暗）。
+    expect(colored.className).not.toContain('ts-chat-color')
+    expect(colored.style.color.toLowerCase()).toMatch(/#ff0000|rgb\(255, 0, 0\)/)
+    expect(screen.queryByText(/\[c\/ff0000/)).toBeNull()
+  })
+
+  it('非法颜色选项按纯文本处理（不崩、不露标签外壳）', () => {
+    render(
+      <I18nProvider lang="zh">
+        <ItemTooltipContent
+          item={item}
+          stat={{ tip: ['[c/不是颜色:文本]'], stats: { rare: 10 } }}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByText('文本')).toBeTruthy()
+  })
+})

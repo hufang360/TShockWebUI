@@ -27,6 +27,7 @@ import { useLocalState } from '@/hooks/useLocalState'
 import { preloadAtlasImage } from '@/lib/atlas'
 import { loadLoginMemory, saveLoginMemory } from '@/lib/credentials'
 import { loadDataset, reconcileDataVersion, withRuntimeCommands } from '@/lib/dataset'
+import { useLanguagePacks } from '@/lib/languagePack/useLanguagePacks'
 import { CommandResultsProvider } from '@/lib/commandResults'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
@@ -153,6 +154,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       translate(settings.language, key, vars),
     [settings.language],
   )
+  // 语言材质包（浏览器本地）：启用顺序 / 词条合并都在这里，数据集要等它读完再加载。
+  const langPacks = useLanguagePacks(settings.language)
 
   // 系统深色偏好（theme='auto' 时用）；jsdom 可能没有 matchMedia，降级为 false。
   const [systemDark, setSystemDark] = useState(() =>
@@ -394,7 +397,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const load = useCallback(async () => {
     setLoadError(null)
     try {
-      const ds = await loadDataset(settings.language)
+      const ds = await loadDataset(settings.language, langPacks.overrides)
       if (reconcileDataVersion(ds.meta)) {
         setNotice(translate(settings.language, 'app.versionChanged'))
       }
@@ -402,11 +405,12 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'data load failed')
     }
-  }, [settings.language])
+  }, [settings.language, langPacks.overrides])
 
   useEffect(() => {
+    if (!langPacks.ready) return
     void load()
-  }, [load])
+  }, [load, langPacks.ready])
 
   // 物品图鉴是高频入口。首次打开时同时等待路由 chunk 与约 1.9 MB 图集解码，
   // 会在点击后形成明显长任务；在空闲时先预热，点击时就只剩页面渲染。
@@ -818,6 +822,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             }
             onCustomModulesChange={setCustomModules}
             onSettingsChange={(patch) => setSettings({ ...settings, ...patch })}
+            languagePacks={langPacks}
           />
         </AppShell>
         <CommandTerminal

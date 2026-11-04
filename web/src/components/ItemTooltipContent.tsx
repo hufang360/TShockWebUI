@@ -4,13 +4,15 @@ import { Info, Star } from 'lucide-react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import { useI18n, type I18n } from '@/lib/i18n'
+import { useDataset } from '@/lib/datasetContext'
+import { useI18n } from '@/lib/i18n'
 import { useItemDetail } from '@/lib/itemDetailContext'
 import { useItemFavorites } from '@/lib/itemFavoritesContext'
 import { rarityColor } from '@/lib/items'
 import { closeItemTooltip } from '@/lib/itemTooltipBus'
+import { parseRichText } from '@/lib/richtext'
 import { prefixDeltaLines } from '@/lib/prefixes'
-import type { Atlas, Item, ItemStatEntry, PrefixMods } from '@/types'
+import type { Atlas, Item, ItemStatEntry, Prefix, PrefixMods } from '@/types'
 
 const EMPTY_LINES: string[] = []
 
@@ -33,11 +35,12 @@ function applyPrefix(
   lines: string[],
   stats: Record<string, number | boolean> | undefined,
   mods: PrefixMods,
-  t: I18n['t'],
+  speedWords: string[],
+  kbWords: string[],
 ): string[] {
   if (lines.length === 0) return lines
-  const speedWords = new Set(Array.from({ length: 8 }, (_, i) => t(`prefix.speed.${i}`)))
-  const kbWords = new Set(Array.from({ length: 9 }, (_, i) => t(`prefix.kb.${i}`)))
+  const speedSet = new Set(speedWords)
+  const kbSet = new Set(kbWords)
   const baseDmg = Number(/^\d+/.exec(lines[0])?.[0] ?? NaN)
   const newDmg = Number.isFinite(baseDmg) ? Math.round(baseDmg * (mods.dmg ?? 1)) : null
   const baseCrit = /^\d+%/.test(lines[1] ?? '') ? Number(/^\d+/.exec(lines[1])![0]) : null
@@ -49,8 +52,8 @@ function applyPrefix(
   return lines.map((line, idx) => {
     if (idx === 0 && newDmg != null && newDmg !== baseDmg) return line.replace(/^\d+/, String(newDmg))
     if (idx === 1 && newCrit != null && newCrit !== baseCrit) return line.replace(/^\d+/, String(newCrit))
-    if (speedWords.has(line)) return t(`prefix.speed.${speedTier(newAnim)}`)
-    if (kbWords.has(line)) return t(`prefix.kb.${kbTier(newKb)}`)
+    if (speedSet.has(line)) return speedWords[speedTier(newAnim)]
+    if (kbSet.has(line)) return kbWords[kbTier(newKb)]
     return line
   })
 }
@@ -121,15 +124,27 @@ export function ItemTooltipContent({
   hideDetailLink = false,
 }: ItemTooltipContentProps) {
   const { t } = useI18n()
+  const dataset = useDataset()
   const favorites = useItemFavorites()
   const detail = useItemDetail()
   const favorited = favorites ? favorites.isFavorited(item.id) : false
-  // tip 行在载入数据集时已按当前界面语言解析好。
+  // tip 行在载入数据集时已按当前界面语言解析好（有语言材质包时按合并后的文本重算过）。
   const baseLines = stat?.tip ?? EMPTY_LINES
+  // 速度 / 击退档位词取自数据集（可能被材质包改写），与提示行同一来源；缺表时回退 i18n。
+  const words = useMemo(() => {
+    const lt = dataset?.loc.LegacyTooltip
+    return {
+      speed: Array.from({ length: 8 }, (_, i) => lt?.[String(6 + i)] ?? t(`prefix.speed.${i}`)),
+      kb: Array.from({ length: 9 }, (_, i) => lt?.[String(14 + i)] ?? t(`prefix.kb.${i}`)),
+    }
+  }, [dataset?.loc, t])
   // 选了词缀就用修正重算属性行（伤害/暴击/速度/击退），并补上「变化行」（红/绿）。
   const lines = useMemo(
-    () => (prefix && prefixMods ? applyPrefix(baseLines, stat?.stats, prefixMods, t) : baseLines),
-    [baseLines, stat?.stats, prefix, prefixMods, t],
+    () =>
+      prefix && prefixMods
+        ? applyPrefix(baseLines, stat?.stats, prefixMods, words.speed, words.kb)
+        : baseLines,
+    [baseLines, stat?.stats, prefix, prefixMods, words],
   )
   /** 词缀相对未附词缀物品的变化行（+15%伤害 / -10%速度 …），颜色复刻游戏。 */
   const deltaLines = useMemo(
@@ -161,7 +176,14 @@ export function ItemTooltipContent({
         {(lines.length > 0 || deltaLines.length > 0) && (
           <div className="flex flex-col gap-0.5 text-sm leading-5 text-foreground/80">
             {lines.map((line, i) => (
-              <p key={i}>{line}</p>
+              <p key={i}>
+                <TipLine
+                  text={line}
+                  itemsById={dataset?.itemsById}
+                  prefixesById={dataset?.prefixesById}
+                  atlas={atlas}
+                />
+              </p>
             ))}
             {deltaLines.map((d, i) => (
               <p key={`d${i}`} style={{ color: d.tone === 'down' ? '#be7878' : '#78be78' }}>
@@ -268,7 +290,14 @@ export function ItemTooltipContent({
           )}
         >
           {lines.map((line, i) => (
-            <p key={i}>{line}</p>
+            <p key={i}>
+              <TipLine
+                text={line}
+                itemsById={dataset?.itemsById}
+                prefixesById={dataset?.prefixesById}
+                atlas={atlas}
+              />
+            </p>
           ))}
           {deltaLines.map((d, i) => (
             <p key={`d${i}`} style={{ color: d.tone === 'down' ? '#be7878' : '#78be78' }}>
@@ -282,6 +311,54 @@ export function ItemTooltipContent({
       )}
       <IdKeyFooter item={item} className="text-zinc-400/90" />
     </div>
+  )
+}
+
+/** 单行物品提示：解析材质包可能带来的 `[c/]` 颜色与 `[i:]` 物品标签（游戏同款）。 */
+function TipLine({
+  text,
+  itemsById,
+  prefixesById,
+  atlas,
+}: {
+  text: string
+  itemsById?: Map<number, Item>
+  prefixesById?: Map<number, Prefix>
+  atlas?: Atlas
+}) {
+  const tokens = useMemo(() => parseRichText(text), [text])
+  // 无标签时直接输出原文；有标签但最后只剩一段文本时也要输出**去掉标签的**文本（不能回退成原文）。
+  if (tokens.length === 1 && tokens[0].kind === 'text' && tokens[0].text === text) return <>{text}</>
+  return (
+    <>
+      {tokens.map((token, index) => {
+        if (token.kind === 'color') {
+          // tooltip 底色恒为深色，颜色按原值渲染（不用 `ts-chat-color` 的浅色主题压暗）。
+          return (
+            <span key={index} style={{ color: token.color }}>
+              {token.text}
+            </span>
+          )
+        }
+        if (token.kind === 'item') {
+          const target = itemsById?.get(token.itemId)
+          if (!target) return <span key={index}>{token.raw}</span>
+          const prefix = token.prefixId != null ? prefixesById?.get(token.prefixId)?.name : undefined
+          return (
+            <span key={index} className="mx-0.5 inline-flex items-center align-middle">
+              <ItemIcon
+                item={target}
+                atlas={atlas}
+                size={18}
+                stack={token.stack}
+                prefix={prefix}
+              />
+            </span>
+          )
+        }
+        return <span key={index}>{token.text}</span>
+      })}
+    </>
   )
 }
 

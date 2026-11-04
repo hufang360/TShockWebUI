@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui'
 import { PluginHelp } from '@/components/PluginHelp'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import type { CustomModule } from '@/lib/customModules'
+import type { LanguagePacksController } from '@/lib/languagePack/useLanguagePacks'
 import { useI18n } from '@/lib/i18n'
 import type { DetailEntry } from '@/lib/itemDetailContext'
 import { PLUGIN_LINKS } from '@/lib/pluginLinks'
@@ -116,6 +117,7 @@ export interface AppRoutesProps {
   onModuleUserSet: (id: ModuleId) => void
   onCustomModulesChange: (next: CustomModule[]) => void
   onSettingsChange: (patch: Partial<Settings>) => void
+  languagePacks: LanguagePacksController
 }
 
 /**
@@ -145,6 +147,7 @@ export function AppRoutes({
   onModuleUserSet,
   onCustomModulesChange,
   onSettingsChange,
+  languagePacks,
 }: AppRoutesProps) {
   const { t } = useI18n()
   const openLogin = onLogin
@@ -293,6 +296,7 @@ export function AppRoutes({
           onCustomModulesChange={onCustomModulesChange}
           onTokenInvalid={onTokenInvalid}
           onLogin={openLogin}
+          languagePacks={languagePacks}
         />
       )}
     </>

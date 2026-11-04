@@ -563,7 +563,35 @@ function main() {
     'NPCName',
     'BuffName',
     'MapObject',
+    // 材质包（语言 Resource Pack）会改写物品提示 / Buff 描述等，运行期需要这些基础表。
+    'ItemTooltip',
+    'CommonItemTooltip',
+    'LegacyTooltip',
+    'GameUI',
+    'LegacyInterface',
+    'PaintingArtist',
+    'BuffDescription',
   ];
+  // 按键触发器的展示名（游戏里是当前绑定的按键，这里用固定可读名；
+  // 与 tools/gen-item-stats.mjs 的 INPUT_SUBS 保持一致，否则默认 tips 与运行期重算会不一致）。
+  const INPUT_TRIGGERS = {
+    'zh-Hans': {
+      InputTrigger_Healing: '快速治疗', InputTrigger_ManaHealing: '快速回蓝', InputTrigger_QuickBuff: '快速增益',
+      InputTrigger_Mount: '骑乘', InputTrigger_UseOrAttack: '使用/攻击', InputTrigger_InteractWithTile: '交互',
+      InputTrigger_ToggleOrOpen: '开启/切换', InputTrigger_Grapple: '抓钩', InputTrigger_Jump: '跳跃',
+      InputTrigger_LockOn: '锁定', InputTrigger_QuickEquip: '快速装备', InputTrigger_SmartCursor: '智能光标',
+      InputTrigger_SmartSelect: '智能选择', InputTrigger_RadialHotbar: '径向热键栏+',
+      InputTrigger_RadialQuickbar: '径向快捷栏+', InputTrigger_InteractWithTileUI: '交互',
+    },
+    'en-US': {
+      InputTrigger_Healing: 'Quick Heal', InputTrigger_ManaHealing: 'Quick Mana', InputTrigger_QuickBuff: 'Quick Buff',
+      InputTrigger_Mount: 'Mount', InputTrigger_UseOrAttack: 'Use/Attack', InputTrigger_InteractWithTile: 'Interact',
+      InputTrigger_ToggleOrOpen: 'Open/Toggle', InputTrigger_Grapple: 'Grapple', InputTrigger_Jump: 'Jump',
+      InputTrigger_LockOn: 'Lock On', InputTrigger_QuickEquip: 'Quick Equip', InputTrigger_SmartCursor: 'Smart Cursor',
+      InputTrigger_SmartSelect: 'Smart Select', InputTrigger_RadialHotbar: 'Radial Hotbar+',
+      InputTrigger_RadialQuickbar: 'Radial Quickbar+', InputTrigger_InteractWithTileUI: 'Interact',
+    },
+  };
   const loadLocBundle = (culture) => {
     const files = [
       `Terraria.Localization.Content.${culture}.Items.json`,
@@ -581,6 +609,7 @@ function main() {
         if (data[cat]) Object.assign((merged[cat] ||= {}), data[cat]);
       }
     }
+    merged.InputTrigger = { ...(INPUT_TRIGGERS[culture] || {}) };
     return merged;
   };
   const locZh = loadLocBundle('zh-Hans');

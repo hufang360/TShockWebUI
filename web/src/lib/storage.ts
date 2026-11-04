@@ -117,6 +117,11 @@ export const StorageKeys = {
   spriteSheet: 'spriteSheet',
   /** 精灵图页面上次打开的 tab（split / merge / gif）。 */
   spriteSheetTab: 'spriteSheetTab',
+  /**
+   * 语言材质包的启用状态与优先级顺序 `{ order: string[], enabled: string[] }`。
+   * 词条本体在 IndexedDB（`tswui` / `languagePacks`），不进 localStorage。
+   */
+  languagePacks: 'languagePacks',
 } as const
 
 type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys]
