@@ -452,6 +452,50 @@ textarea.editor,
   );
 }
 
+/* 鱼店遮阳伞（`ShopAwning` 用 SVG 画，路径在 `lib/fishAwning.ts` 里按宽度算 —— 布条是放射状的，
+   横向条纹渐变做不出来）。这里只放颜色，几何常量在 `lib/fishAwning.ts`。
+   布条取 `--info` 的混色（亮色 80% / 暗色 70%）：这是参考图那种饱和蓝，不是满屏品牌色。
+   混色一律用 `in srgb`：`in oklch` 跟白（`--card` 是 `oklch(1 0 0)`，色相 0）混会把色相
+   走近路拉到 330° 左右，浅蓝布条会渲染成粉的（实测 rgb(241,200,236)）。 */
+.shop-awning {
+  /* 蓝布 / 白布 / 两端绕到背面那一截（灰） */
+  --awning-strip: color-mix(in srgb, var(--info) 80%, var(--card));
+  --awning-strip-alt: color-mix(in srgb, var(--card) 88%, var(--info) 12%);
+  --awning-strip-turn: color-mix(in srgb, var(--card) 55%, var(--foreground) 14%);
+  /* 半圆收口内侧的暗（布边卷下去）与每条布自己的圆柱明暗 */
+  --awning-hem: rgb(0 0 0 / 0.1);
+  --awning-cyl: rgb(0 0 0 / 0.03);
+  position: relative;
+  margin-bottom: 12px;
+}
+
+/* 暗色主题：底本来就深，「遮暗」要更实才看得出层次，折脊的亮线也要收着点。 */
+.dark .shop-awning {
+  --awning-hem: rgb(0 0 0 / 0.26);
+  --awning-cyl: rgb(0 0 0 / 0.08);
+  /* 深底上多重一点蓝，不然布条和卡片底的明度差不够 */
+  --awning-strip: color-mix(in srgb, var(--info) 70%, var(--card));
+  --awning-strip-alt: color-mix(in srgb, var(--card) 74%, var(--foreground) 24%);
+  --awning-strip-turn: color-mix(in srgb, var(--card) 60%, var(--foreground) 10%);
+}
+
+.shop-awning-svg {
+  display: block;
+}
+
+.shop-awning-strip--blue {
+  fill: var(--awning-strip);
+}
+
+.shop-awning-strip--white {
+  fill: var(--awning-strip-alt);
+}
+
+/* 两端绕到背面那一截 */
+.shop-awning-strip--turn {
+  fill: var(--awning-strip-turn);
+}
+
 /* 物品集合下拉的「点我」提示：选中集合分组后，第二级下拉出现时脉冲一圈主色阴影。 */
 @keyframes tswui-attention {
   0% {

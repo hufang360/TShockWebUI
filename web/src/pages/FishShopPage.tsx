@@ -37,6 +37,7 @@ import {
 import { GoodDiagram } from '@/components/fishshop/GoodDiagram'
 import { GoodGrid } from '@/components/fishshop/GoodGrid'
 import { GoodsTable } from '@/components/fishshop/GoodsTable'
+import { ShopAwning } from '@/components/fishshop/ShopAwning'
 import { useChatSend } from '@/hooks/useChatSend'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { cn } from '@/lib/cn'
@@ -129,6 +130,8 @@ interface FishUiState extends Record<string, unknown> {
   tableView?: boolean
   /** 「页面设置 → 货架层板」：默认显示（关掉就是纯网格，没有板线）。 */
   shelf?: boolean
+  /** 「页面设置 → 遮阳伞」：默认显示（表格视图本来就不画）。 */
+  awning?: boolean
   /** 工具条页签：全部 / 买过 / 收藏。 */
   tab?: FishTab
   /** 买过的商品（**按内容指纹去重、最新在前**，不存 serial）。 */
@@ -562,6 +565,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   // 货架板：表格视图没有格子、小尺寸格子又密，这两种情况本来就不画，所以开关也不显示。
   const shelfToggleVisible = !tableView && iconSize !== 'sm'
   const shelfLines = shelfToggleVisible && ui.shelf !== false
+  // 遮阳伞是「摊位」的一部分（不是格子的装饰），网格 / 空态 / 加载中都顶着同一块篷；表格视图里不画。
+  const awning = ui.awning !== false && !tableView
   const [settingsOpen, setSettingsOpen] = useState(false)
   // 「货架全屏」：顶栏以外的区域全部让给货架（与「物品 ID」同一套做法，Esc 退出）。
   const [shelfFullscreen, setShelfFullscreen] = useState(false)
@@ -652,6 +657,19 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               />
               <FieldLabel htmlFor="fish-shelf-lines" className="cursor-pointer font-medium text-foreground">
                 {t('fish.shelfLines')}
+              </FieldLabel>
+            </Field>
+          )}
+          {!tableView && (
+            <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
+              <Checkbox
+                id="fish-awning"
+                checked={ui.awning !== false}
+                onCheckedChange={(value) => setUi({ awning: value === true })}
+                className="mt-0.5"
+              />
+              <FieldLabel htmlFor="fish-awning" className="cursor-pointer font-medium text-foreground">
+                {t('fish.awning')}
               </FieldLabel>
             </Field>
           )}
@@ -837,6 +855,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
           {/* 货架区留一圈内边距（`p-2`）：最后一行的板线 / 板下投影不会被容器下沿切掉。 */}
           <div className="p-2">
+            {awning && <ShopAwning />}
             {loading && !shop ? (
               <div
                 className={GOOD_GRID_CLASS[iconSize]}

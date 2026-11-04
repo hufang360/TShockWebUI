@@ -1130,6 +1130,27 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     await waitFor(() => expect(screen.queryByTestId('fish-shelf')).toBeTruthy())
   })
 
+  it('遮阳伞：默认挂在货架区顶部，表格视图下不画，「页面设置」可以关掉', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    expect(await screen.findByTestId('shop-awning')).toBeTruthy()
+
+    // 表格视图：货架变成数据表，不再顶篷布 —— 开关也跟着藏起来（关了也看不见东西）。
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    fireEvent.click(await screen.findByLabelText('表格视图'))
+    await waitFor(() => expect(screen.queryByTestId('shop-awning')).toBeNull())
+    expect(screen.queryByLabelText('遮阳伞')).toBeNull()
+
+    // 回到网格视图：篷布回来。
+    fireEvent.click(screen.getByLabelText('表格视图'))
+    expect(await screen.findByTestId('shop-awning')).toBeTruthy()
+
+    fireEvent.click(screen.getByLabelText('遮阳伞'))
+    await waitFor(() => expect(screen.queryByTestId('shop-awning')).toBeNull())
+
+    fireEvent.click(screen.getByLabelText('遮阳伞'))
+    expect(await screen.findByTestId('shop-awning')).toBeTruthy()
+  })
+
   it('页签：收藏 ⭐ 后出现在「收藏」，再点取消就没了', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
