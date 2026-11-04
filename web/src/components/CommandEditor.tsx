@@ -125,6 +125,13 @@ export function CommandEditor({
   const composingRef = useRef(false)
   const hasFocusedRef = useRef(false)
   const lastFocusRef = useRef(focusRequest)
+  // 失焦后的延迟关闭：卸载（切页 / 测试 teardown）时清掉，避免 jsdom 销毁后定时器再 setState。
+  const blurCloseTimerRef = useRef<number | null>(null)
+  useEffect(() => {
+    return () => {
+      if (blurCloseTimerRef.current != null) window.clearTimeout(blurCloseTimerRef.current)
+    }
+  }, [])
 
   // 进入页面：输入框默认聚焦；已有指令时光标停在末尾。
   useEffect(() => {
@@ -497,10 +504,12 @@ export function CommandEditor({
             hasFocusedRef.current = true
             syncCaret()
             // 点回输入框时重新弹出候选（终端里回车后再敲也会有）。
+            if (blurCloseTimerRef.current != null) window.clearTimeout(blurCloseTimerRef.current)
             setOpen(true)
           }}
           onFocus={() => {
             hasFocusedRef.current = true
+            if (blurCloseTimerRef.current != null) window.clearTimeout(blurCloseTimerRef.current)
           }}
           onSelect={() => {
             hasFocusedRef.current = true
@@ -514,8 +523,13 @@ export function CommandEditor({
           }}
           onScroll={(e) => setGhostScroll(e.currentTarget.scrollLeft)}
           onBlur={() => {
-            // 延迟关闭，允许鼠标点击候选项
-            window.setTimeout(() => setOpen(false), 150)
+            // 延迟关闭，允许鼠标点击候选项；重复失焦只保留最后一个定时器。
+            if (blurCloseTimerRef.current != null) window.clearTimeout(blurCloseTimerRef.current)
+            blurCloseTimerRef.current = window.setTimeout(() => {
+              blurCloseTimerRef.current = null
+              // 测试 teardown 后 jsdom 已销毁：不要再调度 React 更新。
+              if (typeof window !== 'undefined') setOpen(false)
+            }, 150)
           }}
         />
         </div>

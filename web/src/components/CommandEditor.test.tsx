@@ -451,3 +451,30 @@ describe('CommandEditor 下拉框出现时机与外观', () => {
     expect(panel.className).toContain('border-border/60')
   })
 })
+
+describe('CommandEditor 卸载清理', () => {
+  it('卸载后不残留失焦延迟关闭定时器（避免 jsdom teardown 后 window 未定义）', () => {
+    vi.useFakeTimers()
+    try {
+      const { container, unmount } = render(
+        <CommandEditor
+          value=""
+          onChange={() => {}}
+          computeCompletions={() => []}
+          onExecute={() => {}}
+          busy={false}
+          atlas={undefined}
+        />,
+      )
+      const ta = container.querySelector('textarea') as HTMLTextAreaElement
+      // 基线里可能已有 React/其它定时器；只断言失焦新增的那一个在卸载后被清掉。
+      const baseline = vi.getTimerCount()
+      fireEvent.blur(ta)
+      expect(vi.getTimerCount()).toBeGreaterThan(baseline)
+      unmount()
+      expect(vi.getTimerCount()).toBe(baseline)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

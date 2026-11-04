@@ -105,3 +105,24 @@ describe('SearchInput 快捷键与结果数', () => {
     expect(document.activeElement).not.toBe(input)
   })
 })
+
+describe('SearchInput 卸载清理', () => {
+  it('卸载后不残留失焦延迟关闭定时器', () => {
+    vi.useFakeTimers()
+    try {
+      const { unmount } = render(
+        <I18nProvider lang="zh">
+          <SearchInput value="" onValueChange={vi.fn()} history={['木匣']} historyOnFocus placeholder="搜索" />
+        </I18nProvider>,
+      )
+      const input = screen.getByPlaceholderText('搜索')
+      fireEvent.focus(input)
+      fireEvent.blur(input)
+      expect(vi.getTimerCount()).toBeGreaterThan(0)
+      unmount()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

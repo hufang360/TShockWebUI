@@ -97,6 +97,8 @@ export function SearchInput({
   const [focused, setFocused] = useState(false)
   const [narrow, setNarrow] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  // 失焦后的延迟关闭：卸载（切页 / 测试 teardown）时清掉，避免 jsdom 销毁后定时器再 setState。
+  const blurTimerRef = useRef<number | null>(null)
   const q = value.trim().toLowerCase()
   const items = history && history.length > 0
     ? q
@@ -117,6 +119,12 @@ export function SearchInput({
     return () => {
       ro?.disconnect()
       window.removeEventListener('resize', measure)
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current != null) window.clearTimeout(blurTimerRef.current)
     }
   }, [])
 
@@ -167,13 +175,19 @@ export function SearchInput({
 
   const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
     setFocused(true)
+    if (blurTimerRef.current != null) window.clearTimeout(blurTimerRef.current)
     if (historyOnFocus) setOpen(true)
     onFocus?.(e)
   }
   const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
     setFocused(false)
-    // 延迟关闭，允许鼠标点候选（onMouseDown preventDefault 已避免失焦，这里兜底）。
-    window.setTimeout(() => setOpen(false), 150)
+    // 延迟关闭，允许鼠标点候选（onMouseDown preventDefault 已避免失焦，这里兜底）；
+    // 重复失焦只保留最后一个定时器，卸载时清掉。
+    if (blurTimerRef.current != null) window.clearTimeout(blurTimerRef.current)
+    blurTimerRef.current = window.setTimeout(() => {
+      blurTimerRef.current = null
+      if (typeof window !== 'undefined') setOpen(false)
+    }, 150)
     onBlur?.(e)
   }
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
