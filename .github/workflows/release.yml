@@ -170,13 +170,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
           PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
         run: |
           echo "assets:"; ls -la release-assets
-          ARGS=(--title "$TAG" --generate-notes)
+          # 单版本发布说明（docs/release/<版本>.md）存在时直接用它；否则退回自动生成。
+          NOTES="docs/release/v${VERSION}.md"
+          if [ -f "$NOTES" ]; then
+            cp "$NOTES" /tmp/notes.md
+            echo "使用发布说明：$NOTES"
+          else
+            : > /tmp/notes.md
+            echo "未找到 $NOTES，使用自动生成的说明"
+          fi
+          ARGS=(--title "$TAG")
+          if [ -s /tmp/notes.md ]; then ARGS+=(--notes-file /tmp/notes.md); else ARGS+=(--generate-notes); fi
           if [ "$PRERELEASE" = "true" ]; then ARGS+=(--prerelease); fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" release-assets/* --clobber
+            if [ -s /tmp/notes.md ]; then gh release edit "$TAG" --notes-file /tmp/notes.md; fi
           else
             gh release create "$TAG" "${ARGS[@]}" release-assets/*
           fi

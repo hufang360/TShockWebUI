@@ -34,7 +34,8 @@ API_PORT ?= 18080
 API_TARGET ?= http://127.0.0.1:$(API_PORT)
 
 .PHONY: help data web server lint test plugin image binary \
-        dev dev-web dev-all dev-container dev-container-frontend dev-container-backend clean
+        dev dev-web dev-all dev-container dev-container-frontend dev-container-backend \
+        release-docs release-check docs-check clean
 
 help:
 	@echo "TShockWebUI 任务："
@@ -57,6 +58,10 @@ help:
 	@echo "  —— 交付验证 ——"
 	@echo "  make image         构建并运行交付镜像（scripts/run-container.sh）"
 	@echo "  make binary        构建单文件二进制（scripts/build-binary.sh）"
+	@echo "  —— 发版 ——"
+	@echo "  make release-docs  按当前版本生成两份单版本文档（不覆盖已有）"
+	@echo "  make release-check 检查单版本文档 + 三段标题 + 版本号"
+	@echo "  make docs-check    全仓 md 相对链接死链检查"
 	@echo "  make clean         清理构建产物"
 
 # ---- 数据 ----------------------------------------------------------------
@@ -159,6 +164,20 @@ image:
 # 单文件二进制（内嵌前端与 data），产物在 dist/。
 binary:
 	scripts/build-binary.sh
+
+# ---- 发版 ----------------------------------------------------------------
+# 每个版本都要有 docs/changelog/<版本>.md（详细）与 docs/release/<版本>.md（三段式）。
+# 流程与验收清单见 docs/发布流程.md。
+release-docs:
+	scripts/new-release-docs.sh
+
+# 发版前检查：两份单版本文档存在、release 含「新增 / 改进 / 修复」、标题含版本号。
+release-check:
+	scripts/check-release-docs.sh
+
+# 全仓 Markdown 相对链接死链（跳过模板与构建产物）。
+docs-check:
+	node scripts/check-docs-links.mjs
 
 # ---- 清理 ----------------------------------------------------------------
 # 只删构建产物与 server/internal/webdist 里的注入内容，不动 data/ 与源码。

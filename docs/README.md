@@ -13,8 +13,8 @@
 | 计划 / 草案 | `计划-<名>.md` | 设计稿（机制与取舍）。**实现后仍保留**：头部标状态，当前行为指向页面 / 功能文档 |
 | 审查 / 复盘 | `审查-<名>.md` | 阶段性体验/一致性审查（含发现、建议，待办链接到 `TODO.md`） |
 | 历史存档 | `记录-<名>.md` | 任务与验收记录、页面 / 组件改版日志（**不是待办**） |
-| 单版本更新日志 | `changelog/<版本>.md` | 单个版本的**详细**更新（按功能模块）；根目录 `changelog.md` 是全量历史 |
-| 单版本发布日志 | `release/<版本>.md` | 单个版本**对外**的发布说明（三段式：新增 / 改进 / 修复）；GitHub Release 用这份 |
+| 单版本更新日志 | `changelog/<版本>.md` | 单个版本的**详细**更新（按功能模块）；根目录 `changelog.md` 是全量历史；模板 `changelog/_TEMPLATE.md` |
+| 单版本发布日志 | `release/<版本>.md` | 单个版本**对外**的发布说明（三段式：新增 / 改进 / 修复）；GitHub Release 用这份；模板 `release/_TEMPLATE.md` |
 | 工程 / 规范 | 无前缀或英文大写名 | `设计原则与约束.md`、`ARCHITECTURE.md`、`API_SPEC.md`、`TECHNICAL_RESEARCH.md`、`REST_API限制.md`、`UI组件.md`、`TODO.md` |
 
 ## 单一事实源（避免多处维护）
@@ -45,6 +45,7 @@
 - [`../PRODUCT.md`](../PRODUCT.md) — **产品定义**：用户 / 场景 / 定位 / 不做什么（设计与文案的取材来源）
 - [`UI组件.md`](UI组件.md) — 前端 shadcn/ui 组件与交互约定
 - [`审查-UI一致性与体验.md`](审查-UI一致性与体验.md) — UI 一致性审查 + 业务建议 + 插件卸载降级矩阵（待办见 `TODO.md` P5）
+- [`发布流程.md`](发布流程.md) — 发版 checklist：版本号 / 两份单版本文档 / 全量验证 / tag 与 Release 核对 / 回退
 - [`开发速查.md`](开发速查.md) — 环境路径 / 常用命令 / 数据再生成
 - [`TODO.md`](TODO.md) — **唯一**的「还没做」清单
 - [`验收清单.md`](验收清单.md) — 需要真实游戏 / Windows 的验收步骤（照做即可把「待验证」变「已验证」）
@@ -103,5 +104,8 @@
 
 - [`changelog/`](changelog/) — **单版本**详细更新日志（按功能模块）；根目录 `changelog.md` 为全量历史
   - [`v0.1.0-rc.8.md`](changelog/v0.1.0-rc.8.md)
+  - 模板：[`_TEMPLATE.md`](changelog/_TEMPLATE.md)
 - [`release/`](release/) — **单版本**对外发布说明（三段式：新增 / 改进 / 修复），GitHub Release 直接使用
   - [`v0.1.0-rc.8.md`](release/v0.1.0-rc.8.md)
+  - 模板：[`_TEMPLATE.md`](release/_TEMPLATE.md)
+- [`发布流程.md`](发布流程.md) — 发版步骤与验收（`make release-docs` / `release-check` / `docs-check`）

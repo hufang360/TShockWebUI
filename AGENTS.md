@@ -92,3 +92,8 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
 - 结构：首行 `# 更新日志`；未发布放 `## 未发布（vX.Y.Z-rc.N）`（发版时补日期）；已发布用 `## YYYYMMDD（vX.Y.Z）`，**新的在上**。
 - 条目：无序列表，一条一事；太长换行拆成两级缩进子条目；通俗易懂，写清「做了什么、影响是什么」，多用指令 / 配置示例。
 - 版本号来源：`web/package.json` 的 `version`（构建时注入前端 `__APP_VERSION__`，设置页底部展示）。改版本时同步 `changelog.md` 顶部标题。
+- **每个版本两份单版本文件**（发版前必须齐备）：
+  - `docs/changelog/<版本>.md`：按功能模块的详细更新；
+  - `docs/release/<版本>.md`：**三段式**（新增 / 改进 / 修复）对外发布说明，GitHub Release 用它。
+  用 `make release-docs` 从模板生成、`make release-check` 校验；完整流程见 `docs/发布流程.md`。
+  根 `changelog.md` 是**全量历史**，单版本文件以它的该版本段落为准。
