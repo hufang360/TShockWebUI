@@ -47,6 +47,15 @@ if head -12 changelog.md | grep -q "未发布（v${VERSION}）"; then
   echo "提示：根 changelog.md 仍是「未发布（v${VERSION}）」，发版提交时记得补日期。"
 fi
 
+# README 里的 release 下载地址 / 资产名 / Docker 镜像 tag 必须与当前版本一致。
+if [ -f README.md ]; then
+  refs=$(grep -nE 'releases/download|tshockwebui:|WebUI-[0-9]' README.md \
+    | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?' | sort -u)
+  for ref in $refs; do
+    [ "$ref" = "$VERSION" ] || fail "README.md 引用了旧版本 ${ref}（当前 ${VERSION}）"
+  done
+fi
+
 if [ "$ok" = "1" ]; then
   echo "✓ 单版本文档齐备：$CH / ${REL}（版本 ${VERSION}）"
 else

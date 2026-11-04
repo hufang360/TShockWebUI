@@ -97,3 +97,15 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
   - `docs/release/<版本>.md`：**三段式**（新增 / 改进 / 修复）对外发布说明，GitHub Release 用它。
   用 `make release-docs` 从模板生成、`make release-check` 校验；完整流程见 `docs/发布流程.md`。
   根 `changelog.md` 是**全量历史**，单版本文件以它的该版本段落为准。
+
+## 文档
+
+README 由用户手动维护。不要改它的结构、措辞或顺序。
+
+只在用户明确要求时改 README。改也只改他指定的部分。
+
+其它文档按本节的规则写。细节进 `docs/`，索引见 `docs/README.md`。
+
+格式由测试与 lint 守住：中文段落不折行、列表用 `-`、代码块写语言、不用裸 URL、
+不留连续空行与行尾空格。改完跑 `npm test` 与
+`npx markdownlint-cli2 "README.md" "docs/*.md" "AGENTS.md"`。

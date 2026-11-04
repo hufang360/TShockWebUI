@@ -250,6 +250,7 @@ docker compose -f deploy/docker-compose.example.yml up -d
 
 外层反代不需要再配 `/tshock/`——浏览器只走 `/api/*`。
 
+脚本方式（开发 / 交付验证）：`scripts/run-container.sh` 会构建镜像 + 运行 + 探活（默认映射 `:18080`），与 `make dev-container`（挂载式、不构建镜像）的区别见 [`开发速查.md`](开发速查.md)。
 
 ### 6.4 GitHub Pages（仅静态演示）
 
@@ -260,8 +261,32 @@ docker compose -f deploy/docker-compose.example.yml up -d
 - 部署后地址：<https://hufang360.github.io/TShockWebUI/>
 - **前置条件**：仓库需为 public，或计划支持私有仓库 Pages；GitHub Free 私有仓库会跳过该 workflow。
 - 工作流：`.github/workflows/pages.yml`
+- 首次使用需在仓库 **Settings → Pages → Source** 选择 **GitHub Actions**（workflow 也会尝试自动启用）。
 - 构建：`VITE_TRANSPORT=mock VITE_BASE=/<repo>/ npm run build`
 - 生产部署仍以单容器 + 同源 `/api/*` 为准（§6.1）；Pages 只是展示用前端。
+
+### 6.5 单文件二进制（macOS / Windows / Linux）
+
+不需要 Docker / Node：前端产物 + `data/*.json` + 图集由 `//go:embed all:internal/webdist` 内嵌进一个 Go 二进制，运行后同时提供页面与 `/api/*`。
+
+```bash
+scripts/build-binary.sh                       # 当前系统 → dist/tswui
+SKIP_WEB=1 SMOKE=1 scripts/build-binary.sh    # 复用 web/dist，构建后自动探测 /healthz 与 /
+GOOS=windows GOARCH=amd64 scripts/build-binary.sh   # 交叉编译 → dist/tswui.exe
+VERSION=1.2.3 scripts/build-binary.sh          # 指定版本号（默认 git describe）
+./dist/tswui -version                          # tswui 1.2.3 (go1.27.x darwin/arm64)
+```
+
+注意：
+
+1. 必须先把前端构建进 `server/internal/webdist/`（脚本会自动做）；`webdist` 为空时能编译，但启动会报
+   「内嵌前端资源缺少 index.html」。`WEB_DIST_DIR` 是「读磁盘」的开发模式，不是单文件模式。
+2. `data/` 随仓库提交；构建脚本会先检查文件是否齐全，缺了就提示生成命令。
+3. 脚本一律以仓库根 `data/` 为唯一来源（前端不再有 `web/public/data` 符号链接）。
+4. 交叉编译只交叉 Go 部分；前端构建与平台无关，可在任一平台产出。
+5. Windows 首次运行会弹防火墙授权，需放行才能从局域网访问 `:8080`；`build-binary.ps1` 尚未在 Windows 实机验证。
+
+各平台编译 / 体积 / 运行验证的实测表见 [`记录-实现与验收.md`](记录-实现与验收.md)。
 
 ---
 
@@ -315,8 +340,9 @@ make dev-web                              # 浏览器开 http://localhost:5173
 - 版本规范化：`v1.4.5.8` → `1.4.5.8`。
 
 ### 前端（`vitest`）
-- 现有 33 个用例保留；新增 `HttpTransport` 的 URL/错误映射测试（`fetch` mock）。
-- 保留 App 冒烟测试（Mock 传输）。
+- 全量命令：`cd web && npx vitest run`（或 `make test`）；当前文件 / 用例数与最近结果记录在
+  [`记录-实现与验收.md`](记录-实现与验收.md)。
+- 关键覆盖：传输层 URL / 错误映射、App 冒烟（Mock）、补全、物品 / 数据 ID、鱼店、语言材质包等。
 
 ### 真实联调（可选，构建标签或脚本）
 - `TSHOCK_URL=http://127.0.0.1:7878 go test -tags integration ./internal/tshock`（默认不跑）。
@@ -328,7 +354,12 @@ make dev-web                              # 浏览器开 http://localhost:5173
 
 1. `RestApiEnabled = true`、`RestApiPort = 7878`（已确认本机环境满足）。
 2. 玩家的用户组必须有 **`tshock.rest.useapi`**（建 token）与 **`tshock.rest.command`**（rawcmd）。
-   默认 `guest`/`default` 组都没有，需管理员赋权。
+   默认 `guest`/`default` 组都没有，需管理员赋权。把 `default` 换成玩家所在的组
+   （带 `*` 的 GM / newadmin 等无需配置）：
+
+   ```bash
+   /group addperm default tshock.rest.useapi tshock.rest.command
+   ```
 3. **调大 `RESTMaximumRequestsPerInterval`**（建议 `50`）：经反代后 TShock 只看到网关 IP，
    所有玩家共用一个限流桶（实测 `<gateway-ip>`），默认 5/分钟会互相影响。
    - 一条指令全搞定：装了 WebUI 插件后在游戏内 / 控制台执行 `/web init`（需 `webui.admin` + `tshock.rest.cfg`）——
@@ -337,7 +368,8 @@ make dev-web                              # 浏览器开 http://localhost:5173
    - 只想改限流：`/web limit 60`（或 `unlimited`）会自动改并保存 `config.json`。
 4. 可选：`EnableTokenEndpointAuthentication = false` 让 `/v2/server/status` 公开（否则登录前拿不到版本）。
    后端已兼容两种情况（401 也视为「可达」）。
-5. `7878` 尽量只对本容器网络开放，不要暴露到公网。
+5. 可选：用 `ApplicationRestTokens` 里的令牌免密登录（`POST /api/login {token}`；界面里也支持）。
+6. `7878` 尽量只对本容器网络开放，不要暴露到公网。
 
 ---
 
@@ -348,3 +380,5 @@ make dev-web                              # 浏览器开 http://localhost:5173
 - 无数据库：历史/收藏在浏览器 localStorage（`tswui:*`）；服务器动态历史由**插件**按天落盘
   （`tshock/WebUI/events/*.jsonl`，默认保留 7 天 / 50MB），Go 后端本身仍无状态、不落盘。
 - IPv6 与 `RemoteAddr` 解析、HTTPS 出站证书等需在实现时覆盖测试。
+
+> 安全基线（密码只在请求体、`HttpOnly` Cookie、记住密码、CSP 等）见 [`设计原则与约束.md`](设计原则与约束.md) §4.3 / §4.6 与 [`API_SPEC.md`](API_SPEC.md) 的安全清单。
