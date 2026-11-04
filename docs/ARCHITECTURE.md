@@ -23,7 +23,7 @@
 | # | 决策 | 理由 |
 | --- | --- | --- |
 | ADR-1 | **单容器交付**：前端静态资源 + Go 后端 + TShock 反代合一 | 一份镜像、一个端口，IP:端口 / 域名都能用 |
-| ADR-2 | **后端用 Go 1.27，标准库 only**，`CGO_ENABLED=0` 静态二进制 | 实测全量（含前端 + data）约 **16MB**；零依赖、无供应链风险、跨架构交叉编译 |
+| ADR-2 | **后端用 Go 1.27，标准库 only**，`CGO_ENABLED=0` 静态二进制 | 实测全量（含前端 + data）约 **18MB**（随版本略变）；零依赖、无供应链风险、跨架构交叉编译 |
 | ADR-3 | 运行时基础镜像用 **`gcr.io/distroless/static-debian12:nonroot`**（备选 `scratch`） | 加 ~2MB，自带 CA 证书（可反代 HTTPS 的 TShock）、非 root |
 | ADR-4 | **浏览器不再持有 TShock token**；后端内存会话 + `HttpOnly` Cookie | token 不进 JS，XSS 无法直接搬走；凭证改走 POST body |
 | ADR-5 | 浏览器**只调用固定 `/api/*`**，容器**不暴露通用 `/tshock/` 代理** | 收窄攻击面，避免「任意 URL 转发」；只暴露业务所需端点 |
@@ -220,7 +220,7 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 - **Go 在 `BUILDPLATFORM` 上交叉编译**：`GOOS=$TARGETOS GOARCH=$TARGETARCH` + `CGO_ENABLED=0`，
   arm64 镜像不再在 QEMU 里跑 Go 编译器；最终 distroless 阶段仍按目标平台生成。
 - **可复现构建**：基础镜像按 digest 固定；Go 使用 `-trimpath -buildvcs=false -ldflags="-s -w -buildid= ..."`。
-- 体积参考（本机实测）：二进制 ~16MB + distroless ~2MB → **镜像约 19–20MB**（amd64 19.9MB / arm64 19.2MB）。
+- 体积参考（本机实测）：二进制约 **18MB** + distroless ~2MB → **镜像约 20MB**（随版本略变）。
 - 多架构（先构建前端）：
 
   ```bash

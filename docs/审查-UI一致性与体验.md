@@ -3,6 +3,9 @@
 > 范围：`web/src/` 全站前端 + 「服务器动态 / 网页发言 / Web UI ↔ 游戏内聊天」这条业务线。
 > 目的：找出**体验不一致、偏离 shadcn 规范、可明显改进**的地方，并给出处理建议。
 > 本文件是**分析记录**；待办以 `docs/TODO.md` 为准（唯一「还没做」清单），本轮已处理的列在 §5。
+>
+> **状态（2026-11-04）**：审查时的主要问题大多已处理（共享 `CardManagerSheet`、字号刻度、空态 / 确认按钮、巨型组件拆分、图标按钮规格、能力探测收敛等）；
+> 仍未做项见 [`TODO.md`](TODO.md) P5。下面 §1 的「问题」按审查当时写，读的时候以本节状态为准。
 
 ---
 
@@ -113,7 +116,7 @@
 | 统一聊天事件模型（§2.1.1） | 聊天统一为 `type=chat` + `source=game\|webui`（旧 `type=webui` 仍兼容）；插件、后端、前端、卡片配色一起改 |
 | 网页聊天消息模型（§2.2.1） | `/webui/chat` 返回 `id`/`time`/`source`；前端失败保留输入、可就地「重试」，不造假成功 |
 | 前缀可配（§2.2.3） | 插件配置 `ChatPrefix`（默认 `[WebUI]`），不再硬编码 |
-| 发言入口可发现性（§2.2.5） | 抽出共享 `components/WebChatInput.tsx`；当时首页「服务器动态」卡片底部也放了入口。**后续改动**：首页卡片太小，已移除首页入口，回复玩家统一在「指令 → 动态」 |
+| 发言入口可发现性（§2.2.5） | 抽出共享 `components/WebChatInput.tsx`；当时首页「服务器动态」卡片底部也放了入口。**后续改动**：首页卡片太小，已移除首页入口；聊天并入「指令」页后，回复玩家统一在「指令」页右侧聊天栏（旧聊天页与 `WebChatInput` 已删除） |
 | 手写彩色提示改 `Alert`（U5） | `PlayerManagerPage` 错误提示、`FishShopPage` 购买成功提示去掉手写 `bg-destructive/15`、`bg-success/15` div，改用 `Alert variant="destructive|success"` |
 | i18n 键一致性单测 | 新增 `web/src/lib/i18n.test.ts`：zh/en 键集合相等 + 同键占位符一致 |
 | 抽共享 `CardManagerSheet`（U1） | 新增 `components/CardManagerSheet.tsx`；首页 `HomeCardManager` 与模块/鱼店 `ModuleCardManagerDialog` 都改为复用：添加按钮按需展开表单、自定义卡片按需编辑、自动执行=`Checkbox`、删除=`ConfirmButton`、说明；排序/可见性/恢复默认按需注入 |

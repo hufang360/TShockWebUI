@@ -143,7 +143,7 @@
 
 - 其它可用 props：`size` / `variant`（如 `outline`）/ `active`（选中态抬升底色）/ `pressed`（`aria-pressed`）/
   `iconClassName`（星标 `fill-current`、箭头 `-rotate-90`）/ `tooltip={false}`（浮层内部工具条）/ `testId`。
-- **形状**：一律方形 `rounded-control`；**只有输入条里的发送键是正圆**（`CommandEditor` / `WebChatInput`）。
+- **形状**：一律方形 `rounded-control`；**只有输入条里的发送键是正圆**（`CommandEditor`）。
 - **输入框内的图标按钮**（`InputGroupAddon` 内）是唯一例外：addon 用 `[&_button]:size-7` 统一压到 28px，
   因为它必须塞进 36px 高的输入框（`SearchInput` 的历史 / 清空按钮、物资申请的收藏入口）。
 - 不用 `IconAction` 的合法例外只有三类：`ConfirmButton`（图标按钮 + 就地二次确认）、
@@ -280,7 +280,7 @@
   数据 ID 的 Boss 分类把贴图放大到 **128**、格子/图标区 **144**；页面设置可「隐藏 ID 和名称」，只留图标。
 - 触屏设备（`hover: none` / `pointer: coarse`）上，折叠箭头、刷新、复制、收藏、删除等操作常显；桌面仍可 hover 渐进显示，键盘通过 `focus-within` 显示。
 - 当前页签同步为 URL hash（映射见 `web/src/lib/routes.ts`）；浏览器前进 / 后退、刷新和分享链接均可用。localStorage 中的 `tswui:ui.activeTab` 仅作为无 hash 时的兜底。
-  - 内置页面用短名：`#/home`、`#/cmd`（指令）、`#/chat`（聊天）、`#/commands`（指令小抄）、`#/items`、`#/dataid`、`#/plr`（玩家存档）、`#/pm`（玩家管理）、`#/wm`（世界管理）、`#/fish`（鱼店）、`#/settings`；`#/spawn` 旧链接回落到指令小抄。
+  - 内置页面用短名：`#/home`、`#/cmd`（指令）、`#/commands`（指令小抄）、`#/items`、`#/dataid`、`#/plr`（玩家存档）、`#/pm`（玩家管理）、`#/wm`（世界管理）、`#/fish`（鱼店）、`#/settings`；`#/spawn` 旧链接回落到指令小抄。`#/chat` 为旧链接，解析到「指令」页并切到聊天。
   - 自定义插件页用**主指令**：`/clip` → `#/ext-clip`，`/chest` → `#/ext-chest`（`ext-` + 主指令第一段，小写）。
   - 旧地址继续兼容：`#/save`、`#/players`、`#/world`、`#/store`、`#/commands`、`#/spawn`、旧的自定义模块 `#/m:%3Cid%3E`，打开后会把地址替换成新的短名。
 - `Input` / `Textarea` / `InputGroupInput` 未显式传 `id` 时自动生成稳定 id 与 name，避免表单字段缺少语义。
