@@ -1,5 +1,5 @@
 import { PanelLeftClose, type LucideIcon } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { IconAction } from '@/components/IconAction'
 import { TopBarInfoSlot, TopBarProvider, TopBarSlot } from '@/components/TopBar'
 import {
@@ -165,7 +165,14 @@ export function AppShell({
       >
         {t('nav.skipToContent')}
       </a>
-      <div className="flex h-full w-full overflow-hidden bg-background text-foreground">
+      {/* `--content-left`：内容区的左边界（侧栏收起后是 0）。抽屉遮罩要盖住内容区但不能盖住侧栏，
+          这个值让遮罩能「从侧栏右边开始」，不必测量 DOM。 */}
+      <div
+        className="flex h-full w-full overflow-hidden bg-background text-foreground"
+        style={
+          { '--content-left': sidebarCollapsed ? '0px' : 'var(--sidebar-width, 16rem)' } as CSSProperties
+        }
+      >
         <TopBarProvider>
           <Sidebar collapsible="offcanvas" data-testid="sidebar">
             <SidebarHeader>
@@ -194,6 +201,18 @@ export function AppShell({
             <SidebarRail aria-label={t('nav.railToggle')} title={t('nav.railToggle')} />
           </Sidebar>
 
+          {/* 侧栏收起时的「展开侧栏」：固定在顶栏里那个占位的位置，但**浮在 z-45 遮罩之上**。
+              否则商品详情的遮罩（盖整页 + 顶栏）会把它一起盖住，侧栏就展不开了。
+              `bg-background` 不能省：`ghost` 变体背景透明，遮罩会从按钮里透出来，看着像「不可点」
+              （没遮罩时它和顶栏同色，看不出差别）。 */}
+          {sidebarCollapsed && (
+            <SidebarTrigger
+              className="fixed top-2.5 left-2 z-[46] hidden bg-background md:inline-flex"
+              aria-label={t('nav.showSidebar')}
+              title={t('nav.showSidebar')}
+            />
+          )}
+
           <SidebarInset
             id="main-content"
             tabIndex={-1}
@@ -214,11 +233,9 @@ export function AppShell({
                 title={t('nav.openMenu')}
               />
               {sidebarCollapsed && (
-                <SidebarTrigger
-                  className="-ml-1 hidden md:inline-flex"
-                  aria-label={t('nav.showSidebar')}
-                  title={t('nav.showSidebar')}
-                />
+                // 展开按钮本身 fixed 在遮罩之上（见下面 SidebarInset 后面那个），这里只占位，
+                // 保证面包屑不左右跳（尺寸与 `icon-sm` 一致）。
+                <span aria-hidden className="-ml-1 hidden size-7 shrink-0 md:block" />
               )}
               <Separator
                 orientation="vertical"

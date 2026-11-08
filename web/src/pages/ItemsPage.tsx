@@ -5,6 +5,7 @@ import { FavoriteRecipesPanel } from '@/components/FavoriteRecipesPanel'
 import { CommonRecipes, type CommonRecipeEntry } from '@/components/items/CommonRecipes'
 import { DexCell } from '@/components/items/DexCell'
 import { DexGroupDrawer } from '@/components/items/DexGroupDrawer'
+import { ContentScrim } from '@/components/ContentScrim'
 import { ItemDetailDrawer, type ItemDetailRecipeOptions } from '@/components/items/ItemDetailDrawer'
 import { ItemTableLayout } from '@/components/items/ItemTable'
 import { SearchInput } from '@/components/SearchInput'
@@ -36,6 +37,7 @@ import { useItemFavoritesState } from '@/hooks/useItemFavoritesState'
 import { useRecipeFavoritesState } from '@/hooks/useRecipeFavoritesState'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { useStickyHeaderOffset, usePageScroller } from '@/hooks/usePageScroll'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
@@ -152,6 +154,8 @@ export function ItemsPage({
   const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
   const [settingsPopoverOpen, setSettingsPopoverOpen] = useState(false)
   const [resultsFullscreen, setResultsFullscreen] = useState(false)
+  // 详情抽屉：手机端是自带遮罩的模态（下滑关闭），桌面端只盖内容区（`ContentScrim`）。
+  const isMobileDetail = useIsMobile()
   const [tableView, setTableView] = useLocalState<boolean>(StorageKeys.dexTableView, false)
   const [tableTwoCols, setTableTwoCols] = useLocalState<boolean>(StorageKeys.dexTableTwoCols, true)
   const [openGroup, setOpenGroup] = useState<string>('game')
@@ -1116,6 +1120,10 @@ export function ItemsPage({
 
           {/* 详情：**可堆叠**抽屉（合成区域较长，抽屉比分栏弹框更好用）。
               在抽屉里点配方材料 / 产物、或用提示右上角的 ⓘ「物品详情」入口，会再叠一层，关掉即返回上一层。 */}
+          {/* 遮罩：桌面端只盖内容区（左侧边栏露着、可点，能直接切页）；手机端抽屉自带模态遮罩。 */}
+          {detail.stack.length > 0 && !isMobileDetail && (
+            <ContentScrim testId="items-detail-scrim" onClick={() => closeDetailFrom(0)} />
+          )}
           {detail.stack.length > 0 && (
             <ItemDetailDrawer
               dataset={dataset}

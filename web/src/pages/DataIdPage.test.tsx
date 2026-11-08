@@ -379,6 +379,50 @@ describe('DataIdPage', () => {
     expect(within(detail).getByText('多格')).toBeTruthy()
   })
 
+  it('切到别的页面再回来（组件重新挂载）：详情抽屉还开着', async () => {
+    const first = renderPage()
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    await screen.findByTestId('dataid-detail')
+    first.unmount()
+
+    renderPage()
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(within(detail).getByText('克苏鲁之眼')).toBeTruthy()
+  })
+
+  it('关掉详情后切走再回来，不会再弹出来', async () => {
+    const first = renderPage()
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    const detail = await screen.findByTestId('dataid-detail')
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByTestId('dataid-detail')).toBeNull())
+    expect(detail).toBeTruthy()
+    first.unmount()
+
+    renderPage()
+    expect(screen.queryByTestId('dataid-detail')).toBeNull()
+  })
+
+  it('详情遮罩只盖内容区：点遮罩关闭，点页面别处不关', async () => {
+    renderPage()
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    await screen.findByTestId('dataid-detail')
+
+    // 自带的全屏遮罩不再渲染，换成只盖内容区的 `ContentScrim`（左侧边栏露着、可点）。
+    expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeNull()
+    const scrim = screen.getByTestId('dataid-detail-scrim')
+    expect(scrim.className).toContain('md:left-[var(--content-left,0px)]')
+    expect(scrim.className).toContain('bg-black/50')
+
+    // 点页面别处不关（点导航是切页，不是关详情）
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    expect(screen.getByTestId('dataid-detail')).toBeTruthy()
+
+    fireEvent.click(scrim)
+    await waitFor(() => expect(screen.queryByTestId('dataid-detail')).toBeNull())
+  })
+
   it('NPC 详情：相关指令不探测权限；传送 / 改名只给城镇 NPC', async () => {
     // 未登录也照样显示（页面不调 /api/me，不把权限当展示门槛）。
     renderPage()

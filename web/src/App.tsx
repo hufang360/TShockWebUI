@@ -34,6 +34,7 @@ import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { I18nProvider, translate } from '@/lib/i18n'
 import { TerminalProvider } from '@/lib/terminalContext'
 import { ItemDetailProvider, type DetailEntry, type ItemDetailApi } from '@/lib/itemDetailContext'
+import { ItemDetailDialog } from '@/components/items/ItemDetailDialog'
 import { ItemFavoritesStoreProvider } from '@/lib/itemFavoritesContext'
 import { RecipeFavoritesStoreProvider } from '@/lib/recipeFavoritesProviders'
 import {
@@ -209,17 +210,18 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const [dexFocus, setDexFocus] = useState<DetailEntry | null>(null)
   const consumeDexFocus = useCallback(() => setDexFocus(null), [])
   /**
-   * 物品提示右上角的 ⓘ「物品详情」入口（`ItemDetailProvider`）：跳到「物品图鉴」并打开该物品详情。
-   * 图鉴页会用自己的 Provider 覆盖它（就地打开抽屉，不切页、不丢当前筛选）。
+   * 全局物品详情弹框的栈（`[根物品, 子物品…]`，空 = 关闭）。
+   *
+   * 物品提示右上角的 ⓘ「物品详情」入口（`ItemDetailProvider`）在**物品图鉴以外的页面**就地弹这个框，
+   * 不再跳到图鉴（跳页会丢掉当前筛选与填到一半的指令）。图鉴页会用自己的 Provider 覆盖它，
+   * 依旧打开可堆叠抽屉（状态记在 `DexState`）。
    */
+  const [itemDetailStack, setItemDetailStack] = useState<DetailEntry[]>([])
   const itemDetailApi = useMemo<ItemDetailApi>(
     () => ({
-      open: (itemId, opts) => {
-        setDexFocus({ id: itemId, prefixId: opts?.prefixId, stack: opts?.stack })
-        navigate('items')
-      },
+      open: (itemId, opts) => setItemDetailStack([{ id: itemId, prefixId: opts?.prefixId, stack: opts?.stack }]),
     }),
-    [navigate],
+    [],
   )
   // 已激活模块（侧边栏入口）；「设置」里探测到插件并打开开关后写入。
   const [rawModules, setModules] = useLocalState<ModulesPrefs>(StorageKeys.modules, DEFAULT_MODULES)
@@ -280,6 +282,11 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       window.history.replaceState(null, '', nextHash)
     }
   }, [activeTab, customModules])
+
+  // 切页面就关掉全局物品详情弹框：它是「就地看这件东西」的临时层，不该跟着跳到下一页。
+  useEffect(() => {
+    setItemDetailStack([])
+  }, [activeTab])
 
   // 侧边栏导航：固定项 + 已激活模块入口（玩家管理 / 鱼店 / 物资申请 / 世界管理）。
   // 注意：必须在任何 early return 之前声明（Hooks 顺序稳定）；模块按服务器区分。
@@ -843,6 +850,16 @@ export default function App({ transport: transportProp }: AppProps = {}) {
           onNavigate={navigate}
         />
         </TerminalProvider>
+        <ItemDetailDialog
+          dataset={view}
+          stack={itemDetailStack}
+          username={username}
+          transport={transport}
+          authenticated={session.authenticated}
+          onPush={(entry) => setItemDetailStack((prev) => [...prev, entry])}
+          onBack={() => setItemDetailStack((prev) => prev.slice(0, -1))}
+          onClose={() => setItemDetailStack([])}
+        />
         </RecipeFavoritesStoreProvider>
         </ItemFavoritesStoreProvider>
         </ItemDetailProvider>

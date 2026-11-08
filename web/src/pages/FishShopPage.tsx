@@ -35,6 +35,7 @@ import {
   type GoodIconSize,
 } from '@/components/fishshop/GoodCells'
 import { GoodDiagram } from '@/components/fishshop/GoodDiagram'
+import { FishDetailSurface } from '@/components/fishshop/FishDetailSurface'
 import { GoodGrid } from '@/components/fishshop/GoodGrid'
 import { GoodsTable } from '@/components/fishshop/GoodsTable'
 import { ShopAwning } from '@/components/fishshop/ShopAwning'
@@ -74,10 +75,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Sheet,
-  SheetContent,
   SheetHeader,
-  SheetTitle,
   Select,
   SelectContent,
   SelectItem,
@@ -85,9 +83,11 @@ import {
   SelectValue,
   Skeleton,
   Spinner,
+  DialogTitle,
   ToggleGroup,
   ToggleGroupItem,
 } from '@/components/ui'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useModuleState } from '@/hooks/useModuleState'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
@@ -138,6 +138,8 @@ interface FishUiState extends Record<string, unknown> {
   buys?: FishGoodStamp[]
   /** 收藏的商品（同上）。 */
   favorites?: FishGoodStamp[]
+  /** 打开着的详情（按内容指纹存快照，与「买过 / 收藏」同一套）：切到别的页面再回来，详情还开着。 */
+  detail?: FishGoodStamp
   /** @deprecated 旧版本的「最近购买」（没有指纹），首次读到会迁移进 `buys`。 */
   recentBuys?: FishGood[]
 }
@@ -176,7 +178,14 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   // 详情弹框：`selectedSnapshot` 只是「点了哪一条」，真正展示/购买用的是派生出来的
   // `selected`（同一 serial 的最新货架数据）——这样刷新货架后「我的进度」「能不能买」
   // 会自动跟着变，而货架暂时为空（加载失败）时仍能显示上一次的快照。
-  const [selectedSnapshot, setSelected] = useState<FishGood | null>(null)
+  //
+  // 切到别的页面时本组件会被卸掉（`AppRoutes` 按 activeTab 条件渲染），所以「刚在看哪件」
+  // 存在本机（`ui.detail`），回到鱼店时接着打开。
+  const [selectedSnapshot, setSelected] = useState<FishGood | null>(
+    () => sanitizeStamps([ui.detail], 1)[0]?.good ?? null,
+  )
+  // 恢复出来的详情不抢焦点：从别的页面切回来，光标不该被拉进详情里。
+  const skipDetailAutofocus = useRef(selectedSnapshot !== null)
   // 右列（指令卡片 / 记事本）是否还有内容：全隐藏时左栏铺满整行。
   const [cardsVisible, setCardsVisible] = useState(true)
   // 货架上的「同款」：按**内容指纹**找，不按 serial —— 服主增删商品后 serial 会整体错位，
@@ -308,14 +317,21 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     setConfirming(false)
     setBuyResult(null)
     setError(null)
-  }, [])
+    // 记住「现在看的是哪件」：切走再回来时详情还开着，不用重新翻货架。
+    setUi({ detail: stampGood([], good, 1)[0] })
+  }, [setUi])
 
   const closeDetail = useCallback(() => {
     setSelected(null)
     setConfirming(false)
     setBuyResult(null)
     setError(null)
-  }, [])
+    setUi({ detail: undefined })
+  }, [setUi])
+
+  // 桌面端：详情是非模态抽屉（不压暗、不锁页面，开着也能切页、逛货架）；
+  // 窄屏仍是普通模态抽屉（手机上本来就铺满整屏）。
+  const desktop = useMediaQuery('(min-width: 768px)')
 
   // 网页发言（`POST /api/chat`）：带 `[WebUI] 玩家名:` 前缀播到游戏内聊天，失败直接 toast。
   const { send: sendChat, sending: advertising } = useChatSend({
@@ -399,6 +415,21 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const argTokens = splitFishArgs(args)
   const argsReady = !needArgs || argTokens.length >= Math.max(1, argCount)
 
+  /** 打开详情时的默认焦点（浮窗 / 抽屉共用）：需填参数 → 参数框，否则 → 购买按钮。 */
+  const focusDetailOnOpen = useCallback(
+    (event: Event) => {
+      event.preventDefault()
+      // 从别的页面切回来（详情是恢复出来的）：不抢焦点，让玩家接着操作页面。
+      if (skipDetailAutofocus.current) {
+        skipDetailAutofocus.current = false
+        return
+      }
+      if (needArgs) argsRef.current?.focus()
+      else buyRef.current?.focus()
+    },
+    [needArgs],
+  )
+
   // 个人状态（只有货架带 `canBuy` 时才有；没带 = 不知道，不能当成「不能买」）。
   const hasSelfState = selected?.canBuy !== undefined
   // 上游已明确说不能买（限购已满 / 售完 / 冷却中 / 死了 / 昼夜不对…）→ 别让玩家白点一次。
@@ -406,7 +437,11 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   // 降级条目：商品自身配置有误时插件只回基础字段（其余为空），点进去也买不了。
   const degraded = isDegradedGood(selected)
   // 从「买过 / 收藏」打开、但货架上已经没有这件：只能看快照，不能买。
-  const offShelf = selectedSnapshot !== null && selectedLive === null
+  // 货架还没拉回来（`shop === null`）时不算「已下架」——否则切回页面会先闪一句误导人的提示。
+  const offShelf = selectedSnapshot !== null && selectedLive === null && shop !== null
+  // 还没在**当前货架**上认出来（货架未到 / 已下架）：`serial` 可能已经指向别的商品，
+  // 而插件是按配置下标发货的——这把不能拿它下单，否则会买到别的东西。
+  const unresolved = selectedSnapshot !== null && selectedLive === null
   // ⭐ 是否已收藏：货架数据与打开时的快照两个指纹都算（商品被改名后两者不同）。
   const favorited = useMemo(() => {
     if (!selected) return false
@@ -952,245 +987,239 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
       </div>
       </div>
 
-      <Sheet open={selected !== null} onOpenChange={(o) => !o && closeDetail()}>
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
-          onOpenAutoFocus={(event) => {
-            // 默认焦点：需填参数 → 参数输入框；否则 → 购买按钮。
-            event.preventDefault()
-            if (needArgs) argsRef.current?.focus()
-            else buyRef.current?.focus()
-          }}
-        >
-          {selected && (
-            <>
-              <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
-                <SheetTitle>{t('fish.detail')}</SheetTitle>
-                <div className="mt-2 flex flex-col items-center gap-2">
-                  <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} tooltip={false} />
-                  <p className="text-center text-base font-semibold text-foreground">
-                    {/* 已下架的商品不再显示编号：编号是插件配置里的下标，早就不指向它了。 */}
-                    {offShelf ? null : <>#{selected.serial} </>}
-                    {goodPrefixName(selected, dataset) ? (
-                      <span className="text-warning">{goodPrefixName(selected, dataset)} </span>
-                    ) : null}
-                    {selected.name}
+      <FishDetailSurface
+        desktop={desktop}
+        open={selected !== null}
+        onClose={closeDetail}
+        onOpenAutoFocus={focusDetailOnOpen}
+      >
+        {selected && (
+          <>
+            <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
+              <DialogTitle>{t('fish.detail')}</DialogTitle>
+              <div className="mt-2 flex flex-col items-center gap-2">
+                <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} tooltip={false} />
+                <p className="text-center text-base font-semibold text-foreground">
+                  {/* 已下架的商品不再显示编号：编号是插件配置里的下标，早就不指向它了。 */}
+                  {offShelf ? null : <>#{selected.serial} </>}
+                  {goodPrefixName(selected, dataset) ? (
+                    <span className="text-warning">{goodPrefixName(selected, dataset)} </span>
+                  ) : null}
+                  {selected.name}
+                </p>
+              </div>
+            </SheetHeader>
+
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+              {/* 属性（价格 / 解锁 / 别名 / 限购 / 备注）：文字统一在值框上面一行的左上角 */}
+              <dl className="flex flex-col gap-2">
+                <DetailField label={t('fish.cost')}>
+                  {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
+                </DetailField>
+                {personalNotes.length > 0 && (
+                  <DetailField label={t('fish.myState')}>{renderRichLines(personalNotes)}</DetailField>
+                )}
+                {selected.unlock.trim() && (
+                  <DetailField label={t('fish.unlock')}>{renderRich(selected.unlock)}</DetailField>
+                )}
+                {selected.map.length > 0 && (
+                  <DetailField label={t('fish.alias')}>{renderRich(selected.map.join(', '))}</DetailField>
+                )}
+                {hasLimit && <DetailField label={t('fish.limit')}>{renderRichLines(limitLines)}</DetailField>}
+                {timingLines.length > 0 && (
+                  <DetailField label={t('fish.timing')}>{renderRichLines(timingLines)}</DetailField>
+                )}
+                {selected.check?.trim() && (
+                  <DetailField label={t('fish.check')}>{renderRich(selected.check)}</DetailField>
+                )}
+                {selected.comment.trim() && (
+                  <DetailField label={t('fish.comment')}>{renderRich(selected.comment)}</DetailField>
+                )}
+              </dl>
+
+              {/* 上游已判定不能买（限购满了 / 售完 / 冷却中 / 死了 / 昼夜不对）：先说清楚，别让玩家白点 */}
+              {offShelf && !confirming && (
+                <Alert>
+                  <AlertDescription>{t('fish.offShelf')}</AlertDescription>
+                </Alert>
+              )}
+              {blocked && !confirming && (
+                <Alert>
+                  <AlertDescription>{selected?.blockReason || t('fish.cannotBuy')}</AlertDescription>
+                </Alert>
+              )}
+              {degraded && !confirming && (
+                <Alert>
+                  <AlertDescription>{t('fish.degraded')}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* 确认 / 参数（操作按钮在底部操作区） */}
+              {confirming && (
+                <div className="flex flex-col gap-2 rounded-control bg-accent/50 p-3">
+                  <p className="text-xs text-foreground">
+                    {needArgs
+                      ? t('fish.buyConfirmArgs', { args: args.trim() })
+                      : t('fish.buyConfirm', { n: buyAmount })}
                   </p>
+                  <p className="text-xs text-muted-foreground">{t('fish.buyHint')}</p>
                 </div>
-              </SheetHeader>
+              )}
 
-              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-                {/* 属性（价格 / 解锁 / 别名 / 限购 / 备注）：文字统一在值框上面一行的左上角 */}
-                <dl className="flex flex-col gap-2">
-                  <DetailField label={t('fish.cost')}>
-                    {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
-                  </DetailField>
-                  {personalNotes.length > 0 && (
-                    <DetailField label={t('fish.myState')}>{renderRichLines(personalNotes)}</DetailField>
-                  )}
-                  {selected.unlock.trim() && (
-                    <DetailField label={t('fish.unlock')}>{renderRich(selected.unlock)}</DetailField>
-                  )}
-                  {selected.map.length > 0 && (
-                    <DetailField label={t('fish.alias')}>{renderRich(selected.map.join(', '))}</DetailField>
-                  )}
-                  {hasLimit && <DetailField label={t('fish.limit')}>{renderRichLines(limitLines)}</DetailField>}
-                  {timingLines.length > 0 && (
-                    <DetailField label={t('fish.timing')}>{renderRichLines(timingLines)}</DetailField>
-                  )}
-                  {selected.check?.trim() && (
-                    <DetailField label={t('fish.check')}>{renderRich(selected.check)}</DetailField>
-                  )}
-                  {selected.comment.trim() && (
-                    <DetailField label={t('fish.comment')}>{renderRich(selected.comment)}</DetailField>
-                  )}
-                </dl>
+              {!confirming && needArgs && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">
+                    {argCount > 1 ? t('fish.argsMulti', { n: argCount }) : t('fish.args')}
+                  </span>
+                  <Input
+                    ref={argsRef}
+                    value={args}
+                    onChange={(e) => setArgs(e.target.value)}
+                    placeholder={t('fish.argsPlaceholder')}
+                    aria-label={t('fish.args')}
+                    className="min-w-0"
+                  />
+                </div>
+              )}
 
-                {/* 上游已判定不能买（限购满了 / 售完 / 冷却中 / 死了 / 昼夜不对）：先说清楚，别让玩家白点 */}
-                {offShelf && !confirming && (
-                  <Alert>
-                    <AlertDescription>{t('fish.offShelf')}</AlertDescription>
-                  </Alert>
-                )}
-                {blocked && !confirming && (
-                  <Alert>
-                    <AlertDescription>{selected?.blockReason || t('fish.cannotBuy')}</AlertDescription>
-                  </Alert>
-                )}
-                {degraded && !confirming && (
-                  <Alert>
-                    <AlertDescription>{t('fish.degraded')}</AlertDescription>
-                  </Alert>
-                )}
-
-                {/* 确认 / 参数（操作按钮在底部操作区） */}
-                {confirming && (
-                  <div className="flex flex-col gap-2 rounded-control bg-accent/50 p-3">
-                    <p className="text-xs text-foreground">
-                      {needArgs
-                        ? t('fish.buyConfirmArgs', { args: args.trim() })
-                        : t('fish.buyConfirm', { n: buyAmount })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t('fish.buyHint')}</p>
-                  </div>
-                )}
-
-                {!confirming && needArgs && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">
-                      {argCount > 1 ? t('fish.argsMulti', { n: argCount }) : t('fish.args')}
-                    </span>
+              {!confirming && adjustable && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">{t('fish.amount')}</span>
+                  <div className="flex items-center gap-2">
                     <Input
-                      ref={argsRef}
-                      value={args}
-                      onChange={(e) => setArgs(e.target.value)}
-                      placeholder={t('fish.argsPlaceholder')}
-                      aria-label={t('fish.args')}
-                      className="min-w-0"
+                      type="number"
+                      min={1}
+                      max={maxBuy}
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      aria-label={t('fish.amount')}
+                      className="w-24"
                     />
+                    <span className="text-xs text-muted-foreground">
+                      {t('fish.buyMaxNote', { n: maxBuy })}
+                    </span>
                   </div>
-                )}
-
-                {!confirming && adjustable && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t('fish.amount')}</span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={maxBuy}
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        aria-label={t('fish.amount')}
-                        className="w-24"
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        {t('fish.buyMaxNote', { n: maxBuy })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                {buyResult && buyResult.refunded === true && (
-                  <Alert
-                    className={cn('flex flex-col gap-1', buyCooldown > 0 && 'tswui-flash')}
-                  >
-                    <AlertDescription>{renderRich(t('fish.buyRefunded', { name: buyResult.name || selected.name }))}</AlertDescription>
-                  </Alert>
-                )}
-
-                {buyResult && buyResult.refunded !== true && (
-                  <Alert
-                    variant="success"
-                    className={cn('flex flex-col gap-1', buyCooldown > 0 && 'tswui-flash')}
-                  >
-                    <AlertDescription>
-                      {renderRich(
-                        t('fish.buyOk', {
-                          name: buyResult.name || selected.name,
-                          n: buyResult.amount,
-                          cost: buyResult.cost,
-                        }),
-                      )}
-                    </AlertDescription>
-                    {buyResult.requested != null && buyResult.requested > buyResult.amount && (
-                      <AlertDescription className="text-xs text-warning">
-                        {t('fish.buyClamped', { n: buyResult.amount, req: buyResult.requested })}
-                      </AlertDescription>
-                    )}
-                    <AlertDescription className="font-medium text-foreground">
-                      {t('fish.successHint')}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* 建筑预览固定在最下面（在「已售完 / 已购买」这些状态提示之后）：
-                    它是「怎么做」的参考图，不是要先看的价格信息。居左 / 可折叠 / 点图放大。 */}
-                {diagram && <GoodDiagram src={diagram} name={selected.name} />}
-              </div>
-
-              {/* 底部操作区：⭐ 收藏在最左，右侧是关闭 / 购买 */}
-              <div className="flex shrink-0 items-center justify-end gap-2 border-t px-5 py-3">
-                <div className="mr-auto flex items-center gap-1">
-                  <IconAction
-                    label={favorited ? t('fish.unfavorite') : t('fish.favorite')}
-                    icon={Star}
-                    pressed={favorited}
-                    testId="fish-favorite"
-                    iconClassName={cn(favorited && 'fill-current text-warning')}
-                    onClick={() => toggleFavorite(selected, selectedSnapshot)}
-                  />
-                  <IconAction
-                    label={t('fish.advertise')}
-                    icon={MessageSquare}
-                    testId="fish-advertise"
-                    disabled={advertising}
-                    onClick={() => void advertise(selected)}
-                  />
                 </div>
-                {confirming ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="h-8 bg-card"
-                      disabled={buying}
-                      onClick={() => setConfirming(false)}
-                    >
-                      {t('action.cancel')}
-                    </Button>
-                    <Button variant="primary" className="h-8" disabled={buying} onClick={() => void confirmBuy()}>
-                      {buying ? (
-                        <Spinner aria-hidden data-icon="inline-start" />
-                      ) : (
-                        <ShoppingCart data-icon="inline-start" />
-                      )}
-                      {t('fish.confirmBuy')}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {/* 快捷关闭（弹框右上角也有 X）：轻量文字按钮，不抢「购买」的位置 */}
-                    <Button variant="outline" className="h-8 bg-card" onClick={closeDetail}>
-                      {t('action.close')}
-                    </Button>
-                    <Button
-                      ref={buyRef}
-                      variant="primary"
-                      className="h-8"
-                      disabled={!argsReady || buyCooldown > 0 || blocked || degraded || offShelf}
-                      onClick={() => setConfirming(true)}
-                    >
-                      <ShoppingCart data-icon="inline-start" />
-                      {buyCooldown > 0 ? t('fish.cooldown', { n: buyCooldown }) : t('fish.buy')}
-                    </Button>
-                  </>
-                )}
-              </div>
+              )}
 
-              {/* 空态 / 装饰：右下角半透明渔夫指南图标（鱼店氛围） */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute right-6 bottom-16 opacity-[0.15]"
-              >
-                <ItemIcon
-                  item={dataset?.itemsById.get(3120)}
-                  atlas={dataset?.atlas}
-                  size={170}
-                  mode="fit"
-                  tooltip={false}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {buyResult && buyResult.refunded === true && (
+                <Alert
+                  className={cn('flex flex-col gap-1', buyCooldown > 0 && 'tswui-flash')}
+                >
+                  <AlertDescription>{renderRich(t('fish.buyRefunded', { name: buyResult.name || selected.name }))}</AlertDescription>
+                </Alert>
+              )}
+
+              {buyResult && buyResult.refunded !== true && (
+                <Alert
+                  variant="success"
+                  className={cn('flex flex-col gap-1', buyCooldown > 0 && 'tswui-flash')}
+                >
+                  <AlertDescription>
+                    {renderRich(
+                      t('fish.buyOk', {
+                        name: buyResult.name || selected.name,
+                        n: buyResult.amount,
+                        cost: buyResult.cost,
+                      }),
+                    )}
+                  </AlertDescription>
+                  {buyResult.requested != null && buyResult.requested > buyResult.amount && (
+                    <AlertDescription className="text-xs text-warning">
+                      {t('fish.buyClamped', { n: buyResult.amount, req: buyResult.requested })}
+                    </AlertDescription>
+                  )}
+                  <AlertDescription className="font-medium text-foreground">
+                    {t('fish.successHint')}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* 建筑预览固定在最下面（在「已售完 / 已购买」这些状态提示之后）：
+                  它是「怎么做」的参考图，不是要先看的价格信息。居左 / 可折叠 / 点图放大。 */}
+              {diagram && <GoodDiagram src={diagram} name={selected.name} />}
+            </div>
+
+            {/* 底部操作区：⭐ 收藏在最左，右侧是关闭 / 购买 */}
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t px-5 py-3">
+              <div className="mr-auto flex items-center gap-1">
+                <IconAction
+                  label={favorited ? t('fish.unfavorite') : t('fish.favorite')}
+                  icon={Star}
+                  pressed={favorited}
+                  testId="fish-favorite"
+                  iconClassName={cn(favorited && 'fill-current text-warning')}
+                  onClick={() => toggleFavorite(selected, selectedSnapshot)}
+                />
+                <IconAction
+                  label={t('fish.advertise')}
+                  icon={MessageSquare}
+                  testId="fish-advertise"
+                  disabled={advertising}
+                  onClick={() => void advertise(selected)}
                 />
               </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+              {confirming ? (
+                <>
+                  <Button
+                    variant="outline"
+                    className="h-8 bg-card"
+                    disabled={buying}
+                    onClick={() => setConfirming(false)}
+                  >
+                    {t('action.cancel')}
+                  </Button>
+                  <Button variant="primary" className="h-8" disabled={buying} onClick={() => void confirmBuy()}>
+                    {buying ? (
+                      <Spinner aria-hidden data-icon="inline-start" />
+                    ) : (
+                      <ShoppingCart data-icon="inline-start" />
+                    )}
+                    {t('fish.confirmBuy')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {/* 快捷关闭（弹框右上角也有 X）：轻量文字按钮，不抢「购买」的位置 */}
+                  <Button variant="outline" className="h-8 bg-card" onClick={closeDetail}>
+                    {t('action.close')}
+                  </Button>
+                  <Button
+                    ref={buyRef}
+                    variant="primary"
+                    className="h-8"
+                    disabled={!argsReady || buyCooldown > 0 || blocked || degraded || unresolved}
+                    onClick={() => setConfirming(true)}
+                  >
+                    <ShoppingCart data-icon="inline-start" />
+                    {buyCooldown > 0 ? t('fish.cooldown', { n: buyCooldown }) : t('fish.buy')}
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* 空态 / 装饰：右下角半透明渔夫指南图标（鱼店氛围） */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute right-6 bottom-16 opacity-[0.15]"
+            >
+              <ItemIcon
+                item={dataset?.itemsById.get(3120)}
+                atlas={dataset?.atlas}
+                size={170}
+                mode="fit"
+                tooltip={false}
+              />
+            </div>
+          </>
+        )}
+      </FishDetailSurface>
     </>
   )
 }

@@ -37,10 +37,17 @@ const sheetVariants = cva(
 type SheetContentProps = ComponentProps<typeof SheetPrimitive.Content> &
   VariantProps<typeof sheetVariants>
 
-export function SheetContent({ side = 'right', className, children, ...props }: SheetContentProps) {
+export function SheetContent({
+  side = 'right',
+  className,
+  children,
+  /** 是否渲染暗色遮罩；`false` = 背景不变暗、不锁页面（配 `modal={false}` 用）。 */
+  overlay = true,
+  ...props
+}: SheetContentProps & { overlay?: boolean }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      {overlay && <SheetOverlay />}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(sheetVariants({ side }), className)}

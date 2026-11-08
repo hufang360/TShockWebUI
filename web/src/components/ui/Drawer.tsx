@@ -87,12 +87,18 @@ export function DrawerSwipeHandle({ className, ...props }: ComponentProps<'div'>
 }
 
 /** 抽屉面板 = portal + 遮罩 + 视口 + 弹层；堆叠所需的 CSS 变量都在这里。 */
-export function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.Props) {
+export function DrawerContent({
+  className,
+  children,
+  /** 是否渲染自带遮罩；`false` = 由调用方自己画（如只盖内容区的 `ContentScrim`，配 `modal={false}`）。 */
+  overlay = true,
+  ...props
+}: DrawerPrimitive.Popup.Props & { overlay?: boolean }) {
   const { swipeDirection, showSwipeHandle } = useContext(DrawerConfigContext)
   const swipeAxis = swipeDirection === 'up' || swipeDirection === 'down' ? 'y' : 'x'
   return (
     <DrawerPortal data-slot="drawer-portal">
-      <DrawerOverlay />
+      {overlay && <DrawerOverlay />}
       {/* 视口铺满窗口，但自身不吃事件（只有面板可交互）。 */}
       <DrawerPrimitive.Viewport
         data-slot="drawer-viewport"

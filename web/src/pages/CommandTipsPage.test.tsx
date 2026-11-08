@@ -211,6 +211,26 @@ describe('CommandTipsPage', () => {
     expect(inputValue()).toBe('/worldevent bloodmoon')
   })
 
+  it('详情遮罩只盖内容区：点遮罩关闭，点页面别处不关', async () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    fireEvent.click(screen.getByRole('button', { name: '指令帮助：/worldevent invasion goblins' }))
+    await screen.findByTestId('command-detail')
+
+    // 自带的全屏遮罩不再渲染，换成只盖内容区的 `ContentScrim`（左侧边栏露着、可点）。
+    expect(document.querySelector('[data-slot="drawer-overlay"]')).toBeNull()
+    const scrim = screen.getByTestId('commands-detail-scrim')
+    expect(scrim.className).toContain('md:left-[var(--content-left,0px)]')
+    expect(scrim.className).toContain('bg-black/50')
+
+    // 点页面别处不关（点导航是切页，不是关详情）
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    expect(screen.queryByTestId('command-detail')).toBeTruthy()
+
+    fireEvent.click(scrim)
+    await waitFor(() => expect(screen.queryByTestId('command-detail')).toBeNull())
+  })
+
   it('操作列的「详情」打开右侧抽屉：规范写法 / 权限 / 执行位置 / 说明', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
     fireEvent.click(screen.getByRole('button', { name: '指令帮助：/worldevent invasion goblins' }))

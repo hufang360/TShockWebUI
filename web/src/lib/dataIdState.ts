@@ -18,6 +18,14 @@ export interface DataIdState {
   /** NPC / Buff 是否使用表格视图（默认关闭 = 图标网格）。 */
   tableView: boolean
   scrollTop: number
+  /** 打开着的详情（图格 / 墙；NPC / Buff 走 Popover 不记）。切页面回来继续开着。 */
+  detail: DataIdDetail | null
+}
+
+/** 详情抽屉指向的条目。 */
+export interface DataIdDetail {
+  kind: DataIdKind
+  id: number
 }
 
 const DEFAULT_DATAID_STATE: DataIdState = {
@@ -26,6 +34,7 @@ const DEFAULT_DATAID_STATE: DataIdState = {
   twoCols: true,
   tableView: false,
   scrollTop: 0,
+  detail: null,
 }
 
 let remembered: DataIdState | null = null

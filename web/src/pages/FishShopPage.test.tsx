@@ -116,6 +116,8 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear()
+  // 窄屏用例会改视口宽：断点判断读的是 `window.innerWidth`，别漏给后面的用例。
+  window.innerWidth = 1024
   vi.restoreAllMocks()
 })
 
@@ -883,10 +885,117 @@ describe('FishShopPage', () => {
     )
   })
 
-  it('点击抽屉外区域关闭抽屉', async () => {
+  it('桌面端详情：遮罩只盖内容区（从左边界开始），侧栏不被盖住', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const panel = await screen.findByRole('dialog')
+
+    // 外观仍是抽屉：贴右侧的整高面板，且不再用 Sheet 自带的 `inset-0` 遮罩。
+    expect(panel.className).toContain('right-0')
+    expect(panel.className).toContain('inset-y-0')
+    expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeNull()
+    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeNull()
+
+    // 自绘遮罩：从内容区左边界（`--content-left`，即侧栏右边）开始，半透明黑 + 模糊。
+    // 这里断言它的定位起点，等于断言「不会盖住左侧边栏」。
+    const scrim = screen.getByTestId('fish-detail-scrim')
+    expect(scrim.className).toContain('left-[var(--content-left,0px)]')
+    expect(scrim.className).toContain('bg-black/50')
+    expect(scrim.className).not.toContain('backdrop-blur')
+    // 整页压暗（含顶栏）；侧栏收起时的「展开侧栏」按钮另行浮在这层上面（AppShell 里 `z-[46]`）。
+    expect(scrim.className).toContain('inset-y-0')
+
+    // 页面没被锁住（模态会锁 body 滚动 / 禁用点击）：所以点侧栏能直接切页面。
+    expect(document.body.style.overflow).not.toBe('hidden')
+  })
+
+  it('点遮罩关闭详情（等同点抽屉外）', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     await screen.findByRole('dialog')
+
+    // 点页面别处（含侧栏导航）不关，避免「点导航切页」顺手把详情关掉。
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    expect(screen.queryByRole('dialog')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('fish-detail-scrim'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('关掉详情后点另一件商品，开的是那一件（不会叠两层）', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD, POND_GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const panel = await screen.findByRole('dialog')
+    expect(within(panel).getByText(/#1\s*生命水晶/)).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('fish-detail-scrim'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: '鱼池' }))
+    const next = await screen.findByRole('dialog')
+    expect(within(next).getByText(/#180\s*鱼池/)).toBeTruthy()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(next.querySelector('img[src$="diagram-pond.png"]')).toBeTruthy()
+  })
+
+  it('桌面详情按 Esc 关闭', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    await screen.findByRole('dialog')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('切到别的页面再回来（组件重新挂载）：详情还开着', async () => {
+    const transport = fakeTransport({ fishList: async () => shopOf([GOOD]) })
+    const first = renderPage(transport)
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    await screen.findByRole('dialog')
+    first.unmount()
+
+    renderPage(transport)
+    const panel = await screen.findByRole('dialog')
+    expect(within(panel).getByText(/#1\s*生命水晶/)).toBeTruthy()
+    // 恢复出来的详情不抢焦点（回来就该能直接操作页面）。
+    expect(document.activeElement).not.toBe(within(panel).getByRole('button', { name: '购买' }))
+  })
+
+  it('关掉详情后切走再回来，不会再弹出来', async () => {
+    const transport = fakeTransport({ fishList: async () => shopOf([GOOD]) })
+    const first = renderPage(transport)
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    const panel = await screen.findByRole('dialog')
+    fireEvent.click(within(panel).getByRole('button', { name: '关闭' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    first.unmount()
+
+    renderPage(transport)
+    await screen.findByRole('button', { name: '生命水晶' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('恢复详情时货架还没回来，不会先说「已下架」', async () => {
+    const transport = fakeTransport({ fishList: async () => shopOf([GOOD]) })
+    const first = renderPage(transport)
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    await screen.findByRole('dialog')
+    first.unmount()
+
+    // 重新进页面时货架一直不回（加载中）：这时不该判成「已下架」。
+    renderPage(fakeTransport({ fishList: () => new Promise(() => {}) }))
+    const panel = await screen.findByRole('dialog')
+    expect(within(panel).queryByText(/已不在当前货架/)).toBeNull()
+  })
+
+  it('窄屏仍是抽屉：点外面关闭', async () => {
+    window.innerWidth = 480
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+    await screen.findByRole('dialog')
+    expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeTruthy()
+
     fireEvent.pointerDown(document.body)
     fireEvent.click(document.body)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

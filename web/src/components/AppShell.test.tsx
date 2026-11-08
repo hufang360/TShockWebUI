@@ -68,6 +68,31 @@ describe('AppShell 顶栏', () => {
     )
   })
 
+  it('侧栏收起时「展开侧栏」单独浮在遮罩之上（顶栏里只留占位）', () => {
+    render(
+      <I18nProvider lang="zh">
+        <AppShell
+          activeTab="home"
+          onTabChange={vi.fn()}
+          nav={[{ id: 'home', label: '首页', icon: Home }]}
+          headerRight={<div>账号</div>}
+          sidebarCollapsed
+          onToggleSidebar={vi.fn()}
+        >
+          <p>content</p>
+        </AppShell>
+      </I18nProvider>,
+    )
+
+    const trigger = screen.getByRole('button', { name: '显示侧栏' })
+    // 商品详情的遮罩是 z-45 且盖住顶栏：这个按钮必须比它高，否则侧栏展不开。
+    expect(trigger.className).toContain('z-[46]')
+    // 不在顶栏里（顶栏自己的 z-20 会把它困在遮罩下面），顶栏只留同尺寸占位。
+    expect(document.querySelector('header')!.contains(trigger)).toBe(false)
+    // 收起侧栏 = 内容区从 0 开始（遮罩的 left 变量）。
+    expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toBeTruthy()
+  })
+
   it('页面的 TopBarActions 渲染到顶栏右侧插槽', async () => {
     render(
       <I18nProvider lang="zh">

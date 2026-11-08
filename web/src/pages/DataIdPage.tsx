@@ -12,6 +12,7 @@ import {
   TileIconGrid,
 } from '@/components/dataid/DataIdViews'
 import { IconAction } from '@/components/IconAction'
+import { ContentScrim } from '@/components/ContentScrim'
 import { FullscreenDock } from '@/components/FullscreenDock'
 import { SearchInput } from '@/components/SearchInput'
 import {
@@ -39,10 +40,16 @@ import {
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { usePageScrollReset, usePageScroller, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
-import { readDataIdState, rememberDataIdState, type DataIdKind } from '@/lib/dataIdState'
+import {
+  readDataIdState,
+  rememberDataIdState,
+  type DataIdDetail,
+  type DataIdKind,
+} from '@/lib/dataIdState'
 import { useDataset } from '@/lib/datasetContext'
 import { TopBarActions } from '@/components/TopBar'
 import { useI18n } from '@/lib/i18n'
@@ -110,7 +117,10 @@ export function DataIdPage({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [resultsFullscreen, setResultsFullscreen] = useState(false)
   // 图格 / 墙的抽屉详情（NPC / Buff 改用 Popover，不再走这里）。
-  const [selected, setSelected] = useState<{ kind: DataIdKind; id: number } | null>(null)
+  // 详情抽屉：切到别的页面再回来时接着开（模块内存里记着，见 `lib/dataIdState.ts`）。
+  const [selected, setSelected] = useState<DataIdDetail | null>(initial.detail)
+  // 详情抽屉：手机端是自带遮罩的模态，桌面端只盖内容区（`ContentScrim`）。
+  const isMobileDetail = useIsMobile()
   const debounced = useDebouncedValue(query, 150)
 
   // 「最近搜索」按数据源分开记（NPC / 图格·墙 / Buff，老记录不丢）。
@@ -145,10 +155,10 @@ export function DataIdPage({
   usePageScrollReset(rootRef)
 
   // 把当前状态存到 ref，卸载（切走）时一次性写回模块内存。
-  const stateRef = useRef({ kind, npcFilter, twoCols, tableView })
+  const stateRef = useRef({ kind, npcFilter, twoCols, tableView, detail: selected })
   useEffect(() => {
-    stateRef.current = { kind, npcFilter, twoCols, tableView }
-  }, [kind, npcFilter, twoCols, tableView])
+    stateRef.current = { kind, npcFilter, twoCols, tableView, detail: selected }
+  }, [kind, npcFilter, twoCols, tableView, selected])
   useEffect(
     () => () => {
       rememberDataIdState({ ...stateRef.current, scrollTop: scrollTopRef.current })
@@ -698,18 +708,28 @@ export function DataIdPage({
         )}
       </div>
 
+      {/* 遮罩：桌面端只盖内容区（左侧边栏露着、可点，能直接切页）；手机端抽屉自带模态遮罩。 */}
+      {selected != null && !isMobileDetail && (
+        <ContentScrim testId="dataid-detail-scrim" onClick={() => setSelected(null)} />
+      )}
+
       {/* 详情：图格 / 墙仍用右侧抽屉（NPC / Buff 已改为 Popover） */}
       <Sheet
         open={selected != null}
+        // 桌面端非模态：点外面不关（导航点击是切页，不是关详情），关闭走遮罩 / × / Esc。
+        modal={isMobileDetail}
         onOpenChange={(open) => {
           if (!open) setSelected(null)
         }}
       >
         <SheetContent
           side="right"
+          overlay={isMobileDetail}
           data-testid="dataid-detail"
           data-kind={selectedKind}
           className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-sm"
+          onInteractOutside={isMobileDetail ? undefined : (event) => event.preventDefault()}
+          onPointerDownOutside={isMobileDetail ? undefined : (event) => event.preventDefault()}
         >
           {selected && (
             <>

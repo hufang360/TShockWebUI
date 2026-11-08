@@ -193,6 +193,29 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.getByTestId('dex-detail')).toBeTruthy()
   })
 
+  it('详情遮罩只盖内容区：点遮罩关掉整叠抽屉，点页面别处不关', async () => {
+    renderPage(makeItems(10))
+    expect(screen.queryByTestId('dex-detail')).toBeNull()
+    // 格子点一下打开详情
+    fireEvent.click(cell('物品1'))
+    expect(screen.getByTestId('dex-detail')).toBeTruthy()
+
+    // 自带的全屏遮罩不再渲染；换成只盖内容区的 `ContentScrim`（左侧边栏露着、可点）。
+    expect(document.querySelector('[data-slot="drawer-overlay"]')).toBeNull()
+    const scrim = screen.getByTestId('items-detail-scrim')
+    expect(scrim.className).toContain('md:left-[var(--content-left,0px)]')
+    expect(scrim.className).toContain('bg-black/50')
+
+    // 点页面别处不关（点导航是切页，不是关详情）
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    expect(screen.getByTestId('dex-detail')).toBeTruthy()
+
+    // 点遮罩关掉
+    fireEvent.click(scrim)
+    await waitFor(() => expect(screen.queryByTestId('dex-detail')).toBeNull())
+  })
+
   it('取消翻页：全部结果交给虚拟滚动，只显示结果个数', () => {
     renderPage(makeItems(250))
     expect(screen.getByText('250 个结果')).toBeTruthy()

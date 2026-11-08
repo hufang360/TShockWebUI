@@ -15,10 +15,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui'
+import { ContentScrim } from '@/components/ContentScrim'
 import { IconAction } from '@/components/IconAction'
 import { PageHelp } from '@/components/PageHelp'
 import { SearchInput } from '@/components/SearchInput'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { TIPS_GROUPS, type TipsGroup } from '@/lib/commandTips'
 import { readDataIdState, rememberDataIdState } from '@/lib/dataIdState'
 import { cn } from '@/lib/cn'
@@ -334,6 +336,8 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
   const [query, setQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
+  // 两个抽屉（分组 / 指令详情）：手机端是自带遮罩的模态，桌面端只盖内容区（`ContentScrim`）。
+  const isMobileDrawer = useIsMobile()
   /** 详情抽屉：点哪一行就看哪一行的指令帮助。 */
   const [detail, setDetail] = useState<TableRow | null>(null)
   // 页面不固定高度：内容多就把页面撑高，滚动交给主内容区（浏览器右侧那条滚动条）。
@@ -589,8 +593,19 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
         </aside>
       </div>
 
-      <Drawer open={groupDrawerOpen} onOpenChange={setGroupDrawerOpen} swipeDirection="right">
-        <DrawerContent className="flex w-64 flex-col">
+      {/* 遮罩：桌面端只盖内容区（左侧边栏露着、可点）；手机端抽屉自带模态遮罩。 */}
+      {groupDrawerOpen && !isMobileDrawer && (
+        <ContentScrim testId="commands-groups-scrim" onClick={() => setGroupDrawerOpen(false)} />
+      )}
+      <Drawer
+        open={groupDrawerOpen}
+        onOpenChange={setGroupDrawerOpen}
+        swipeDirection="right"
+        modal={isMobileDrawer}
+        // 非模态时 Base UI 默认「点外面 / 焦点离开」就关：点左侧导航是切页，不该顺手关面板。
+        disablePointerDismissal={!isMobileDrawer}
+      >
+        <DrawerContent overlay={isMobileDrawer} className="flex w-64 flex-col">
           <DrawerHeader className="flex-row items-center border-b px-4 py-3">
             <DrawerTitle className="min-w-0 flex-1">{t('commands.groups')}</DrawerTitle>
             <IconAction
@@ -610,7 +625,12 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
         </DrawerContent>
       </Drawer>
 
-      <CommandDetailDrawer row={detail} onClose={() => setDetail(null)} onPick={pick} />
+      <CommandDetailDrawer
+        row={detail}
+        onClose={() => setDetail(null)}
+        onPick={pick}
+        isMobile={isMobileDrawer}
+      />
     </div>
   )
 }
@@ -637,24 +657,38 @@ function CommandDetailDrawer({
   row,
   onClose,
   onPick,
+  isMobile,
 }: {
   row: TableRow | null
   onClose: () => void
   onPick: (command: string) => void
+  /** 手机端保持模态（自带遮罩）；桌面端只盖内容区（`ContentScrim`）。 */
+  isMobile: boolean
 }) {
   const { t } = useI18n()
   const def = row?.def
   const canonical = row?.usage ?? row?.command ?? ''
   const help = def?.helpZh ?? def?.help
   return (
-    <Drawer
-      open={row !== null}
-      onOpenChange={(open) => {
-        if (!open) onClose()
-      }}
-      swipeDirection="right"
-    >
-      <DrawerContent data-testid="command-detail" className="flex w-full flex-col sm:max-w-sm">
+    <>
+      {row !== null && !isMobile && (
+        <ContentScrim testId="commands-detail-scrim" onClick={onClose} />
+      )}
+      <Drawer
+        open={row !== null}
+        onOpenChange={(open) => {
+          if (!open) onClose()
+        }}
+        swipeDirection="right"
+        modal={isMobile}
+        // 非模态时 Base UI 默认「点外面 / 焦点离开」就关：点左侧导航是切页，不该顺手关详情。
+        disablePointerDismissal={!isMobile}
+      >
+        <DrawerContent
+          overlay={isMobile}
+          data-testid="command-detail"
+          className="flex w-full flex-col sm:max-w-sm"
+        >
         <DrawerHeader className="flex-row items-start gap-2 border-b px-4 py-3">
           <div className="min-w-0 flex-1">
             <DrawerTitle>{t('commands.detail.title')}</DrawerTitle>
@@ -722,7 +756,8 @@ function CommandDetailDrawer({
             </Button>
           )}
         </div>
-      </DrawerContent>
-    </Drawer>
+        </DrawerContent>
+      </Drawer>
+    </>
   )
 }
