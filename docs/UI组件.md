@@ -37,8 +37,8 @@
 | Switch | `ui/Switch.tsx` | radix switch | |
 | Dialog | `ui/Dialog.tsx` | radix dialog | 每个 Dialog 必须有 `DialogTitle`；`DialogFooter` = 底部操作区（`bg-background` + `border-t`）；`DialogContent` 支持 `overlay={false}`（不画暗色遮罩，配 `modal={false}` 用，行为接近 popover） |
 | DropdownMenu | `ui/DropdownMenu.tsx` | radix dropdown-menu | 菜单项包在 `DropdownMenuGroup` 里；侧栏底部账号卡片（`SidebarAccountMenu`）用它 |
-| Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用 / 鱼店商品详情 / 数据ID 详情）；**不支持堆叠**，需要叠层就用 `Drawer` |
-| Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`。**每个 Drawer 必须有 `DrawerTitle`** |
+| Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用 / 鱼店商品详情 / 数据ID 详情）；`SheetContent` 有 `overlay` 参数（`false` = 不画自带遮罩，配 `modal={false}` + `ContentScrim` 做「只盖内容区」的抽屉）；**不支持堆叠**，需要叠层就用 `Drawer` |
+| Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`；`DrawerContent` 也有 `overlay` 参数（`false` = 不画自带遮罩，物品 / 指令小抄的详情用它 + `ContentScrim`）。**每个 Drawer 必须有 `DrawerTitle`** |
 | Tooltip | `ui/Tooltip.tsx` | radix tooltip | 需要 `TooltipProvider` 祖先（`SlotTooltip` 自带一个） |
 | Popover | `ui/Popover.tsx` | radix popover | 点击 / 受控展开的浮层（`PopoverContent` 默认 `side=bottom` / `sideOffset=6`）；登录框「登录帮助」、物品 ID / 数据 ID「页面设置」用它 |
 | Separator | `ui/Separator.tsx` | radix separator | 分隔线一律用它，不要 `border-t/b` div 或 `<hr>` |
@@ -89,7 +89,10 @@
   同理，富文本结果区的每一行（`<p className="min-h-5 shrink-0">`）不能被压缩：行高 `20px` 只是下限，
   折行的行 / 含 24px 物品图标的行自然更高，被压回 20px 就会溢出行框、和下一行**叠字**。
 - **详情优先用右侧抽屉**（鱼店商品详情、数据ID的 NPC / 图格 / 墙 / Buff 详情用 `Sheet`；物品详情用可堆叠的 `Drawer`）：
-  标题栏固定、中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框。
+  标题栏固定、中间内容滚动、右上角 × 关闭；居中 `Dialog` 只用于需要「必须做选择」的小弹框
+  （唯一例外：**图鉴以外页面的物品详情弹框**，见本章「物品详情弹框」）。
+  **详情抽屉桌面端一律「只盖内容区」**（`ContentScrim` + `modal={false}`，见本章「浮层」）：
+  玩家要一边看列表一边翻详情、还可能中途切页再回来，模态会逼他「先关详情才能动页面」；窄屏仍是普通模态抽屉。
 - **抽屉里可以再开抽屉时用 `Drawer`（Base UI）**：像物品详情那样「点配方材料 → 看材料详情 → 返回」的钻取，
   `Sheet`（radix dialog）做不到——它只会并排弹出、不会把父层缩小留在后面。叠层写法：把子 `<Drawer>`
   **渲染在父 `DrawerContent` 里**（Base UI 靠 React 树判定嵌套），`open` 受控、关掉就出栈。
@@ -453,12 +456,72 @@
 - `theme='auto'` 由 `App` 监听 `prefers-color-scheme`（`systemDark`）决定是否加 `.dark`；`light` / `dark` 忽略系统。恢复默认 `dark`。
 - 设置页的「主题」`ToggleGroup` 同步支持三态（`settings.theme.auto/light/dark`）。
 
-## 非模态浮层（浮动终端）
+## 浮层：模态 / 非模态 / 「只盖内容区」
 
-- 全站唯一的非模态浮层是**浮动终端**（`components/CommandTerminal.tsx`，窗口标题「指令」）。入口是**顶栏右侧的「指令」图标按钮**
-  （`components/TerminalTopBarButton.tsx`，桌面排在页面操作之后；**手机端收在 `…` 菜单里**；「指令」「设置」页与**首页**不显示）：
-  `role="dialog"` + `aria-modal="false"`，自己处理拖动 / 缩放 / `Esc`，**不做焦点陷阱、不压暗页面**。
-- 层级：`z-40`，低于所有模态层（`Sheet` / `Drawer` / `Dialog` 的 `z-50`）。打开模态时不强行关闭它。
+全站浮层分三类，选型别混：
+
+| 类 | 例子 | 页面可点 | 左栏导航 | 遮罩 |
+| --- | --- | --- | --- | --- |
+| 模态 | `Dialog`（确认框、物品详情弹框）、`Sheet`（管理卡片） | 否 | 被盖住 | `inset-0` |
+| 非模态 | 浮动终端（`z-40`） | 是 | 可用 | 无 |
+| **带遮罩但不盖导航** | 鱼店商品详情 / 物品详情（图鉴）/ 数据ID 详情 / 指令小抄的抽屉 | 否 | **可用**（可切页） | `ContentScrim`（只盖内容区） |
+
+### 只盖内容区的遮罩（`components/ContentScrim.tsx`）
+
+详情抽屉要「压暗页面、但不锁住左栏导航」，用这个共享遮罩：
+
+```tsx
+{open && !isMobile && <ContentScrim testId="xxx-scrim" onClick={close} />}
+```
+
+- 位置：`left-0 md:left-[var(--content-left,0px)]`、`inset-y-0 right-0`，`bg-black/50`（**不模糊**）；
+- `--content-left` 由 `AppShell` 写在布局外层：侧栏展开 = `var(--sidebar-width,16rem)`、收起 = `0px`，所以不用测 DOM；
+  窄屏侧栏是抽屉本身、内容从 0 开始，故 `left-0`；
+- 层级 `z-[45]`：高于页面内容（`20`）与浮动终端 / 货架全屏（`40`），低于抽屉面板与其它模态（`50`）；
+- 点它 = 关闭；**不能用** `SheetContent` / `DrawerContent` 自带的 `inset-0` 遮罩（会把侧栏一起压暗并挡住导航）。
+
+配套的三件事，改其中一处必须一起改：
+
+1. 抽屉根加 `modal={false}`（radix `Sheet`）/ `modal={isMobile}`（Base UI `Drawer`），并传 `overlay={false}`
+   （`SheetContent` / `DrawerContent` 都支持这个参数）；
+2. **挡住「点外面自动关」**：radix 用 `onPointerDownOutside` / `onInteractOutside` 里 `preventDefault()`，
+   Base UI 用 `disablePointerDismissal={!isMobile}`。否则点左栏导航会被当成「点外面」，顺手把详情关掉；
+3. 窄屏（`<768px`）保持**模态**（自带遮罩 + 点外面 / 下滑关闭）：手机上抽屉铺满整屏，模态更省心。
+
+**侧栏收起时的「展开侧栏」按钮**：它在内容区顶栏最左侧，会被遮罩压住，所以 `AppShell` 把它单独
+`fixed top-2.5 left-2 z-[46]` 渲染在顶栏之外（顶栏自己是 `sticky z-20`，在里面写多高的 z 都出不来），
+顶栏里只留一个同尺寸占位保证面包屑不跳；并且必须带 `bg-background`（`ghost` 变体背景透明，
+遮罩会从按钮里透出来，看着像不可点）。
+
+### 各页面用它做的详情
+
+| 页面 | 容器 | 备注 |
+| --- | --- | --- |
+| 鱼店商品详情 | `Sheet`（`components/fishshop/FishDetailSurface.tsx`） | 切页面回来仍开着（`tswui:moduleState` 的 `ui.detail`，按内容指纹存） |
+| 物品图鉴 详情 | Base UI `Drawer`（可堆叠，`components/items/ItemDetailDrawer.tsx`） | 遮罩由 `ItemsPage` 画，点它关掉整叠 |
+| 数据ID 详情 | `Sheet` | 切页面回来仍开着（`lib/dataIdState.ts` 的 `detail`） |
+| 指令小抄 详情 / 分组 | Base UI `Drawer` | 两个抽屉各自一层遮罩 |
+| 物品详情（图鉴以外的页面） | `Dialog`（`components/items/ItemDetailDialog.tsx`） | **就地弹框**，不再跳图鉴；见下 |
+
+### 物品详情弹框（图鉴以外的页面）
+
+物品提示右上角的 ⓘ「物品详情」由 `ItemDetailProvider` 决定打开方式：
+
+- **物品图鉴页内**：自己提供 Provider → 就地打开可堆叠抽屉（状态在 `DexState`）；
+- **其它页面**：`App` 提供实现 → 打开 `ItemDetailDialog`（居中弹框），**不再跳页**（跳页会丢筛选与填了一半的指令）；
+  弹框内部再提供一次 Provider，点配方材料 / 掉落的 ⓘ 是**叠一层**（左上角「返回」），不重开弹框；
+- 切 `activeTab` 时自动关闭。
+
+内容只有一份：`components/items/ItemDetailPanel.tsx`（`chrome: 'drawer' | 'dialog'` 只切换标题栏 / 底部外壳），
+抽屉与弹框都复用它。
+
+### 浮动终端（真·非模态）
+
+`components/CommandTerminal.tsx`，窗口标题「指令」。入口是**顶栏右侧的「指令」图标按钮**
+（`components/TerminalTopBarButton.tsx`，桌面排在页面操作之后；**手机端收在 `…` 菜单里**；「指令」「设置」页与**首页**不显示）：
+`role="dialog"` + `aria-modal="false"`，自己处理拖动 / 缩放 / `Esc`，**不做焦点陷阱、不压暗页面**。
+
+- 层级：`z-40`，低于所有模态层与上表的 `ContentScrim`（`z-45`）。打开模态时不强行关闭它。
 - 关闭只认 `×` / `Esc` / 再点入口按钮（**不**响应点击外部），这样「边看页面边执行」才成立。
 - 窗口几何存 `tswui:terminal`（见 `lib/terminalWindow.ts`），恢复时先 clamp 进视口。
 - 需要模态交互时**不要**改它的样式来凑，直接用 `Sheet` / `Dialog`。
@@ -490,6 +553,9 @@
 | `FullscreenDock` | `components/FullscreenDock.tsx` | 全屏结果页**右上角**操作坞：先露出，随后收成贴右边的竖条（左侧上下圆角、宽 12px）；悬停 / 聚焦 / 点击展开，展开后 4 秒无操作再收起 |
 | `CommandLine` | `components/CommandLine.tsx` | 「相关指令」分组（数据 ID → NPC / Buff、物品详情的给予指令共用）：标题 = 149 号物品图标 + 文字（绿色 `text-success`，**带条目数量** `相关指令（6）`）+ 折角箭头（可折叠），下面每条指令一行 —— 行外观同合成记录；**点条目本身什么也不做**，右侧 终端（`填充指令`：填进浮动终端并弹出，同时回调 `onOpenTerminal` 让调用方关抽屉）/ ⭐（收藏指令）/ 复制（只复制）三个按钮悬停或聚焦才出现（触屏常显）。条目可带 `note`（如 `/sb all` → 「召唤所有Boss」），悬停整行时用 Tooltip 出说明 |
 | `CommandTerminal` / `TerminalTopBarButton` | `components/CommandTerminal.tsx` / `components/TerminalTopBarButton.tsx` | 浮动终端（桌面非模态浮窗 / 窄屏底部抽屉）与顶栏入口（**首页是例外**：那里放；手机在 `…` 菜单里）；开关状态在 `lib/terminalContext.tsx`。见 [`功能-浮动终端.md`](功能-浮动终端.md) |
+| `ContentScrim` | `components/ContentScrim.tsx` | 只盖内容区的遮罩（`z-[45]`、`bg-black/50`、不模糊），左栏导航不被压暗、可点。四处详情抽屉共用；见本章「浮层」一节 |
+| `ItemDetailDialog` / `ItemDetailPanel` | `components/items/ItemDetailDialog.tsx` / `ItemDetailPanel.tsx` | 物品详情弹框（图鉴以外的页面）+ 抽屉/弹框共用的内容面板（`chrome` 切换外壳）。见本章「物品详情弹框」 |
+| `FishDetailSurface` | `components/fishshop/FishDetailSurface.tsx` | 鱼店商品详情的抽屉：桌面端遮罩只盖内容区（侧栏仍可点）、点遮罩关；窄屏普通模态抽屉；切页面回来仍开着。见 [`插件-鱼店.md`](插件-鱼店.md) 与本章「浮层」一节 |
 
 ## 未登录的页面门控
 
