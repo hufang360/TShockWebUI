@@ -2,11 +2,11 @@
  * 「指令小抄」页的**分组定义**（手工维护；分组标题 / 说明在 `lib/i18n.tsx`）。
  *
  * 两种分组：
- * - **有可点条目的**（世界事件、时间、召唤 Boss…）：语法行用 `usageKey`，具体指令在页面里生成
- *   （见 `CommandTipsPage` 的 `curatedRows`），点了把完整指令填进「指令」浮窗。
+ * - **有可点条目的**（世界事件、时间、召唤 Boss…）：语法行用 `usageKey`（只在详情抽屉里显示），具体指令在页面里生成
+ *   （见 `CommandTipsPage` 的 `curatedRows`）；单击行打开详情，在详情里把完整指令填进「指令」浮窗。
  * - **参考型分组**（物品、增益、传送、服务器…）：`commands` 列 TShock 内置指令名，
  *   语法取自 `data/commands.json` 的 `paramSets`（由 TShock 6.2.1 源码提取，**不猜**），
- *   页面渲染成不可点的参考行（带复制按钮），`allowServer=false` 的会标「仅游戏内」。
+ *   页面渲染成参考行（详情里只能复制），`allowServer=false` 的会标「仅游戏内」。
  *
  * 没列进来的插件指令（本服还有 `/bwl` `/chest` `/judge` `/worldmodify` `/playermanager`
  * `/fishshop` `/webui` `/npcmanage` `/bossmanage` `/igen` `/moonphase` …）不在本页收录：
@@ -24,8 +24,11 @@ export interface TipsGroup {
   hintKey?: string
   /** 参考型分组收录的内置指令名（语法来自 `dataset.commands[].paramSets`）。 */
   commands?: readonly string[]
-  /** 这个分组里额外给一个「在数据 ID → NPC 里查更多」的入口。 */
-  npcLink?: boolean
+  /**
+   * 额外折叠：这几条指令在表格里折成一行（首条指令作为折叠行，如 `/death` 收起 `/pvpdeath` 等）。
+   * 同一条指令的多个子命令（`/region define`、`/region protect` …）**不用写**，会自动按指令名折。
+   */
+  folds?: readonly (readonly string[])[]
 }
 
 /** 侧栏顺序：世界 → NPC → 物品 → 增益 → 生命 → 传送 → 建筑 → 用户 → 权限配置 → 服务器 → 聊天。 */
@@ -44,7 +47,6 @@ export const TIPS_GROUPS: readonly TipsGroup[] = [
     titleKey: 'commands.group.npctp',
     usageKey: 'commands.group.npctp.usage',
     hintKey: 'commands.group.npctp.hint',
-    npcLink: true,
   },
   { id: 'spawnrate', titleKey: 'commands.group.spawnrate', usageKey: 'commands.group.spawnrate.usage' },
   { id: 'godmode', titleKey: 'commands.group.godmode', usageKey: 'commands.group.godmode.usage', hintKey: 'commands.group.godmode.hint' },
@@ -65,16 +67,8 @@ export const TIPS_GROUPS: readonly TipsGroup[] = [
     commands: ['region', 'antibuild', 'itemban', 'projban', 'tileban', 'setdungeon', 'grow', 'clear'],
   },
 
-  { id: 'account', titleKey: 'commands.group.account', hintKey: 'commands.group.account.hint', commands: ['register', 'login', 'password', 'logout'] },
-  {
-    id: 'useradmin',
-    titleKey: 'commands.group.useradmin',
-    usageKey: 'commands.group.useradmin.usage',
-    hintKey: 'commands.group.useradmin.hint',
-    commands: ['accountinfo', 'userinfo'],
-  },
-  { id: 'ban', titleKey: 'commands.group.ban', usageKey: 'commands.group.ban.usage', hintKey: 'commands.group.ban.hint' },
-  { id: 'mutekick', titleKey: 'commands.group.mutekick', hintKey: 'commands.group.mutekick.hint', commands: ['mute', 'kick'] },
+  { id: 'account', titleKey: 'commands.group.account', usageKey: 'commands.group.account.usage', hintKey: 'commands.group.account.hint', commands: ['register', 'login', 'password', 'logout', 'accountinfo', 'userinfo'] },
+  { id: 'ban', titleKey: 'commands.group.ban', usageKey: 'commands.group.ban.usage', hintKey: 'commands.group.ban.hint', commands: ['mute', 'kick'] },
   { id: 'ugroup', titleKey: 'commands.group.ugroup', hintKey: 'commands.group.ugroup.hint', commands: ['group', 'tempgroup'] },
   {
     id: 'permsetup',
@@ -128,5 +122,7 @@ export const TIPS_GROUPS: readonly TipsGroup[] = [
       'wallow',
       'clearangler',
     ],
+    // 四个死亡次数开关折成一行，不占四行
+    folds: [['death', 'pvpdeath', 'alldeath', 'allpvpdeath']],
   },
 ]

@@ -258,26 +258,19 @@ const zh: Dict = {
   'editor.badge.inGame': '游戏内',
 
   'commands.col.command': '指令',
-  'commands.col.name': '名称',
+  'commands.col.name': '说明',
   'commands.col.note': '备注',
-  'commands.col.fill': '填入指令浮窗',
-  'commands.col.action': '操作',
-  'commands.detail.title': '指令帮助',
-  'commands.detail.canonical': '规范写法',
-  'commands.detail.group': '分组',
+  'commands.detail.title': '指令详情',
+  'commands.detail.canonical': '指令语法',
   'commands.detail.permission': '权限',
   'commands.detail.noPermission': '无（任何人可用）',
-  'commands.detail.where': '执行位置',
-  'commands.detail.where.web': '网页可执行（浮窗里回车即可）',
-  'commands.detail.where.ingame': '只能在游戏内执行',
-  'commands.detail.about': '说明',
+  'commands.detail.hint': '使用提示',
   'commands.detail.aliases': '别名',
-  'commands.detail.copy': '复制指令',
   'commands.detail.fill': '填入指令浮窗',
   'commands.search.placeholder': '搜索指令或名称',
   'commands.search.empty': '没有匹配的指令',
-  'page.tips.desc': '点一条只把指令填进指令浮窗，不会自动执行。\n'
-    + '带占位符的语法行只提供复制。\n'
+  'page.tips.desc': '单击一行查看详情，在详情里复制或把指令填进指令浮窗，不会自动执行。\n'
+    + '带占位符的语法行只能复制。\n'
     + '各指令权限不同，由服务器判定。',
   'pluginHelp.name': '插件名称：',
   'pluginHelp.en': '英文名称：',
@@ -292,7 +285,7 @@ const zh: Dict = {
   'commands.group.invasion.usage':
     '/worldevent invasion <goblins|snowmen|pirates|pumpkinmoon|frostmoon|martians>',
   'commands.group.holiday': '节日模式',
-  'commands.group.holiday.usage': '/forcehalloween、/forcexmas（再执行一次关闭）',
+  'commands.group.holiday.usage': '/forcehalloween、/forcexmas\n（再执行一次关闭）',
   'commands.group.worldmode': '世界模式',
   'commands.group.worldmode.usage': '/worldmode <normal|expert|master|journey>',
   'commands.group.time': '时间',
@@ -306,48 +299,60 @@ const zh: Dict = {
   'commands.group.npctp': '传送 NPC',
   'commands.group.npctp.usage': '/tpnpc <NPC 名称>',
   'commands.group.npctp.hint':
-    '只能传送到当前世界里已经存在的 NPC（城镇 NPC 需先入住）；/tpnpc 只认名称（TShock 不支持 ID），所以这里用英文名。',
-  'commands.group.npctp.more': '在数据 ID → NPC 里查更多',
+    '只能传送到当前世界里已经存在的 NPC（城镇 NPC 需先入住）。\n'
+    + '/tpnpc 只认名称（TShock 不支持 ID），所以这里用英文名。',
   'commands.group.spawnrate': '刷怪率',
-  'commands.group.spawnrate.usage': '/maxspawns [数量|default]、/spawnrate [数量|default]',
+  'commands.group.spawnrate.usage': '/maxspawns [数量|default]\n/spawnrate [数量|default]',
   'commands.group.godmode': '无敌模式',
   'commands.group.godmode.usage': '/godmode [玩家名]',
   'commands.group.godmode.hint':
-    '对别人用 /godmode <玩家名> 需要 tshock.godmodeother；/sb、/sm、/tpnpc 默认只能在游戏内执行，需服主开启「允许执行游戏内指令」后才能在浮窗里直接跑。',
+    '对别人用 /godmode <玩家名> 需要 tshock.godmodeother。\n'
+    + '/sb、/sm、/tpnpc 默认只能在游戏内执行，需服主开启「允许执行游戏内指令」后才能在浮窗里直接跑。',
   'commands.group.npcadmin': 'NPC 管理',
   'commands.group.npcadmin.hint':
-    '/npcmanage、/bossmanage、/bossinfo、/relive、/cleartomb、/igen 是本服插件指令，语法随插件版本，本页只收 TShock 内置的 /butcher 与 /renamenpc。',
+    '/npcmanage、/bossmanage、/bossinfo、/relive、/cleartomb、/igen 是本服插件指令，语法随插件版本。\n'
+    + '本页只收 TShock 内置的 /butcher 与 /renamenpc。',
   'commands.group.item': '物品',
   'commands.group.buff': '增益',
   'commands.group.vital': '生命与伤害',
   'commands.group.tp': '传送与位置',
   'commands.group.build': '建筑与保护',
-  'commands.group.account': '账号（玩家自己）',
+  'commands.group.account': '玩家账号',
+  'commands.group.account.usage':
+    '/register <密码>　/login [密码]\n'
+    + '/password <旧> <新>　/logout\n'
+    + '/user add <用户名> <密码> <组>\n'
+    + '/user del <用户名>　/user group <用户名> <组>',
   'commands.group.account.hint':
-    '这四条只能在游戏内执行，网页端会被 TShock 拒绝；服务器开了 UUID 登录时直接 /login 就行（不用输密码）。',
-  'commands.group.useradmin': '用户账号',
-  'commands.group.useradmin.usage':
-    '/user add <用户名> <密码> <组>、/user del <用户名>、/user password <用户名> <新密码>、/user group <用户名> <组>',
-  'commands.group.useradmin.hint':
-    '需要 tshock.superadmin.user（超管 / 控制台）；查账号用 /accountinfo <用户名>，查在线玩家用 /userinfo <玩家>。',
+    '注册 / 登录 / 改密 / 登出这四条只能在游戏内执行，网页端会被 TShock 拒绝。\n'
+    + '服务器开了 UUID 登录时直接 /login 就行（不用输密码）。\n'
+    + '/user 系列需要 tshock.superadmin.user（超管 / 控制台）。\n'
+    + '查账号用 /accountinfo <用户名>，查在线玩家用 /userinfo <玩家>。',
   'commands.group.ban': '封禁',
   'commands.group.ban.usage':
-    '/ban add <目标> [原因] [时长] [标志]、/ban del <编号>、/ban list [页]、/ban details <编号>',
+    '/ban add <目标> [原因] [时长] [标志]\n'
+    + '/ban del <编号>　/ban list [页]　/ban details <编号>',
   'commands.group.ban.hint':
-    '时长写成 0d0h0m0s（只写一部分也行），不写＝永久；标志 -a 账号、-u UUID、-n 角色名、-ip 地址、-e 把目标当标识符，默认 -a -u -ip。',
-  'commands.group.mutekick': '禁言 / 踢出',
-  'commands.group.mutekick.hint': '再执行一次 /mute 就是解除禁言；对方拥有同一权限时 mute 不生效。',
+    '时长写成 0d0h0m0s（只写一部分也行），不写＝永久。\n'
+    + '标志 -a 账号、-u UUID、-n 角色名、-ip 地址、-e 把目标当标识符，默认 -a -u -ip。\n'
+    + '再执行一次 /mute 就是解除禁言；对方拥有同一权限时 mute 不生效。',
   'commands.group.ugroup': '用户组',
   'commands.group.ugroup.hint':
-    '/group rename、/group prefix、/group suffix、/group color 可改组名与显示样式；/tempgroup 只对在线玩家生效，到时间自动恢复。',
+    '/group rename、/group prefix、/group suffix、/group color 可改组名与显示样式。\n'
+    + '/tempgroup 只对在线玩家生效，到时间自动恢复。',
   'commands.group.permsetup': '权限配置',
   'commands.group.permsetup.usage':
-    '/group addperm <组> <权限...>、/group delperm <组> <权限...>、/group add <组> [权限...]、/user group <玩家> <组>',
+    '/group addperm <组> <权限...>\n'
+    + '/group delperm <组> <权限...>\n'
+    + '/group add <组> [权限...]\n'
+    + '/user group <玩家> <组>',
   'commands.group.permsetup.hint':
-    '权限加在组上（需要 tshock.admin.group，/user group 另需 tshock.superadmin.user）；权限名前缀 ! 表示取反、* 表示全部。',
+    '权限加在组上（需要 tshock.admin.group，/user group 另需 tshock.superadmin.user）。\n'
+    + '权限名前缀 ! 表示取反、* 表示全部。',
   'commands.group.server': '服务器与权限',
   'commands.group.server.hint':
-    '权限都很高（如 /off 会保存并关闭服务器），执行前请确认；本页只列语法，不会替你执行。',
+    '权限都很高（如 /off 会保存并关闭服务器），执行前请确认。\n'
+    + '本页只列语法，不会替你执行。',
   'commands.group.chat': '聊天与统计',
 
   'terminal.title': '指令',
@@ -1713,25 +1718,18 @@ const en: Dict = {
   'editor.badge.inGame': 'In-game',
 
   'commands.col.command': 'Command',
-  'commands.col.name': 'Name',
+  'commands.col.name': 'Description',
   'commands.col.note': 'Note',
-  'commands.col.fill': 'Fill the command window',
-  'commands.col.action': 'Actions',
-  'commands.detail.title': 'Command help',
-  'commands.detail.canonical': 'Canonical form',
-  'commands.detail.group': 'Group',
+  'commands.detail.title': 'Command details',
+  'commands.detail.canonical': 'Syntax',
   'commands.detail.permission': 'Permission',
   'commands.detail.noPermission': 'None (everyone)',
-  'commands.detail.where': 'Runs from',
-  'commands.detail.where.web': 'Web OK (press enter in the command window)',
-  'commands.detail.where.ingame': 'In-game only',
-  'commands.detail.about': 'About',
+  'commands.detail.hint': 'Usage notes',
   'commands.detail.aliases': 'Aliases',
-  'commands.detail.copy': 'Copy command',
   'commands.detail.fill': 'Fill the command window',
   'commands.search.placeholder': 'Search command or name',
   'commands.search.empty': 'No matching command',
-  'page.tips.desc': 'Clicking a row only fills the command into the terminal — nothing runs automatically.\n'
+  'page.tips.desc': 'Click a row to open its details, then copy it or fill it into the command window — nothing runs automatically.\n'
     + 'Syntax rows with placeholders can only be copied.\n'
     + 'Every command needs its own permission, checked by the server.',
   'pluginHelp.name': 'Plugin: ',
@@ -1747,7 +1745,7 @@ const en: Dict = {
   'commands.group.invasion.usage':
     '/worldevent invasion <goblins|snowmen|pirates|pumpkinmoon|frostmoon|martians>',
   'commands.group.holiday': 'Holiday modes',
-  'commands.group.holiday.usage': '/forcehalloween, /forcexmas (run again to turn off)',
+  'commands.group.holiday.usage': '/forcehalloween, /forcexmas\n(run again to turn off)',
   'commands.group.worldmode': 'World mode',
   'commands.group.worldmode.usage': '/worldmode <normal|expert|master|journey>',
   'commands.group.time': 'Time',
@@ -1761,49 +1759,60 @@ const en: Dict = {
   'commands.group.npctp': 'Teleport to NPC',
   'commands.group.npctp.usage': '/tpnpc <NPC name>',
   'commands.group.npctp.hint':
-    'Only NPCs currently present in the world can be targeted (town NPCs must have moved in); /tpnpc matches names only (TShock has no ID lookup), so English names are used here.',
-  'commands.group.npctp.more': 'Find more in Data IDs → NPC',
+    'Only NPCs currently present in the world can be targeted (town NPCs must have moved in).\n'
+    + '/tpnpc matches names only (TShock has no ID lookup), so English names are used here.',
   'commands.group.spawnrate': 'Spawn rate',
-  'commands.group.spawnrate.usage': '/maxspawns [n|default], /spawnrate [n|default]',
+  'commands.group.spawnrate.usage': '/maxspawns [n|default]\n/spawnrate [n|default]',
   'commands.group.godmode': 'Godmode',
   'commands.group.godmode.usage': '/godmode [player]',
   'commands.group.godmode.hint':
-    'God-moding another player (/godmode <player>) needs tshock.godmodeother; /sb, /sm and /tpnpc can only run in-game unless the owner enables in-game command execution.',
+    'God-moding another player (/godmode <player>) needs tshock.godmodeother.\n'
+    + '/sb, /sm and /tpnpc can only run in-game unless the owner enables in-game command execution.',
   'commands.group.npcadmin': 'NPC administration',
   'commands.group.npcadmin.hint':
-    '/npcmanage, /bossmanage, /bossinfo, /relive, /cleartomb and /igen come from plugins and their syntax follows the plugin version — this page only lists the built-in /butcher and /renamenpc.',
+    '/npcmanage, /bossmanage, /bossinfo, /relive, /cleartomb and /igen come from plugins, so their syntax follows the plugin version.\n'
+    + 'This page only lists the built-in /butcher and /renamenpc.',
   'commands.group.item': 'Items',
   'commands.group.buff': 'Buffs',
   'commands.group.vital': 'Health & damage',
   'commands.group.tp': 'Teleport & position',
   'commands.group.build': 'Building & protection',
-  'commands.group.account': 'Your account',
+  'commands.group.account': 'Player accounts',
+  'commands.group.account.usage':
+    '/register <password>   /login [password]\n'
+    + '/password <old> <new>   /logout\n'
+    + '/user add <username> <password> <group>\n'
+    + '/user del <username>   /user group <username> <group>',
   'commands.group.account.hint':
-    'These four only run in-game — TShock rejects them from the web UI. With UUID login enabled, a bare /login is enough.',
-  'commands.group.useradmin': 'User accounts',
-  'commands.group.useradmin.usage':
-    '/user add <username> <password> <group>, /user del <username>, /user password <username> <new>, /user group <username> <group>',
-  'commands.group.useradmin.hint':
-    'Needs tshock.superadmin.user (superadmin / console). Look an account up with /accountinfo <username>, an online player with /userinfo <player>.',
+    'Register, login, password and logout only run in-game — TShock rejects them from the web UI.\n'
+    + 'With UUID login enabled, a bare /login is enough.\n'
+    + 'The /user commands need tshock.superadmin.user (superadmin / console).\n'
+    + 'Look an account up with /accountinfo <username>, an online player with /userinfo <player>.',
   'commands.group.ban': 'Bans',
   'commands.group.ban.usage':
-    '/ban add <target> [reason] [duration] [flags], /ban del <id>, /ban list [page], /ban details <id>',
+    '/ban add <target> [reason] [duration] [flags]\n'
+    + '/ban del <id>   /ban list [page]   /ban details <id>',
   'commands.group.ban.hint':
-    'Duration uses 0d0h0m0s (any part may be omitted); no duration means permanent. Flags: -a account, -u UUID, -n character name, -ip address, -e treat target as identifier; default is -a -u -ip.',
-  'commands.group.mutekick': 'Mute / kick',
-  'commands.group.mutekick.hint':
-    'Running /mute again unmutes; it has no effect on someone holding the same permission.',
+    'Duration uses 0d0h0m0s (any part may be omitted); no duration means permanent.\n'
+    + 'Flags: -a account, -u UUID, -n character name, -ip address, -e treat target as identifier; default is -a -u -ip.\n'
+    + 'Running /mute again unmutes; it has no effect on someone holding the same permission.',
   'commands.group.ugroup': 'Groups',
   'commands.group.ugroup.hint':
-    '/group rename, /group prefix, /group suffix and /group color change the name and display; /tempgroup only affects online players and reverts when the time is up.',
+    '/group rename, /group prefix, /group suffix and /group color change the name and display.\n'
+    + '/tempgroup only affects online players and reverts when the time is up.',
   'commands.group.permsetup': 'Permission setup',
   'commands.group.permsetup.usage':
-    '/group addperm <group> <permission...>, /group delperm <group> <permission...>, /group add <group> [permission...], /user group <player> <group>',
+    '/group addperm <group> <permission...>\n'
+    + '/group delperm <group> <permission...>\n'
+    + '/group add <group> [permission...]\n'
+    + '/user group <player> <group>',
   'commands.group.permsetup.hint':
-    'Permissions live on groups (needs tshock.admin.group; /user group also needs tshock.superadmin.user). Prefix a permission with ! to negate it, * for everything.',
+    'Permissions live on groups (needs tshock.admin.group; /user group also needs tshock.superadmin.user).\n'
+    + 'Prefix a permission with ! to negate it, * for everything.',
   'commands.group.server': 'Server & permissions',
   'commands.group.server.hint':
-    'These are high-privilege (e.g. /off saves and shuts the server down) — this page only shows syntax, it never runs anything for you.',
+    'These are high-privilege (e.g. /off saves and shuts the server down), so confirm before running.\n'
+    + 'This page only shows syntax, it never runs anything for you.',
   'commands.group.chat': 'Chat & stats',
 
   'terminal.title': 'Commands',

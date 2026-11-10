@@ -27,6 +27,13 @@ export interface CommandTip {
   label: { zh: string; en: string }
   /** 备注列的一句话（可选；不给就不占位）。 */
   note?: { zh: string; en: string }
+  /**
+   * 表格里归到哪个折叠行（折叠行「指令」列显示这段文字）。
+   * 不给就按指令前缀自动折；给 `/group` 就并进内置 `/group` 的折叠组，给自定义文字就是单独一组。
+   */
+  fold?: string
+  /** 折叠行「说明」列的文字（不给就用分区标题，如 `/worldevent` → 世界事件）。 */
+  foldLabel?: { zh: string; en: string }
 }
 
 /** `/worldevent` 的事件（不含入侵，入侵见下）。 */
@@ -36,9 +43,15 @@ export const WORLD_EVENT_COMMANDS: CommandTip[] = [
   { command: '/worldevent bloodmoon', label: { zh: '血月', en: 'Blood moon' } },
   { command: '/worldevent eclipse', label: { zh: '日食', en: 'Solar eclipse' } },
   { command: '/worldevent sandstorm', label: { zh: '沙尘暴（再执行停止）', en: 'Sandstorm (toggle)' } },
-  { command: '/worldevent rain', label: { zh: '下雨（再执行停止）', en: 'Rain (toggle)' } },
-  { command: '/worldevent rain slime', label: { zh: '史莱姆雨（再执行停止）', en: 'Slime rain (toggle)' } },
-  { command: '/worldevent rain coin', label: { zh: '金币雨（再执行停止）', en: 'Coin rain (toggle)' } },
+  {
+    command: '/worldevent rain',
+    label: { zh: '雨', en: 'Rain' },
+    note: { zh: '再执行停止', en: 'toggle' },
+    fold: '/worldevent rain',
+    foldLabel: { zh: '雨', en: 'Rain' },
+  },
+  { command: '/worldevent rain slime', label: { zh: '史莱姆雨', en: 'Slime rain' }, note: { zh: '再执行停止', en: 'toggle' }, fold: '/worldevent rain' },
+  { command: '/worldevent rain coin', label: { zh: '金币雨', en: 'Coin rain' }, note: { zh: '再执行停止', en: 'toggle' }, fold: '/worldevent rain' },
   { command: '/worldevent lanternsnight', label: { zh: '灯笼夜', en: 'Lantern night' } },
   { command: '/worldevent meteorshower', label: { zh: '流星雨', en: 'Meteor shower' } },
 ]

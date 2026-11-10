@@ -1,7 +1,7 @@
 import type { CommandTip } from '@/lib/worldCommandTips'
 
 /**
- * 「用户管理」/「权限配置」分组用的指令清单（**手工维护**）。
+ * 「玩家账号」/「权限配置」分组用的指令清单（**手工维护**）。
  *
  * 来源：TShock 6.2.1 源码 `TShockAPI/Commands.cs`（行号见每条注释），
  * 并用本服 `POST /v3/server/rawcmd` 实测过（`/user help`、`/ban help`、`/ban list` 都返回预期的帮助 / 列表）。
@@ -43,26 +43,32 @@ export const PERM_SETUP_COMMANDS: CommandTip[] = [
     command: '/group addperm default tshock.rest.useapi tshock.rest.command',
     label: { zh: '允许网页登录、执行指令', en: 'Allow web login and commands' },
     note: { zh: 'WebUI 前置；default 默认没有', en: 'Required by the web UI; off by default' },
+    fold: '/group',
+  },
+  {
+    command: '/group addperm default tshock.tp.home',
+    label: { zh: '允许 /home', en: 'Allow /home' },
+    fold: '/group',
   },
   {
     command: '/group add GM * !tshock.ignore.ssc',
     label: { zh: '新建 GM 组（全权限）', en: 'Create a GM group (all permissions)' },
     note: { zh: '* = 全部，! = 去掉（保留 SSC）', en: '* = all, ! = remove (SSC kept)' },
-  },
-  {
-    command: '/group addperm default tshock.tp.home',
-    label: { zh: '允许 /home', en: 'Allow /home' },
+    fold: 'hf 常用',
   },
   {
     command: '/group addperm default hf.recipe hf.search',
     label: { zh: '查一查插件：/r 合成表、/s 物品 ID', en: 'Recipes plugin: /r recipes, /s item ids' },
+    fold: 'hf 常用',
   },
   {
     command: '/group addperm default worldinfo bossinfo',
     label: { zh: '世界管理插件：/wi 世界信息、/bi Boss 进度', en: 'World plugin: /wi world info, /bi boss progress' },
+    fold: 'hf 常用',
   },
   {
     command: '/group addperm default lookbag',
     label: { zh: '玩家管理插件：/lb 查背包', en: 'Player manager plugin: /lb look bag' },
+    fold: 'hf 常用',
   },
 ]

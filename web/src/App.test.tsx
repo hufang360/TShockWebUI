@@ -644,16 +644,31 @@ it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 
   )
   expect(labels.indexOf('指令小抄')).toBe(labels.indexOf('数据 ID') + 1)
 
-  // 行本身不再响应单击：点「操作」列的终端按钮才填进浮窗。
-  fireEvent.click(
-    await screen.findByRole('button', { name: '填入指令浮窗：/spawnboss "king slime"' }),
-  )
+  // 同一前缀的行默认折叠（`/spawnboss …`、`/tpnpc …`），先展开再点。
+  const fold = (stem: string) =>
+    fireEvent.click(
+      [...document.querySelectorAll<HTMLElement>('tr[data-fold]')].find(
+        (el) => el.getAttribute('data-fold') === stem,
+      )!,
+    )
+  const row = (command: string) =>
+    [...document.querySelectorAll<HTMLElement>('tr[data-command]')].find(
+      (el) => el.getAttribute('data-command') === command,
+    )!
+
+  fold('/spawnboss')
+  fireEvent.click(row('/spawnboss "king slime"'))
+  const detail = await screen.findByTestId('command-detail')
+  fireEvent.click(within(detail).getByRole('button', { name: /填入指令浮窗/ }))
   const win = await screen.findByTestId('terminal-window')
   const input = within(win).getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
   expect(input.value).toBe('/spawnboss "king slime"')
 
   // 传送 NPC 用英文名（真实数据里的 `en` 字段）；点新记录会覆盖输入框。
-  fireEvent.click(screen.getByRole('button', { name: '填入指令浮窗：/tpnpc Angler' }))
+  fold('/tpnpc')
+  fireEvent.click(row('/tpnpc Angler'))
+  const detail2 = await screen.findByTestId('command-detail')
+  fireEvent.click(within(detail2).getByRole('button', { name: /填入指令浮窗/ }))
   expect(input.value).toBe('/tpnpc Angler')
 })
 it('「聊天」已并入「指令」：侧栏没有聊天，老地址 #/chat 落到指令页', async () => {
