@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { diagramKind, diagramUrl } from '@/lib/fishDiagram'
 import type { FishGood } from '@/lib/tshock'

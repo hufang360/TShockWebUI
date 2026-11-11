@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { inspectCommand, parseCommand } from './commands'
 import { makeDataset } from '@/test/fixtures'

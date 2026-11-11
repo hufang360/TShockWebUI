@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ATLAS_JSON_FETCH, atlasImageUrl, loadVerifiedAtlasImage } from '@/lib/atlas'
 

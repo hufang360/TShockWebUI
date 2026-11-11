@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * 用**本机真实存档**做的端到端核对（默认跳过，不进 CI）。
  *

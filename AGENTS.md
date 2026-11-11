@@ -44,10 +44,13 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
 - **需求中途追加时先重述待办**：把新旧需求并成一条清单，不要一边继续旧岔路一边接新需求。
 - **长文档分段读**（`docs/` 里动辄上千行）：按需 `grep` / 局部 `read`，整篇读进来会把后续每一步都变贵。
 
-### 验证强度（实测：一次全量测试 = 118 个 worker、CPU 约 150s，默认并发会把 10 核打满）
+### 验证强度（实测：全量 129 文件 / 1400 用例 ≈ 21s 墙钟、约 170s CPU；10 核会吃满）
 
 - **迭代期只跑相关文件**：`npx vitest run src/pages/XxxPage.test.tsx`（<3s，单核）；全量只在收尾跑一次。
-  中途必须全量就限并发：`npx vitest run --maxWorkers=10`。
+- **不知道会牵连谁就用 `npm run test:changed`**：只跑 git 改动引用到的测试（改一个 util 通常 2s 内）。
+  改了 `vite.config.ts` 会让这种增量失效、退回全量，属正常现象。
+- 必须全量又不想把机器占满：`npx vitest run --maxWorkers=4`（~28s，CPU 约 130s）。
+- 纯逻辑测试（不碰 DOM）在文件头写 `// @vitest-environment node`：省掉每个文件 ~0.3s 的 jsdom 建文档开销。
 - **`tsc -b` 可常跑**（~4s）；**`vite build` 只在交付前**跑一次。
 - **不启浏览器、不留后台进程**：收尾 `ps` 确认一遍（vite / 无头 Chrome / vitest）。
 - **只在不确定的情况才截图查看界面**（改布局没把握时）；能靠代码或测试判断的不要开浏览器，
@@ -107,5 +110,5 @@ README 由用户手动维护。不要改它的结构、措辞或顺序。
 其它文档按本节的规则写。细节进 `docs/`，索引见 `docs/README.md`。
 
 格式由测试与 lint 守住：中文段落不折行、列表用 `-`、代码块写语言、不用裸 URL、
-不留连续空行与行尾空格。改完跑 `npm test` 与
+不留连续空行与行尾空格。改完跑 `cd web && npm run test:run` 与
 `npx markdownlint-cli2 "README.md" "docs/*.md" "AGENTS.md"`。

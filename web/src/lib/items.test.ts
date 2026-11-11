@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { formatItemTag, parseItemTags, searchItems, wikiUrl } from './items'
 import { testItems } from '@/test/fixtures'

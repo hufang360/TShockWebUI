@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { bestPrefixIds, formatBenefit, isPrefixValid, prefixDeltaLines, rankPrefixes, roundHalfEven } from './prefixes'
 import type { PrefixMods } from '@/types'

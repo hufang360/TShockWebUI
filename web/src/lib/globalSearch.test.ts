@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { House } from 'lucide-react'
 import { describe, expect, it } from 'vitest'
 import { makeDataset, testItems } from '@/test/fixtures'

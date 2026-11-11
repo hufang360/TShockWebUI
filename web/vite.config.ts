@@ -60,10 +60,40 @@ function dataDirPlugin(): Plugin {
 // GitHub Pages 演示构建通过 VITE_BASE 改成仓库子路径（如 `/TShockWebUI/`）。
 const base = (process.env.VITE_BASE || '/').replace(/\/*$/, '/')
 
+/**
+ * 首屏体积的两处约束（改前：单块 516 kB，且首屏混入只被懒加载页面用到的 UI 组件）：
+ * 1. `treeshake.moduleSideEffects`：默认的保守 tree-shaking 会认为每个模块都可能有副作用，
+ *    于是 `@/components/ui` 桶文件（App.tsx 引入）里没人用到的 Drawer / Slider / Accordion /
+ *    Switch / Pagination 也都进了首屏。声明「只有 CSS 有副作用」后它们会被摇掉。
+ * 2. `codeSplitting`：第三方库按来源拆成独立 chunk，避免单块超过 500 kB 的告警，
+ *    也让改业务代码时不必重新下载 react / radix。
+ *    `tags: ['$initial']` 是关键：不加它，分组会把懒加载页面才依赖的模块也捕获回首屏。
+ */
 export default defineConfig({
   base,
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [react(), tailwindcss(), dataDirPlugin()],
+  build: {
+    rolldownOptions: {
+      treeshake: { moduleSideEffects: ['**/*.css'] },
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'react',
+              test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              tags: ['$initial'],
+            },
+            {
+              name: 'vendor-ui',
+              test: /node_modules[\\/](@radix-ui|@base-ui|@floating-ui|sonner|react-resizable-panels|tailwind-merge|class-variance-authority|clsx|lucide-react)[\\/]/,
+              tags: ['$initial'],
+            },
+          ],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -84,7 +114,13 @@ export default defineConfig({
     },
   },
   test: {
+    // 默认 jsdom：组件 / 页面测试要真实 DOM。纯逻辑测试（本地存储、解析、换算……）
+    // 在文件头写 `// @vitest-environment node` 即可——jsdom 每个文件要现建一次文档
+    // （约 0.4s），纯逻辑用例占全部文件的一半，白白多花十几秒 CPU。
     environment: 'jsdom',
+    // 默认的 forks 每个文件都要 fork 一个进程；threads 复用 worker 线程，
+    // 全量用例的 CPU 时间少约一成，且没有 vmThreads 的跨 realm 坑（`new File([blob])` 会读成空）。
+    pool: 'threads',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],

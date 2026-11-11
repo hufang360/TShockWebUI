@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { aes128CbcEncrypt, PLR_AES_KEY } from './aes'

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { aes128CbcDecrypt, aes128CbcEncrypt, PLR_AES_KEY } from './aes'
 import { dotnetBinaryToIso, SaveFormatError } from './bytes'

@@ -43,43 +43,44 @@ import { activeTargetHeader } from './servers'
 
 const API_BASE = '/api'
 
-/** 后端错误码 → 前端类别（docs/API_SPEC.md 第 0 节）。 */
-function kindFromCode(code: string | undefined): TshockErrorKind {
-  switch (code) {
-    case 'bad_credentials':
-    case 'not_authenticated':
-      return 'auth'
-    case 'token_invalid':
-      return 'token'
-    case 'no_permission':
-    case 'no_api_permission':
-      return 'permission'
-    case 'plugin_not_installed':
-      return 'plugin_missing'
-    case 'plugin_outdated':
-      return 'plugin_outdated'
-    case 'plugin_protocol_mismatch':
-      return 'plugin_protocol'
-    case 'player_offline':
-    case 'online_auth_denied':
-    case 'online_auth_error':
-    case 'fishshop_error':
-    case 'request_error':
-      return 'validation'
-    case 'online_auth_timeout':
-      return 'timeout'
-    case 'rate_limited':
-      return 'rate_limited'
-    case 'tshock_unavailable':
-      return 'unavailable'
-    case 'tshock_timeout':
-      return 'timeout'
-    case 'csrf':
-    case 'bad_request':
-      return 'validation'
-    default:
-      return 'bad_response'
-  }
+/**
+ * 后端错误码 → 前端类别（docs/API_SPEC.md 第 0 节）。
+ *
+ * 写成数据而不是 switch，是为了让 `backendCodes.contract.test.ts` 能逐键比对
+ * `server/internal/api/handlers.go` 里的 `code*` 常量：后端新增错误码而前端没表态，测试就红。
+ * 新增码就在这里显式写一行——哪怕结论是「按 bad_response 处理」（那就是在表态：前端不该触发它）。
+ */
+export const BACKEND_CODE_KINDS = {
+  bad_credentials: 'auth',
+  not_authenticated: 'auth',
+  token_invalid: 'token',
+  no_permission: 'permission',
+  no_api_permission: 'permission',
+  plugin_not_installed: 'plugin_missing',
+  plugin_outdated: 'plugin_outdated',
+  plugin_protocol_mismatch: 'plugin_protocol',
+  player_offline: 'validation',
+  online_auth_denied: 'validation',
+  online_auth_error: 'validation',
+  fishshop_error: 'validation',
+  request_error: 'validation',
+  online_auth_timeout: 'timeout',
+  tshock_timeout: 'timeout',
+  rate_limited: 'rate_limited',
+  tshock_unavailable: 'unavailable',
+  csrf: 'validation',
+  bad_request: 'validation',
+  // 基础设施类：前端正常流程不该触发。真出现了就原样展示上游文案，不猜成业务错误。
+  bad_response: 'bad_response',
+  not_found: 'bad_response',
+  method_not_allowed: 'bad_response',
+  server_error: 'bad_response',
+} as const satisfies Record<string, TshockErrorKind>
+
+/** 未知 / 缺失错误码的兵底：按「响应异常」处理。 */
+export function kindFromCode(code: string | undefined): TshockErrorKind {
+  if (!code) return 'bad_response'
+  return (BACKEND_CODE_KINDS as Record<string, TshockErrorKind>)[code] ?? 'bad_response'
 }
 
 interface ErrorEnvelope {

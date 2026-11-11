@@ -343,6 +343,26 @@ make dev-web                              # 浏览器开 http://localhost:5173
 - 全量命令：`cd web && npx vitest run`（或 `make test`）；当前文件 / 用例数与最近结果记录在
   [`记录-实现与验收.md`](记录-实现与验收.md)。
 - 关键覆盖：传输层 URL / 错误映射、App 冒烟（Mock）、补全、物品 / 数据 ID、鱼店、语言材质包等。
+- 性能约定：`pool: 'threads'`（比默认 forks 少约一成 CPU）；不碰 DOM 的用例在文件头写
+  `// @vitest-environment node`。全量约 21s 墙钟 / 170s CPU（129 文件、1400 用例）；
+  墙钟被 `App` / `FishShopPage` / `ItemsPage` / `CommandPage` 四个大文件卡住（单文件 10–17s），
+  要再快只能拆这几个文件或减少用例。
+- 试过但没采用：`pool: 'vmThreads'`（环境只建一次，CPU 降到 ~120s，但 jsdom 在 vm 里缺 Web
+  Streams，且 `new File([blob])` 跨 realm 会读成空字符串，11 个用例悄错）；`happy-dom`（CPU ~100s，
+  但 Radix Popover / `document.execCommand` / fetch 桩失效等 11 个用例失败）；`jsdom@26`（快 40%，
+  但 `:has()` 等 40 个用例失败）。换环境前先跑全量验证。
+
+**护栏类测试（扫源码，不渲染，~0.2s）**：一条规则管全仓，比给单个组件写一堆 `className` 断言划算，
+新写的代码也自动被管。
+
+- `src/test/conventions.test.ts`：只用语义色令牌（禁裸 `text-red-500` 一类）、禁
+  `dangerouslySetInnerHTML`、业务代码不直接碰 `localStorage` / `sessionStorage`（统一走 `lib/storage`）、
+  只有 `lib/httpTransport` 能请求 `/api`、只有 `App` / `lib/routes` 读写 `location.hash`。
+  加规则 = 往 `RULES` 里加一条 `{ name, pattern, allow, why }`；`allow` 必须写清「为什么可以例外」，
+  测试会顺手报「已经不再违规」的过期条目，不让 allowlist 越养越大。
+- `src/lib/backendCodes.contract.test.ts`：读 `server/internal/api/handlers.go` 的
+  `code*` 常量，与前端 `BACKEND_CODE_KINDS` 双向比对。**后端新增错误码 → 前端不归类就红**，
+  避免静默落到 `bad_response`，让用户看到一句对不上号的报错（铁律：异常信息不迷惑人）。
 
 ### 真实联调（可选，构建标签或脚本）
 - `TSHOCK_URL=http://127.0.0.1:7878 go test -tags integration ./internal/tshock`（默认不跑）。

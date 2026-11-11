@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { analysisFilename, buildAnalysisText, type AnalysisNames } from './worldAnalysisText'
 import type { WorldInfo } from './worldFile'

@@ -122,28 +122,19 @@ afterEach(() => {
 })
 
 describe('FishShopPage', () => {
-  it('插件可用时以网格列出货架商品', async () => {
+  it('货架网格：列出商品，格子尺寸 / 排版 / 提示都对', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
     expect((await screen.findAllByText('生命水晶')).length).toBeGreaterThan(0)
     expect(screen.getByText('#1')).toBeTruthy()
-  })
 
-  it('格子高度跟随内容：`h-auto` 必须同时写 `md:h-auto`', async () => {
-    // 尺寸变体自带 `md:h-9`（媒体查询变体在后，会盖掉无断点的 `h-auto`）：只写 `h-auto` 时
-    // ≥768px 的格子被锁成 36px，图标 / 名称溢出压到下一行，整片商品重叠。
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-
+    // 格子高度跟随内容：尺寸变体自带 `md:h-9`（媒体查询变体在后，会盖掉无断点的 `h-auto`），
+    // 只写 `h-auto` 时 ≥768px 的格子被锁成 36px，图标 / 名称溢出压到下一行，整片商品重叠。
     const cell = await screen.findByRole('button', { name: '生命水晶' })
     expect(cell.className).toContain('h-auto')
     expect(cell.className).toContain('md:h-auto')
-  })
 
-  it('商品格子和「物品 ID」同尺寸同排版：72 宽 / 图标 64、编号在名称上面、hover 底色只在图标区', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-
-    const cell = await screen.findByRole('button', { name: '生命水晶' })
-    // 默认「大」：格子宽 72、不随窗口拉伸；整格 hover 不铺底色。
+    // 与「物品 ID」同尺寸同排版。默认「大」：格子宽 72、不随窗口拉伸；整格 hover 不铺底色。
     expect(cell.dataset.size).toBe('lg')
     expect(cell.style.width).toBe('72px')
     expect(cell.className).toContain('hover:bg-transparent')
@@ -163,16 +154,12 @@ describe('FishShopPage', () => {
     expect(grid.className).toContain('grid-cols-[repeat(auto-fill,4.5rem)]')
     expect(grid.className).toContain('gap-x-4')
     expect(grid.className).toContain('gap-y-6')
-  })
 
-  it('原生物品的图标仍走物品提示（不再多一层「编号 + 商品名」）', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-
-    await screen.findByRole('button', { name: '生命水晶' })
+    // 原生（真物品）的图标仍走物品提示，不再多一层「编号 + 商品名」。
     expect(screen.queryByTestId('good-tooltip')).toBeNull()
   })
 
-  it('鱼池 / 小房间 / 钓棚 的详情多一张建筑预览图', async () => {
+  it('建筑预览：可折叠、可放大、四档倍率', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
     fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
     const dialog = await screen.findByRole('dialog')
@@ -188,78 +175,49 @@ describe('FishShopPage', () => {
     expect(imageButton.className).not.toContain('mx-auto')
     // 详情头部那个大图标不重复弹「编号 + 名称」（名字就在图下面）
     expect(within(dialog).queryByTestId('good-tooltip')).toBeNull()
-  })
 
-  it('建筑预览可以折叠（收起后图不显示），再点就回来', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
-    const dialog = await screen.findByRole('dialog')
+    // 折叠：收起后图不显示，再点回来。
     const trigger = within(dialog).getByRole('button', { name: '建筑预览' })
-
-    // 默认展开：图在
-    expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeTruthy()
-
     fireEvent.click(trigger)
-    await waitFor(() =>
-      expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeNull(),
-    )
-
+    await waitFor(() => expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeNull())
     fireEvent.click(trigger)
-    await waitFor(() =>
-      expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeTruthy(),
-    )
-  })
+    await waitFor(() => expect(dialog.querySelector('img[src$="diagram-pond.png"]')).toBeTruthy())
 
-  it('点建筑预览弹出一层放大弹框（不关掉详情）', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
-    const sheet = await screen.findByRole('dialog')
-
-    fireEvent.click(within(sheet).getByRole('button', { name: '放大建筑预览' }))
-    // 叠一层：详情仍在（radix 把非顶层标 aria-hidden，所以查 hidden）
+    // 放大：叠一层弹框，详情仍在（radix 把非顶层标 aria-hidden，所以查 hidden）。
+    // jsdom 不加载图片（naturalWidth = 0），这里只断言放大弹框里那张图存在；
+    // 倍率宽度由浏览器 onLoad 拿到真实像素宽度后生效。
+    fireEvent.click(within(dialog).getByRole('button', { name: '放大建筑预览' }))
     await waitFor(() => expect(screen.getAllByRole('dialog', { hidden: true })).toHaveLength(2))
     expect(screen.getByText('商品详情')).toBeTruthy()
-
-    // jsdom 不加载图片（naturalWidth = 0），所以这里只断言放大弹框里的那张图存在；
-    // 倍率宽度的计算在浏览器里由 onLoad 拿到真实像素宽度后生效。
     const zoomed = screen
       .getAllByRole('dialog', { hidden: true })
       .map((el) => el.querySelector('img[src$="diagram-pond.png"]'))
       .filter(Boolean)
     expect(zoomed.length).toBeGreaterThan(1)
-  })
 
-  it('放大弹框有 1/2 · 1:1 · 2× · 3× 四档，默认 1:1，切档高亮跟着变', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([POND_GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '鱼池' }))
-    const sheet = await screen.findByRole('dialog')
-    fireEvent.click(within(sheet).getByRole('button', { name: '放大建筑预览' }))
-
+    // 四档倍率：默认 1:1（图片原生像素），切档高亮跟着变。
     const group = await screen.findByRole('radiogroup', { name: '缩放倍率' })
-    const levels = ['1/2', '1:1', '2×', '3×']
-    for (const label of levels) {
+    for (const label of ['1/2', '1:1', '2×', '3×']) {
       expect(within(group).getByRole('radio', { name: label })).toBeTruthy()
     }
-    // 默认 1:1（图片原生像素）
     expect(within(group).getByRole('radio', { name: '1:1' }).getAttribute('aria-checked')).toBe('true')
-
     fireEvent.click(within(group).getByRole('radio', { name: '3×' }))
     await waitFor(() =>
       expect(within(group).getByRole('radio', { name: '3×' }).getAttribute('aria-checked')).toBe('true'),
     )
   })
 
-  it('刷怪场（cmds 含 spawnerfarm）用刷怪场预览图', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([SPAWNER_GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '岛牌刷怪厂' }))
-    const dialog = await screen.findByRole('dialog')
-    expect(dialog.querySelector('img[src$="diagram-spawnerfarm.png"]')).toBeTruthy()
-  })
+  it('建筑预览按指令 / 关键字匹配：刷怪场有自己的图，普通商品没有', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([SPAWNER_GOOD, GOOD]) }))
 
-  it('普通商品的详情里没有建筑预览', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
-    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(await screen.findByRole('button', { name: '岛牌刷怪厂' }))
+    let dialog = await screen.findByRole('dialog')
+    expect(dialog.querySelector('img[src$="diagram-spawnerfarm.png"]')).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: '生命水晶' }))
+    dialog = await screen.findByRole('dialog')
     expect(dialog.querySelector('img[src*="fishshop/diagram-"]')).toBeNull()
   })
 
@@ -447,7 +405,7 @@ describe('FishShopPage', () => {
     expect(within(tip).getByText('生命水晶')).toBeTruthy()
   })
 
-  it('点击商品弹出详情，价格与备注渲染为物品图标', async () => {
+  it('详情内容与布局：标题 / 价格图标 / 数量框 / 不显示空行 / 遮罩只盖内容区', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
@@ -461,6 +419,44 @@ describe('FishShopPage', () => {
     expect(within(dialog).getByRole('button', { name: '购买' })).toBeTruthy()
     // 询价按钮已移除（数据在 list 里已有）
     expect(within(dialog).queryByRole('button', { name: '询价' })).toBeNull()
+    // —— 可购买多件时才显示数量框 ——
+    {
+      fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByRole('spinbutton')).toBeTruthy()
+      expect(within(dialog).getByText('最多 999 件')).toBeTruthy()
+    }
+    // —— 没有限购 / 时机 / 检查的商品不显示这些行 ——
+    {
+      fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).queryByText('限制')).toBeNull()
+      expect(within(dialog).queryByText('购买时机')).toBeNull()
+      expect(within(dialog).queryByText('购买前检查')).toBeNull()
+    }
+    // —— 桌面端详情：遮罩只盖内容区（从左边界开始），侧栏不被盖住 ——
+    {
+      fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+      const panel = await screen.findByRole('dialog')
+
+      // 外观仍是抽屉：贴右侧的整高面板，且不再用 Sheet 自带的 `inset-0` 遮罩。
+      expect(panel.className).toContain('right-0')
+      expect(panel.className).toContain('inset-y-0')
+      expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeNull()
+      expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeNull()
+
+      // 自绘遮罩：从内容区左边界（`--content-left`，即侧栏右边）开始，半透明黑 + 模糊。
+      // 这里断言它的定位起点，等于断言「不会盖住左侧边栏」。
+      const scrim = screen.getByTestId('fish-detail-scrim')
+      expect(scrim.className).toContain('left-[var(--content-left,0px)]')
+      expect(scrim.className).toContain('bg-black/50')
+      expect(scrim.className).not.toContain('backdrop-blur')
+      // 整页压暗（含顶栏）；侧栏收起时的「展开侧栏」按钮另行浮在这层上面（AppShell 里 `z-[46]`）。
+      expect(scrim.className).toContain('inset-y-0')
+
+      // 页面没被锁住（模态会锁 body 滚动 / 禁用点击）：所以点侧栏能直接切页面。
+      expect(document.body.style.overflow).not.toBe('hidden')
+    }
   })
 
   it('未安装插件时提示并隐藏货架', async () => {
@@ -559,13 +555,6 @@ describe('FishShopPage', () => {
     expect(within(cell).getByRole('img')).toBeTruthy()
   })
 
-  it('可购买多件时才显示数量框', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('spinbutton')).toBeTruthy()
-    expect(within(dialog).getByText('最多 999 件')).toBeTruthy()
-  })
 
   it('buyMax=1 的商品不显示数量框', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([ARG_GOOD]) }))
@@ -647,14 +636,6 @@ describe('FishShopPage', () => {
     expect(within(dialog).queryByText(/只能夜晚买/)).toBeNull()
   })
 
-  it('没有限购 / 时机 / 检查的商品不显示这些行', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).queryByText('限制')).toBeNull()
-    expect(within(dialog).queryByText('购买时机')).toBeNull()
-    expect(within(dialog).queryByText('购买前检查')).toBeNull()
-  })
 
   it('多个透传参数时提示参数个数', async () => {
     const multi: FishGood = { ...ARG_GOOD, serial: 161, name: '放置建筑', argCount: 2 }
@@ -844,12 +825,33 @@ describe('FishShopPage', () => {
     expect(within(dialog).getByText('请打开游戏，进行查收！')).toBeTruthy()
   })
 
-  it('购买按钮同一行左侧有关闭按钮，可快捷关闭弹框', async () => {
+  it('关闭详情：同一行左侧按钮 / 点遮罩 / Esc 三种方式', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /关闭/ }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // —— 点遮罩关闭详情（等同点抽屉外） ——
+    {
+      fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+      await screen.findByRole('dialog')
+
+      // 点页面别处（含侧栏导航）不关，避免「点导航切页」顺手把详情关掉。
+      fireEvent.pointerDown(document.body)
+      fireEvent.click(document.body)
+      expect(screen.queryByRole('dialog')).toBeTruthy()
+
+      fireEvent.click(screen.getByTestId('fish-detail-scrim'))
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    }
+    // —— 桌面详情按 Esc 关闭 ——
+    {
+      fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
+      await screen.findByRole('dialog')
+
+      fireEvent.keyDown(document, { key: 'Escape' })
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    }
   })
 
   it('业务错误（钱不够）原样展示', async () => {
@@ -885,43 +887,7 @@ describe('FishShopPage', () => {
     )
   })
 
-  it('桌面端详情：遮罩只盖内容区（从左边界开始），侧栏不被盖住', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
-    const panel = await screen.findByRole('dialog')
 
-    // 外观仍是抽屉：贴右侧的整高面板，且不再用 Sheet 自带的 `inset-0` 遮罩。
-    expect(panel.className).toContain('right-0')
-    expect(panel.className).toContain('inset-y-0')
-    expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeNull()
-    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeNull()
-
-    // 自绘遮罩：从内容区左边界（`--content-left`，即侧栏右边）开始，半透明黑 + 模糊。
-    // 这里断言它的定位起点，等于断言「不会盖住左侧边栏」。
-    const scrim = screen.getByTestId('fish-detail-scrim')
-    expect(scrim.className).toContain('left-[var(--content-left,0px)]')
-    expect(scrim.className).toContain('bg-black/50')
-    expect(scrim.className).not.toContain('backdrop-blur')
-    // 整页压暗（含顶栏）；侧栏收起时的「展开侧栏」按钮另行浮在这层上面（AppShell 里 `z-[46]`）。
-    expect(scrim.className).toContain('inset-y-0')
-
-    // 页面没被锁住（模态会锁 body 滚动 / 禁用点击）：所以点侧栏能直接切页面。
-    expect(document.body.style.overflow).not.toBe('hidden')
-  })
-
-  it('点遮罩关闭详情（等同点抽屉外）', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
-    await screen.findByRole('dialog')
-
-    // 点页面别处（含侧栏导航）不关，避免「点导航切页」顺手把详情关掉。
-    fireEvent.pointerDown(document.body)
-    fireEvent.click(document.body)
-    expect(screen.queryByRole('dialog')).toBeTruthy()
-
-    fireEvent.click(screen.getByTestId('fish-detail-scrim'))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  })
 
   it('关掉详情后点另一件商品，开的是那一件（不会叠两层）', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD, POND_GOOD]) }))
@@ -939,14 +905,6 @@ describe('FishShopPage', () => {
     expect(next.querySelector('img[src$="diagram-pond.png"]')).toBeTruthy()
   })
 
-  it('桌面详情按 Esc 关闭', async () => {
-    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
-    fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
-    await screen.findByRole('dialog')
-
-    fireEvent.keyDown(document, { key: 'Escape' })
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  })
 
   it('切到别的页面再回来（组件重新挂载）：详情还开着', async () => {
     const transport = fakeTransport({ fishList: async () => shopOf([GOOD]) })

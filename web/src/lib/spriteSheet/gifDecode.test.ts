@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { encodeGif, type GifFrameInput } from './gif'
 import { decodeGif } from './gifDecode'
