@@ -46,7 +46,10 @@ jobs:
       - name: Build
         run: npm run build
       - name: Bundle budget
-        run: node ../scripts/check-bundle-size.mjs
+        # 脚本里的 web/dist 与 scripts/bundle-budget.json 都是相对仓库根的，所以回到根目录跑，
+        # 而不是用 web job 默认的 working-directory: web。
+        working-directory: ${{ github.workspace }}
+        run: node scripts/check-bundle-size.mjs
 
   plugin:
     name: Messenger plugin (C#)
