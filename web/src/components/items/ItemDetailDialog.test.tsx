@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { DatasetProvider } from '@/lib/datasetContext'
@@ -79,6 +79,13 @@ describe('ItemDetailDialog', () => {
     expect(within(actions).getByRole('link', { name: '前往 Wiki' })).toBeTruthy()
     // 根层没有「返回」
     expect(within(dialog).queryByTestId('dex-detail-back')).toBeNull()
+  })
+
+  it('打开时焦点落在主操作「复制ID」上（不是 × 或 Wiki）', async () => {
+    renderDialog()
+    const dialog = screen.getByTestId('dex-detail-dialog')
+    const copyId = within(dialog).getByRole('button', { name: '复制ID' })
+    await waitFor(() => expect(document.activeElement).toBe(copyId))
   })
 
   it('右上角 × 关掉整个弹框', () => {

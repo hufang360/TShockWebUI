@@ -197,3 +197,31 @@ describe('AppShell 滚动条槽（整页滚动的页面）', () => {
     main.remove()
   })
 })
+
+describe('AppShell 全局搜索入口', () => {
+  it('sidebarSearch 在页头第二行（导航之上），mobileSearch 只在顶栏', () => {
+    render(
+      <I18nProvider lang="zh">
+        <AppShell
+          activeTab="home"
+          onTabChange={vi.fn()}
+          nav={[{ id: 'home', label: '首页', icon: Home }]}
+          sidebarSearch={<input data-testid="global-search" />}
+          mobileSearch={<button data-testid="global-search-open">搜索</button>}
+          headerRight={<span>账号</span>}
+          sidebarCollapsed={false}
+          onToggleSidebar={vi.fn()}
+        >
+          <p>content</p>
+        </AppShell>
+      </I18nProvider>,
+    )
+
+    const search = screen.getByTestId('global-search')
+    const home = screen.getByRole('button', { name: '首页' })
+    expect(search.closest('[data-slot="sidebar-header"]')).toBeTruthy()
+    // 搜索在导航之前的 DOM 位置 = 渲染在「首页」那一行上面。
+    expect(search.compareDocumentPosition(home) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByTestId('global-search-open')).toBeTruthy()
+  })
+})

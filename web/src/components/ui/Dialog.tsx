@@ -22,8 +22,20 @@ export function DialogContent({
   children,
   /** 是否渲染暗色遮罩；`false` = 背景不变暗（更接近 popover 的行为，配 `modal={false}` 用）。 */
   overlay = true,
+  /** 是否渲染右上角自带的关闭键（调用方自己提供更合适的关闭入口时用，如全宽搜索框）。 */
+  hideClose = false,
+  /**
+   * 圆角档位：`modal`（默认，24px）适合内容型弹框；`container`（16px）给命令面板这类偏紧凑的。
+   * 用属性而不是 `className` 覆盖：`rounded-modal` / `rounded-container` 是两个独立工具类，
+   * twMerge 不会把它们当成同一组，同时写上只会由 CSS 顺序决定谁生效。
+   */
+  radius = 'modal',
   ...props
-}: ComponentProps<typeof DialogPrimitive.Content> & { overlay?: boolean }) {
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  overlay?: boolean
+  hideClose?: boolean
+  radius?: 'modal' | 'container'
+}) {
   return (
     <DialogPrimitive.Portal>
       {overlay && <DialogOverlay />}
@@ -32,22 +44,25 @@ export function DialogContent({
         className={cn(
           'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4',
           'max-h-[calc(100dvh-2rem)] overflow-y-auto',
-          'rounded-modal bg-card p-4 text-card-foreground shadow-2xl',
+          radius === 'container' ? 'rounded-container' : 'rounded-modal',
+          'bg-card p-4 text-card-foreground shadow-2xl',
           'focus:outline-none',
           className,
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close
-          className={cn(
-            'absolute top-3 right-3 cursor-pointer rounded-control p-1 text-muted-foreground transition-colors',
-            'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-          )}
-          aria-label="Close"
-        >
-          <X className="size-4" />
-        </DialogPrimitive.Close>
+        {!hideClose && (
+          <DialogPrimitive.Close
+            className={cn(
+              'absolute top-3 right-3 cursor-pointer rounded-control p-1 text-muted-foreground transition-colors',
+              'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+            )}
+            aria-label="Close"
+          >
+            <X className="size-4" />
+          </DialogPrimitive.Close>
+        )}
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   )

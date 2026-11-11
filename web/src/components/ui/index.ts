@@ -32,6 +32,15 @@ export {
   InputGroupAddon,
   InputGroupInput,
 } from './InputGroup'
+export {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from './Command'
 export { Checkbox } from './Checkbox'
 export { Slider } from './Slider'
 export { Toggle } from './Toggle'

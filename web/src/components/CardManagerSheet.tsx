@@ -48,6 +48,7 @@ import {
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { CARD_WIDTHS, type CardWidth } from '@/lib/cardLayout'
+import { copyText } from '@/lib/clipboard'
 import { normalizeCustomCommand } from '@/lib/homeCards'
 import { StorageKeys } from '@/lib/storage'
 import { useI18n } from '@/lib/i18n'
@@ -300,14 +301,10 @@ export function CardManagerSheet({
   const copyCommand = async (id: string, raw: string) => {
     const cmd = normalizeCustomCommand(raw)
     if (!cmd) return
-    try {
-      await navigator.clipboard.writeText(cmd)
-      setCopiedId(id)
-      window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1200)
-    } catch {
-      // 剪贴板不可用（非 https / 权限被拒）：不假装成功。
-      setCopiedId(null)
-    }
+    // 剪贴板不可用（非 https / 权限被拒）：不假装成功。
+    const ok = await copyText(cmd)
+    setCopiedId(ok ? id : null)
+    if (ok) window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1200)
   }
 
   const canAdd = Boolean(add && name.trim() && normalizeCustomCommand(command))

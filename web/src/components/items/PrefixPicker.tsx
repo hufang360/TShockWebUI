@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { useChatSend } from '@/hooks/useChatSend'
 import { useI18n } from '@/lib/i18n'
@@ -99,7 +100,7 @@ export function PrefixPicker({
 
   const copyTag = async () => {
     try {
-      await navigator.clipboard.writeText(tag)
+      await copyText(tag)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1200)
     } catch {

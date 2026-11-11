@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Download, Maximize2, Minimize2, Search, Settings2 } from 'lucide-react'
 import {
   BuffDetail,
@@ -53,6 +53,7 @@ import {
 import { useDataset } from '@/lib/datasetContext'
 import { TopBarActions } from '@/components/TopBar'
 import { useI18n } from '@/lib/i18n'
+import { useSearchIntent } from '@/lib/searchIntent'
 import {
   NPC_COLLECTIONS,
   NPC_COLLECTION_BY_ID,
@@ -153,6 +154,25 @@ export function DataIdPage({
   const { scrollToTop } = scroller
   // 切页回来时把主内容区滚回顶部，再还原上次记住的位置（整个页面共用一个滚动条）。
   usePageScrollReset(rootRef)
+
+  // 全局搜索选完「NPC / Buff / 图格 / 墙」跳过来：切到对应数据源并带上搜索词。
+  useSearchIntent(
+    'dataid',
+    useCallback(
+      (intent) => {
+        const nextKind = intent.kind ?? kind
+        if (intent.kind && intent.kind !== kind) {
+          setKind(intent.kind)
+          setSelected(null)
+        }
+        if (intent.query != null) {
+          setQuery(intent.query)
+          setQueryKind(nextKind)
+        }
+      },
+      [kind],
+    ),
+  )
 
   // 把当前状态存到 ref，卸载（切走）时一次性写回模块内存。
   const stateRef = useRef({ kind, npcFilter, twoCols, tableView, detail: selected })

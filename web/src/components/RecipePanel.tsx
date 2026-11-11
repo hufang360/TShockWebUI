@@ -4,6 +4,7 @@ import { IconAction } from '@/components/IconAction'
 import { DetailSection } from '@/components/DetailSection'
 import { ItemIcon } from '@/components/ItemIcon'
 import { Badge, Button } from '@/components/ui'
+import { copyText } from '@/lib/clipboard'
 import { useI18n } from '@/lib/i18n'
 import { locText } from '@/lib/loc'
 import { cn } from '@/lib/cn'
@@ -249,7 +250,7 @@ export function RecipeRow({
   const showStation = recipe.station >= 0
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(recipeToText(recipe, dataset, t, copyTags))
+      await copyText(recipeToText(recipe, dataset, t, copyTags))
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1200)
     } catch {
@@ -327,7 +328,7 @@ export function ReverseRecipeRow({
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(reverseRecipeToText(recipe, itemId, dataset, t, copyTags))
+      await copyText(reverseRecipeToText(recipe, itemId, dataset, t, copyTags))
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1200)
     } catch {

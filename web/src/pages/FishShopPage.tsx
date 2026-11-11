@@ -91,6 +91,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useModuleState } from '@/hooks/useModuleState'
 import { useDataset } from '@/lib/datasetContext'
 import { useI18n } from '@/lib/i18n'
+import { useSearchIntent } from '@/lib/searchIntent'
 
 import { TshockRequestError } from '@/lib/tshock'
 import type { BackendTransport, FishBuyResult, FishCapabilities, FishGood, FishShop } from '@/lib/tshock'
@@ -168,6 +169,14 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const { t } = useI18n()
   const dataset = useDataset()
   const [ui, setUi] = useModuleState<FishUiState>(serverId, 'store', DEFAULT_STATE)
+
+  // 全局搜索选了「鱼店商品」/点了「前往鱼店查看更多」：把词填进这里的搜索框（不自动打开详情）。
+  useSearchIntent(
+    'store',
+    useCallback((intent) => {
+      if (intent.query != null) setUi({ query: intent.query })
+    }, [setUi]),
+  )
   const [capability, setCapability] = useState<FishCapabilities | null>(null)
   const [checking, setChecking] = useState(false)
   const [probeError, setProbeError] = useState<string | null>(null)

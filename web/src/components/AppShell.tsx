@@ -48,6 +48,10 @@ interface AppShellProps {
   nav: NavItem[]
   /** 侧栏页头的额外控件，如语言 / 主题快捷切换（放在「WebUI」右侧）。 */
   headerExtra?: ReactNode
+  /** 侧栏页头第二行（标题行下方）：全局搜索输入。 */
+  sidebarSearch?: ReactNode
+  /** 内容区顶栏的移动端入口（`md` 以下显示）：移动端侧栏是抽屉，搜索改从这里进。 */
+  mobileSearch?: ReactNode
   /** 顶栏右侧的全局操作（在页面操作之后，如浮动指令入口）。 */
   headerActions?: ReactNode
   /** 侧栏底部的玩家状态 / 设置等 */
@@ -129,6 +133,8 @@ export function AppShell({
   onTabChange,
   nav,
   headerExtra,
+  sidebarSearch,
+  mobileSearch,
   headerActions,
   headerRight,
   sidebarExtra,
@@ -188,6 +194,8 @@ export function AppShell({
                   />
                 </div>
               </div>
+              {/* 全局搜索固定在页头第二行：导航滚不滚都不会把它推走。 */}
+              {sidebarSearch}
             </SidebarHeader>
 
             <SidebarContent>
@@ -232,6 +240,7 @@ export function AppShell({
                 aria-label={t('nav.openMenu')}
                 title={t('nav.openMenu')}
               />
+              {mobileSearch}
               {sidebarCollapsed && (
                 // 展开按钮本身 fixed 在遮罩之上（见下面 SidebarInset 后面那个），这里只占位，
                 // 保证面包屑不左右跳（尺寸与 `icon-sm` 一致）。

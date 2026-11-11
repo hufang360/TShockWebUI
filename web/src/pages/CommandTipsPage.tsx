@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Check, ChevronRight, Copy, ListFilter, Search, Terminal, X } from 'lucide-react'
 import {
   Button,
@@ -27,8 +27,10 @@ import { SearchInput } from '@/components/SearchInput'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { TIPS_GROUPS, type TipsGroup } from '@/lib/commandTips'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { useSearchIntent } from '@/lib/searchIntent'
 import {
   SPAWN_BOSS_TIPS,
   SPAWN_MOB_EXAMPLES,
@@ -483,6 +485,14 @@ export function CommandTipsPage({ dataset, onPick }: CommandTipsPageProps) {
   const isMobileDrawer = useIsMobile()
   /** 详情抽屉：点哪一行就看哪一行的指令帮助。 */
   const [detail, setDetail] = useState<TableRow | null>(null)
+
+  // 全局搜索选了某条指令：落到本页并带上搜索词（不再单独维护「跳转到某一行」）。
+  useSearchIntent(
+    'commands',
+    useCallback((intent) => {
+      if (intent.query != null) setQuery(intent.query)
+    }, []),
+  )
   // 页面不固定高度：内容多就把页面撑高，滚动交给主内容区（浏览器右侧那条滚动条）。
   const rootRef = useRef<HTMLDivElement>(null)
   // 工具条吸在顶栏（`top-12`）下面，表头再吸在工具条下面 → 实测工具条高度写进 CSS 变量。
@@ -885,13 +895,10 @@ function CommandDetailDialog({
 function useCopy(value: string): [boolean, () => void] {
   const [copied, setCopied] = useState(false)
   const copy = () => {
-    void navigator.clipboard
-      .writeText(value)
-      .then(() => {
-        setCopied(true)
-        window.setTimeout(() => setCopied(false), 1200)
-      })
-      .catch(() => setCopied(false))
+    void copyText(value).then((ok) => {
+      setCopied(ok)
+      if (ok) window.setTimeout(() => setCopied(false), 1200)
+    })
   }
   return [copied, copy]
 }

@@ -30,6 +30,7 @@ import {
   TooltipProvider,
 } from '@/components/ui'
 import { useBottomList } from '@/hooks/useBottomList'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { formatClock } from '@/lib/clock'
@@ -86,13 +87,9 @@ function OutputBlock({
     return <p className="text-xs text-foreground/60">{t('result.noOutput')}</p>
   }
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(output.join('\n'))
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1200)
-    } catch {
-      setCopied(false)
-    }
+    const ok = await copyText(output.join('\n'))
+    setCopied(ok)
+    if (ok) window.setTimeout(() => setCopied(false), 1200)
   }
   return (
     <div className={cn('group/rich relative', fill && 'flex min-h-0 flex-1 flex-col')}>

@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui'
 import { useCommandFavoritesState } from '@/hooks/useCommandFavoritesState'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { useDataset } from '@/lib/datasetContext'
 import type { CommandFavoritesApi } from '@/lib/favorites'
@@ -96,13 +97,9 @@ function CommandRow({
   const note = item.note ? t(item.note.key, item.note.vars) : null
   const favorited = favorites.isFavorited(command)
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(command)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1200)
-    } catch {
-      setCopied(false)
-    }
+    const ok = await copyText(command)
+    setCopied(ok)
+    if (ok) window.setTimeout(() => setCopied(false), 1200)
   }
   const row = (
     <div

@@ -41,11 +41,7 @@ export function QuickPreferences({
 
   return (
     <>
-      <IconAction
-        label={t('settings.theme.toggle', { name: themeName })}
-        icon={ThemeIcon}
-        onClick={() => onThemeChange(nextTheme)}
-      />
+      {/* 语言在左、主题在右（用户要求的顺序；两者都是“个人偏好”类开关）。 */}
       <Button
         variant="ghost"
         size="icon-sm"
@@ -56,6 +52,11 @@ export function QuickPreferences({
       >
         {language === 'zh' ? '中' : 'EN'}
       </Button>
+      <IconAction
+        label={t('settings.theme.toggle', { name: themeName })}
+        icon={ThemeIcon}
+        onClick={() => onThemeChange(nextTheme)}
+      />
     </>
   )
 }

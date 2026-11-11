@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, ScissorsLineDashed, ScrollText, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
+import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, ScissorsLineDashed, ScrollText, Search, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
 import { CommandTerminal } from '@/components/CommandTerminal'
 import { TerminalTopBarButton } from '@/components/TerminalTopBarButton'
 import { AppShell, type NavItem } from '@/components/AppShell'
 import { AppRoutes, preloadRoute } from '@/components/AppRoutes'
 import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
+import { GlobalSearchDialog, GlobalSearchTrigger } from '@/components/GlobalSearch'
+import { IconAction } from '@/components/IconAction'
 import { LoginDialog } from '@/components/LoginDialog'
 import { QuickPreferences } from '@/components/QuickPreferences'
 import { SidebarAccountMenu } from '@/components/SidebarAccountMenu'
@@ -25,6 +27,11 @@ import {
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
 import { preloadAtlasImage } from '@/lib/atlas'
+import type { GlobalSearchSources } from '@/lib/globalSearch'
+import { getCachedFishGoods, loadFishGoods } from '@/lib/fishGoodsCache'
+import type { FishGood } from '@/lib/tshock'
+import { clearSearchIntent, requestSearchIntent, type SearchIntent } from '@/lib/searchIntent'
+import { resultFromError, TshockRequestError } from '@/lib/transport'
 import { loadLoginMemory, saveLoginMemory } from '@/lib/credentials'
 import { loadDataset, reconcileDataVersion, withRuntimeCommands } from '@/lib/dataset'
 import { useLanguagePacks } from '@/lib/languagePack/useLanguagePacks'
@@ -73,7 +80,7 @@ import {
   type ServerStatus,
   type Session,
 } from '@/lib/tshock'
-import type { Dataset, Me, Settings, TabId, UiState } from '@/types'
+import type { CommandResult, Dataset, Me, Settings, TabId, UiState } from '@/types'
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
@@ -187,13 +194,19 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   }, [isDark])
 
   const [ui, setUi] = useLocalState(StorageKeys.ui, DEFAULT_UI)
+  // 全局搜索是一个独立弹框：侧栏入口 / 顶栏图标 / Ctrl·Cmd+K 都开它。
+  const [searchOpen, setSearchOpen] = useState(false)
   const preloadItems = useCallback(() => {
     preloadRoute('items')
     preloadAtlasImage(dataset?.atlas)
   }, [dataset?.atlas])
   const [hashTab, setHashTab] = useState<TabId | null>(readTabFromHash)
   const navigate = useCallback(
-    (tab: TabId) => {
+    (tab: TabId, intent?: SearchIntent) => {
+      // 全局搜索带着「预填词」跳页时才留待办；用户自己点导航就作废，
+      // 免得下次进入该页突然带上旧的搜索词。
+      if (intent) requestSearchIntent(tab, intent)
+      else clearSearchIntent()
       setUi((prev) => ({ ...prev, activeTab: tab }))
       setHashTab(tab)
       const nextHash = tabHash(tab)
@@ -565,10 +578,60 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     [dataset, runtimeCommands],
   )
 
+  // 鱼店货架：搜索要用到，但货架本来只在鱼店页拉。打开搜索弹框时才懒加载（有缓存就不请求），
+  // 未登录 / 鱼店模块没开时整组不出现（`goods` 空数组）。
+  const [searchGoods, setSearchGoods] = useState<FishGood[] | undefined>(getCachedFishGoods(activeServerId))
+  useEffect(() => {
+    if (!searchOpen || !session.authenticated) return
+    if (!isModuleEnabled(modules, activeServerId, 'store')) return
+    let cancelled = false
+    void loadFishGoods(transport, activeServerId)
+      .then((goods) => {
+        if (!cancelled) setSearchGoods(goods)
+      })
+      .catch(() => {
+        // 货架拉不到（插件没装 / 无权限）：静默，搜索里就没有这一组。
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [searchOpen, session.authenticated, modules, activeServerId, transport])
+
+  // 全局搜索的数据源：本地数据 + 两份按需的服务器数据（在线玩家 / 鱼店货架）。
+  // 未登录时不拼进去，避免搜到点开却没权限看的东西。
+  const searchSources = useMemo<GlobalSearchSources | null>(() => {
+    const base = effectiveDataset ?? dataset
+    if (!base) return null
+    return {
+      pages: nav.map((item) => ({ id: item.id, label: item.label, icon: item.icon })),
+      dataset: base,
+      goods: session.authenticated ? (searchGoods ?? []) : [],
+    }
+  }, [nav, effectiveDataset, dataset, session.authenticated, searchGoods])
+
   const handleTokenInvalid = useCallback(
     () => requireLogin('app.tokenInvalid'),
     [requireLogin],
   )
+
+  /**
+   * 全局搜索里「直接执行」指令：走 `transport.runCommand`（内部是 rawcmd / 权限由 TShock 判），
+   * 出错归一成 `CommandResult`，不抛给弹框（弹框只负责显示）。
+   */
+  const runSearchCommand = useCallback(
+    async (command: string): Promise<CommandResult> => {
+      try {
+        return await transport.runCommand(command, false)
+      } catch (err) {
+        if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
+          void handleTokenInvalid()
+        }
+        return resultFromError(err)
+      }
+    },
+    [transport, handleTokenInvalid],
+  )
+
 
   const handleLogout = useCallback(async () => {
     const name = session.username ?? me?.username ?? ''
@@ -762,6 +825,20 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               onLanguageChange={(language) => setSettings({ ...settings, language })}
             />
           }
+          sidebarSearch={
+            searchSources ? <GlobalSearchTrigger onOpen={() => setSearchOpen(true)} /> : undefined
+          }
+          mobileSearch={
+            searchSources ? (
+              <IconAction
+                label={t('search.global.open')}
+                icon={Search}
+                className="md:hidden"
+                testId="global-search-open"
+                onClick={() => setSearchOpen(true)}
+              />
+            ) : undefined
+          }
           headerActions={
             // 首页与各模块都放（右侧顶栏：上次刷新 / 刷新 / 管理卡片 / 终端）。
             terminalAllowed && session.authenticated ? (
@@ -850,6 +927,20 @@ export default function App({ transport: transportProp }: AppProps = {}) {
           onNavigate={navigate}
         />
         </TerminalProvider>
+        {/* 搜索弹框：桌面与移动共用同一套界面。 */}
+        {searchSources && (
+          <GlobalSearchDialog
+            key={searchOpen ? 'open' : 'closed'}
+            open={searchOpen}
+            onOpenChange={setSearchOpen}
+            sources={searchSources}
+            onNavigate={navigate}
+            onOpenItem={(itemId) => itemDetailApi.open(itemId)}
+            canFillTerminal={terminalAllowed && session.authenticated}
+            canRunCommands={session.authenticated}
+            onRunCommand={runSearchCommand}
+          />
+        )}
         <ItemDetailDialog
           dataset={view}
           stack={itemDetailStack}

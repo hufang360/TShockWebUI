@@ -8,6 +8,7 @@ import { ItemTooltipContent } from '@/components/ItemTooltipContent'
 import { PrefixPicker } from '@/components/items/PrefixPicker'
 import { RecipePanel } from '@/components/RecipePanel'
 import { Button, DialogHeader, DialogTitle, DrawerHeader, DrawerTitle } from '@/components/ui'
+import { copyText } from '@/lib/clipboard'
 import { useI18n } from '@/lib/i18n'
 import { formatItemTag, wikiUrl } from '@/lib/items'
 import { rankPrefixes } from '@/lib/prefixes'
@@ -112,13 +113,9 @@ export function ItemDetailPanel({
 
   const copy = useCallback(
     async (kind: 'id' | 'name') => {
-      try {
-        await navigator.clipboard.writeText(kind === 'id' ? String(item.id) : item.name)
-        setCopied(kind)
-        window.setTimeout(() => setCopied(null), 1200)
-      } catch {
-        setCopied(null)
-      }
+      const ok = await copyText(kind === 'id' ? String(item.id) : item.name)
+      setCopied(ok ? kind : null)
+      if (ok) window.setTimeout(() => setCopied(null), 1200)
     },
     [item.id, item.name],
   )
@@ -237,7 +234,12 @@ export function ItemDetailPanel({
           <Button variant="outline" onClick={() => void copy('name')} aria-label={t('dex.copyName')}>
             {copied === 'name' ? t('dex.copied') : t('dex.copyName')}
           </Button>
-          <Button variant="primary" onClick={() => void copy('id')} aria-label={t('dex.copyId')}>
+          <Button
+            variant="primary"
+            onClick={() => void copy('id')}
+            aria-label={t('dex.copyId')}
+            data-testid="item-detail-copy-id"
+          >
             {copied === 'id' ? t('dex.copied') : t('dex.copyId')}
           </Button>
         </div>

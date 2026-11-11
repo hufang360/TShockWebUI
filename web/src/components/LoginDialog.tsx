@@ -36,6 +36,7 @@ import {
 } from '@/components/ui'
 import { IconAction } from '@/components/IconAction'
 import { ServerSwitcherDialog } from '@/components/ServerSwitcher'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { loadLoginMemory, saveLoginMemory } from '@/lib/credentials'
 import { useI18n } from '@/lib/i18n'
@@ -154,13 +155,9 @@ export function LoginDialog({
   }, [open, transport, serverId])
 
   const copyPermCommand = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(PERM_COMMAND)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1200)
-    } catch {
-      setCopied(false)
-    }
+    const ok = await copyText(PERM_COMMAND)
+    setCopied(ok)
+    if (ok) window.setTimeout(() => setCopied(false), 1200)
   }, [])
 
   const switchMode = (next: LoginMode) => {

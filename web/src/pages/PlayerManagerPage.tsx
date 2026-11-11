@@ -83,6 +83,7 @@ export function PlayerManagerPage({
   // `touched` 用来区分「从未填过」（默认自己）与「手动清空」（就显示空）。
   const name = uiState.name || (uiState.touched ? '' : username || '')
   const setName = useCallback((value: string) => setUiState({ name: value, touched: true }), [setUiState])
+
   // 最近查询过的玩家名（统一规则：最多 10 条、窄区域显示 5 条；见 lib/searchHistory.ts）；按服务器记忆。
   const recent = useMemo(() => uiState.recent ?? [], [uiState.recent])
   const rememberName = useCallback(

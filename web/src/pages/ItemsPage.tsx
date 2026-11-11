@@ -50,6 +50,7 @@ import {
   type ItemCollection,
 } from '@/lib/collections'
 import { useI18n } from '@/lib/i18n'
+import { useSearchIntent } from '@/lib/searchIntent'
 import { readDexState, rememberDexState, DEFAULT_GAME_TAB, type DexMode, type DexState } from '@/lib/dexState'
 import { ItemFavoritesProvider } from '@/lib/itemFavoritesContext'
 import { ItemDetailProvider, type ItemDetailApi, type DetailEntry, type ItemDetailOptions } from '@/lib/itemDetailContext'
@@ -220,6 +221,40 @@ export function ItemsPage({
     // 网格的滚动位置就是页面（`<main>`）的滚动位置：回到页面顶部，工具条与第一行都在眼前。
     scrollToTop()
   }, [scrollToTop])
+
+  // 全局搜索选完「物品集合 / 关键词」跳过来：应用集合或直接搜词。
+  useSearchIntent(
+    'items',
+    useCallback(
+      (intent) => {
+        if (intent.collectionId) {
+          const collection = COLLECTIONS_BY_ID.get(intent.collectionId)
+          if (collection) {
+            patch({
+              mode: collection.group,
+              favoritesOnly: false,
+              groupTab: '',
+              collectionId: collection.id,
+              query: '',
+            })
+            resetScroll()
+          }
+          return
+        }
+        if (intent.query != null) {
+          patch({
+            mode: 'all',
+            favoritesOnly: false,
+            groupTab: '',
+            collectionId: '',
+            query: intent.query,
+          })
+          resetScroll()
+        }
+      },
+      [patch, resetScroll],
+    ),
+  )
 
   // 全屏查看结果时，Esc 退出，并避免背景页面继续滚动。
   useEffect(() => {

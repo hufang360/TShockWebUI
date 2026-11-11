@@ -53,6 +53,8 @@ export function ItemDetailDialog({
   const entry = stack[depth]
   const item = entry ? dataset.itemsById.get(entry.id) ?? null : null
 
+  // 打开时焦点落到主操作「复制ID」上（这个弹框最常见的用途就是拿 ID 去写指令）。
+  // 用 `querySelector` 而不是透传 ref：按钮在 `ItemDetailPanel` 深处，透传要穿过整条渲染链。
   return (
     <Dialog
       open={stack.length > 0}
@@ -63,6 +65,12 @@ export function ItemDetailDialog({
       <DialogContent
         data-testid="dex-detail-dialog"
         aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          const target = document.querySelector<HTMLElement>('[data-testid="item-detail-copy-id"]')
+          if (!target) return
+          event.preventDefault()
+          target.focus()
+        }}
         // 标题栏 / 底部固定，只有中间滚动；宽度沿用图鉴详情的 ≤576px，窄屏左右各留 1rem。
         className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl flex-col gap-0 overflow-hidden p-0"
       >

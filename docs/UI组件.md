@@ -21,6 +21,7 @@
 | SearchInput | `components/SearchInput.tsx` | InputGroup + Button + Kbd | 搜索与最近搜索；左侧放大镜（`leadingIcon`）、右侧结果数（`resultLabel`）/ 清空 / 历史按钮 / 尾部图标（`trailingIcon`）；页面级搜索框开 `shortcut`：失焦且空时右侧显示 `kbd` `/`，按 `/` 聚焦。圆角与高度走 `InputGroup` 默认（`rounded-control`），页面不要再传 `rounded-full`。 |
 | Textarea | `ui/Textarea.tsx` | — | 多行文本（物资申请的用途 / 拒绝原因） |
 | InputGroup | `ui/InputGroup.tsx` | — | 输入框内的图标 / 按钮（`InputGroupInput` + `InputGroupAddon`），替代绝对定位按钮 |
+| Command | `ui/Command.tsx` | **cmdk** | 分组列表 + 键盘导航 + `role=listbox/option` / `aria-activedescendant`（`Command` / `CommandList` / `CommandGroup` / `CommandItem` / `CommandEmpty` / `CommandSeparator`）。**排序不交给它**：自己排好序就传 `shouldFilter={false}`（否则 cmdk 会按 `value` 再过滤一遍）。`CommandItem` 必须放在 `CommandGroup` 里。`CommandInput` 是**裸 input**（没有 shadcn 那个带放大镜的 `border-b` 包裹层），放进 `InputGroup` 里用，视觉与全站搜索框一致。**根节点不带 `overflow-hidden`**（shadcn 默认有）：它会把 `InputGroup` 的 `focus-within:ring-2` 裁成残缺的描边。当前用在全局搜索弹框（`GlobalSearchDialog`）；侧栏那行只是打开它的按钮（`GlobalSearchTrigger`）。 |
 | Label | `ui/Label.tsx` | radix label | 一般通过 `FieldLabel` 使用 |
 | Field | `ui/Field.tsx` | — | `FieldGroup/Field/FieldLabel/FieldDescription/FieldTitle/FieldSet/FieldLegend`；表单一律用它 |
 | Checkbox | `ui/Checkbox.tsx` | radix checkbox | 布尔勾选（表单/开关项） |
@@ -35,7 +36,7 @@
 | Pagination | `ui/Pagination.tsx` | Button | 复用 Button（`<button>` + `disabled`）；页码窗口见 `lib/pagination.ts` 的 `paginationRange` |
 | Tabs | `ui/Tabs.tsx` | radix tabs | 真正切换视图 / 面板时用；`TabsTrigger` 自带 `cursor-pointer`（可点击）与图标尺寸兜底 |
 | Switch | `ui/Switch.tsx` | radix switch | |
-| Dialog | `ui/Dialog.tsx` | radix dialog | 每个 Dialog 必须有 `DialogTitle`；`DialogFooter` = 底部操作区（`bg-background` + `border-t`）；`DialogContent` 支持 `overlay={false}`（不画暗色遮罩，配 `modal={false}` 用，行为接近 popover） |
+| Dialog | `ui/Dialog.tsx` | radix dialog | 每个 Dialog 必须有 `DialogTitle`；`DialogFooter` = 底部操作区（`bg-background` + `border-t`）；`DialogContent` 支持 `overlay={false}`（不画暗色遮罩，配 `modal={false}` 用，行为接近 popover）与 `hideClose`（不画右上角 ×，调用方自己提供更合适的关闭入口）；`radius="container"` 换成 16px 圆角（默认 `modal` 24px，给命令面板这类紧凑弹框用——写成属性是因为 `rounded-modal` / `rounded-container`是两个独立工具类，同时写只会由 CSS 顺序决定谁生效） |
 | DropdownMenu | `ui/DropdownMenu.tsx` | radix dropdown-menu | 菜单项包在 `DropdownMenuGroup` 里；侧栏底部账号卡片（`SidebarAccountMenu`）用它 |
 | Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用 / 鱼店商品详情 / 数据ID 详情）；`SheetContent` 有 `overlay` 参数（`false` = 不画自带遮罩，配 `modal={false}` + `ContentScrim` 做「只盖内容区」的抽屉）；**不支持堆叠**，需要叠层就用 `Drawer` |
 | Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`；`DrawerContent` 也有 `overlay` 参数（`false` = 不画自带遮罩，物品 / 指令小抄的详情用它 + `ContentScrim`）。**每个 Drawer 必须有 `DrawerTitle`** |
@@ -45,6 +46,7 @@
 | Breadcrumb | `ui/Breadcrumb.tsx` | radix slot + lucide | 内容区顶栏只显示**当前页面**（不再带分组前缀）的 `Breadcrumb/BreadcrumbList/BreadcrumbItem/BreadcrumbPage`；纯展示，带 `aria-current="page"` |
 | Collapsible | `ui/Collapsible.tsx` | radix collapsible | 可折叠区块（玩家管理的银行 / 配装分区）；`CollapsibleTrigger` 包在自定义标题按钮上 |
 | DetailSection | `components/DetailSection.tsx` | Collapsible + `CollapseChevron` + `ItemIcon` | 物品详情里的**可折叠分区**（唯一实现）：`[固定图标] 彩色标题 + 箭头`，标题色取 `lib/sectionTones.ts` 的 `RECIPE_SECTION_TONE`。「合成」/「作为材料」/「微光嬗变」/「词缀」都走它；`twoColumn` 开关两列网格 |
+| GlobalSearch | `components/GlobalSearch.tsx` | Command（cmdk）+ ItemIcon + NpcSprite + BuffIcon + InputGroup + Dialog | 全局搜索：`GlobalSearchDialog`（唯一的搜索界面，桌面 / 移动共用）+ `GlobalSearchTrigger`（侧栏入口按钮，桌面上挂着 `Ctrl·Cmd+K` 监听）；匹配与分组在 `lib/globalSearch.ts`，跨页预填在 `lib/searchIntent.ts`。见 [`功能-全局搜索.md`](功能-全局搜索.md) |
 | Sidebar | `ui/Sidebar.tsx` | Sheet + Tooltip + Button + Separator + `hooks/use-mobile` | 见下 |
 
 `components/ui/index.ts` 统一再导出；业务代码从 `@/components/ui` 引入。
@@ -511,6 +513,8 @@
 - **其它页面**：`App` 提供实现 → 打开 `ItemDetailDialog`（居中弹框），**不再跳页**（跳页会丢筛选与填了一半的指令）；
   弹框内部再提供一次 Provider，点配方材料 / 掉落的 ⓘ 是**叠一层**（左上角「返回」），不重开弹框；
 - 切 `activeTab` 时自动关闭。
+- **打开时焦点落在主操作「复制ID」**（`onOpenAutoFocus` 里 `preventDefault` 后手动聚焦）：这个弹框最常见的用途
+  就是拿 ID 去写指令，落在 × 或「前往 Wiki」上要多按好几下 `Tab`。
 
 内容只有一份：`components/items/ItemDetailPanel.tsx`（`chrome: 'drawer' | 'dialog'` 只切换标题栏 / 底部外壳），
 抽屉与弹框都复用它。
