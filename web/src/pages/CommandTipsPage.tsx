@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Check, ChevronRight, Copy, ExternalLink, ListFilter, Search, Terminal, X } from 'lucide-react'
 import {
+  Badge,
   Button,
   Drawer,
   DrawerContent,
@@ -10,6 +11,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -310,29 +314,26 @@ function RowCopyAction({ value, label }: { value: string; label: string }) {
  * `indent` 用于折叠组里的子行（缩进一级表示层级）。
  * 悬停整行时右侧浮出「复制 / 执行」（帮助类指令只给复制）。
  */
-function CommandCell({
-  text,
-  className,
-  indent,
+function CommandCellBody({
+  row,
   open,
-  executable,
   onRun,
 }: {
-  text: string
-  className: string
-  indent?: boolean
-  /** 详情行是否展开（展开时箭头朝下）。 */
+  row: TableRow
+  /** 浮层是否展开（展开时箭头朝下）。 */
   open?: boolean
-  /** 能不能直接跑：只能游戏内执行 / 带占位符的语法行都不给「执行」。 */
-  executable?: boolean
   onRun?: () => void
 }) {
   const { t } = useI18n()
-  const content = <span className={className}>{text}</span>
+  const text = row.command
+  const ingame = ingameOnly(row)
+  // 帮助类指令（带占位符的语法行）与只能在游戏内执行的都不给「执行」
+  const executable = !row.syntax && !ingame
+  const content = <span className={commandCellClass(ingame)}>{text}</span>
   return (
-    <td className={cn('px-2 py-2 align-top', indent && 'pl-6')}>
+    <PopoverAnchor asChild>
       <div className="flex min-w-0 items-start gap-1">
-        {/* 箭头只表示「可以展开」，展开后朝下 */}
+        {/* 箭头表示「可以点开详情」 */}
         <ChevronRight
           className={cn(
             'mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform',
@@ -367,7 +368,7 @@ function CommandCell({
           )}
         </span>
       </div>
-    </td>
+    </PopoverAnchor>
   )
 }
 
@@ -424,99 +425,147 @@ function DetailBit({ label, children }: { label: string; children: ReactNode }) 
   )
 }
 
+/** 详情里的一块可复制文字：浅底 + 悬停出现的复制键（与合成记录条目同一套外观）。 */
+function InlineCopy({ value, testId }: { value: string; testId?: string }) {
+  const { t } = useI18n()
+  const [copied, copy] = useCopy(value)
+  return (
+    <div className="group/copy flex min-w-0 items-center gap-1 rounded-control bg-muted/40 px-2 py-1">
+      <span className="min-w-0 flex-1 font-mono text-2xs break-all text-foreground">{value}</span>
+      <span className="touch-visible flex shrink-0 items-center opacity-0 transition-opacity group-focus-within/copy:opacity-100 group-hover/copy:opacity-100">
+        <IconAction
+          size="icon-xs"
+          testId={testId}
+          label={copied ? t('action.copied') : t('action.copy')}
+          icon={copied ? Check : Copy}
+          iconClassName="size-3.5"
+          onClick={copy}
+        />
+      </span>
+    </div>
+  )
+}
+
 /**
- * 行内「详情行」：原来是弹框里的那些信息，现在跟在行下面显示（单击行展开 / 收起）。
- * 只放表格里放不下的：使用提示、指令语法、别名、相关指令、移动端的权限、数据 ID → NPC。
+ * 行详情浮层（Popover）：内容就是原来那个「指令详情」弹框。
+ *
+ * 单击数据行弹出、锚在该行的指令单元格上；不进表格流，所以行高不变、条纹不乱。
+ * 指令 / 说明 / 权限 / 复制 / 执行这些表格里已经有的，仍然放在这里一份（浮层是完整信息，方便一次看完）。
  */
-function RowDetail({
+function RowPopoverBody({
   row,
   onNavigate,
   onFilter,
-  onClose,
+  onPick,
 }: {
   row: TableRow
   onNavigate?: (tab: TabId) => void
-  /** 点「相关指令」：把表格过滤到那条，并收起本详情行。 */
+  /** 点「相关指令」：把表格过滤到那条，并关掉浮层。 */
   onFilter: (query: string) => void
-  onClose: () => void
+  onPick: (command: string) => void
 }) {
   const { t } = useI18n()
   const def = row.def
-  // 和这一行自己的指令一样就不重复（分区没写语法时 `usage` 为空）。
-  const syntax = row.usage && row.usage !== row.command ? row.usage : ''
+  const canonical = row.usage && row.usage !== row.command ? row.usage : ''
   const related = RELATED_COMMANDS[commandName(row.command)] ?? []
+  const runnable = !row.syntax && !ingameOnly(row)
   const showNpc = Boolean(onNavigate) && NPC_LOOKUP_COMMANDS.has(commandName(row.command))
 
-  if (!syntax && !row.hint && !def?.aliases.length && !related.length && !showNpc) {
-    // 什么补充信息都没有的行（如纯参考行）就不展开空行
-    return null
-  }
-
   return (
-    <tr data-row-detail={row.command} className="border-t border-border/40 bg-muted/40">
-      <td colSpan={3} className="px-2 py-2.5 pl-9">
-        <dl className="flex flex-wrap items-start gap-x-6 gap-y-2">
-          {syntax && (
-            <DetailBit label={t('commands.row.syntax')}>
-              <span className="font-mono text-2xs">{syntax}</span>
-            </DetailBit>
+    <div className="flex max-h-[min(32rem,70dvh)] flex-col gap-2 overflow-y-auto overscroll-contain">
+      {/* 指令本身：等宽加粗 + 悬停复制 */}
+      <div className="group/copy flex min-w-0 flex-wrap items-center gap-1">
+        <span
+          className={cn(
+            'min-w-0 font-mono text-sm font-semibold break-all',
+            ingameOnly(row) ? 'text-destructive' : 'text-foreground',
           )}
-          {row.hint && <DetailBit label={t('commands.row.hint')}>{row.hint}</DetailBit>}
-          {def && def.aliases.length > 0 && (
-            <DetailBit label={t('commands.row.aliases')}>
-              <span className="font-mono text-2xs">
-                {def.aliases.map((alias) => `/${alias}`).join('  ')}
-              </span>
-            </DetailBit>
-          )}
-          {/* 权限列在 md 以下隐藏，详情行里补一份 */}
-          {def && (
-            <div className="flex min-w-0 flex-col gap-0.5 md:hidden">
-              <dt className="text-2xs text-muted-foreground">
-                {t('commands.col.permission')}
-              </dt>
-              <dd className="text-xs break-words font-mono">
-                {def.permission ?? t('commands.row.noPermission')}
-              </dd>
-            </div>
-          )}
-          {related.length > 0 && (
-            <DetailBit label={t('commands.row.related')}>
-              <span className="flex flex-wrap gap-1">
-                {related.map((name) => (
-                  <Button
-                    key={name}
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-1.5 font-mono text-2xs"
-                    onClick={() => {
-                      onFilter(`/${name}`)
-                      onClose()
-                    }}
-                  >
-                    /{name}
-                  </Button>
-                ))}
-              </span>
-            </DetailBit>
-          )}
-          {showNpc && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7"
-              onClick={() => {
-                rememberDataIdState({ ...readDataIdState(), kind: 'npc', npcFilter: '', scrollTop: 0 })
-                onNavigate?.('dataid')
-              }}
-            >
-              <ExternalLink data-icon="inline-start" />
-              {t('commands.row.npcLink')}
-            </Button>
-          )}
-        </dl>
-      </td>
-    </tr>
+        >
+          {row.command}
+        </span>
+        <span className="touch-visible flex shrink-0 items-center opacity-0 transition-opacity group-focus-within/copy:opacity-100 group-hover/copy:opacity-100">
+          <RowCopyAction value={row.command} label={`${t('commands.col.copy')}${t('commands.col.command')}`} />
+        </span>
+      </div>
+      {row.label && (
+        <p className="text-xs text-foreground">
+          {row.label}
+          {row.note ? <span className="text-2xs"> · {row.note}</span> : null}
+        </p>
+      )}
+      {ingameOnly(row) && <Badge tone="danger">{t('commands.onlyInGame')}</Badge>}
+      {row.hint && (
+        <p className="text-2xs leading-relaxed whitespace-pre-line text-muted-foreground">
+          {row.hint}
+        </p>
+      )}
+
+      {(canonical || def) && <div className="border-t border-border/60" />}
+
+      <dl className="flex flex-col gap-2">
+        {canonical && (
+          <DetailBit label={t('commands.row.syntax')}>
+            <span className="font-mono text-2xs">{canonical}</span>
+          </DetailBit>
+        )}
+        {def && (
+          <DetailBit label={t('commands.col.permission')}>
+            {def.permission ? (
+              <InlineCopy value={def.permission} testId="command-detail-permission-copy" />
+            ) : (
+              t('commands.row.noPermission')
+            )}
+          </DetailBit>
+        )}
+        {def && def.aliases.length > 0 && (
+          <DetailBit label={t('commands.row.aliases')}>
+            <span className="font-mono text-2xs">
+              {def.aliases.map((alias) => `/${alias}`).join('  ')}
+            </span>
+          </DetailBit>
+        )}
+        {related.length > 0 && (
+          <DetailBit label={t('commands.row.related')}>
+            <span className="flex flex-wrap gap-1">
+              {related.map((name) => (
+                <Button
+                  key={name}
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-1.5 font-mono text-2xs"
+                  onClick={() => onFilter(`/${name}`)}
+                >
+                  /{name}
+                </Button>
+              ))}
+            </span>
+          </DetailBit>
+        )}
+      </dl>
+
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        {showNpc && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="sm:mr-auto"
+            onClick={() => {
+              rememberDataIdState({ ...readDataIdState(), kind: 'npc', npcFilter: '', scrollTop: 0 })
+              onNavigate?.('dataid')
+            }}
+          >
+            <ExternalLink data-icon="inline-start" />
+            {t('commands.row.npcLink')}
+          </Button>
+        )}
+        {runnable && (
+          <Button variant="primary" size="sm" className="ml-auto" onClick={() => onPick(row.command)}>
+            <Terminal data-icon="inline-start" />
+            {t('commands.col.run')}
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -532,6 +581,8 @@ function CommandRow({
   indent,
   onToggle,
   onPick,
+  onNavigate,
+  onFilter,
 }: {
   row: TableRow
   rowKey: string
@@ -540,20 +591,43 @@ function CommandRow({
   indent?: boolean
   onToggle: () => void
   onPick: (command: string) => void
+  onNavigate?: (tab: TabId) => void
+  onFilter: (query: string) => void
 }) {
   const { t } = useI18n()
   const note = row.note ?? (!indent && ingameOnly(row) ? t('commands.onlyInGame') : '')
   return (
-    <tr data-command={row.command} data-row-key={rowKey} onClick={onToggle} className={cn(ROW_CLASS, stripe)}>
-      <CommandCell
-        text={row.command}
-        className={commandCellClass(ingameOnly(row))}
-        indent={indent}
-        open={open}
-        // 帮助类指令（带占位符的语法行）与只能在游戏内执行的都不给「执行」
-        executable={!row.syntax && !ingameOnly(row)}
-        onRun={() => onPick(row.command)}
-      />
+    <tr
+      data-command={row.command}
+      data-row-key={rowKey}
+      onClick={onToggle}
+      className={cn(ROW_CLASS, stripe)}
+    >
+      <td className={cn('px-2 py-2 align-top', indent && 'pl-6')}>
+        <Popover
+          open={open}
+          onOpenChange={(next) => {
+            if (!next) onToggle()
+          }}
+        >
+          <CommandCellBody row={row} open={open} onRun={() => onPick(row.command)} />
+          <PopoverContent
+            data-testid="command-detail"
+            side="bottom"
+            align="start"
+            sideOffset={4}
+            className="w-[min(26rem,calc(100vw-1rem))] p-3"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <RowPopoverBody
+              row={row}
+              onNavigate={onNavigate}
+              onFilter={onFilter}
+              onPick={onPick}
+            />
+          </PopoverContent>
+        </Popover>
+      </td>
       <td className="w-full max-w-0 px-2 py-2 text-xs text-foreground">
         <div className="truncate">
           {row.label}
@@ -707,15 +781,9 @@ function CommandTable({
                               indent
                               onToggle={() => setOpenRow(rowOpen ? null : rowKey)}
                               onPick={onPick}
+                              onNavigate={onNavigate}
+                              onFilter={onFilter}
                             />
-                            {rowOpen && (
-                              <RowDetail
-                                row={row}
-                                onNavigate={onNavigate}
-                                onFilter={onFilter}
-                                onClose={() => setOpenRow(null)}
-                              />
-                            )}
                           </Fragment>
                         )
                       })}
@@ -733,15 +801,9 @@ function CommandTable({
                     stripe={stripe}
                     onToggle={() => setOpenRow(rowOpen ? null : key)}
                     onPick={onPick}
+                    onNavigate={onNavigate}
+                    onFilter={onFilter}
                   />
-                  {rowOpen && (
-                    <RowDetail
-                      row={row}
-                      onNavigate={onNavigate}
-                      onFilter={onFilter}
-                      onClose={() => setOpenRow(null)}
-                    />
-                  )}
                 </Fragment>
               )
             })}

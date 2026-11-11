@@ -123,12 +123,16 @@ function row(command: string) {
   return found
 }
 
-/** 单击一行 → 展开的行内「详情行」（再点一次收起）。 */
+/** 单击一行 → 弹出该行的详情浮层（Popover；再点一次收起）。 */
 function openDetail(command: string) {
   fireEvent.click(row(command))
-  const detail = document.querySelector<HTMLElement>(`tr[data-row-detail="${command}"]`)
-  if (!detail) throw new Error(`详情行没展开：${command}`)
-  return within(detail)
+  const panel = screen.getByTestId('command-detail')
+  return within(panel)
+}
+
+/** 当前是否开着详情浮层。 */
+function hasDetail() {
+  return screen.queryByTestId('command-detail') !== null
 }
 
 /** 行内悬停的「执行指令」（只是填进浮窗，不自动跑）。 */
@@ -262,24 +266,24 @@ describe('CommandTipsPage', () => {
     expect(child?.textContent).toContain('哥布林入侵')
   })
 
-  it('单击一行就地展开详情行（再点收起，单开）', () => {
+  it('单击一行弹出详情浮层（单开，再点收起）', () => {
     renderPage()
-    expect(document.querySelector('[data-row-detail]')).toBeNull()
+    expect(hasDetail()).toBe(false)
 
-    // 展开
     fireEvent.click(row('/hardmode'))
-    expect(document.querySelector('tr[data-row-detail="/hardmode"]')).toBeTruthy()
+    expect(hasDetail()).toBe(true)
+    expect(screen.getByTestId('command-detail').textContent).toContain('/hardmode')
     // 单击行不会填浮窗
     expect(screen.queryByTestId('terminal-window')).toBeNull()
 
-    // 点另一条：上一条自动收起（单开）
+    // 点另一条：只开一个（锚到新行）
     fireEvent.click(row('/evil'))
-    expect(document.querySelector('tr[data-row-detail="/hardmode"]')).toBeNull()
-    expect(document.querySelector('tr[data-row-detail="/evil"]')).toBeTruthy()
+    expect(screen.getAllByTestId('command-detail')).toHaveLength(1)
+    expect(screen.getByTestId('command-detail').textContent).toContain('/evil')
 
     // 再点同一行收起
     fireEvent.click(row('/evil'))
-    expect(document.querySelector('[data-row-detail]')).toBeNull()
+    expect(hasDetail()).toBe(false)
   })
 
   it('多子项的指令折成一行（/warp /region /itemban /projban /tileban /group /tp /death）', () => {
@@ -327,13 +331,17 @@ describe('CommandTipsPage', () => {
     expect(bossChild?.textContent).not.toContain('仅游戏内')
   })
 
-  it('详情不再用浮层（没有 dialog / 抽屉）', () => {
+  it('详情是 popover（不是 dialog / 抽屉），也不占表格行', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
-    fireEvent.click(row('/worldevent invasion goblins'))
-    expect(screen.queryByTestId('command-detail')).toBeNull()
+    expandAllGroups()
+    const before = document.querySelectorAll('tbody tr').length
+    // 用 data-command 直接点（该行已在展开的折叠组里）
+    fireEvent.click(findRow('data-command', '/worldevent invasion goblins')!)
     expect(document.querySelector('[data-slot="dialog-content"]')).toBeNull()
     expect(document.querySelector('[data-slot="drawer-content"]')).toBeNull()
-    expect(document.querySelector('tr[data-row-detail="/worldevent invasion goblins"]')).toBeTruthy()
+    expect(document.querySelector('[data-slot="popover-content"]')).toBeTruthy()
+    // 浮层不往表格里插行
+    expect(document.querySelectorAll('tbody tr').length).toBe(before)
   })
 
   it('详情行：指令语法 / 别名 / 相关指令', () => {
@@ -343,9 +351,9 @@ describe('CommandTipsPage', () => {
     expect(
       detail.getByText('/worldevent invasion <goblins|snowmen|pirates|pumpkinmoon|frostmoon|martians>'),
     ).toBeTruthy()
-    // 不再重复表格里已有的「指令 / 说明 / 权限」
-    expect(detail.queryByText('哥布林入侵')).toBeNull()
-    expect(detail.queryByText('/worldevent invasion goblins')).toBeNull()
+    // 浮层是完整信息（指令 + 说明 + 语法 + 权限）
+    expect(detail.getByText('/worldevent invasion goblins')).toBeTruthy()
+    expect(detail.getByText('哥布林入侵')).toBeTruthy()
 
     // 别名
     const aliases = openDetail('/godmode')
@@ -357,7 +365,7 @@ describe('CommandTipsPage', () => {
     expect(related.getByText('相关指令')).toBeTruthy()
     fireEvent.click(related.getByRole('button', { name: '/spawnrate' }))
     expect((screen.getByPlaceholderText('搜索指令或名称') as HTMLInputElement).value).toBe('/spawnrate')
-    expect(document.querySelector('[data-row-detail]')).toBeNull()
+    expect(hasDetail()).toBe(false)
   })
 
   it('只能游戏内执行的指令：行里红字 + 「仅游戏内」，且没有「执行」', () => {
@@ -659,7 +667,7 @@ describe('CommandTipsPage', () => {
     expect((screen.getByPlaceholderText('搜索指令或名称') as HTMLInputElement).value).toBe(
       '/worldevent',
     )
-    expect(document.querySelector('[data-row-detail]')).toBeNull()
+    expect(hasDetail()).toBe(false)
   })
 
   it('搜索也匹配权限名', () => {
@@ -702,7 +710,7 @@ describe('CommandTipsPage', () => {
     const hardmode = findRow('data-command', '/hardmode')!
     fireEvent.click(within(hardmode).getByRole('button', { name: '执行指令' }))
     expect(inputValue()).toBe('/hardmode')
-    expect(document.querySelector('[data-row-detail]')).toBeNull()
+    expect(hasDetail()).toBe(false)
   })
 
   it('数据 ID → NPC 只在参数是 NPC 的指令的详情行里出现', () => {
