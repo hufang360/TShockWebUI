@@ -71,4 +71,10 @@ export const PERM_SETUP_COMMANDS: CommandTip[] = [
     label: { zh: '玩家管理插件：/lb 查背包', en: 'Player manager plugin: /lb look bag' },
     fold: 'hf 常用',
   },
+  {
+    command: '/user group hf GM',
+    label: { zh: '把 hf 放进 GM 组（服主）', en: 'Put hf in the GM group (owner)' },
+    note: { zh: '先把玩家注册成账号 hf', en: 'register the account hf first' },
+    fold: 'hf 常用',
+  },
 ]

@@ -1,13 +1,7 @@
 import { Fragment, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Check, ChevronRight, Copy, ExternalLink, ListFilter, Search, Terminal, X } from 'lucide-react'
 import {
-  Badge,
   Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Drawer,
   DrawerContent,
   DrawerHeader,
@@ -114,9 +108,9 @@ interface TableRow {
   syntax?: boolean
   /** 详情里这一行的「指令语法」：已按分区 / 指令解析好，`''` = 这条指令没有语法。 */
   usage?: string
-  /** 详情抽屉：这一组的额外提示（原来表格里的说明行，如「/tpnpc 只认名称」）。 */
+  /** 行内详情：这一组的额外提示（原来表格里的说明行，如「/tpnpc 只认名称」）。 */
   hint?: string
-  /** 详情抽屉：对应的内置指令定义（权限 / 是否可网页执行 / 说明 / 别名）。 */
+  /** 行内详情：对应的内置指令定义（权限 / 别名 / 是否可在网页执行）。 */
   def?: CommandDef
   /** 表格里归到哪个折叠行（见 `CommandTip.fold`）。 */
   fold?: string
@@ -210,8 +204,13 @@ const FOLD_MAX_DEPTH = 2
  * 行外观：斑马纹（奇行浅底，与物品 / 数据 ID 表格同一套）+ 悬停加深。
  * 折叠行、子行、普通行共用，展开收起后条纹自动重排。
  */
+/** 行的公共样式；斑马纹由渲染时的行序号决定（`stripeClass`），不用 `odd:`——插入详情行会让条纹跳。 */
 const ROW_CLASS =
-  'cursor-pointer border-t border-border/40 align-top transition-colors odd:bg-muted/25 hover:bg-accent/25'
+  'group/row cursor-pointer border-t border-border/40 align-top transition-colors hover:bg-accent/25'
+
+/** 数据行斑马纹（详情行不计数、也不上色）。 */
+const stripeClass = (index: number) => (index % 2 === 1 ? 'bg-muted/25' : '')
+
 
 /** 一个分区的显示项：折叠组（`stem` 非空）或单行（`stem` 为空）。 */
 interface RowGroup {
@@ -282,20 +281,66 @@ function sortKey(entry: RowGroup): string {
  * 左边固定留出折叠箭头的宽度（折叠行自己画箭头），这样**所有行的指令都从同一条竖线开始**。
  * `indent` 用于折叠组里的子行（缩进一级表示层级）。
  */
+/** 行内操作容器：悬停整行 / 键盘聚焦时才出现（触屏常显）。 */
+const ROW_ACTION_CLASS =
+  'touch-visible flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100'
+
+/** 行内复制键：复制这段文字，1.2s 内显示 ✓。 */
+function RowCopyAction({ value, label }: { value: string; label: string }) {
+  const { t } = useI18n()
+  const [copied, copy] = useCopy(value)
+  return (
+    <IconAction
+      size="icon-xs"
+      label={copied ? t('action.copied') : label}
+      icon={copied ? Check : Copy}
+      iconClassName="size-3.5"
+      onClick={(event) => {
+        // 别让单击冒泡到整行（那会打开详情）
+        event.stopPropagation()
+        copy()
+      }}
+    />
+  )
+}
+
+/**
+ * 指令单元格。只有**可能被截断**的才挂 Tooltip：一页几百行，逐个挂 Radix Tooltip 太重。
+ * 左边固定留出折叠箭头的宽度（折叠行自己画箭头），这样**所有行的指令都从同一条竖线开始**。
+ * `indent` 用于折叠组里的子行（缩进一级表示层级）。
+ * 悬停整行时右侧浮出「复制 / 执行」（帮助类指令只给复制）。
+ */
 function CommandCell({
   text,
   className,
   indent,
+  open,
+  executable,
+  onRun,
 }: {
   text: string
   className: string
   indent?: boolean
+  /** 详情行是否展开（展开时箭头朝下）。 */
+  open?: boolean
+  /** 能不能直接跑：只能游戏内执行 / 带占位符的语法行都不给「执行」。 */
+  executable?: boolean
+  onRun?: () => void
 }) {
+  const { t } = useI18n()
   const content = <span className={className}>{text}</span>
   return (
     <td className={cn('px-2 py-2 align-top', indent && 'pl-6')}>
       <div className="flex min-w-0 items-start gap-1">
-        <span className="size-3.5 shrink-0" aria-hidden />
+        {/* 箭头只表示「可以展开」，展开后朝下 */}
+        <ChevronRight
+          className={cn(
+            'mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform',
+            open && 'rotate-90',
+            !open && 'opacity-40',
+          )}
+          aria-hidden
+        />
         {text.length > TRUNCATE_HINT_MIN ? (
           <Tooltip>
             <TooltipTrigger asChild>{content}</TooltipTrigger>
@@ -306,6 +351,21 @@ function CommandCell({
         ) : (
           content
         )}
+        <span className={cn(ROW_ACTION_CLASS, 'ml-auto')}>
+          <RowCopyAction value={text} label={`${t('commands.col.copy')}${t('commands.col.command')}`} />
+          {executable && onRun && (
+            <IconAction
+              size="icon-xs"
+              label={`${t('commands.col.run')}${t('commands.col.command')}`}
+              icon={Terminal}
+              iconClassName="size-3.5"
+              onClick={(event) => {
+                event.stopPropagation()
+                onRun()
+              }}
+            />
+          )}
+        </span>
       </div>
     </td>
   )
@@ -316,10 +376,19 @@ function CommandCell({
  * 折叠行传 `undefined`（整组权限不一致，不的代表任何一条）；整组一致时传该权限（`null` = 无权限）。
  */
 function PermissionCell({ permission }: { permission?: string | null }) {
+  const { t } = useI18n()
   return (
     <td className="hidden w-[10rem] px-2 py-2 align-top md:table-cell">
       {permission === undefined ? null : permission ? (
-        <PermissionText value={permission} />
+        <div className="flex min-w-0 items-center gap-1">
+          <PermissionText value={permission} />
+          <span className={cn(ROW_ACTION_CLASS, 'ml-auto')}>
+            <RowCopyAction
+              value={permission}
+              label={`${t('commands.col.copy')}${t('commands.col.permission')}`}
+            />
+          </span>
+        </div>
       ) : (
         <span className="text-2xs text-muted-foreground">-</span>
       )}
@@ -330,7 +399,9 @@ function PermissionCell({ permission }: { permission?: string | null }) {
 /** 权限文字：短的不挂 Tooltip（几百行，逐个挂 Radix Tooltip 太重）。 */
 function PermissionText({ value }: { value: string }) {
   const content = (
-    <span className="block max-w-[10rem] truncate font-mono text-2xs text-foreground">{value}</span>
+    <span className="block min-w-0 max-w-[10rem] flex-1 truncate font-mono text-2xs text-foreground">
+      {value}
+    </span>
   )
   if (value.length <= TRUNCATE_HINT_MIN) return content
   return (
@@ -340,6 +411,157 @@ function PermissionText({ value }: { value: string }) {
         {value}
       </TooltipContent>
     </Tooltip>
+  )
+}
+
+/** 详情行里的一小块：`标签 + 值`（值可换行）。 */
+function DetailBit({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <dt className="text-2xs text-muted-foreground">{label}</dt>
+      <dd className="text-xs break-words whitespace-pre-line text-foreground">{children}</dd>
+    </div>
+  )
+}
+
+/**
+ * 行内「详情行」：原来是弹框里的那些信息，现在跟在行下面显示（单击行展开 / 收起）。
+ * 只放表格里放不下的：使用提示、指令语法、别名、相关指令、移动端的权限、数据 ID → NPC。
+ */
+function RowDetail({
+  row,
+  onNavigate,
+  onFilter,
+  onClose,
+}: {
+  row: TableRow
+  onNavigate?: (tab: TabId) => void
+  /** 点「相关指令」：把表格过滤到那条，并收起本详情行。 */
+  onFilter: (query: string) => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const def = row.def
+  // 和这一行自己的指令一样就不重复（分区没写语法时 `usage` 为空）。
+  const syntax = row.usage && row.usage !== row.command ? row.usage : ''
+  const related = RELATED_COMMANDS[commandName(row.command)] ?? []
+  const showNpc = Boolean(onNavigate) && NPC_LOOKUP_COMMANDS.has(commandName(row.command))
+
+  if (!syntax && !row.hint && !def?.aliases.length && !related.length && !showNpc) {
+    // 什么补充信息都没有的行（如纯参考行）就不展开空行
+    return null
+  }
+
+  return (
+    <tr data-row-detail={row.command} className="border-t border-border/40 bg-muted/40">
+      <td colSpan={3} className="px-2 py-2.5 pl-9">
+        <dl className="flex flex-wrap items-start gap-x-6 gap-y-2">
+          {syntax && (
+            <DetailBit label={t('commands.row.syntax')}>
+              <span className="font-mono text-2xs">{syntax}</span>
+            </DetailBit>
+          )}
+          {row.hint && <DetailBit label={t('commands.row.hint')}>{row.hint}</DetailBit>}
+          {def && def.aliases.length > 0 && (
+            <DetailBit label={t('commands.row.aliases')}>
+              <span className="font-mono text-2xs">
+                {def.aliases.map((alias) => `/${alias}`).join('  ')}
+              </span>
+            </DetailBit>
+          )}
+          {/* 权限列在 md 以下隐藏，详情行里补一份 */}
+          {def && (
+            <div className="flex min-w-0 flex-col gap-0.5 md:hidden">
+              <dt className="text-2xs text-muted-foreground">
+                {t('commands.col.permission')}
+              </dt>
+              <dd className="text-xs break-words font-mono">
+                {def.permission ?? t('commands.row.noPermission')}
+              </dd>
+            </div>
+          )}
+          {related.length > 0 && (
+            <DetailBit label={t('commands.row.related')}>
+              <span className="flex flex-wrap gap-1">
+                {related.map((name) => (
+                  <Button
+                    key={name}
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-1.5 font-mono text-2xs"
+                    onClick={() => {
+                      onFilter(`/${name}`)
+                      onClose()
+                    }}
+                  >
+                    /{name}
+                  </Button>
+                ))}
+              </span>
+            </DetailBit>
+          )}
+          {showNpc && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7"
+              onClick={() => {
+                rememberDataIdState({ ...readDataIdState(), kind: 'npc', npcFilter: '', scrollTop: 0 })
+                onNavigate?.('dataid')
+              }}
+            >
+              <ExternalLink data-icon="inline-start" />
+              {t('commands.row.npcLink')}
+            </Button>
+          )}
+        </dl>
+      </td>
+    </tr>
+  )
+}
+
+/**
+ * 一行数据：指令 / 说明 / 权限。
+ * 单击整行展开「详情行」；悬停时指令列与权限列浮出复制 / 执行（帮助类指令没有执行）。
+ */
+function CommandRow({
+  row,
+  rowKey,
+  open,
+  stripe,
+  indent,
+  onToggle,
+  onPick,
+}: {
+  row: TableRow
+  rowKey: string
+  open: boolean
+  stripe: string
+  indent?: boolean
+  onToggle: () => void
+  onPick: (command: string) => void
+}) {
+  const { t } = useI18n()
+  const note = row.note ?? (!indent && ingameOnly(row) ? t('commands.onlyInGame') : '')
+  return (
+    <tr data-command={row.command} data-row-key={rowKey} onClick={onToggle} className={cn(ROW_CLASS, stripe)}>
+      <CommandCell
+        text={row.command}
+        className={commandCellClass(ingameOnly(row))}
+        indent={indent}
+        open={open}
+        // 帮助类指令（带占位符的语法行）与只能在游戏内执行的都不给「执行」
+        executable={!row.syntax && !ingameOnly(row)}
+        onRun={() => onPick(row.command)}
+      />
+      <td className="w-full max-w-0 px-2 py-2 text-xs text-foreground">
+        <div className="truncate">
+          {row.label}
+          {note ? <span className="text-2xs"> · {note}</span> : null}
+        </div>
+      </td>
+      <PermissionCell permission={row.def?.permission ?? null} />
+    </tr>
   )
 }
 
@@ -357,16 +579,37 @@ function PermissionText({ value }: { value: string }) {
 function CommandTable({
   groups,
   expandAll,
-  onDetails,
+  onPick,
+  onNavigate,
+  onFilter,
 }: {
   groups: TableSection[]
   /** 搜索时强制展开：否则命中的行藏在折叠组里。 */
   expandAll: boolean
-  onDetails: (row: TableRow) => void
+  /** 行内「执行」：只是把指令填进浮窗，不自动发出。 */
+  onPick: (command: string) => void
+  /** 「数据 ID → NPC」入口（只有参数是 NPC 的指令才有）。 */
+  onNavigate?: (tab: TabId) => void
+  /** 点「相关指令」：把表格过滤到那条。 */
+  onFilter: (query: string) => void
 }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  /** 展开详情行的键（单开：点另一条会收起上一条）。 */
+  const [openRow, setOpenRow] = useState<string | null>(null)
   const onlyInGame = t('commands.onlyInGame')
+
+  /**
+   * 整表条目：先按分区算出折叠项，再把**所有分区**合并成一条列表按指令列 a~z 排序
+   * （折叠行用它的前缀参与排序）。分区只用来给折叠行提供「说明」，不再决定表格顺序。
+   */
+  const tableEntries = useMemo(
+    () =>
+      groups
+        .flatMap((group) => toRowGroups(group.rows, group.folds).map((entry) => ({ group, entry })))
+        .sort((a, b) => sortKey(a.entry).localeCompare(sortKey(b.entry))),
+    [groups],
+  )
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -397,21 +640,6 @@ function CommandTable({
     return rows.every((row) => (row.def?.permission ?? null) === first) ? first : undefined
   }
 
-  /**
-   * 一行三格。备注并入说明列：行自己的备注（`#22` 等）；**仅游戏内**的标记只给「不缩进的单行」——
-   * 折叠组里的子行不再重复（父行已经标了）。
-   */
-  const rowCells = (row: TableRow, text: string, indent: boolean) => {
-    const note = row.note ?? (!indent && ingameOnly(row) ? onlyInGame : '')
-    return (
-      <>
-        <CommandCell text={text} className={commandCellClass(ingameOnly(row))} indent={indent} />
-        {labelCell(row.label, note)}
-        <PermissionCell permission={row.def?.permission ?? null} />
-      </>
-    )
-  }
-
   return (
     <TooltipProvider delayDuration={150}>
       <div className="min-w-0">
@@ -430,70 +658,93 @@ function CommandTable({
             </tr>
           </thead>
           <tbody>
-            {groups.map((group) => (
-              <Fragment key={group.id}>
-                {toRowGroups(group.rows, group.folds).map((entry, i) => {
-                  const key = `${group.id}:${entry.stem ?? entry.rows[0]!.command}:${i}`
-                  if (entry.stem) {
-                    const open = expandAll || expanded.has(key)
-                    // 整组都只能在游戏内执行 → 标记只写在折叠行（子行不重复）
-                    const allIngame = entry.rows.every(ingameOnly)
-                    // 折叠行的「说明」：条目可以自己声明（`/worldevent rain` → 雨），否则用分区标题。
-                    const foldLabel = entry.rows.find((row) => row.foldLabel)?.foldLabel ?? group.title ?? ''
-                    return (
-                      <Fragment key={key}>
-                        <tr
-                          data-fold={entry.stem}
-                          onClick={() => toggle(key)}
-                          className={ROW_CLASS}
-                        >
-                          <td className="px-2 py-2 align-top">
-                            {/* 按钮只是为了键盘可用：单击冒泡到整行，所以这里不再挂 onClick。 */}
-                            <button
-                              type="button"
-                              aria-expanded={open}
-                              className="flex w-full items-start gap-1 text-left"
-                            >
-                              <ChevronRight
-                                className={cn(
-                                  'mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform',
-                                  open && 'rotate-90',
-                                )}
-                              />
-                              <span className={commandCellClass(allIngame)}>{entry.stem}</span>
-                            </button>
-                          </td>
-                          {labelCell(foldLabel, allIngame ? onlyInGame : '')}
-                          <PermissionCell permission={sharedPermission(entry.rows)} />
-                        </tr>
-                        {open &&
-                          entry.rows.map((row, j) => (
-                            <tr
-                              key={`${key}:${j}`}
-                              data-command={row.command}
-                              onClick={() => onDetails(row)}
-                              className={ROW_CLASS}
-                            >
-                              {rowCells(row, row.command, true)}
-                            </tr>
-                          ))}
-                      </Fragment>
-                    )
-                  }
-                  const row = entry.rows[0]!
-                  return (
+            {tableEntries.map(({ group, entry }, i) => {
+              const key = `${group.id}:${entry.stem ?? entry.rows[0]!.command}:${i}`
+              const stripe = stripeClass(i)
+              if (entry.stem) {
+                const open = expandAll || expanded.has(key)
+                // 整组都只能在游戏内执行 → 标记只写在折叠行（子行不重复）
+                const allIngame = entry.rows.every(ingameOnly)
+                // 折叠行的「说明」：条目可以自己声明（`/worldevent rain` → 雨），否则用分区标题。
+                const foldLabel = entry.rows.find((row) => row.foldLabel)?.foldLabel ?? group.title ?? ''
+                return (
+                  <Fragment key={key}>
                     <tr
-                      key={key}
-                      data-command={row.command}
-                      onClick={() => onDetails(row)}
-                      className={ROW_CLASS}
+                      data-fold={entry.stem}
+                      onClick={() => toggle(key)}
+                      className={cn(ROW_CLASS, stripe)}
                     >
-                      {rowCells(row, row.command, false)}
+                      <td className="px-2 py-2 align-top">
+                        {/* 按钮只是为了键盘可用：单击冒泡到整行，所以这里不再挂 onClick。 */}
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          className="flex w-full items-start gap-1 text-left"
+                        >
+                          <ChevronRight
+                            className={cn(
+                              'mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform',
+                              open && 'rotate-90',
+                            )}
+                          />
+                          <span className={commandCellClass(allIngame)}>{entry.stem}</span>
+                        </button>
+                      </td>
+                      {labelCell(foldLabel, allIngame ? onlyInGame : '')}
+                      <PermissionCell permission={sharedPermission(entry.rows)} />
                     </tr>
-                  )
-                })}
-              </Fragment>
-            ))}
+                    {open &&
+                      entry.rows.map((row, j) => {
+                        const rowKey = `${key}:${j}`
+                        const rowOpen = openRow === rowKey
+                        return (
+                          <Fragment key={rowKey}>
+                            <CommandRow
+                              row={row}
+                              rowKey={rowKey}
+                              open={rowOpen}
+                              stripe={stripe}
+                              indent
+                              onToggle={() => setOpenRow(rowOpen ? null : rowKey)}
+                              onPick={onPick}
+                            />
+                            {rowOpen && (
+                              <RowDetail
+                                row={row}
+                                onNavigate={onNavigate}
+                                onFilter={onFilter}
+                                onClose={() => setOpenRow(null)}
+                              />
+                            )}
+                          </Fragment>
+                        )
+                      })}
+                  </Fragment>
+                )
+              }
+              const row = entry.rows[0]!
+              const rowOpen = openRow === key
+              return (
+                <Fragment key={key}>
+                  <CommandRow
+                    row={row}
+                    rowKey={key}
+                    open={rowOpen}
+                    stripe={stripe}
+                    onToggle={() => setOpenRow(rowOpen ? null : key)}
+                    onPick={onPick}
+                  />
+                  {rowOpen && (
+                    <RowDetail
+                      row={row}
+                      onNavigate={onNavigate}
+                      onFilter={onFilter}
+                      onClose={() => setOpenRow(null)}
+                    />
+                  )}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -551,7 +802,7 @@ function GroupList({
  *
  * 布局：**左边搜索框 + 表格，右边分组列表**（手机端分组收进抽屉）。
  * **单击一行打开右侧详情**，在详情里复制或把完整指令填进右下角「指令」浮窗（不自动执行）；
- * 参考行（语法带占位符）在详情里只提供复制。
+ * 参考行（语法带占位符）只提供复制。
  * 权限与执行结果都由 TShock 判定。
  */
 export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPageProps) {
@@ -561,10 +812,8 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
   const [query, setQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
-  // 两个抽屉（分组 / 指令详情）：手机端是自带遮罩的模态，桌面端只盖内容区（`ContentScrim`）。
+  // 分组抽屉：手机端是自带遮罩的模态，桌面端只盖内容区（`ContentScrim`）。
   const isMobileDrawer = useIsMobile()
-  /** 详情抽屉：点哪一行就看哪一行的指令帮助。 */
-  const [detail, setDetail] = useState<TableRow | null>(null)
 
   // 全局搜索选了某条指令：落到本页并带上搜索词（不再单独维护「跳转到某一行」）。
   useSearchIntent(
@@ -622,9 +871,13 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
     const tpExamples = TP_NPC_EXAMPLES.map((key) => byKey.get(key)).filter(
       (npc): npc is Npc => Boolean(npc),
     )
+    // 入侵并进「世界事件」：表格里只折成一行 `/worldevent`（入侵条目仍保留自己的语法行）
+    const invasionUsage = t('commands.group.invasion.usage')
     return {
-      event: toRows(WORLD_EVENT_COMMANDS, lang),
-      invasion: toRows(WORLD_INVASION_COMMANDS, lang),
+      event: [
+        ...toRows(WORLD_EVENT_COMMANDS, lang),
+        ...toRows(WORLD_INVASION_COMMANDS, lang).map((row) => ({ ...row, usage: invasionUsage })),
+      ],
       holiday: toRows(HOLIDAY_COMMANDS, lang),
       worldmode: toRows(WORLD_MODE_COMMANDS, lang),
       time: toRows(TIME_COMMANDS, lang),
@@ -646,9 +899,9 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
       ban: toRows(BAN_COMMANDS, lang),
       permsetup: toRows(PERM_SETUP_COMMANDS, lang),
     }
-  }, [bySb, byKey, lang])
+  }, [bySb, byKey, lang, t])
 
-  /** 分组 → 表内分区（标题 / 说明 / 行；`usage` 只给详情抽屉）。 */
+  /** 分组 → 表内分区（标题 / 说明 / 行；`usage` 给行内详情行）。 */
   const sections = useMemo<TableSection[]>(() => {
     /**
      * 参考行：`/give <item type/id> <player> …` 这种语法来自 `data/commands.json` 的 `paramSets`
@@ -691,6 +944,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
         ...row,
         usage: rowUsage(row, group, sectionUsage, t),
         hint: rowHint(row, group, sectionHint),
+        fold: row.fold ?? group.foldAs,
         def: row.def ?? commandsByName.get(commandName(row.command)),
       }))
       return {
@@ -726,7 +980,9 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
           rows: section.rows.filter(
             (row) =>
               sectionHit ||
-              `${row.command} ${row.label} ${row.note ?? ''} ${row.hint ?? ''}`
+              `${row.command} ${row.label} ${row.note ?? ''} ${row.hint ?? ''} ${
+                row.def?.permission ?? ''
+              }`
                 .toLowerCase()
                 .includes(q),
           ),
@@ -740,28 +996,6 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
     const found = TIPS_GROUPS.find((group) => group.id === activeId)
     return found ? t(found.titleKey) : t('commands.groups.all')
   }, [activeId, t])
-
-  /** 指令名 → 第一条行（相关指令跳转用；`/region` 这类多子命令取第一行）。 */
-  const firstRowByName = useMemo(() => {
-    const map = new Map<string, TableRow>()
-    for (const section of sections) {
-      for (const row of section.rows) {
-        const name = commandName(row.command)
-        if (!map.has(name)) map.set(name, row)
-      }
-    }
-    return map
-  }, [sections])
-
-  const relatedRows = useMemo(() => {
-    if (!detail) return []
-    const names = RELATED_COMMANDS[commandName(detail.command)] ?? []
-    return names.flatMap((name) => {
-      const found = firstRowByName.get(name)
-      // 按钮显示**相关的那条指令名**（`/worldevent` 这类一族指令取第一行，但标签不跟着变）
-      return found ? [{ label: `/${name}`, row: found }] : []
-    })
-  }, [detail, firstRowByName])
 
   /** 选中分组：清空搜索（避免「选了组又搜不到」的死路）。 */
   const selectGroup = (id: string | null) => {
@@ -824,7 +1058,16 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
               </EmptyHeader>
             </Empty>
           ) : (
-            <CommandTable groups={visible} expandAll={q.length > 0} onDetails={setDetail} />
+            <CommandTable
+              groups={visible}
+              expandAll={q.length > 0}
+              onPick={pick}
+              onNavigate={onNavigate}
+              onFilter={(next) => {
+                setQuery(next)
+                setActiveId(null)
+              }}
+            />
           )}
         </div>
 
@@ -872,191 +1115,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
         </DrawerContent>
       </Drawer>
 
-      <CommandDetailDialog
-        row={detail}
-        related={relatedRows}
-        onSelect={setDetail}
-        onClose={() => setDetail(null)}
-        onPick={pick}
-        onOpenNpc={
-          onNavigate
-            ? () => {
-                rememberDataIdState({ ...readDataIdState(), kind: 'npc', npcFilter: '', scrollTop: 0 })
-                onNavigate('dataid')
-              }
-            : undefined
-        }
-      />
     </div>
-  )
-}
-
-/** 详情里的一行：上标签 + 下内容（多行文本保留换行）。 */
-function DetailField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-2xs text-foreground">{label}</dt>
-      <dd className="text-xs break-words whitespace-pre-line text-foreground">{children}</dd>
-    </div>
-  )
-}
-
-/**
- * 「指令帮助」弹框（居中 dialog）。
- *
- * 一张表里同一类指令很多（`/worldevent bloodmoon`、`/worldevent eclipse` …），
- * 所以先给**这一条怎么写**（指令语法 = 行自己的 / 分区的语法行），再给这一条的
- * 权限（`tshock.world.events` 之类，来自 `data/commands.json`）、能否在网页端执行（`allowServer`）、
- * 提示、别名与相关指令。
- *
- * 用 dialog 而不是右侧抽屉：规范写法 / 权限 / 提示文字都很长，抽屉那点宽度只能频繁折行。
- */
-function CommandDetailDialog({
-  row,
-  related,
-  onSelect,
-  onClose,
-  onPick,
-  onOpenNpc,
-}: {
-  row: TableRow | null
-  /** 「相关指令」：标签 + 点一下切到那一条的详情。 */
-  related: readonly { label: string; row: TableRow }[]
-  onSelect: (row: TableRow) => void
-  onClose: () => void
-  onPick: (command: string) => void
-  /** 「在数据 ID → NPC 里查更多」；没传就不显示这个入口。 */
-  onOpenNpc?: () => void
-}) {
-  const { t } = useI18n()
-  const def = row?.def
-  // 和这一行自己的指令一样就不重复（分区没写语法时 `usage` 为空）。
-  const canonical = row?.usage && row.usage !== row.command ? row.usage : ''
-  return (
-    <Dialog
-      open={row !== null}
-      onOpenChange={(open) => {
-        if (!open) onClose()
-      }}
-    >
-      <DialogContent
-        data-testid="command-detail"
-        // 标题 + 指令就是说明，不再额外渲染 `DialogDescription`。
-        aria-describedby={undefined}
-        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-0"
-        // Radix 默认聚焦第一个可 Tab 元素（这里是指令旁的复制键）；改成聚焦弹框本身（标题可读）。
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
-          ;(event.target as HTMLElement | null)?.focus()
-        }}
-      >
-        <DialogHeader className="shrink-0 border-b px-4 py-3 pr-10">
-          <DialogTitle>{t('commands.detail.title')}</DialogTitle>
-        </DialogHeader>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-          {/* 上段：这条指令怎么用（指令 + 说明 + 使用提示） */}
-          <CommandBlock
-            value={row?.command ?? ''}
-            testId="command-detail-copy"
-            ingame={row ? ingameOnly(row) : false}
-          />
-          {row?.label && <p className="mt-2 text-xs text-foreground">{row.label}</p>}
-          {row?.hint && (
-            <div className="mt-2 flex flex-col gap-0.5">
-              <span className="text-2xs text-foreground">{t('commands.detail.hint')}</span>
-              <p className="text-2xs leading-relaxed whitespace-pre-line text-foreground">
-                {row.hint}
-              </p>
-            </div>
-          )}
-
-          {/* 下段：技术细节（指令语法 / 权限 / 别名），字号降一档 */}
-          <dl className="mt-4 flex flex-col gap-3 border-t border-border/60 pt-3">
-            {canonical && (
-              <DetailField label={t('commands.detail.canonical')}>
-                <span className="font-mono text-2xs whitespace-pre-line text-foreground">
-                  {canonical}
-                </span>
-              </DetailField>
-            )}
-            {def &&
-              (def.permission ? (
-                <DetailField label={t('commands.detail.permission')}>
-                  <InlineCopy value={def.permission} testId="command-detail-permission-copy" />
-                </DetailField>
-              ) : (
-                <DetailField label={t('commands.detail.permission')}>
-                  {t('commands.detail.noPermission')}
-                </DetailField>
-              ))}
-            {/* 别名：标签一行、别名一行（没有别名就不占位） */}
-            {def && def.aliases.length > 0 && (
-              <DetailField label={t('commands.detail.aliases')}>
-                <span className="font-mono text-2xs">
-                  {def.aliases.map((alias) => `/${alias}`).join('  ')}
-                </span>
-              </DetailField>
-            )}
-          </dl>
-
-          {/* 参数是 NPC 名称 / ID 的指令：给一个去 NPC 列表的入口 */}
-          {onOpenNpc && row && NPC_LOOKUP_COMMANDS.has(commandName(row.command)) && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => {
-                onOpenNpc()
-                onClose()
-              }}
-            >
-              <ExternalLink data-icon="inline-start" />
-              {t('commands.detail.npcLink')}
-            </Button>
-          )}
-
-          {/* 相关指令：点一下把弹框切到那一条（不关弹框、不改表格筛选） */}
-          {related.length > 0 && (
-            <div className="mt-3 flex flex-col gap-1">
-              <span className="text-2xs text-foreground">
-                {t('commandLine.withCount', { label: t('commandLine.related'), n: related.length })}
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {related.map((item) => (
-                  <Button
-                    key={item.label}
-                    variant="outline"
-                    size="sm"
-                    className="h-7 max-w-full px-2 font-mono text-2xs"
-                    onClick={() => onSelect(item.row)}
-                  >
-                    <span className="truncate">{item.label}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 底部操作区：通栏 + 浅底（与卡片区分） */}
-        {row && !row.syntax && (
-          <DialogFooter className="mx-0 mt-0 mb-0 shrink-0 bg-muted/50 px-4 py-3">
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => {
-                onPick(row.command)
-                onClose()
-              }}
-            >
-              <Terminal data-icon="inline-start" />
-              {t('commands.detail.fill')}
-            </Button>
-          </DialogFooter>
-        )}
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -1070,72 +1129,4 @@ function useCopy(value: string): [boolean, () => void] {
     })
   }
   return [copied, copy]
-}
-
-/** 悬停 / 聚焦才出现的复制键（触屏常显）；跟在文字右边，不占常驻视觉重量。 */
-function CopyOnHover({
-  copied,
-  testId,
-  onCopy,
-}: {
-  copied: boolean
-  testId?: string
-  onCopy: () => void
-}) {
-  const { t } = useI18n()
-  return (
-    <span className="touch-visible flex shrink-0 items-center opacity-0 transition-opacity group-focus-within/copy:opacity-100 group-hover/copy:opacity-100">
-      <IconAction
-        size="icon-xs"
-        testId={testId}
-        label={copied ? t('action.copied') : t('action.copy')}
-        icon={copied ? Check : Copy}
-        iconClassName="size-3.5"
-        onClick={onCopy}
-      />
-    </span>
-  )
-}
-
-/**
- * 详情顶部的**指令本身**：等宽加粗、比正文大一号、无底色。
- * 复制键跟在指令右边，悬停 / 聚焦才出现。
- */
-function CommandBlock({
-  value,
-  testId,
-  ingame,
-}: {
-  value: string
-  testId?: string
-  /** 只能在游戏内执行（`allowServer=false`）：红字 + 徽标。 */
-  ingame: boolean
-}) {
-  const { t } = useI18n()
-  const [copied, copy] = useCopy(value)
-  return (
-    <div className="group/copy flex min-w-0 flex-wrap items-center gap-1">
-      <span
-        className={cn(
-          'min-w-0 font-mono text-sm font-semibold break-all',
-          ingame ? 'text-destructive' : 'text-foreground',
-        )}
-      >
-        {value}
-      </span>
-      <CopyOnHover copied={copied} testId={testId} onCopy={copy} />
-      {ingame && <Badge tone="danger">{t('commands.onlyInGame')}</Badge>}
-    </div>
-  )
-}
-
-/** 详情里的**权限**：一行小字（超出省略），无底色，悬停时旁边出现复制键。 */
-function InlineCopy({ value, testId }: { value: string; testId?: string }) {
-  const [copied, copy] = useCopy(value)
-  return (
-    <div className="group/copy flex min-w-0 items-center gap-1">
-      <span className="min-w-0 font-mono text-2xs truncate text-foreground">{value}</span>
-      <CopyOnHover copied={copied} testId={testId} onCopy={copy} />
-    </div>
-  )
 }

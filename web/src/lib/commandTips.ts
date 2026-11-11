@@ -39,6 +39,11 @@ export interface TipsGroup {
    * 同一条指令的多个子命令（`/region define`、`/region protect` …）**不用写**，会自动按指令名折。
    */
   folds?: readonly (readonly string[])[]
+  /**
+   * 整组折进同一个折叠行（值 = 折叠行显示的指令前缀），优先级低于条目自己的 `fold`。
+   * `/worldevent` 与 `/worldevent invasion` 两个分区都折进 `/worldevent`，表格里只剩一行。
+   */
+  foldAs?: string
 }
 
 /**
@@ -79,8 +84,8 @@ export const RELATED_COMMANDS: Record<string, readonly string[]> = {
 
 /** 侧栏顺序：世界 → NPC → 物品 → 增益 → 生命 → 传送 → 建筑 → 用户 → 权限配置 → 服务器 → 聊天。 */
 export const TIPS_GROUPS: readonly TipsGroup[] = [
-  { id: 'event', titleKey: 'commands.group.event', usageKey: 'commands.group.event.usage' },
-  { id: 'invasion', titleKey: 'commands.group.invasion', usageKey: 'commands.group.invasion.usage' },
+  // 事件与入侵都收在 `/worldevent` 一行里（入侵的条目在 page 里并进本分区，表格只折一行）
+  { id: 'event', titleKey: 'commands.group.event', usageKey: 'commands.group.event.usage', foldAs: '/worldevent' },
   { id: 'holiday', titleKey: 'commands.group.holiday', usageKey: 'commands.group.holiday.usage' },
   { id: 'worldmode', titleKey: 'commands.group.worldmode', usageKey: 'commands.group.worldmode.usage' },
   { id: 'time', titleKey: 'commands.group.time', usageKey: 'commands.group.time.usage' },
@@ -120,7 +125,7 @@ export const TIPS_GROUPS: readonly TipsGroup[] = [
   {
     id: 'build',
     titleKey: 'commands.group.build',
-    commands: ['region', 'antibuild', 'itemban', 'projban', 'tileban', 'setdungeon', 'grow', 'clear'],
+    commands: ['region', 'antibuild', 'setdungeon', 'grow', 'clear'],
   },
 
   {
@@ -135,8 +140,9 @@ export const TIPS_GROUPS: readonly TipsGroup[] = [
     titleKey: 'commands.group.ban',
     usageKey: 'commands.group.ban.usage',
     hintKey: 'commands.group.ban.hint',
-    selfOnly: ['mute', 'kick'],
-    commands: ['mute', 'kick'],
+    // 物品 / 弹幕 / 物块封禁也属于「封禁」，但它们各说各的（不套 `/ban` 的语法与提示）
+    selfOnly: ['mute', 'kick', 'itemban', 'projban', 'tileban'],
+    commands: ['mute', 'kick', 'itemban', 'projban', 'tileban'],
   },
   { id: 'ugroup', titleKey: 'commands.group.ugroup', hintKey: 'commands.group.ugroup.hint', selfOnly: ['tempgroup'], commands: ['group', 'tempgroup'] },
   {

@@ -48,15 +48,9 @@ export const WORLD_EVENT_COMMANDS: CommandTip[] = [
   { command: '/worldevent bloodmoon', label: { zh: '血月', en: 'Blood moon' } },
   { command: '/worldevent eclipse', label: { zh: '日食', en: 'Solar eclipse' } },
   { command: '/worldevent sandstorm', label: { zh: '沙尘暴（再执行停止）', en: 'Sandstorm (toggle)' } },
-  {
-    command: '/worldevent rain',
-    label: { zh: '雨', en: 'Rain' },
-    note: { zh: '再执行停止', en: 'toggle' },
-    fold: '/worldevent rain',
-    foldLabel: { zh: '雨', en: 'Rain' },
-  },
-  { command: '/worldevent rain slime', label: { zh: '史莱姆雨', en: 'Slime rain' }, note: { zh: '再执行停止', en: 'toggle' }, fold: '/worldevent rain' },
-  { command: '/worldevent rain coin', label: { zh: '金币雨', en: 'Coin rain' }, note: { zh: '再执行停止', en: 'toggle' }, fold: '/worldevent rain' },
+  { command: '/worldevent rain', label: { zh: '雨', en: 'Rain' }, note: { zh: '再执行停止', en: 'toggle' } },
+  { command: '/worldevent rain slime', label: { zh: '史莱姆雨', en: 'Slime rain' }, note: { zh: '再执行停止', en: 'toggle' } },
+  { command: '/worldevent rain coin', label: { zh: '金币雨', en: 'Coin rain' }, note: { zh: '再执行停止', en: 'toggle' } },
   { command: '/worldevent lanternsnight', label: { zh: '灯笼夜', en: 'Lantern night' } },
   { command: '/worldevent meteorshower', label: { zh: '流星雨', en: 'Meteor shower' } },
 ]
