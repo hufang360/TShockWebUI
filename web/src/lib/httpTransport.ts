@@ -254,6 +254,11 @@ export class HttpTransport implements BackendTransport {
     return (await res.json()) as MeInfo
   }
 
+  async refreshMe(): Promise<MeInfo> {
+    const res = await request('/me/refresh', { method: 'POST' })
+    return (await res.json()) as MeInfo
+  }
+
   async pluginData(type: PluginDataType): Promise<NameItem[]> {
     const res = await request(`/data?type=${encodeURIComponent(type)}`)
     const data = (await res.json()) as { items?: NameItem[] }

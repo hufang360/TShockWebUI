@@ -12,6 +12,7 @@ import {
   TileIconGrid,
 } from '@/components/dataid/DataIdViews'
 import { IconAction } from '@/components/IconAction'
+import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
 import { ContentScrim } from '@/components/ContentScrim'
 import { FullscreenDock } from '@/components/FullscreenDock'
 import { SearchInput } from '@/components/SearchInput'
@@ -39,6 +40,7 @@ import {
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useLocalState } from '@/hooks/useLocalState'
+import { useSettingsPopoverFocus } from '@/hooks/useSettingsPopoverFocus'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { usePageScrollReset, usePageScroller, useStickyHeaderOffset } from '@/hooks/usePageScroll'
@@ -116,6 +118,7 @@ export function DataIdPage({
   // 图格是否把子 ID 平铺成独立行（默认关闭，只在详情里看）。
   const [expandStyles, setExpandStyles] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsFocus = useSettingsPopoverFocus()
   const [resultsFullscreen, setResultsFullscreen] = useState(false)
   // 图格 / 墙的抽屉详情（NPC / Buff 改用 Popover，不再走这里）。
   // 详情抽屉：切到别的页面再回来时接着开（模块内存里记着，见 `lib/dataIdState.ts`）。
@@ -404,19 +407,31 @@ export function DataIdPage({
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
+  /** 恢复默认：只重置本弹框里的视图开关；数据源 tab / 搜索词 / 分类不动。 */
+  const resetViewSettings = () => {
+    setHideMeta(false)
+    setTwoCols(true)
+    setTableView(false)
+    setExpandStyles(false)
+  }
+
   const settingsControl = (
     <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
       <PopoverTrigger asChild>
         <IconAction label={t('dataId.settings')} icon={Settings2} active={settingsOpen} />
       </PopoverTrigger>
       <PopoverContent
+        ref={settingsFocus.ref}
+        onOpenAutoFocus={settingsFocus.onOpenAutoFocus}
         align="end"
         className="w-80 max-w-[calc(100vw-2rem)] p-0"
         data-testid="dataid-settings-popover"
       >
-        <div className="border-b px-4 py-3 text-sm font-semibold text-foreground">
-          {t('dataId.settings')}
-        </div>
+        <SettingsPopoverHeader
+          title={t('dataId.settings')}
+          onReset={resetViewSettings}
+          resetTestId="dataid-settings-reset"
+        />
 
         <div className="flex flex-col gap-2 p-3">
           <div className="text-2xs font-medium text-muted-foreground">

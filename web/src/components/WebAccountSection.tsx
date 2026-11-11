@@ -10,6 +10,8 @@ interface WebAccountSectionProps {
   authenticated: boolean
   /** 切换服务器后需要重新拉取。 */
   serverId: string
+  /** 刷新用户组成功后回调：设置页重探模块状态，App 重拉指令目录 / 能力矩阵。 */
+  onPermissionsChanged?: (me: MeInfo) => void
 }
 
 /**
@@ -17,13 +19,19 @@ interface WebAccountSectionProps {
  * 展示当前用户的组与 REST 权限，并列出本插件的 web 会话，可自助吊销。
  * 服务器未安装信使插件时整体优雅降级（提示未安装）。
  */
-export function WebAccountSection({ transport, authenticated, serverId }: WebAccountSectionProps) {
+export function WebAccountSection({
+  transport,
+  authenticated,
+  serverId,
+  onPermissionsChanged,
+}: WebAccountSectionProps) {
   const { t } = useI18n()
   const [me, setMe] = useState<MeInfo | null>(null)
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [missing, setMissing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
@@ -69,6 +77,37 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [authenticated, load])
+
+  /**
+   * 游戏内 `/group` 只改账号与在线玩家，token 里的组还是登录那一刻的快照。
+   * 这个按钮让插件按账号当前组改写 token；不改的话权限状态 / 指令目录也依旧是旧的。
+   */
+  const refreshPerms = async () => {
+    setRefreshing(true)
+    setNotice('')
+    try {
+      const next = await transport.refreshMe()
+      setMe(next)
+      setMissing(false)
+      setNotice(
+        next.fixedToken
+          ? t('account.fixedToken')
+          : next.previousGroup && next.previousGroup !== next.group
+            ? t('account.groupChanged', { from: next.previousGroup, to: next.group })
+            : t('account.groupUnchanged', { group: next.group }),
+      )
+      onPermissionsChanged?.(next)
+    } catch (err) {
+      const outdated =
+        err instanceof TshockRequestError &&
+        (err.kind === 'plugin_outdated' || err.kind === 'plugin_missing' || err.kind === 'plugin_protocol')
+      setNotice(t(outdated ? 'account.refreshOutdated' : 'account.refreshFailed'))
+      // 旧插件也能刷新会话列表，别让页面停在旧数据上。
+      if (outdated) await load()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const revoke = async (id?: string, all?: boolean) => {
     setBusy(true)
@@ -123,17 +162,24 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
         </Button>
       }
     >
-        {me && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge tone="neutral">{t('account.group')}: {me.group}</Badge>
-            <Badge tone={me.canUseApi ? 'success' : 'danger'}>
-              {t('account.canUseApi')}
-            </Badge>
-            <Badge tone={me.canRunCommands ? 'success' : 'warn'}>
-              {t('account.canRunCommands')}
-            </Badge>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {me && (
+            <>
+              <Badge tone="neutral">{t('account.group')}: {me.group}</Badge>
+              <Badge tone={me.canUseApi ? 'success' : 'danger'}>
+                {t('account.canUseApi')}
+              </Badge>
+              <Badge tone={me.canRunCommands ? 'success' : 'warn'}>
+                {t('account.canRunCommands')}
+              </Badge>
+            </>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => void refreshPerms()} disabled={refreshing || checking}>
+            {refreshing ? <Spinner aria-hidden data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
+            {t('account.refreshPerms')}
+          </Button>
+        </div>
+        {notice && <p className="text-2xs text-muted-foreground">{notice}</p>}
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{t('account.sessions')}</span>
@@ -169,7 +215,6 @@ export function WebAccountSection({ transport, authenticated, serverId }: WebAcc
             </ul>
           )}
         </div>
-        {notice && <p className="text-2xs text-muted-foreground">{notice}</p>}
     </CollapsibleCard>
   )
 }

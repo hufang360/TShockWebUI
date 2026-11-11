@@ -30,6 +30,11 @@ P1（数据补全）/ P2（data 缓存）/ P8（世界存档编辑）/ P10（语
 | 物资申请「在线发放」未用真实客户端验收 | 离线批准 / 补发 / 审核 / 限额 / item ban 判定已在 TShock 6.2.1 实测；在线 `GiveItemCheck` 路径需进服验收 | **步骤见 [`验收清单.md`](验收清单.md) §C**，待验证 |
 | `.plr` 编辑结果未用真实客户端验收 | 写回不变量（长度不变 / 只改目标字节 / 重新解析逐项一致）已用 106 份真实存档验证，但「进游戏后确实生效」只能由客户端确认 | **步骤见 [`验收清单.md`](验收清单.md) §A**，待验证 |
 | `.wld` 编辑结果未用真实客户端验收 | 75 个真实世界通过了改名 / 种子 / 难度 / 出生点 / 时间 / 月相 / 困难 / Boss 的写回与重新解析；「游戏里能正常打开」仍需客户端确认 | **步骤见 [`验收清单.md`](验收清单.md) §B**，待验证 |
+| `@types/node` 24 → 26 的依赖升级 PR 未处置 | 唯一失败的是 `Bundle budget` 的 exit 2（读不到 `web/dist`），属 `89f7e52`（bundle-check 回到仓库根执行）之前的旧 CI 运行；同一轮 typecheck / lint / test 均通过 | 重跑或 rebase 后预期转绿 |
+| `jsdom` 30.1.2 → 31.0.0 的依赖升级 PR 未处置 | `web/src/components/ItemIcon.test.tsx:102` 的 `toContain('0 0 3px')` 失败：jsdom 31 把 `text-shadow` 序列化成 `rgb(0, 0, 0) 0px 0px 3px` | 断言改为 `0px 0px 3px` |
+| `react-resizable-panels` 2.1.9 → 4.19.1 的依赖升级 PR 未处置 | v4 不再导出 `PanelGroup` / `PanelResizeHandle` / `ImperativePanelGroupHandle`（typecheck 报 `TS2339` / `TS2305`）；影响面只有 `web/src/components/ui/Resizable.tsx` 与 `web/src/pages/CommandPage.tsx` | 先勘定 v4 真实导出名再迁移；或不迁移而给该依赖的 major 加 `ignore` |
+| 插件握手版本恒为 `0.1.0.0` | `Meta.Version` 取 `AssemblyName.Version`（csproj `<Version>0.1.0-rc.N` 的 rc 号被 MSBuild 丢掉），与注释「来自 csproj 的 `<Version>`」不符；「插件版本过旧」的诊断文案因此分不出新旧 | 改读 `AssemblyInformationalVersionAttribute`（去掉 `+sha` 后缀），回退 `AssemblyName.Version` |
+| 首屏体积预算余量只剩 2.5% | `make bundle-check` 实测 js 322,387 B gzip / 预算 330,752 B（余量 8.4 KB）；其中 `useLocalState-*` 是一个 ~46 KB gzip 的共享 chunk，被 `$initial` 捕获进了首屏 | 继续瘦身（拆该 chunk / 按页面懒加载第三方组件）需单独评估；不要靠抬预算绕过 |
 
 ---
 

@@ -2,7 +2,7 @@
 
 TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达给在线玩家与服务器，再把游戏内的真实结果带回网页。
 
-> 版本 **0.1.0-rc.8**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
+> 版本 **0.1.0-rc.9**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
 > 配置 `<TShock SavePath>/WebUI/config.json`。
 
 核心能力：
@@ -13,7 +13,7 @@ TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达�
 2. **批量执行指令**：首页「统一执行」把一批指令一次性交给 `/webui/batch` 端点，
    由插件按调用者 token 的权限逐条执行并统一返回结果。
 3. **只读信息与会话管理**：运行时指令目录（含插件指令，用于补全）、区域 / 传送点 / NPC / buff 补全数据、
-   服务器状态与事件流（`/webui/{commands,me,data,serverinfo,events}`），以及网页会话的自助查看 / 吊销。
+   服务器状态与事件流（`/webui/{commands,me,me/refresh,data,serverinfo,events}`），以及网页会话的自助查看 / 吊销。
 4. **物资申请**：玩家提交物品申请（物品 / 数量 / 用途）→ 服主在游戏内 `/web req ...` 或网页「待审核」
    审核 → 在线立即发放 / 离线下次登录发放；权限 `webui.request.use` / `webui.request.review`，
    发放用 TShock 的 `GiveItemCheck`（尊重 item ban）。
@@ -53,7 +53,7 @@ scripts/build-plugin.sh      # 打印 DLL 路径
    ```
    [Server API] Info Plugin WebUI v0.1.0.0 (by TShockWebUI) initiated.
    正在侦听端口7777
-   [WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}、/webui/requests*
+   [WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,me/refresh,data,serverinfo,events,chat}、/webui/requests*
    ```
 
 > 启动报告在 `GamePostInitialize`（世界加载 + 监听端口之后）才打，跟 TShock 自己的 UUID / 登录提醒同一段；
@@ -151,6 +151,7 @@ docker restart tshock
 | `/webui/batch` | `cmds`（JSON 数组）、`token`、可选 `mode=server\|player` | `{status:"200", results:[{cmd, output:[...]}]}`（需 token + `tshock.rest.command`） |
 | `/webui/commands` | `token` | `{commands:[{name,aliases,permissions,allowServer,help,doLog}]}`（TShock 运行时指令，含插件指令；**按调用者用户组过滤**，带权限的不下发） |
 | `/webui/me` | `token` | `{username,group,permissions,canUseApi,canRunCommands}` |
+| `/webui/me/refresh` | `token` | 游戏内 `/user group` 换组后把 token 的用户组快照对齐到账号当前组（能力 `me_refresh`）；返回同上 + `previousGroup` |
 | `/webui/data` | `type=regions\|warps\|npcs\|buffs`、`token` | `{regions/warps:[...]}` 或 `{npcs/buffs:[{id,name}]}` |
 | `/webui/serverinfo` | `token` | 世界事件 / Boss 进度等 |
 | `/webui/events` | `since`、`limit`、`tail`、`token` | `{events:[{seq,type,text,time,source?}],lastSeq,firstSeq?}`；`type ∈ join\|leave\|boss\|announce\|npc\|chat`；`announce` = 世界公告（Boss 苏醒 / 事件开始 / 入侵），`npc` = 旅商到达（其它城镇 NPC 与 NPC 死亡不记）；聊天的 `source ∈ game\|webui`；`tail=N` 取最新 N 条（磁盘历史，需能力 `events_history`） |

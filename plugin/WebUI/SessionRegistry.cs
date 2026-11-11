@@ -58,6 +58,17 @@ namespace WebUI
             return id;
         }
 
+        /// <summary>账号在游戏内换了组（/group）后，同步登记表里显示的组。</summary>
+        public void UpdateGroup(string token, string group)
+        {
+            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(group)) return;
+            lock (_lock)
+            {
+                if (!_byToken.TryGetValue(token, out var id)) return;
+                if (_byId.TryGetValue(id, out var record)) record.Group = group;
+            }
+        }
+
         /// <summary>列出某账号名下的会话（不含 token 明文）。</summary>
         public List<Dictionary<string, object>> ListFor(string username, string currentToken)
         {

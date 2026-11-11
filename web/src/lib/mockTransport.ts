@@ -144,6 +144,12 @@ export class MockTransport implements BackendTransport {
     }
   }
 
+  /** Mock 里没有真实用户组，刷新就当作「没有变化」。 */
+  async refreshMe(): Promise<MeInfo> {
+    const me = await this.me()
+    return { ...me, previousGroup: me.group }
+  }
+
   async pluginData(type: PluginDataType): Promise<NameItem[]> {
     await delay(80)
     switch (type) {

@@ -62,18 +62,57 @@ namespace WebUI
 
         // ---------- /webui/me ----------
 
-        public static object Me(SecureRest.TokenData token)
+        public static object Me(SecureRest.TokenData token) => Profile(token, token.UserGroupName, null);
+
+        // ---------- /webui/me/refresh ----------
+
+        /// <summary>
+        /// 重新读取调用者账号在 TShock 里的**当前**用户组，并把 token 里的快照对齐。
+        /// 游戏内 /group 只改账号与在线玩家；web token 的 UserGroupName 是登录那一刻的快照，
+        /// 不对齐的话这个 token 的所有权限判定（含 TShock 自己的 rawcmd）都还按旧组来，
+        /// 玩家只能重新登录。只读调用者自己的组，不提权。
+        /// </summary>
+        public static object RefreshMe(RestRequestArgs args)
         {
-            var group = TShock.Groups.GetGroupByName(token.UserGroupName);
+            var token = args.TokenData;
+            var previous = token.UserGroupName;
+            var accountGroup = CurrentGroupName(token);
+            // 预置令牌（ApplicationRestTokens）不在 Tokens 里，组由服务器配置决定，改不了。
+            var applied = Plugin.RenewTokenGroup(args.Parameters["token"], accountGroup ?? previous);
+            if (!applied)
+            {
+                // 如实返回这个 token 实际生效的组，不假装刷新成功。
+                var fixedProfile = Profile(token, previous, previous);
+                fixedProfile.Add("fixedToken", true);
+                return fixedProfile;
+            }
+            return Profile(token, accountGroup ?? previous, previous);
+        }
+
+        /// <summary>账号的当前组：先查账号库（离线账号也查得到），再退回在线玩家。</summary>
+        private static string CurrentGroupName(SecureRest.TokenData token)
+        {
+            if (string.IsNullOrWhiteSpace(token.Username)) return null;
+            var account = TShock.UserAccounts.GetUserAccountByName(token.Username);
+            if (account != null && !string.IsNullOrWhiteSpace(account.Group)) return account.Group;
+            var group = Plugin.FindPlayer(token.Username)?.Account?.Group;
+            return string.IsNullOrWhiteSpace(group) ? null : group;
+        }
+
+        private static RestObject Profile(SecureRest.TokenData token, string groupName, string previousGroup)
+        {
+            var group = string.IsNullOrEmpty(groupName) ? null : TShock.Groups.GetGroupByName(groupName);
             var perms = group != null ? group.TotalPermissions : new List<string>();
-            return new RestObject("200")
+            var profile = new RestObject("200")
             {
                 { "username", token.Username },
-                { "group", token.UserGroupName },
+                { "group", groupName },
                 { "permissions", perms },
                 { "canUseApi", group != null && group.HasPermission(RestPermissions.restapi) },
                 { "canRunCommands", group != null && group.HasPermission(RestPermissions.restrawcommand) },
             };
+            if (previousGroup != null) profile.Add("previousGroup", previousGroup);
+            return profile;
         }
 
         // ---------- /webui/data?type= ----------

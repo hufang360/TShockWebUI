@@ -4,6 +4,7 @@ package api
 //
 //   GET  /api/commands          运行时指令目录（含插件指令，供前端补全）
 //   GET  /api/me                当前用户档案（组 / 权限 / 是否可登录）
+//   POST /api/me/refresh        游戏内 /group 后刷新 token 的用户组快照（要求新插件）
 //   GET  /api/data?type=        补全数据源（regions | warps | npcs | buffs）
 //   GET  /api/serverinfo        世界事件 / Boss 进度等增强状态
 //   GET  /api/events?since=     服务器动态事件流
@@ -70,6 +71,24 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	me, err := client.Me(ctx, sess.TShockToken)
 	if err != nil {
 		s.writePluginError(ctx, w, &sess, client, tshock.CapMe, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, me)
+}
+
+// handleMeRefresh 用账号在 TShock 的当前组改写 token 快照（游戏内 /group 后手动触发）。
+// 插件会同时把登录时铸的 REST token 对齐，所以后续指令目录 / 权限判定也变。
+func (s *Server) handleMeRefresh(w http.ResponseWriter, r *http.Request) {
+	sess, client, ok := s.requireSessionAndClient(w, r)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.TShockTimeout)
+	defer cancel()
+
+	me, err := client.RefreshMe(ctx, sess.TShockToken)
+	if err != nil {
+		s.writePluginError(ctx, w, &sess, client, tshock.CapMeRefresh, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, me)

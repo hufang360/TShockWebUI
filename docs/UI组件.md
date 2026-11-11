@@ -530,6 +530,15 @@
 - 窗口几何存 `tswui:terminal`（见 `lib/terminalWindow.ts`），恢复时先 clamp 进视口。
 - 需要模态交互时**不要**改它的样式来凑，直接用 `Sheet` / `Dialog`。
 
+## 页面设置弹框（物品 ID / 数据 ID / 鱼店共用）
+
+三处「页面设置」结构一致：标题用 `SettingsPopoverHeader`（左标题、右「恢复默认」图标按钮，`RotateCcw` + `icon-xs`）。
+
+- 「恢复默认」只重置弹框里的**视图开关**，不碰搜索词、页签、分组、收藏 / 买过；点一下立即生效，不做二次确认——
+  这些都是看得到、随手能改回来的偏好，弹框里再弹一级确认反而碍事。
+- **打开弹框时不聚焦它**：`hooks/useSettingsPopoverFocus.ts` 拦掉 Radix 默认的「聚焦第一个可聚焦元素」
+  （标题栏按钮排在第一位，一打开就高亮，看着像「先点这里」），改为聚焦第一个设置项（Checkbox / Select）。
+
 ## Tooltip 的两套并存
 
 - **物品提示 `ItemTooltip`**（自研，`components/ItemTooltip.tsx` + `ItemTooltipContent.tsx`）：
@@ -553,6 +562,7 @@
 | `QuickPreferences` | `components/QuickPreferences.tsx` | 侧栏页头「WebUI」右侧的语言 / 主题多状态图标按钮。见「主题 / 语言快捷切换」 |
 | `TopBar` | `components/TopBar.tsx` | `TopBarProvider` + `TopBarInfoSlot`（标题右侧说明）+ `TopBarSlot`（右侧操作 / 手机 `…` 下拉）+ `TopBarActions`（`info` 与 children 分槽投递）。无 Provider 时原地渲染（页面单测用） |
 | `IconAction` | `components/IconAction.tsx` | 顶栏 / 工具条图标按钮：`ghost` + `icon-sm` + `Tooltip`，支持 `loading`（Spinner）与 `pressed`；**常态灰 `text-muted-foreground`、悬停才 `text-foreground`**（顶栏右侧 / 卡片页头一致，不再有纯黑混搭）；手机 `…` 菜单里通过 `data-action-label` 同一份 DOM 显示文字标签 |
+| `SettingsPopoverHeader` | `components/SettingsPopoverHeader.tsx` | 页面设置 Popover 的标题栏：左标题、右「恢复默认」`IconAction`（`RotateCcw` + `icon-xs`）。三处页面设置共用，见「页面设置弹框」 |
 | `InfoPopover` | `components/InfoPopover.tsx` | 「页面说明」info 图标 + Popover，收纳原先铺在正文里的小字说明 |
 | `FullscreenDock` | `components/FullscreenDock.tsx` | 全屏结果页**右上角**操作坞：先露出，随后收成贴右边的竖条（左侧上下圆角、宽 12px）；悬停 / 聚焦 / 点击展开，展开后 4 秒无操作再收起 |
 | `CommandLine` | `components/CommandLine.tsx` | 「相关指令」分组（数据 ID → NPC / Buff、物品详情的给予指令共用）：标题 = 149 号物品图标 + 文字（绿色 `text-success`，**带条目数量** `相关指令（6）`）+ 折角箭头（可折叠），下面每条指令一行 —— 行外观同合成记录；**点条目本身什么也不做**，右侧 终端（`填充指令`：填进浮动终端并弹出，同时回调 `onOpenTerminal` 让调用方关抽屉）/ ⭐（收藏指令）/ 复制（只复制）三个按钮悬停或聚焦才出现（触屏常显）。条目可带 `note`（如 `/sb all` → 「召唤所有Boss」），悬停整行时用 Tooltip 出说明 |

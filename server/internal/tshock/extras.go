@@ -21,6 +21,7 @@ import (
 const (
 	commandsPath    = "/webui/commands"
 	mePath          = "/webui/me"
+	meRefreshPath   = "/webui/me/refresh"
 	dataPath        = "/webui/data"
 	serverInfoPath_ = "/webui/serverinfo"
 	eventsPath      = "/webui/events"
@@ -45,6 +46,11 @@ type MeInfo struct {
 	Permissions    []string `json:"permissions"`
 	CanUseAPI      bool     `json:"canUseApi"`
 	CanRunCommands bool     `json:"canRunCommands"`
+	// PreviousGroup 只由 /webui/me/refresh 返回（刷新前的用户组），前端用它提示「组变了」。
+	PreviousGroup string `json:"previousGroup,omitempty"`
+	// FixedToken 表示这个会话用的是服务器预置令牌（ApplicationRestTokens），
+	// 用户组由服务器配置决定，网页改不了。
+	FixedToken bool `json:"fixedToken,omitempty"`
 }
 
 // NameItem 是补全数据源里的一条 {id, name}；regions/warps 的 id 为 0。
@@ -117,7 +123,19 @@ func (c *Client) CommandCatalog(ctx context.Context, token string) ([]RuntimeCom
 
 // Me 调用 /webui/me。
 func (c *Client) Me(ctx context.Context, token string) (*MeInfo, error) {
-	body, err := c.secureJSON(ctx, token, mePath, nil)
+	return c.meAt(ctx, token, mePath)
+}
+
+// RefreshMe 调用 /webui/me/refresh：让插件按账号在 TShock 的**当前**组改写 token 快照。
+//
+// 游戏内 /group 只改账号与在线玩家；web token 的 UserGroupName 是登录那一刻的快照，
+// 不刷新的话这个 token 的指令目录 / 权限判定 / rawcmd 都还按旧组来。
+func (c *Client) RefreshMe(ctx context.Context, token string) (*MeInfo, error) {
+	return c.meAt(ctx, token, meRefreshPath)
+}
+
+func (c *Client) meAt(ctx context.Context, token, path string) (*MeInfo, error) {
+	body, err := c.secureJSON(ctx, token, path, nil)
 	if err != nil {
 		return nil, err
 	}

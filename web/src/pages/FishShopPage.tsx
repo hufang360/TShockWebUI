@@ -15,6 +15,7 @@ import {
   Star,
 } from 'lucide-react'
 import { IconAction } from '@/components/IconAction'
+import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
 import { PageHelp } from '@/components/PageHelp'
 import { PluginHelp } from '@/components/PluginHelp'
 import { TopBarActions } from '@/components/TopBar'
@@ -41,6 +42,7 @@ import { GoodsTable } from '@/components/fishshop/GoodsTable'
 import { ShopAwning } from '@/components/fishshop/ShopAwning'
 import { useChatSend } from '@/hooks/useChatSend'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
+import { useSettingsPopoverFocus } from '@/hooks/useSettingsPopoverFocus'
 import { cn } from '@/lib/cn'
 import { splitFishArgs } from '@/lib/fishArgs'
 import { diagramUrl } from '@/lib/fishDiagram'
@@ -612,6 +614,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   // 遮阳伞是「摊位」的一部分（不是格子的装饰），网格 / 空态 / 加载中都顶着同一块篷；表格视图里不画。
   const awning = ui.awning !== false && !tableView
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsFocus = useSettingsPopoverFocus()
   // 「货架全屏」：顶栏以外的区域全部让给货架（与「物品 ID」同一套做法，Esc 退出）。
   const [shelfFullscreen, setShelfFullscreen] = useState(false)
 
@@ -629,16 +632,35 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     }
   }, [shelfFullscreen])
 
+  /** 恢复默认：清掉本弹框里的视图开关与图标大小（不动搜索词 / 页签 / 买过 / 收藏）。 */
+  const resetViewSettings = () => {
+    setUi({
+      iconSize: undefined,
+      hideMeta: undefined,
+      tableView: undefined,
+      shelf: undefined,
+      awning: undefined,
+    })
+  }
+
   /** 页面设置（与物品 ID 同规）：图标大小 / 隐藏编号和名称 / 表格视图。 */
   const fishSettingsControl = (
     <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
       <PopoverTrigger asChild>
         <IconAction label={t('fish.settings')} icon={Settings2} active={settingsOpen} />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 max-w-[calc(100vw-2rem)] p-0" data-testid="fish-settings-popover">
-        <div className="border-b px-4 py-3 text-sm font-semibold text-foreground">
-          {t('fish.settings')}
-        </div>
+      <PopoverContent
+        ref={settingsFocus.ref}
+        onOpenAutoFocus={settingsFocus.onOpenAutoFocus}
+        align="end"
+        className="w-80 max-w-[calc(100vw-2rem)] p-0"
+        data-testid="fish-settings-popover"
+      >
+        <SettingsPopoverHeader
+          title={t('fish.settings')}
+          onReset={resetViewSettings}
+          resetTestId="fish-settings-reset"
+        />
         <FieldGroup className="gap-0.5 p-2">
           <div className="px-2 py-1 text-2xs font-medium text-muted-foreground">
             {t('dex.viewSection')}

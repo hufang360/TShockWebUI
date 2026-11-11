@@ -21,6 +21,11 @@ function cacheFor(transport: BackendTransport): Map<string, MeInfo> {
   return map
 }
 
+/** 游戏内 `/group` 后手动刷新权限时清掉缓存（`useMyPermissions` 会重新拉 `/api/me`）。 */
+export function clearMyPermissionsCache(transport: BackendTransport, serverId: string): void {
+  cacheFor(transport).delete(serverId)
+}
+
 export interface MyPermissions {
   /** 当前登录用户名（未登录 / 请求中为 null）。 */
   username: string | null

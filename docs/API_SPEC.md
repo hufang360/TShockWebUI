@@ -624,6 +624,19 @@ TShock **运行时**指令目录（含 `/fish`、`/pm`、本插件的 `/web` 等
 当前 token 用户档案：`{ username, group, permissions[], canUseApi, canRunCommands }`。
 用于诊断「为什么登录/执行失败」。
 
+### `POST /api/me/refresh`
+让插件把 token 的用户组快照对齐到账号在 TShock 的**当前**组（游戏内 `/user group` 换组之后用）。
+响应与 `GET /api/me` 同构，额外带 `previousGroup`（刷新前的组）：
+```json
+{ "username": "hf", "group": "vip", "permissions": ["tshock.rest.useapi"],
+  "canUseApi": true, "canRunCommands": true, "previousGroup": "default" }
+```
+- 为什么需要：登录时铸造的 REST token 里存的 `UserGroupName` 是快照，`/webui/commands`、批量执行与 TShock 自己的 `rawcmd` 都按它判权限；
+  不改的话换组后只能重新登录。只影响「换组」；同一个组的权限定义（`/group addperm`）本来每次请求都会重读，不用刷新。
+- 会话用的是服务器预置令牌（`ApplicationRestTokens`）时，组由服务器配置决定、网页改不了：插件如实返回 `fixedToken: true`（不改组），前端据此说明原因。
+- 要求插件具备能力 `me_refresh`；旧插件返回 `501 plugin_outdated`（前端提示升级插件或重新登录）。
+- 只读调用者自己的账号组，不提权；非 GET，需 `X-Requested-With: tswui`。
+
 ### `GET /api/data?type=regions|warps|npcs|buffs`
 补全数据源：`{ type, items: [{ id?, name }] }`（regions/warps 无 id）。
 区域需 `tshock.region`、传送点需 `tshock.warp`，缺权限返回空列表；NPC/buff 全量返回（本地化名）。

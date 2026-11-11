@@ -714,6 +714,35 @@ describe('DataIdPage', () => {
     expect(screen.getAllByRole('table')).toHaveLength(1)
   })
 
+  it('页面设置「恢复默认」：视图开关回到默认值，打开时焦点不落在它身上', async () => {
+    renderPage()
+    const popover = openSettings()
+    // 打开时焦点给第一个设置项，不是标题栏的「恢复默认」。
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(popover).getByTestId('dataid-hide-meta')),
+    )
+
+    fireEvent.click(within(popover).getByTestId('dataid-hide-meta'))
+    fireEvent.click(within(popover).getByRole('checkbox', { name: '表格视图' }))
+    fireEvent.click(within(popover).getByTestId('dataid-two-cols'))
+    fireEvent.click(within(popover).getByTestId('dataid-expand-styles'))
+    expect(localStorage.getItem('tswui:dataId:hideMeta')).toBe('true')
+    expect(within(popover).getByTestId('dataid-two-cols').getAttribute('data-state')).toBe('unchecked')
+
+    fireEvent.click(within(popover).getByRole('button', { name: '恢复默认' }))
+    expect(within(popover).getByTestId('dataid-hide-meta').getAttribute('data-state')).toBe('unchecked')
+    expect(
+      within(popover).getByRole('checkbox', { name: '表格视图' }).getAttribute('data-state'),
+    ).toBe('unchecked')
+    expect(within(popover).getByTestId('dataid-two-cols').getAttribute('data-state')).toBe('checked')
+    expect(
+      within(popover).getByTestId('dataid-expand-styles').getAttribute('data-state'),
+    ).toBe('unchecked')
+    // 表格视图已关 → 回到图标网格
+    expect(screen.queryByRole('table')).toBeNull()
+    expect(localStorage.getItem('tswui:dataId:hideMeta')).toBe('false')
+  })
+
   it('NPC 表格最后一列是英文名（英文界面下改显示内部名）', () => {
     renderPage()
     enableTable()

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ChevronDown, Download, Info, ListFilter, Maximize2, Minimize2, Search, Settings2, Star, X } from 'lucide-react'
 import { IconAction } from '@/components/IconAction'
+import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
 import { FavoriteRecipesPanel } from '@/components/FavoriteRecipesPanel'
 import { CommonRecipes, type CommonRecipeEntry } from '@/components/items/CommonRecipes'
 import { DexCell } from '@/components/items/DexCell'
@@ -36,6 +37,7 @@ import { TopBarActions } from '@/components/TopBar'
 import { useItemFavoritesState } from '@/hooks/useItemFavoritesState'
 import { useRecipeFavoritesState } from '@/hooks/useRecipeFavoritesState'
 import { useLocalState } from '@/hooks/useLocalState'
+import { useSettingsPopoverFocus } from '@/hooks/useSettingsPopoverFocus'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useStickyHeaderOffset, usePageScroller } from '@/hooks/usePageScroll'
@@ -154,6 +156,7 @@ export function ItemsPage({
   /** 分组侧抽屉：打开时展开当前选中的分区（未选中则展开第一区「制作界面」）。 */
   const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
   const [settingsPopoverOpen, setSettingsPopoverOpen] = useState(false)
+  const settingsFocus = useSettingsPopoverFocus()
   const [resultsFullscreen, setResultsFullscreen] = useState(false)
   // 详情抽屉：手机端是自带遮罩的模态（下滑关闭），桌面端只盖内容区（`ContentScrim`）。
   const isMobileDetail = useIsMobile()
@@ -815,6 +818,16 @@ export function ItemsPage({
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
+  /** 恢复默认：只重置本弹框里的视图开关；搜索词 / 分组 / 收藏不动。 */
+  const resetViewSettings = () => {
+    setHideItemMeta(false)
+    setTableView(false)
+    setTableTwoCols(true)
+    setRecipeShowNames(false)
+    setRecipeTwoColumn(false)
+    setRecipeTwoColumnFavorites(true)
+  }
+
   const itemsSettingsControl = (
                 // 设置项里的「info」提示依赖这层 Provider（`DexSettingField` 用 Tooltip）。
                 <TooltipProvider delayDuration={150}>
@@ -827,13 +840,17 @@ export function ItemsPage({
                       />
                     </PopoverTrigger>
                     <PopoverContent
+                      ref={settingsFocus.ref}
+                      onOpenAutoFocus={settingsFocus.onOpenAutoFocus}
                       align="end"
                       className="w-80 max-w-[calc(100vw-2rem)] p-0"
                       data-testid="dex-settings-popover"
                     >
-                      <div className="border-b px-4 py-3 text-sm font-semibold text-foreground">
-                        {t('dex.settings')}
-                      </div>
+                      <SettingsPopoverHeader
+                        title={t('dex.settings')}
+                        onReset={resetViewSettings}
+                        resetTestId="dex-settings-reset"
+                      />
                       <FieldGroup className="gap-0.5 p-2">
                         <div className="px-2 py-1 text-2xs font-medium text-muted-foreground">
                           {t('dex.viewSection')}

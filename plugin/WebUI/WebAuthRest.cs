@@ -115,6 +115,9 @@ namespace WebUI
 
         public static object Me(RestRequestArgs args) => Extras.Me(args.TokenData);
 
+        /// <summary>游戏内 /group 之后把 token 的用户组快照对齐到账号当前组。</summary>
+        public static object RefreshMe(RestRequestArgs args) => Extras.RefreshMe(args);
+
         public static object Data(RestRequestArgs args) => Extras.Data(args);
 
         public static object ServerInfo(RestRequestArgs args) => Extras.ServerInfo();

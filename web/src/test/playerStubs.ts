@@ -41,6 +41,14 @@ export const playerStubs = {
     canUseApi: true,
     canRunCommands: true,
   }),
+  refreshMe: async (): Promise<MeInfo> => ({
+    username: 'test',
+    group: 'default',
+    permissions: [],
+    canUseApi: true,
+    canRunCommands: true,
+    previousGroup: 'default',
+  }),
   pluginData: async (): Promise<NameItem[]> => [],
   serverInfoExtra: async (): Promise<ServerInfoExtra> => ({
     name: 'test',

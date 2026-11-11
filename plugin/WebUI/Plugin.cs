@@ -116,6 +116,8 @@ namespace WebUI
                 // 只读信息 / 会话管理：只要有效 token（不额外要求权限）。
                 TShock.RestApi.Register(new SecureRestCommand("/webui/commands", WebAuthRest.Commands) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/me", WebAuthRest.Me) { DoLog = false });
+                // 游戏内 /group 后刷新 token 的用户组快照（只读调用者自己的组，不提权）。
+                TShock.RestApi.Register(new SecureRestCommand("/webui/me/refresh", WebAuthRest.RefreshMe) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/data", WebAuthRest.Data) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/serverinfo", WebAuthRest.ServerInfo) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/events", WebAuthRest.Events) { DoLog = false });
@@ -146,7 +148,7 @@ namespace WebUI
             _startupAnnounced = true;
 
             if (_restRegistered)
-                TShock.Log.ConsoleInfo("[WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,data,serverinfo,events,chat}、/webui/requests*");
+                TShock.Log.ConsoleInfo("[WebUI] REST 端点已注册：/webui/meta、/webui/auth/*、/webui/restlimit、/webui/batch、/webui/{commands,me,me/refresh,data,serverinfo,events,chat}、/webui/requests*");
             else
                 TShock.Log.ConsoleError("[WebUI] TShock REST 未启用（RestApiEnabled=false），在线授权不可用；在游戏内 / 控制台执行 /web init 可自动打开。");
 
@@ -484,6 +486,23 @@ namespace WebUI
             tokens.Add(token, new SecureRest.TokenData { Username = accountName, UserGroupName = groupName });
             Sessions?.Register(token, accountName, groupName, Config?.TokenTTLMinutes ?? 0);
             return token;
+        }
+
+        /// <summary>
+        /// 把 token 的用户组对齐到账号当前所在组（游戏内 /group 之后由 /webui/me/refresh 触发）。
+        /// SecureRest.TokenData 是 struct（字典里存值），所以要整条替换，而不是改字段；
+        /// TShock 自己的 rawcmd 权限判定每次请求都读这份数据。
+        /// 返回 false 表示这个 token 不在 <c>Tokens</c> 里（如服务器预置的 <c>ApplicationRestTokens</c>）。
+        /// </summary>
+        internal static bool RenewTokenGroup(string token, string groupName)
+        {
+            if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(groupName)) return false;
+            var tokens = TShock.RestApi?.Tokens;
+            if (tokens == null || !tokens.TryGetValue(token, out var data)) return false;
+            data.UserGroupName = groupName;
+            tokens[token] = data;
+            Sessions?.UpdateGroup(token, groupName);
+            return true;
         }
 
         internal static void DestroyToken(string token)

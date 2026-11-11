@@ -40,6 +40,7 @@ namespace WebUI
                 "batch",       // /webui/batch
                 "commands",    // /webui/commands
                 "me",          // /webui/me
+                "me_refresh",  // /webui/me/refresh（游戏内 /group 后刷新 token 的用户组快照）
                 "data",        // /webui/data
                 "serverinfo",  // /webui/serverinfo
                 "events",      // /webui/events

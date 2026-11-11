@@ -1082,6 +1082,43 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect(screen.queryByRole('button', { name: '导出表格' })).toBeNull()
   })
 
+  it('页面设置「恢复默认」：图标大小与开关回到默认，打开时焦点不落在它身上', async () => {
+    localStorage.setItem(
+      'tswui:moduleState',
+      JSON.stringify({
+        default: { store: { iconSize: 'sm', hideMeta: true, shelf: false, awning: false } },
+      }),
+    )
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    const cell = await screen.findByRole('button', { name: '生命水晶' })
+    // 存的「小」图标生效（40px，格子只剩图标）。
+    expect(cell.style.width).toBe('40px')
+    expect(screen.queryByText('#1')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    const popover = screen.getByTestId('fish-settings-popover')
+    // 打开时焦点给第一个设置项（图标大小），不是标题栏的「恢复默认」。
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(popover).getByRole('combobox', { name: '图标大小' }),
+      ),
+    )
+
+    fireEvent.click(within(popover).getByRole('button', { name: '恢复默认' }))
+    await waitFor(() => expect(cell.style.width).toBe('72px'))
+    expect(screen.getByText('#1')).toBeTruthy()
+    expect(screen.getByTestId('shop-awning')).toBeTruthy()
+    // 货架层板（jsdom 没排版，画不出来；看开关本身）回到勾选。
+    expect(within(popover).getByLabelText('货架层板').getAttribute('data-state')).toBe('checked')
+    expect(within(popover).getByLabelText('遮阳伞').getAttribute('data-state')).toBe('checked')
+
+    // 设置键从本机存储里清掉（回落到默认值，而不是写一串 false）。
+    const store = JSON.parse(localStorage.getItem('tswui:moduleState') ?? '{}').default?.store ?? {}
+    for (const key of ['iconSize', 'hideMeta', 'tableView', 'shelf', 'awning']) {
+      expect(key in store).toBe(false)
+    }
+  })
+
   it('图标大小：小 32 / 中 48 / 大 64，小尺寸不显示编号与名称', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     const cell = await screen.findByRole('button', { name: '生命水晶' })

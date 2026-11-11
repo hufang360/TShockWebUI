@@ -68,3 +68,84 @@ it('插件缺失时可点「重新检测」恢复，无需刷新页面', async (
   expect(screen.getByText('用户组: default')).toBeTruthy()
   expect(screen.getByText('没有其它网页会话')).toBeTruthy()
 })
+
+/**
+ * 游戏内 `/group` 之后：点「刷新组与权限」要能拿到新用户组 / 权限，
+ * 并把「组变了」这件事交给上层（模块探测 / 指令目录重拉）。
+ */
+it('刷新组与权限：显示组变化并通知上层', async () => {
+  const onPermissionsChanged = vi.fn()
+  const refreshMe = vi.fn(
+    async (): Promise<MeInfo> => ({
+      username: 'hf',
+      group: 'vip',
+      permissions: ['tshock.rest.useapi', 'tshock.rest.command'],
+      canUseApi: true,
+      canRunCommands: true,
+      previousGroup: 'default',
+    }),
+  )
+  const transport = makeTransport({ refreshMe })
+
+  render(
+    <I18nProvider lang="zh">
+      <WebAccountSection
+        transport={transport}
+        authenticated
+        serverId="default"
+        onPermissionsChanged={onPermissionsChanged}
+      />
+    </I18nProvider>,
+  )
+
+  fireEvent.click(await screen.findByRole('button', { name: '刷新组与权限' }))
+
+  await screen.findByText('用户组 default → vip，权限已更新')
+  expect(screen.getByText('用户组: vip')).toBeTruthy()
+  expect(onPermissionsChanged).toHaveBeenCalledTimes(1)
+})
+
+it('刷新组与权限：组没变也给反馈', async () => {
+  const refreshMe = vi.fn(
+    async (): Promise<MeInfo> => ({
+      username: 'hf',
+      group: 'default',
+      permissions: [],
+      canUseApi: true,
+      canRunCommands: true,
+      previousGroup: 'default',
+    }),
+  )
+  renderSection(makeTransport({ refreshMe }))
+
+  fireEvent.click(await screen.findByRole('button', { name: '刷新组与权限' }))
+  await screen.findByText('用户组仍是 default')
+})
+
+it('刷新组与权限：旧插件（没有 me_refresh）提示升级或重新登录', async () => {
+  const refreshMe = vi.fn(async (): Promise<MeInfo> => {
+    throw new TshockRequestError('plugin_outdated', '插件缺少 me_refresh 能力')
+  })
+  renderSection(makeTransport({ refreshMe }))
+
+  fireEvent.click(await screen.findByRole('button', { name: '刷新组与权限' }))
+  await screen.findByText('插件版本过旧，无法刷新；请升级插件或重新登录')
+})
+
+it('刷新组与权限：服务器预置令牌时如实说明，不假装换组', async () => {
+  const refreshMe = vi.fn(
+    async (): Promise<MeInfo> => ({
+      username: 'hf',
+      group: 'default',
+      permissions: [],
+      canUseApi: true,
+      canRunCommands: true,
+      previousGroup: 'default',
+      fixedToken: true,
+    }),
+  )
+  renderSection(makeTransport({ refreshMe }))
+
+  fireEvent.click(await screen.findByRole('button', { name: '刷新组与权限' }))
+  await screen.findByText('这个会话用的是服务器预置令牌，用户组由服务器配置决定')
+})

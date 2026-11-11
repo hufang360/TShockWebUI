@@ -29,10 +29,13 @@ const (
 
 // 能力名（与插件 Meta.Capabilities() 一一对应，勿随意改名）。
 const (
-	CapAuth       = "auth"
-	CapBatch      = "batch"
-	CapCommands   = "commands"
-	CapMe         = "me"
+	CapAuth     = "auth"
+	CapBatch    = "batch"
+	CapCommands = "commands"
+	CapMe       = "me"
+	// CapMeRefresh：新插件支持 /webui/me/refresh（游戏内 /group 后把 token 的用户组快照
+	// 对齐到账号当前组）。旧插件没有这个端点，只能让玩家重新登录。
+	CapMeRefresh  = "me_refresh"
 	CapData       = "data"
 	CapServerInfo = "serverinfo"
 	CapEvents     = "events"

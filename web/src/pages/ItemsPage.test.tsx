@@ -1043,6 +1043,35 @@ describe('ItemsPage 图鉴', () => {
     expect(within(dialog).queryByLabelText('两列视图-收藏页')).toBeNull()
   })
 
+  it('页面设置「恢复默认」：视图开关回到默认值，打开时焦点不落在它身上', async () => {
+    renderPage(makeItems(3))
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    const popover = screen.getByTestId('dex-settings-popover')
+    // 打开时焦点给第一个设置项，不是标题栏的「恢复默认」（否则一开就高亮它）。
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(popover).getByLabelText('隐藏 ID 和名称')),
+    )
+
+    fireEvent.click(within(popover).getByLabelText('隐藏 ID 和名称'))
+    fireEvent.click(within(popover).getByLabelText('表格视图'))
+    fireEvent.click(within(popover).getByLabelText('显示物品名称'))
+    fireEvent.click(within(popover).getByLabelText('两列视图-详情页'))
+    fireEvent.click(within(popover).getByLabelText('两列视图-收藏页'))
+    expect(localStorage.getItem('tswui:dex:tableView')).toBe('true')
+
+    fireEvent.click(within(popover).getByRole('button', { name: '恢复默认' }))
+    const state = (label: string) =>
+      within(popover).getByLabelText(label).getAttribute('data-state')
+    expect(state('隐藏 ID 和名称')).toBe('unchecked')
+    expect(state('表格视图')).toBe('unchecked')
+    expect(state('显示物品名称')).toBe('unchecked')
+    expect(state('两列视图-详情页')).toBe('unchecked')
+    expect(state('两列视图-收藏页')).toBe('checked')
+    expect(localStorage.getItem('tswui:dex:tableView')).toBe('false')
+    expect(localStorage.getItem('tswui:dex:tableTwoCols')).toBe('true')
+    expect(localStorage.getItem('tswui:dex:recipeShowNames')).toBe('false')
+  })
+
   it('饰品不显示「最佳词缀」按钮（下拉里已带效果）', () => {
     renderPage(
       makeDataset({

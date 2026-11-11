@@ -117,6 +117,8 @@ export interface AppRoutesProps {
   onModuleUserSet: (id: ModuleId) => void
   onCustomModulesChange: (next: CustomModule[]) => void
   onSettingsChange: (patch: Partial<Settings>) => void
+  /** 用户组 / 权限被手动刷新后：App 重拉指令目录与能力矩阵。 */
+  onPermissionsChanged?: () => void
   languagePacks: LanguagePacksController
 }
 
@@ -147,6 +149,7 @@ export function AppRoutes({
   onModuleUserSet,
   onCustomModulesChange,
   onSettingsChange,
+  onPermissionsChanged,
   languagePacks,
 }: AppRoutesProps) {
   const { t } = useI18n()
@@ -296,6 +299,7 @@ export function AppRoutes({
           onCustomModulesChange={onCustomModulesChange}
           onTokenInvalid={onTokenInvalid}
           onLogin={openLogin}
+          onPermissionsChanged={onPermissionsChanged}
           languagePacks={languagePacks}
         />
       )}

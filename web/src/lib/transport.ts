@@ -61,6 +61,10 @@ export interface MeInfo {
   permissions: string[]
   canUseApi: boolean
   canRunCommands: boolean
+  /** 仅 `POST /api/me/refresh` 返回：刷新前的用户组（旧插件不返回）。 */
+  previousGroup?: string
+  /** 仅刷新返回：会话用的是服务器预置令牌，用户组由服务器配置决定（网页改不了）。 */
+  fixedToken?: boolean
 }
 
 /** 补全 / 数据源里的一条 {id?, name}。 */
@@ -522,6 +526,11 @@ export interface BackendTransport {
   runtimeCommands(): Promise<RuntimeCommand[]>
   /** 当前用户档案（组 / 权限 / 是否可登录）。 */
   me(): Promise<MeInfo>
+  /**
+   * 让插件把 token 的用户组快照对齐到账号在 TShock 的**当前**组（游戏内 `/group` 之后用）。
+   * 旧插件没有这个端点 → 抛 `plugin_outdated`，调用方应提示重新登录 / 升级插件。
+   */
+  refreshMe(): Promise<MeInfo>
   /** 信使插件提供的补全数据源（区域 / 传送点 / NPC / buff）。 */
   pluginData(type: PluginDataType): Promise<NameItem[]>
   /** 世界事件 / Boss 进度等增强状态。 */

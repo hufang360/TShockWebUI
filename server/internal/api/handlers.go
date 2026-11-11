@@ -178,6 +178,7 @@ func (s *Server) Handler() http.Handler {
 	// 信使插件只读信息 / 会话管理。
 	mux.HandleFunc("GET /api/commands", s.handleRuntimeCommands)
 	mux.HandleFunc("GET /api/me", s.handleMe)
+	mux.HandleFunc("POST /api/me/refresh", s.handleMeRefresh)
 	mux.HandleFunc("GET /api/data", s.handleData)
 	mux.HandleFunc("GET /api/serverinfo", s.handleServerInfo)
 	mux.HandleFunc("GET /api/events", s.handleEvents)

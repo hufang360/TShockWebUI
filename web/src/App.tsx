@@ -72,6 +72,7 @@ import {
   type ServerTarget,
 } from '@/lib/servers'
 import { clearSelfAvatar } from '@/lib/selfAvatar'
+import { clearMyPermissionsCache } from '@/hooks/useMyPermissions'
 import {
   createTransport,
   type BackendTransport,
@@ -375,6 +376,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   // 登录框被动弹出时的说明 i18n key（token 失效 / 会话过期）。
   const [loginReason, setLoginReason] = useState<string | null>(null)
   const [players, setPlayers] = useState<string[]>([])
+  // 用户组 / 权限被手动刷新（游戏内 /group 之后）→ +1，触发指令目录与能力矩阵重拉。
+  const [permsVersion, setPermsVersion] = useState(0)
+  // 权限刚被手动刷新时绕过后端 3 秒微缓存，否则可能拿回旧结果。
+  const forceCapsRef = useRef(false)
   const [status, setStatus] = useState<ServerStatus | null>(null)
   // 已通过登录动作建立会话；用于避免首屏 /api/session 的慢响应把登录态覆盖回未登录。
   const authedRef = useRef(false)
@@ -529,7 +534,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       // 统一能力矩阵：一次请求拿到批量执行 / 玩家管理 / 鱼店 / 物资申请等的可用性
       //（此前是分别打 4 个探测端点；首页与设置页读同一份，不再各自重复探测）。
       try {
-        const caps = await transport.capabilities()
+        const caps = await transport.capabilities(forceCapsRef.current)
+        forceCapsRef.current = false
         if (!cancelled) {
           setIngameAllowed(caps.batch.ingame === true)
           // 「统一执行」：检测到信使插件后自动开启（用户手动关过则保持其选择）。
@@ -570,7 +576,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     return () => {
       cancelled = true
     }
-  }, [dataset, session.authenticated, transport, activeServerId, setBatchMode, setModules])
+  }, [dataset, session.authenticated, transport, activeServerId, permsVersion, setBatchMode, setModules])
 
   // 静态数据集 + 运行时指令目录（仅补充本地没有的插件指令）。
   const effectiveDataset = useMemo(
@@ -895,6 +901,11 @@ export default function App({ transport: transportProp }: AppProps = {}) {
               setLoginOpen(true)
             }}
             onTokenInvalid={handleTokenInvalid}
+            onPermissionsChanged={() => {
+              clearMyPermissionsCache(transport, activeServerId)
+              forceCapsRef.current = true
+              setPermsVersion((v) => v + 1)
+            }}
             onFocusConsumed={consumeDexFocus}
             onOpenInDex={(itemId) => {
               setDexFocus({ id: itemId })

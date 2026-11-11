@@ -61,6 +61,8 @@ interface SettingsPageProps {
   onCustomModulesChange: (next: CustomModule[]) => void
   onTokenInvalid: () => void
   onLogin: () => void
+  /** 用户组 / 权限被手动刷新后：App 重拉指令目录与能力矩阵。 */
+  onPermissionsChanged?: () => void
   /** 语言材质包（浏览器本地；设置页里上传 / 排序 / 启用）。 */
   languagePacks?: LanguagePacksController
 }
@@ -110,6 +112,7 @@ export function SettingsPage({
   onCustomModulesChange,
   onTokenInvalid,
   onLogin,
+  onPermissionsChanged,
   languagePacks = NO_LANGUAGE_PACKS,
 }: SettingsPageProps) {
   const { t } = useI18n()
@@ -524,7 +527,17 @@ export function SettingsPage({
       />
 
           <PluginDiagnosticsCard transport={transport} serverId={serverId} />
-          <WebAccountSection transport={transport} authenticated={authenticated} serverId={serverId} />
+          <WebAccountSection
+            transport={transport}
+            authenticated={authenticated}
+            serverId={serverId}
+            onPermissionsChanged={(me) => {
+              // 组变了会影响模块权限探测；指令目录 / 能力矩阵由 App 重拉。
+              setGroup(me.group)
+              void probeAll(true)
+              onPermissionsChanged?.()
+            }}
+          />
         </div>
       </div>
 
