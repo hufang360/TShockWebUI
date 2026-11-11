@@ -242,7 +242,7 @@ jobs:
           printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
           echo "--- tags ---"; echo "$tags"
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
