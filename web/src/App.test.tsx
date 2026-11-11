@@ -630,12 +630,13 @@ it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 
   await loginAsAlice()
 
   fireEvent.click(screen.getAllByRole('button', { name: '指令小抄' })[0])
-  // 没有顶部 tab 了：左边搜索框，右边分组栏。
+  // 没有顶部 tab / 常驻分组栏：分组在搜索框旁边的图标按钮里。
   expect(await screen.findByPlaceholderText('搜索指令或名称')).toBeTruthy()
   expect(screen.queryByRole('tablist')).toBeNull()
   expect(window.location.hash).toBe('#/commands')
+  fireEvent.click(screen.getByRole('button', { name: '分组' }))
   expect(
-    within(screen.getByRole('complementary')).getByRole('button', { name: /召唤 Boss/ }),
+    within(screen.getByTestId('commands-groups')).getByRole('button', { name: /召唤 Boss/ }),
   ).toBeTruthy()
   // 侧栏顺序：指令小抄紧跟「数据 ID」。
   const sidebar = screen.getByTestId('sidebar')
@@ -656,20 +657,20 @@ it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 
       (el) => el.getAttribute('data-command') === command,
     )!
 
+  // `/spawnboss` 只能在游戏内执行（allowServer=false），浮层里没有「执行」，只有复制。
   fold('/spawnboss')
   fireEvent.click(row('/spawnboss "king slime"'))
   const detail = await screen.findByTestId('command-detail')
-  fireEvent.click(within(detail).getByRole('button', { name: /执行/ }))
-  const win = await screen.findByTestId('terminal-window')
-  const input = within(win).getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
-  expect(input.value).toBe('/spawnboss "king slime"')
+  expect(detail.textContent).toContain('/spawnboss "king slime"')
+  expect(within(detail).getByRole('button', { name: '复制指令' })).toBeTruthy()
+  expect(within(detail).queryByRole('button', { name: '执行' })).toBeNull()
 
-  // 传送 NPC 用英文名（真实数据里的 `en` 字段）；点新记录会覆盖输入框。
+  // 换一条：浮层内容是新的（单开，换内容而不是叠加）
   fold('/tpnpc')
   fireEvent.click(row('/tpnpc Angler'))
   const detail2 = await screen.findByTestId('command-detail')
-  fireEvent.click(within(detail2).getByRole('button', { name: /执行/ }))
-  expect(input.value).toBe('/tpnpc Angler')
+  expect(detail2.textContent).toContain('/tpnpc Angler')
+  expect(screen.getAllByTestId('command-detail')).toHaveLength(1)
 })
 it('「聊天」已并入「指令」：侧栏没有聊天，老地址 #/chat 落到指令页', async () => {
   mockFetch()

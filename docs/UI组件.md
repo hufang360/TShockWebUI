@@ -39,7 +39,7 @@
 | Dialog | `ui/Dialog.tsx` | radix dialog | 每个 Dialog 必须有 `DialogTitle`；`DialogFooter` = 底部操作区（`bg-background` + `border-t`）；`DialogContent` 支持 `overlay={false}`（不画暗色遮罩，配 `modal={false}` 用，行为接近 popover）与 `hideClose`（不画右上角 ×，调用方自己提供更合适的关闭入口）；`radius="container"` 换成 16px 圆角（默认 `modal` 24px，给命令面板这类紧凑弹框用——写成属性是因为 `rounded-modal` / `rounded-container`是两个独立工具类，同时写只会由 CSS 顺序决定谁生效） |
 | DropdownMenu | `ui/DropdownMenu.tsx` | radix dropdown-menu | 菜单项包在 `DropdownMenuGroup` 里；侧栏底部账号卡片（`SidebarAccountMenu`）用它 |
 | Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用 / 鱼店商品详情 / 数据ID 详情）；`SheetContent` 有 `overlay` 参数（`false` = 不画自带遮罩，配 `modal={false}` + `ContentScrim` 做「只盖内容区」的抽屉）；**不支持堆叠**，需要叠层就用 `Drawer` |
-| Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`；`DrawerContent` 也有 `overlay` 参数（`false` = 不画自带遮罩，物品 / 指令小抄的详情用它 + `ContentScrim`）。**每个 Drawer 必须有 `DrawerTitle`** |
+| Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`；`DrawerContent` 也有 `overlay` 参数（`false` = 不画自带遮罩，物品详情的抽屉用它 + `ContentScrim`）。**每个 Drawer 必须有 `DrawerTitle`** |
 | Tooltip | `ui/Tooltip.tsx` | radix tooltip | 需要 `TooltipProvider` 祖先（`SlotTooltip` 自带一个） |
 | Popover | `ui/Popover.tsx` | radix popover | 点击 / 受控展开的浮层（`PopoverContent` 默认 `side=bottom` / `sideOffset=6`）；登录框「登录帮助」、物品 ID / 数据 ID「页面设置」用它 |
 | Separator | `ui/Separator.tsx` | radix separator | 分隔线一律用它，不要 `border-t/b` div 或 `<hr>` |
@@ -466,7 +466,7 @@
 | --- | --- | --- | --- | --- |
 | 模态 | `Dialog`（确认框、物品详情弹框）、`Sheet`（管理卡片） | 否 | 被盖住 | `inset-0` |
 | 非模态 | 浮动终端（`z-40`） | 是 | 可用 | 无 |
-| **带遮罩但不盖导航** | 鱼店商品详情 / 物品详情（图鉴）/ 数据ID 详情 / 指令小抄的分组抽屉 | 否 | **可用**（可切页） | `ContentScrim`（只盖内容区） |
+| **带遮罩但不盖导航** | 鱼店商品详情 / 物品详情（图鉴）/ 数据ID 详情 | 否 | **可用**（可切页） | `ContentScrim`（只盖内容区） |
 
 ### 只盖内容区的遮罩（`components/ContentScrim.tsx`）
 
@@ -502,7 +502,7 @@
 | 鱼店商品详情 | `Sheet`（`components/fishshop/FishDetailSurface.tsx`） | 切页面回来仍开着（`tswui:moduleState` 的 `ui.detail`，按内容指纹存） |
 | 物品图鉴 详情 | Base UI `Drawer`（可堆叠，`components/items/ItemDetailDrawer.tsx`） | 遮罩由 `ItemsPage` 画，点它关掉整叠 |
 | 数据ID 详情 | `Sheet` | 切页面回来仍开着（`lib/dataIdState.ts` 的 `detail`） |
-| 指令小抄 分组 | Base UI `Drawer` | 一层 `ContentScrim`（指令的补充信息已改成**行内详情行**，不再有浮层） |
+| 指令小抄 分组 / 详情 | `Popover`（Radix） | 都不用遮罩：分组锚在工具条按钮上，详情锚在鼠标位置 |
 | 物品详情（图鉴以外的页面） | `Dialog`（`components/items/ItemDetailDialog.tsx`） | **就地弹框**，不再跳图鉴；见下 |
 
 ### 物品详情弹框（图鉴以外的页面）
@@ -814,26 +814,28 @@
 ## 指令小抄（`pages/CommandTipsPage.tsx`）
 
 - 侧边栏「工具」分组，**紧跟「数据 ID」下一行**，图标 `ScrollText`，地址 `#/commands`。
-- **没有顶部 tab**：**左边搜索框 + 表格，右边分组列表**（`lg` 起常驻，窄屏收进 `Drawer`）。
-  分组定义在 `lib/commandTips.ts` 的 `TIPS_GROUPS`（世界事件 / 节日模式 / 世界模式 / 时间 / 风 / NPC / 物品 / 增益 / 生命 / 传送 / 建筑 / 玩家账号 / 封禁 / 用户组 / 权限配置 / 服务器 / 聊天，共 22 组）。
-- 表有**三列**：**指令 / 说明 / 权限**（`md` 以下隐藏权限），**没有操作列**，也没有单独的分类行 / 语法行 / 说明行。
-  说明列 = 原来的说明 + 备注（`主说明 · 备注`）；权限取自 `data/commands.json`，无权限写 `-`；折叠行整组权限一致才显示。
-- 行分四种：**折叠行**（`▸`，同前缀的指令收成一行，点一下展开 / 收起）、**具体指令行**、
-  **参考行**（内置指令的语法，带占位符 → 只能复制）、**详情行**（见下）。
-- **单击数据行就地展开「详情行」**（单开、再点收起）：指令语法 / 使用提示 / 别名 / 相关指令（点了把表格过滤到那条）/
-  数据 ID → NPC（`/spawnboss` `/spawnmob` `/tpnpc` `/butcher` `/renamenpc`）/ 权限（仅 `md` 以下）。
-  **没有任何补充信息的行展开时不插空行**；整页不再有指令详情弹框或抽屉。
-- 行内悬停出「复制指令 / 执行指令 / 复制权限」（触屏常显）；`allowServer=false` 与带占位符的参考行**没有「执行指令」**。
-- `allowServer=false` 的指令文字标红 + 说明里跟「仅游戏内」（多子项的只标折叠行）。
+- **没有顶部 tab、也没有常驻分组侧栏**：**搜索框 + 整宽表格**；分组是搜索框右边的**图标按钮**（`ListFilter`）开的
+  `Popover`（`data-testid="commands-groups"`，桌面 / 窄屏同一套；选了某组按钮显示 `active`）。
+  分组定义在 `lib/commandTips.ts` 的 `TIPS_GROUPS`（世界事件 / 节日模式 / 世界模式 / 时间 / 风 / NPC / 物品 / 增益 / 生命 /
+  传送 / 建筑 / 玩家账号 / 封禁 / 用户组 / 权限配置 / 服务器 / 聊天，共 22 组）。
+- 表只有**两列：指令 / 说明**（说明 = 原来的说明 + 备注，`主说明 · 备注`），**没有操作列、没有权限列**，
+  也没有单独的分类行 / 语法行 / 说明行。
+- 行分两种：**折叠行**（`▸`，同前缀的指令收成一行，点一下展开 / 收起）、**数据行**（具体指令 / 参考行）。
+  **数据行上没有任何按钮**（也不画箭头）。
+- **单击数据行在鼠标位置弹出详情 `Popover`**（`data-testid="command-detail"`）：Radix **虚拟锚点**（0 尺寸矩形 =
+  `clientX/clientY`，靠近边缘自动翻转），**不抢焦点**（`onOpenAutoFocus` 阻止默认）；单开，
+  点另一行换内容、点同一行 / 浮层外 / `Esc` 关闭（`onInteractOutside` 对 `tr[data-command]` 放行，避免「先关再开」）。
+  内容：指令（等宽加粗 + 悬停复制）、说明、仅游戏内徽标、使用提示、指令语法、权限（悬停复制）、别名、
+  相关指令（点了把表格过滤到那条）、底部「数据 ID → NPC」与「执行」（只是把指令填进浮窗）。
+- `allowServer=false` 的指令文字标红 + 说明里跟「仅游戏内」（多子项的只标折叠行）；参考行与它们都没有「执行」。
 - 整表按指令列 **a~z 排序**（折叠行用它的前缀参与），分区只决定折叠行的「说明」。
-- 搜索会清掉分组筛选；命中分区标题 / 语法 / 提示就整段留下，否则逐行匹配；**搜索时折叠组自动展开**。
+- 搜索会清掉分组筛选；命中分区标题 / 语法 / 提示就整段留下，否则逐行匹配**指令 + 说明 + 提示 + 权限名**；
+  **搜索时折叠组自动展开**。
 - **表格不在卡片里，也不自己滚**：整页交给 AppShell 的 `<main>`（见「整页滚动」）；
-  搜索框 + 分组按钮那一行 `sticky top-12` 吸在顶栏下面，表头再吸在它下面
-  （`top-[var(--page-sticky-top,0px)]`）；桌面端右侧分组列表 `lg:sticky`，自己内部仍可滚（最多一屏高）。
-- 指令 / 说明 / 权限三列都**单行、超出省略**；指令列最大宽度（手机 11rem / `sm` 16rem / `xl` 22rem），
-  超过 22 字符时悬停弹 `Tooltip` 看完整指令；斑马纹按**数据行序号**算（`stripeClass()`，插详情行时条纹不跳）。
+  搜索框 + 分组按钮那一行 `sticky top-12` 吸在顶栏下面，表头再吸在它下面（`top-[var(--page-sticky-top,0px)]`）。
+- 指令 / 说明两列都**单行、超出省略**；指令列最大宽度（手机 11rem / `sm` 16rem / `xl` 22rem），
+  超过 22 字符时悬停弹 `Tooltip`；斑马纹按**数据行序号**算（`stripeClass()`）。
 - 页面公开：不需要登录，也不依赖插件。
-- 执行失败原因显示在**富文本下方的 `Alert`**（指令不存在 = warning，权限/执行错误 = destructive）。
 
 ## 物品详情的「相关指令」
 
