@@ -45,6 +45,8 @@ jobs:
         run: npm run test:run
       - name: Build
         run: npm run build
+      - name: Bundle budget
+        run: node ../scripts/check-bundle-size.mjs
 
   plugin:
     name: Messenger plugin (C#)

@@ -33,7 +33,7 @@ WEB_PORT ?= 5173
 API_PORT ?= 18080
 API_TARGET ?= http://127.0.0.1:$(API_PORT)
 
-.PHONY: help data web server lint test plugin image binary \
+.PHONY: help data web server lint test bundle-check plugin image binary \
         dev dev-web dev-all dev-container dev-container-frontend dev-container-backend \
         release-docs release-check docs-check clean
 
@@ -48,6 +48,7 @@ help:
 	@echo "  —— 校验 ——"
 	@echo "  make lint          go vet + 前端 typecheck/lint"
 	@echo "  make test          后端 go test -race + 前端 vitest"
+	@echo "  make bundle-check  首屏体积护栏（需先 cd web && npm run build）"
 	@echo "  —— 开发（改代码）——"
 	@echo "  make dev-all       一条命令：容器后端 :$(API_PORT) + vite 页面 :$(WEB_PORT)（前台）"
 	@echo "  make dev-web       vite HMR 页面 :$(WEB_PORT)，/api → $(API_TARGET)"
@@ -93,6 +94,12 @@ lint:
 test:
 	cd server && go test -race ./...
 	cd web && npm run test:run
+
+# 首屏体积护栏：量 web/dist 里首屏资源的 gzip 体积，超 scripts/bundle-budget.json 即失败。
+# 需要先构建（make web 或 cd web && npm run build）；CI 的 web job 在 Build 之后跑同一条命令。
+# 真把首屏做小了，就照脚本打印的建议同步预算数字，并在 PR 里写清降了多少、为什么。
+bundle-check:
+	node scripts/check-bundle-size.mjs
 
 # C# 信使插件（在线授权 / 批量执行等）。DLL 由 ts-sync-plugins 同步进 TShock。
 plugin:

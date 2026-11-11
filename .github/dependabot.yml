@@ -1,0 +1,49 @@
+# 依赖更新（Dependabot）。
+#
+# 只开两个生态，另两个是**故意**不开的：
+# - npm（/web）：前端依赖跟着浏览器生态走，补丁必须及时。这是主要目标。
+# - github-actions（/）：action 的 major 升级常带破坏性变更，早看到早改。
+# - gomod（/server）不开：后端只用标准库（server/go.mod 里没有任何 require），开了只会产生
+#   「go 指令版本」这类噪音 PR。哪天真加了第三方依赖，把文件末尾注释里的那段打开。
+# - nuget（/plugin/WebUI）不开：插件引用的 TShock 必须与服务端版本一致（目标 TShock 6.2.1 /
+#   Terraria 1.4.5.8），升这个库等于换目标游戏版本 —— 那是一次「数据再生成 + 真机验收」的迁移，
+#   不是一次依赖更新。要升就手动升，并同步 docs/开发速查.md 与 docs/ 里的版本号。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+    labels:
+      - dependencies
+    # minor + patch 合成一条 PR（不然一周能来十条）；major 各占一条，必须单独看。
+    groups:
+      npm-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore(ci)
+    labels:
+      - dependencies
+
+# 备查：后端一旦引入第三方 Go 依赖，把下面这段取消注释并把上面的「不开」注释删掉。
+#  - package-ecosystem: gomod
+#    directory: /server
+#    schedule:
+#      interval: weekly
+#    open-pull-requests-limit: 3
+#    commit-message:
+#      prefix: chore(server)
