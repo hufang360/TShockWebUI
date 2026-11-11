@@ -8,14 +8,10 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react'
-import { Check, ChevronRight, Copy, ExternalLink, ListFilter, Search, Terminal, X } from 'lucide-react'
+import { Check, ChevronRight, Copy, ExternalLink, ListFilter, Search, Terminal } from 'lucide-react'
 import {
   Badge,
   Button,
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
   Empty,
   EmptyHeader,
   EmptyMedia,
@@ -23,17 +19,16 @@ import {
   Popover,
   PopoverAnchor,
   PopoverContent,
+  PopoverTrigger,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui'
-import { ContentScrim } from '@/components/ContentScrim'
 import { IconAction } from '@/components/IconAction'
 import { PageHelp } from '@/components/PageHelp'
 import { SearchInput } from '@/components/SearchInput'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { TIPS_GROUPS, RELATED_COMMANDS, type TipsGroup } from '@/lib/commandTips'
 import { enumLabelsFor } from '@/lib/commandMeta'
 import { copyText } from '@/lib/clipboard'
@@ -331,40 +326,6 @@ function CommandCellBody({ row, indent }: { row: TableRow; indent?: boolean }) {
   )
 }
 
-/**
- * 权限列（`md` 起显示，手机太窄）：等宽小字、超出省略；没有权限写 `-`。
- * 折叠行传 `undefined`（整组权限不一致，不的代表任何一条）；整组一致时传该权限（`null` = 无权限）。
- */
-function PermissionCell({ permission }: { permission?: string | null }) {
-  return (
-    <td className="hidden w-[10rem] px-2 py-2 align-top md:table-cell">
-      {permission === undefined ? null : permission ? (
-        <PermissionText value={permission} />
-      ) : (
-        <span className="text-2xs text-muted-foreground">-</span>
-      )}
-    </td>
-  )
-}
-
-/** 权限文字：短的不挂 Tooltip（几百行，逐个挂 Radix Tooltip 太重）。 */
-function PermissionText({ value }: { value: string }) {
-  const content = (
-    <span className="block min-w-0 max-w-[10rem] flex-1 truncate font-mono text-2xs text-foreground">
-      {value}
-    </span>
-  )
-  if (value.length <= TRUNCATE_HINT_MIN) return content
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{content}</TooltipTrigger>
-      <TooltipContent className="max-w-[min(24rem,85vw)] font-mono text-xs break-all">
-        {value}
-      </TooltipContent>
-    </Tooltip>
-  )
-}
-
 /** 详情行里的一小块：`标签 + 值`（值可换行）。 */
 function DetailBit({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -547,7 +508,6 @@ function CommandRow({
           {note ? <span className="text-2xs"> · {note}</span> : null}
         </div>
       </td>
-      <PermissionCell permission={row.def?.permission ?? null} />
     </tr>
   )
 }
@@ -646,12 +606,6 @@ function CommandTable({
     </td>
   )
 
-  /** 折叠行：整组权限一致才显示那一个，否则留空。 */
-  const sharedPermission = (rows: TableRow[]): string | null | undefined => {
-    const first = rows[0]?.def?.permission ?? null
-    return rows.every((row) => (row.def?.permission ?? null) === first) ? first : undefined
-  }
-
   return (
     <TooltipProvider delayDuration={150}>
       <div className="min-w-0">
@@ -663,9 +617,6 @@ function CommandTable({
               </th>
               <th scope="col" className="px-2 py-2 font-medium">
                 {t('commands.col.name')}
-              </th>
-              <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
-                {t('commands.col.permission')}
               </th>
             </tr>
           </thead>
@@ -703,7 +654,6 @@ function CommandTable({
                         </button>
                       </td>
                       {labelCell(foldLabel, allIngame ? onlyInGame : '')}
-                      <PermissionCell permission={sharedPermission(entry.rows)} />
                     </tr>
                     {open &&
                       entry.rows.map((row, j) => {
@@ -755,6 +705,8 @@ function CommandTable({
             sideOffset={8}
             collisionPadding={8}
             className="w-[min(26rem,calc(100vw-1rem))] p-3"
+            // 打开时不要把焦点送到第一个可聚焦元素（那是指令旁的复制键）
+            onOpenAutoFocus={(event) => event.preventDefault()}
             // 点表格里的其它行时不要先关：让它换内容；点别处才关
             onInteractOutside={(event) => {
               if ((event.target as HTMLElement | null)?.closest('tr[data-command]')) {
@@ -842,9 +794,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
   const pick = onPick ?? open
   const [query, setQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
-  // 分组抽屉：手机端是自带遮罩的模态，桌面端只盖内容区（`ContentScrim`）。
-  const isMobileDrawer = useIsMobile()
+  const [groupOpen, setGroupOpen] = useState(false)
 
   // 全局搜索选了某条指令：落到本页并带上搜索词（不再单独维护「跳转到某一行」）。
   useSearchIntent(
@@ -1032,7 +982,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
   const selectGroup = (id: string | null) => {
     setActiveId(id)
     setQuery('')
-    setGroupDrawerOpen(false)
+    setGroupOpen(false)
   }
 
   return (
@@ -1066,17 +1016,37 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
                 shortcut
               />
             </div>
-            {/* 手机 / 窄屏：分组收进抽屉，按钮显示当前分组 */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="shrink-0 gap-2 px-2 text-xs text-muted-foreground lg:hidden"
-              aria-label={t('commands.groups')}
-              onClick={() => setGroupDrawerOpen(true)}
-            >
-              <ListFilter className="size-3.5" />
-              <span className="max-w-28 truncate">{activeTitle}</span>
-            </Button>
+            {/* 分组：图标按钮开 popover（宽屏也不再常驻右栏） */}
+            <Popover open={groupOpen} onOpenChange={setGroupOpen}>
+              <PopoverTrigger asChild>
+                <IconAction
+                  label={t('commands.groups')}
+                  icon={ListFilter}
+                  active={groupOpen || activeId !== null}
+                  aria-expanded={groupOpen}
+                />
+              </PopoverTrigger>
+              <PopoverContent
+                side="bottom"
+                align="end"
+                sideOffset={6}
+                className="w-56 p-2"
+                data-testid="commands-groups"
+              >
+                <div className="mb-1 flex items-center justify-between px-1">
+                  <span className="text-2xs text-muted-foreground">{t('commands.groups')}</span>
+                  <span className="max-w-28 truncate text-2xs text-foreground">{activeTitle}</span>
+                </div>
+                <div className="max-h-[min(24rem,60dvh)] overflow-y-auto overscroll-contain">
+                  <GroupList
+                    entries={entries}
+                    activeId={activeId}
+                    total={total}
+                    onSelect={selectGroup}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {visible.length === 0 ? (
@@ -1102,49 +1072,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
           )}
         </div>
 
-        {/* 右：分组列表（桌面常驻；窄屏走抽屉） */}
-        <aside
-          aria-label={t('commands.groups')}
-          className="hidden w-44 shrink-0 flex-col gap-1 border-l border-border/60 pl-3 lg:sticky lg:top-12 lg:flex lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start"
-        >
-          <div className="shrink-0 px-2 pb-1 text-2xs text-muted-foreground">
-            {t('commands.groups')}
-          </div>
-          <GroupList entries={entries} activeId={activeId} total={total} onSelect={selectGroup} />
-        </aside>
       </div>
-
-      {/* 遮罩：桌面端只盖内容区（左侧边栏露着、可点）；手机端抽屉自带模态遮罩。 */}
-      {groupDrawerOpen && !isMobileDrawer && (
-        <ContentScrim testId="commands-groups-scrim" onClick={() => setGroupDrawerOpen(false)} />
-      )}
-      <Drawer
-        open={groupDrawerOpen}
-        onOpenChange={setGroupDrawerOpen}
-        swipeDirection="right"
-        modal={isMobileDrawer}
-        // 非模态时 Base UI 默认「点外面 / 焦点离开」就关：点左侧导航是切页，不该顺手关面板。
-        disablePointerDismissal={!isMobileDrawer}
-      >
-        <DrawerContent overlay={isMobileDrawer} className="flex w-64 flex-col">
-          <DrawerHeader className="flex-row items-center border-b px-4 py-3">
-            <DrawerTitle className="min-w-0 flex-1">{t('commands.groups')}</DrawerTitle>
-            <IconAction
-              label={t('action.close')}
-              icon={X}
-              onClick={() => setGroupDrawerOpen(false)}
-            />
-          </DrawerHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
-            <GroupList
-              entries={entries}
-              activeId={activeId}
-              total={total}
-              onSelect={selectGroup}
-            />
-          </div>
-        </DrawerContent>
-      </Drawer>
 
     </div>
   )

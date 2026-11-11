@@ -95,9 +95,12 @@ function table() {
   return within(screen.getByRole('table'))
 }
 
-/** 右侧分组栏。 */
+/** 分组列表：点工具栏上的分组图标按钮开 popover。 */
 function groupList() {
-  return within(screen.getByRole('complementary'))
+  if (!screen.queryByTestId('commands-groups')) {
+    fireEvent.click(screen.getByRole('button', { name: '分组' }))
+  }
+  return within(screen.getByTestId('commands-groups'))
 }
 
 /** 展开所有折叠组（`/worldevent …`、`/worldmode …` 这类同前缀的行默认收起）。 */
@@ -176,12 +179,12 @@ describe('CommandTipsPage', () => {
     expect(await screen.findByText(help)).toBeTruthy()
   })
 
-  it('没有顶部 tab：左边搜索框，右边分组栏', () => {
+  it('没有顶部 tab：搜索框 + 分组 popover', () => {
     renderPage()
     expect(screen.queryByRole('tablist')).toBeNull()
     expect(screen.getByPlaceholderText('搜索指令或名称')).toBeTruthy()
 
-    // 分组栏：全部指令 + 各分组（世界 / NPC / 物品 / 增益 / 玩家账号 / 服务器 …）
+    // 分组列表在 popover 里：全部指令 + 各分组（世界 / NPC / 物品 / 增益 / 玩家账号 / 服务器 …）
     const groups = groupList()
     expect(groups.getByRole('button', { name: /全部指令/ })).toBeTruthy()
     for (const title of [
@@ -237,7 +240,7 @@ describe('CommandTipsPage', () => {
     const folds = [...document.querySelectorAll<HTMLElement>('tr[data-fold]')]
       .filter((el) => el.getAttribute('data-fold') === '/worldevent')
       .map((el) => el.textContent)
-    expect(folds).toEqual(['/worldevent世界事件-'])
+    expect(folds).toEqual(['/worldevent世界事件'])
     // 没有分组行（表格里只剩行，不再有「世界事件」这类跨列标题）
     expect(screen.getByRole('table').querySelector('[scope="colgroup"]')).toBeNull()
 
@@ -245,7 +248,7 @@ describe('CommandTipsPage', () => {
     const headers = [...screen.getByRole('table').querySelectorAll('thead th')].map(
       (th) => th.textContent,
     )
-    expect(headers).toEqual(['指令', '说明', '权限'])
+    expect(headers).toEqual(['指令', '说明'])
   })
 
   it('同一前缀的指令默认折叠，点一下展开 / 收起', () => {
@@ -333,6 +336,15 @@ describe('CommandTipsPage', () => {
     expect(bossChild?.textContent).not.toContain('仅游戏内')
   })
 
+  it('详情浮层打开时，焦点不落在复制键上', () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    fireEvent.click(row('/hardmode'), { clientX: 100, clientY: 200 })
+    const active = document.activeElement as HTMLElement | null
+    // 不能是浮层里的复制 / 执行按钮
+    expect(active?.closest('[data-slot="popover-content"]')).toBeNull()
+    expect(active?.getAttribute('aria-label')).not.toBe('复制指令')
+  })
+
   it('详情是 popover（不是 dialog / 抽屉），也不占表格行', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
     expandAllGroups()
@@ -375,7 +387,6 @@ describe('CommandTipsPage', () => {
     const tr = row('/register <password>')
     expect(tr.querySelector('span.font-mono')?.className).toContain('text-destructive')
     expect(tr.textContent).toContain('仅游戏内')
-    expect(tr.textContent).toContain('tshock.account.register')
     // 行里不再有按钮（复制 / 执行都在详情浮层里）
     expect(tr.querySelectorAll('button')).toHaveLength(0)
 
@@ -609,24 +620,8 @@ describe('CommandTipsPage', () => {
     // 带占位符的指令语法只在详情里；权限照旧从 data/commands.json 取
     const detail = openDetail('/group addperm default lookbag')
     expect(detail.getByText(/\/group addperm <组> <权限\.\.\.>/)).toBeTruthy()
-    // 权限在表格的权限列里（详情行只在 md 以下补显示）
-    expect(table().getAllByText('tshock.admin.group').length).toBeGreaterThan(0)
-  })
-
-  it('主表有权限列：没有权限写 `-`，折叠行整组一致才显示', () => {
-    renderPage(makeTestDataset({ commands: realCommands }))
-    // 折叠行整组权限一致 → 显示那一个
-    expect(findRow('data-fold', '/time')?.textContent).toContain('tshock.world.time.set')
-
-    fireEvent.click(groupList().getByRole('button', { name: /^服务器与权限/ }))
-    const cells = (command: string) => {
-      const row = findRow('data-command', command)
-      if (!row) throw new Error(`找不到行：${command}`)
-      return [...row.querySelectorAll('td')].map((td) => td.textContent)
-    }
-    // 有权限照写（单元格里还有悬停才出现的「复制权限」按钮，用包含断言），无权限（`/help`）写 `-`
-    expect(cells('/save').at(2)).toContain('tshock.world.save')
-    expect(cells('/help <command/page>').at(2)).toBe('-')
+    // 权限在详情浮层里
+    expect(detail.getByText('tshock.admin.group')).toBeTruthy()
   })
 
   it('同一条指令的两个方向也折叠：/give 收 /item、/buff 收 /gbuff', () => {
@@ -645,7 +640,7 @@ describe('CommandTipsPage', () => {
     const headers = [...screen.getByRole('table').querySelectorAll('thead th')].map(
       (th) => th.textContent,
     )
-    expect(headers).toEqual(['指令', '说明', '权限'])
+    expect(headers).toEqual(['指令', '说明'])
 
     // `/home` 只能游戏内 → 说明里跟一句「仅游戏内」；`/worldinfo` 能在网页跑 → 不带
     const home = [...(findRow('data-command', '/home')?.querySelectorAll('td') ?? [])].map(
