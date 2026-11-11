@@ -1,4 +1,13 @@
-import { Fragment, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react'
 import { Check, ChevronRight, Copy, ExternalLink, ListFilter, Search, Terminal, X } from 'lucide-react'
 import {
   Badge,
@@ -280,16 +289,7 @@ function sortKey(entry: RowGroup): string {
   return text.replace(/^\//, '').replace(/["“”]/g, '').toLowerCase()
 }
 
-/**
- * 指令单元格。只有**可能被截断**的才挂 Tooltip：一页几百行，逐个挂 Radix Tooltip 太重。
- * 左边固定留出折叠箭头的宽度（折叠行自己画箭头），这样**所有行的指令都从同一条竖线开始**。
- * `indent` 用于折叠组里的子行（缩进一级表示层级）。
- */
-/** 行内操作容器：悬停整行 / 键盘聚焦时才出现（触屏常显）。 */
-const ROW_ACTION_CLASS =
-  'touch-visible flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100'
-
-/** 行内复制键：复制这段文字，1.2s 内显示 ✓。 */
+/** 复制键：复制这段文字，1.2s 内显示 ✓。 */
 function RowCopyAction({ value, label }: { value: string; label: string }) {
   const { t } = useI18n()
   const [copied, copy] = useCopy(value)
@@ -299,49 +299,23 @@ function RowCopyAction({ value, label }: { value: string; label: string }) {
       label={copied ? t('action.copied') : label}
       icon={copied ? Check : Copy}
       iconClassName="size-3.5"
-      onClick={(event) => {
-        // 别让单击冒泡到整行（那会打开详情）
-        event.stopPropagation()
-        copy()
-      }}
+      onClick={copy}
     />
   )
 }
 
 /**
- * 指令单元格。只有**可能被截断**的才挂 Tooltip：一页几百行，逐个挂 Radix Tooltip 太重。
- * 左边固定留出折叠箭头的宽度（折叠行自己画箭头），这样**所有行的指令都从同一条竖线开始**。
- * `indent` 用于折叠组里的子行（缩进一级表示层级）。
- * 悬停整行时右侧浮出「复制 / 执行」（帮助类指令只给复制）。
+ * 数据行的指令单元格（**没有箭头、没有 hover 按钮**——详情在点击后用浮层给）。
+ * 左边固定留出折叠箭头的宽度，这样数据行与折叠行的指令仍从同一条竖线开始。
+ * 只有**可能被截断**的才挂 Tooltip：一页几百行，逐个挂 Radix Tooltip 太重。
  */
-function CommandCellBody({
-  row,
-  open,
-  onRun,
-}: {
-  row: TableRow
-  /** 浮层是否展开（展开时箭头朝下）。 */
-  open?: boolean
-  onRun?: () => void
-}) {
-  const { t } = useI18n()
+function CommandCellBody({ row, indent }: { row: TableRow; indent?: boolean }) {
   const text = row.command
-  const ingame = ingameOnly(row)
-  // 帮助类指令（带占位符的语法行）与只能在游戏内执行的都不给「执行」
-  const executable = !row.syntax && !ingame
-  const content = <span className={commandCellClass(ingame)}>{text}</span>
+  const content = <span className={commandCellClass(ingameOnly(row))}>{text}</span>
   return (
-    <PopoverAnchor asChild>
+    <td className={cn('px-2 py-2 align-top', indent && 'pl-6')}>
       <div className="flex min-w-0 items-start gap-1">
-        {/* 箭头表示「可以点开详情」 */}
-        <ChevronRight
-          className={cn(
-            'mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform',
-            open && 'rotate-90',
-            !open && 'opacity-40',
-          )}
-          aria-hidden
-        />
+        <span className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         {text.length > TRUNCATE_HINT_MIN ? (
           <Tooltip>
             <TooltipTrigger asChild>{content}</TooltipTrigger>
@@ -352,23 +326,8 @@ function CommandCellBody({
         ) : (
           content
         )}
-        <span className={cn(ROW_ACTION_CLASS, 'ml-auto')}>
-          <RowCopyAction value={text} label={`${t('commands.col.copy')}${t('commands.col.command')}`} />
-          {executable && onRun && (
-            <IconAction
-              size="icon-xs"
-              label={`${t('commands.col.run')}${t('commands.col.command')}`}
-              icon={Terminal}
-              iconClassName="size-3.5"
-              onClick={(event) => {
-                event.stopPropagation()
-                onRun()
-              }}
-            />
-          )}
-        </span>
       </div>
-    </PopoverAnchor>
+    </td>
   )
 }
 
@@ -377,19 +336,10 @@ function CommandCellBody({
  * 折叠行传 `undefined`（整组权限不一致，不的代表任何一条）；整组一致时传该权限（`null` = 无权限）。
  */
 function PermissionCell({ permission }: { permission?: string | null }) {
-  const { t } = useI18n()
   return (
     <td className="hidden w-[10rem] px-2 py-2 align-top md:table-cell">
       {permission === undefined ? null : permission ? (
-        <div className="flex min-w-0 items-center gap-1">
-          <PermissionText value={permission} />
-          <span className={cn(ROW_ACTION_CLASS, 'ml-auto')}>
-            <RowCopyAction
-              value={permission}
-              label={`${t('commands.col.copy')}${t('commands.col.permission')}`}
-            />
-          </span>
-        </div>
+        <PermissionText value={permission} />
       ) : (
         <span className="text-2xs text-muted-foreground">-</span>
       )}
@@ -576,58 +526,21 @@ function RowPopoverBody({
 function CommandRow({
   row,
   rowKey,
-  open,
   stripe,
   indent,
-  onToggle,
-  onPick,
-  onNavigate,
-  onFilter,
+  onClick,
 }: {
   row: TableRow
   rowKey: string
-  open: boolean
   stripe: string
   indent?: boolean
-  onToggle: () => void
-  onPick: (command: string) => void
-  onNavigate?: (tab: TabId) => void
-  onFilter: (query: string) => void
+  onClick: (event: ReactMouseEvent) => void
 }) {
   const { t } = useI18n()
   const note = row.note ?? (!indent && ingameOnly(row) ? t('commands.onlyInGame') : '')
   return (
-    <tr
-      data-command={row.command}
-      data-row-key={rowKey}
-      onClick={onToggle}
-      className={cn(ROW_CLASS, stripe)}
-    >
-      <td className={cn('px-2 py-2 align-top', indent && 'pl-6')}>
-        <Popover
-          open={open}
-          onOpenChange={(next) => {
-            if (!next) onToggle()
-          }}
-        >
-          <CommandCellBody row={row} open={open} onRun={() => onPick(row.command)} />
-          <PopoverContent
-            data-testid="command-detail"
-            side="bottom"
-            align="start"
-            sideOffset={4}
-            className="w-[min(26rem,calc(100vw-1rem))] p-3"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <RowPopoverBody
-              row={row}
-              onNavigate={onNavigate}
-              onFilter={onFilter}
-              onPick={onPick}
-            />
-          </PopoverContent>
-        </Popover>
-      </td>
+    <tr data-command={row.command} data-row-key={rowKey} onClick={onClick} className={cn(ROW_CLASS, stripe)}>
+      <CommandCellBody row={row} indent={indent} />
       <td className="w-full max-w-0 px-2 py-2 text-xs text-foreground">
         <div className="truncate">
           {row.label}
@@ -669,9 +582,34 @@ function CommandTable({
 }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
-  /** 展开详情行的键（单开：点另一条会收起上一条）。 */
-  const [openRow, setOpenRow] = useState<string | null>(null)
+  /** 详情浮层：看哪一条 + **弹出时的鼠标坐标**（浮层跟着鼠标位置走，不锚在单元格上）。 */
+  const [detail, setDetail] = useState<{ row: TableRow; x: number; y: number } | null>(null)
   const onlyInGame = t('commands.onlyInGame')
+
+  // Radix 的虚拟锚点：把浮层定位到鼠标点（0 尺寸矩形）。
+  const anchorRef = useRef({
+    getBoundingClientRect: () => {
+      const { x, y } = mousePoint.current
+      return {
+        x,
+        y,
+        top: y,
+        left: x,
+        right: x,
+        bottom: y,
+        width: 0,
+        height: 0,
+        toJSON: () => ({}),
+      }
+    },
+  })
+  const mousePoint = useRef({ x: 0, y: 0 })
+
+  /** 单击数据行：记下鼠标位置并弹出详情浮层（点同一条 = 收起）。 */
+  const openDetailAt = (row: TableRow, event: ReactMouseEvent) => {
+    mousePoint.current = { x: event.clientX, y: event.clientY }
+    setDetail((prev) => (prev?.row === row ? null : { row, x: event.clientX, y: event.clientY }))
+  }
 
   /**
    * 整表条目：先按分区算出折叠项，再把**所有分区**合并成一条列表按指令列 a~z 排序
@@ -770,19 +708,14 @@ function CommandTable({
                     {open &&
                       entry.rows.map((row, j) => {
                         const rowKey = `${key}:${j}`
-                        const rowOpen = openRow === rowKey
                         return (
                           <Fragment key={rowKey}>
                             <CommandRow
                               row={row}
                               rowKey={rowKey}
-                              open={rowOpen}
                               stripe={stripe}
                               indent
-                              onToggle={() => setOpenRow(rowOpen ? null : rowKey)}
-                              onPick={onPick}
-                              onNavigate={onNavigate}
-                              onFilter={onFilter}
+                              onClick={(event) => openDetailAt(row, event)}
                             />
                           </Fragment>
                         )
@@ -791,24 +724,60 @@ function CommandTable({
                 )
               }
               const row = entry.rows[0]!
-              const rowOpen = openRow === key
               return (
                 <Fragment key={key}>
                   <CommandRow
                     row={row}
                     rowKey={key}
-                    open={rowOpen}
                     stripe={stripe}
-                    onToggle={() => setOpenRow(rowOpen ? null : key)}
-                    onPick={onPick}
-                    onNavigate={onNavigate}
-                    onFilter={onFilter}
+                    onClick={(event) => openDetailAt(row, event)}
                   />
                 </Fragment>
               )
             })}
           </tbody>
         </table>
+
+        {/* 详情浮层：位置跟鼠标（虚拟锚点），内容就是这一条的完整信息 */}
+        <Popover
+          open={detail !== null}
+          onOpenChange={(next) => {
+            if (!next) setDetail(null)
+          }}
+          // 点别的数据行由行自己的 onClick 换内容；别让 Radix 先把浮层关掉（同一个 tick 里会互相抵消）
+          modal={false}
+        >
+          <PopoverAnchor virtualRef={anchorRef as never} />
+          <PopoverContent
+            data-testid="command-detail"
+            side="bottom"
+            align="start"
+            sideOffset={8}
+            collisionPadding={8}
+            className="w-[min(26rem,calc(100vw-1rem))] p-3"
+            // 点表格里的其它行时不要先关：让它换内容；点别处才关
+            onInteractOutside={(event) => {
+              if ((event.target as HTMLElement | null)?.closest('tr[data-command]')) {
+                event.preventDefault()
+              }
+            }}
+          >
+            {detail && (
+              <RowPopoverBody
+                row={detail.row}
+                onNavigate={onNavigate}
+                onFilter={(query) => {
+                  onFilter(query)
+                  setDetail(null)
+                }}
+                onPick={(command) => {
+                  onPick(command)
+                  setDetail(null)
+                }}
+              />
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
     </TooltipProvider>
   )

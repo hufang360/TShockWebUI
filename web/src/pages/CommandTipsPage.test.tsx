@@ -135,9 +135,11 @@ function hasDetail() {
   return screen.queryByTestId('command-detail') !== null
 }
 
-/** 行内悬停的「执行指令」（只是填进浮窗，不自动跑）。 */
+/** 展开详情浮层 → 点浮层里的「执行」（只是填进浮窗，不自动跑）。 */
 function fill(command: string) {
-  fireEvent.click(within(row(command)).getByRole('button', { name: '执行指令' }))
+  const panel = screen.queryByTestId('command-detail')
+  const detail = panel && panel.textContent?.includes(command) ? within(panel) : openDetail(command)
+  fireEvent.click(detail.getByRole('button', { name: '执行' }))
 }
 
 /** 打开（或复用）右下角浮窗里的输入框。 */
@@ -374,8 +376,8 @@ describe('CommandTipsPage', () => {
     expect(tr.querySelector('span.font-mono')?.className).toContain('text-destructive')
     expect(tr.textContent).toContain('仅游戏内')
     expect(tr.textContent).toContain('tshock.account.register')
-    // 参考行 / 仅游戏内都没有「执行」按钮
-    expect(within(tr).queryByRole('button', { name: '执行指令' })).toBeNull()
+    // 行里不再有按钮（复制 / 执行都在详情浮层里）
+    expect(tr.querySelectorAll('button')).toHaveLength(0)
 
     // 这几条也不显示「指令语法」与「使用提示」
     const detail = openDetail('/register <password>')
@@ -534,10 +536,11 @@ describe('CommandTipsPage', () => {
     expect(table().getAllByText(/仅游戏内/).length).toBeGreaterThan(0)
     expect(table().getByText(/^\/item /)).toBeTruthy()
 
-    // 参考行只有「复制指令」，没有「执行指令」
-    const giveRow = row(give)
-    expect(within(giveRow).getByRole('button', { name: '复制指令' })).toBeTruthy()
-    expect(within(giveRow).queryByRole('button', { name: '执行指令' })).toBeNull()
+    // 行里没有按钮；浮层里有「复制指令」、没有「执行」
+    expect(row(give).querySelectorAll('button')).toHaveLength(0)
+    const giveDetail = openDetail(give)
+    expect(giveDetail.getByRole('button', { name: '复制指令' })).toBeTruthy()
+    expect(giveDetail.queryByRole('button', { name: '执行' })).toBeNull()
   })
 
   it('玩家账号 / 封禁 / 用户组：分组提示收在详情里', () => {
@@ -684,33 +687,6 @@ describe('CommandTipsPage', () => {
     fireEvent.change(search, { target: { value: 'tshock.world.save' } })
     expect(findRow('data-command', '/save')).toBeTruthy()
     expect(findRow('data-fold', '/worldevent')).toBeNull()
-  })
-
-  it('主表：悬停行内给「复制指令 / 执行指令」，权限列给「复制权限」', () => {
-    renderPage(makeTestDataset({ commands: realCommands }))
-    const buttons = (command: string) => {
-      const row = findRow('data-command', command)
-      if (!row) throw new Error(`找不到行：${command}`)
-      return [...row.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))
-    }
-
-    // 网页可执行的具体指令：复制 + 执行 + 复制权限
-    expect(buttons('/hardmode')).toEqual(['复制指令', '执行指令', '复制权限'])
-
-    // 帮助类（带占位符的语法行）不给「执行」
-    expandAllGroups()
-    const item = buttons('/item <item name/id> [item amount] [prefix id/name]')
-    expect(item).toEqual(['复制指令', '复制权限'])
-
-    // 只能游戏内执行的也不给「执行」
-    const tpallow = buttons('/tpallow')
-    expect(tpallow).toEqual(['复制指令', '复制权限'])
-
-    // 点行内「执行」只填浮窗，不展开详情行
-    const hardmode = findRow('data-command', '/hardmode')!
-    fireEvent.click(within(hardmode).getByRole('button', { name: '执行指令' }))
-    expect(inputValue()).toBe('/hardmode')
-    expect(hasDetail()).toBe(false)
   })
 
   it('数据 ID → NPC 只在参数是 NPC 的指令的详情行里出现', () => {
