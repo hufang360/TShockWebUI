@@ -283,14 +283,15 @@ const zh: Dict = {
 
   'commands.col.command': '指令',
   'commands.col.name': '说明',
-  'commands.col.note': '备注',
+  'commands.col.permission': '权限',
   'commands.detail.title': '指令详情',
   'commands.detail.canonical': '指令语法',
   'commands.detail.permission': '权限',
   'commands.detail.noPermission': '无（任何人可用）',
   'commands.detail.hint': '使用提示',
   'commands.detail.aliases': '别名',
-  'commands.detail.fill': '填入指令浮窗',
+  'commands.detail.npcLink': '在数据 ID → NPC 里查更多',
+  'commands.detail.fill': '执行',
   'commands.search.placeholder': '搜索指令或名称',
   'commands.search.empty': '没有匹配的指令',
   'page.tips.desc': '单击一行查看详情，在详情里复制或把指令填进指令浮窗，不会自动执行。\n'
@@ -326,32 +327,17 @@ const zh: Dict = {
     '只能传送到当前世界里已经存在的 NPC（城镇 NPC 需先入住）。\n'
     + '/tpnpc 只认名称（TShock 不支持 ID），所以这里用英文名。',
   'commands.group.spawnrate': '刷怪率',
-  'commands.group.spawnrate.usage': '/maxspawns [数量|default]\n/spawnrate [数量|default]',
+  'commands.group.spawnrate.maxspawns.usage': '/maxspawns [数量|default]',
+  'commands.group.spawnrate.spawnrate.usage': '/spawnrate [数量|default]',
   'commands.group.godmode': '无敌模式',
   'commands.group.godmode.usage': '/godmode [玩家名]',
-  'commands.group.godmode.hint':
-    '对别人用 /godmode <玩家名> 需要 tshock.godmodeother。\n'
-    + '/sb、/sm、/tpnpc 默认只能在游戏内执行，需服主开启「允许执行游戏内指令」后才能在浮窗里直接跑。',
   'commands.group.npcadmin': 'NPC 管理',
-  'commands.group.npcadmin.hint':
-    '/npcmanage、/bossmanage、/bossinfo、/relive、/cleartomb、/igen 是本服插件指令，语法随插件版本。\n'
-    + '本页只收 TShock 内置的 /butcher 与 /renamenpc。',
   'commands.group.item': '物品',
   'commands.group.buff': '增益',
   'commands.group.vital': '生命与伤害',
   'commands.group.tp': '传送与位置',
   'commands.group.build': '建筑与保护',
   'commands.group.account': '玩家账号',
-  'commands.group.account.usage':
-    '/register <密码>　/login [密码]\n'
-    + '/password <旧> <新>　/logout\n'
-    + '/user add <用户名> <密码> <组>\n'
-    + '/user del <用户名>　/user group <用户名> <组>',
-  'commands.group.account.hint':
-    '注册 / 登录 / 改密 / 登出这四条只能在游戏内执行，网页端会被 TShock 拒绝。\n'
-    + '服务器开了 UUID 登录时直接 /login 就行（不用输密码）。\n'
-    + '/user 系列需要 tshock.superadmin.user（超管 / 控制台）。\n'
-    + '查账号用 /accountinfo <用户名>，查在线玩家用 /userinfo <玩家>。',
   'commands.group.ban': '封禁',
   'commands.group.ban.usage':
     '/ban add <目标> [原因] [时长] [标志]\n'
@@ -1767,14 +1753,15 @@ const en: Dict = {
 
   'commands.col.command': 'Command',
   'commands.col.name': 'Description',
-  'commands.col.note': 'Note',
+  'commands.col.permission': 'Permission',
   'commands.detail.title': 'Command details',
   'commands.detail.canonical': 'Syntax',
   'commands.detail.permission': 'Permission',
   'commands.detail.noPermission': 'None (everyone)',
   'commands.detail.hint': 'Usage notes',
   'commands.detail.aliases': 'Aliases',
-  'commands.detail.fill': 'Fill the command window',
+  'commands.detail.npcLink': 'Find more in Data IDs → NPC',
+  'commands.detail.fill': 'Run',
   'commands.search.placeholder': 'Search command or name',
   'commands.search.empty': 'No matching command',
   'page.tips.desc': 'Click a row to open its details, then copy it or fill it into the command window — nothing runs automatically.\n'
@@ -1810,32 +1797,17 @@ const en: Dict = {
     'Only NPCs currently present in the world can be targeted (town NPCs must have moved in).\n'
     + '/tpnpc matches names only (TShock has no ID lookup), so English names are used here.',
   'commands.group.spawnrate': 'Spawn rate',
-  'commands.group.spawnrate.usage': '/maxspawns [n|default]\n/spawnrate [n|default]',
+  'commands.group.spawnrate.maxspawns.usage': '/maxspawns [n|default]',
+  'commands.group.spawnrate.spawnrate.usage': '/spawnrate [n|default]',
   'commands.group.godmode': 'Godmode',
   'commands.group.godmode.usage': '/godmode [player]',
-  'commands.group.godmode.hint':
-    'God-moding another player (/godmode <player>) needs tshock.godmodeother.\n'
-    + '/sb, /sm and /tpnpc can only run in-game unless the owner enables in-game command execution.',
   'commands.group.npcadmin': 'NPC administration',
-  'commands.group.npcadmin.hint':
-    '/npcmanage, /bossmanage, /bossinfo, /relive, /cleartomb and /igen come from plugins, so their syntax follows the plugin version.\n'
-    + 'This page only lists the built-in /butcher and /renamenpc.',
   'commands.group.item': 'Items',
   'commands.group.buff': 'Buffs',
   'commands.group.vital': 'Health & damage',
   'commands.group.tp': 'Teleport & position',
   'commands.group.build': 'Building & protection',
   'commands.group.account': 'Player accounts',
-  'commands.group.account.usage':
-    '/register <password>   /login [password]\n'
-    + '/password <old> <new>   /logout\n'
-    + '/user add <username> <password> <group>\n'
-    + '/user del <username>   /user group <username> <group>',
-  'commands.group.account.hint':
-    'Register, login, password and logout only run in-game — TShock rejects them from the web UI.\n'
-    + 'With UUID login enabled, a bare /login is enough.\n'
-    + 'The /user commands need tshock.superadmin.user (superadmin / console).\n'
-    + 'Look an account up with /accountinfo <username>, an online player with /userinfo <player>.',
   'commands.group.ban': 'Bans',
   'commands.group.ban.usage':
     '/ban add <target> [reason] [duration] [flags]\n'

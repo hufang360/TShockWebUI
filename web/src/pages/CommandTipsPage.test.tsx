@@ -65,11 +65,11 @@ const transport = {
   ...playerStubs,
 } as unknown as BackendTransport
 
-function renderPage(dataset: Dataset = makeTestDataset()) {
+function renderPage(dataset: Dataset = makeTestDataset(), onNavigate = vi.fn()) {
   const view = render(
     <I18nProvider lang="zh">
       <TerminalProvider>
-        <CommandTipsPage dataset={dataset} />
+        <CommandTipsPage dataset={dataset} onNavigate={onNavigate} />
         <CommandTerminal
           visible
           dataset={dataset}
@@ -87,7 +87,7 @@ function renderPage(dataset: Dataset = makeTestDataset()) {
       </TerminalProvider>
     </I18nProvider>,
   )
-  return view
+  return { ...view, onNavigate }
 }
 
 /** 表格内容（右侧分组栏里也有同名标题，所以断言都限定在表内）。 */
@@ -124,10 +124,10 @@ function openDetail(command: string) {
   return within(screen.getByTestId('command-detail'))
 }
 
-/** 单击一行 → 详情里「填入指令浮窗」。 */
+/** 单击一行 → 详情里「执行」（实际只是填进浮窗，不自动跑）。 */
 function fill(command: string) {
   const drawer = openDetail(command)
-  fireEvent.click(drawer.getByRole('button', { name: /填入指令浮窗/ }))
+  fireEvent.click(drawer.getByRole('button', { name: /执行/ }))
 }
 
 /** 打开（或复用）右下角浮窗里的输入框。 */
@@ -207,7 +207,8 @@ describe('CommandTipsPage', () => {
   it('点分组只显示那一组（再点「全部指令」回到全部）', () => {
     renderPage()
     fireEvent.click(groupList().getByRole('button', { name: /^物品/ }))
-    expect(table().getByText(/^\/give /)).toBeTruthy()
+    // `/give` + `/item` 折成一行
+    expect(findRow('data-fold', '/give')).toBeTruthy()
     expect(table().queryByText('召唤 Boss')).toBeNull()
 
     fireEvent.click(groupList().getByRole('button', { name: /全部指令/ }))
@@ -222,18 +223,18 @@ describe('CommandTipsPage', () => {
     expect(table().queryByText('/wind <mph>（-40 ~ 40）')).toBeNull()
 
     // 分组标题不单独占一行，而是折叠行的说明
-    expect(findRow('data-fold', '/worldevent')?.textContent).toBe('/worldevent世界事件')
-    expect(findRow('data-fold', '/worldevent invasion')?.textContent).toBe(
+    expect(findRow('data-fold', '/worldevent')?.textContent).toContain('/worldevent世界事件')
+    expect(findRow('data-fold', '/worldevent invasion')?.textContent).toContain(
       '/worldevent invasion入侵',
     )
     // 没有分组行（表格里只剩行，不再有「世界事件」这类跨列标题）
     expect(screen.getByRole('table').querySelector('[scope="colgroup"]')).toBeNull()
 
-    // 表头只剩指令 / 说明 / 备注
+    // 表头：指令 / 说明（含原备注）/ 权限
     const headers = [...screen.getByRole('table').querySelectorAll('thead th')].map(
       (th) => th.textContent,
     )
-    expect(headers).toEqual(['指令', '说明', '备注'])
+    expect(headers).toEqual(['指令', '说明', '权限'])
   })
 
   it('同一前缀的指令默认折叠，点一下展开 / 收起', () => {
@@ -241,12 +242,12 @@ describe('CommandTipsPage', () => {
     // `/worldevent invasion` 的 6 条收成一行，说明就是分组标题
     expect(findRow('data-command', '/worldevent invasion goblins')).toBeNull()
     const fold = findRow('data-fold', '/worldevent invasion')
-    expect(fold?.textContent).toBe('/worldevent invasion入侵')
+    expect(fold?.textContent).toContain('/worldevent invasion入侵')
 
     // 世界模式也是折叠组
-    expect(findRow('data-fold', '/worldmode')?.textContent).toBe('/worldmode世界模式')
+    expect(findRow('data-fold', '/worldmode')?.textContent).toContain('/worldmode世界模式')
     // 组里有同名指令时（`/worldevent rain`），说明用它的名称而不是分区标题
-    expect(findRow('data-fold', '/worldevent rain')?.textContent).toBe('/worldevent rain雨')
+    expect(findRow('data-fold', '/worldevent rain')?.textContent).toContain('/worldevent rain雨')
     expect(findRow('data-command', '/worldmode expert')).toBeNull()
 
     fireEvent.click(fold!)
@@ -269,7 +270,7 @@ describe('CommandTipsPage', () => {
     expect(drawer.getByText('切换困难模式')).toBeTruthy()
     expect(screen.queryByTestId('terminal-window')).toBeNull()
 
-    fireEvent.click(drawer.getByRole('button', { name: /填入指令浮窗/ }))
+    fireEvent.click(drawer.getByRole('button', { name: /执行/ }))
     expect(inputValue()).toBe('/hardmode')
   })
 
@@ -299,7 +300,8 @@ describe('CommandTipsPage', () => {
 
   it('只能在游戏内执行的指令用红色标出', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
-    // allowServer=false：红色（语义色 text-destructive）
+    // `/give` + `/item` 折成一行，展开后看子行：/item 只能在游戏内
+    expandAllGroups()
     const item = screen.getByText('/item <item name/id> [item amount] [prefix id/name]')
     expect(item.className).toContain('text-destructive')
     // 网页可执行的保持普通颜色
@@ -313,7 +315,6 @@ describe('CommandTipsPage', () => {
     const time = findRow('data-fold', '/time')
     expect(time?.querySelector('span.font-mono')?.className).toContain('text-foreground')
 
-    expandAllGroups()
     const bossChild = findRow('data-command', '/spawnboss "king slime"')
     expect(bossChild?.textContent).not.toContain('仅游戏内')
   })
@@ -325,7 +326,7 @@ describe('CommandTipsPage', () => {
 
     // 不再是右侧抽屉（抽屉太窄，指令语法 / 权限会频繁折行）
     expect(document.querySelector('[data-slot="drawer-content"]')).toBeNull()
-    expect(dialog.className).toContain('max-w-xl')
+    expect(dialog.className).toContain('max-w-lg')
     expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeTruthy()
 
     // 打开时焦点落在弹框本身，不落在指令旁的复制键上
@@ -354,19 +355,23 @@ describe('CommandTipsPage', () => {
     // 权限块也有复制按钮
     expect(drawer.getByTestId('command-detail-permission-copy')).toBeTruthy()
 
-    // 抽屉里也能直接填入
-    fireEvent.click(drawer.getByRole('button', { name: /填入指令浮窗/ }))
+    // 详情里也能直接填进浮窗
+    fireEvent.click(drawer.getByRole('button', { name: /执行/ }))
     expect(inputValue()).toBe('/worldevent invasion goblins')
   })
 
-  it('详情：只能游戏内执行的指令会写清楚', () => {
+  it('详情：只能游戏内执行的指令用红字 + 「仅游戏内」徽标', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
     const drawer = openDetail('/register <password>')
-    // 执行位置一行 + 分组提示里也会提到（都是真实信息，不重复断言条数）
-    expect(drawer.getAllByText(/只能在游戏内执行/).length).toBeGreaterThan(0)
+    const command = drawer.getByText('/register <password>')
+    expect(command.className).toContain('text-destructive')
+    expect(drawer.getByText('仅游戏内')).toBeTruthy()
     expect(drawer.getByText('tshock.account.register')).toBeTruthy()
-    // 参考行没有「填入浮窗」，抽屉里也不给填入按钮
-    expect(drawer.queryByRole('button', { name: /填入指令浮窗/ })).toBeNull()
+    // 这几条不再显示「指令语法」与「使用提示」
+    expect(drawer.queryByText('指令语法')).toBeNull()
+    expect(drawer.queryByText('使用提示')).toBeNull()
+    // 参考行没有「执行」，详情里也不给按钮
+    expect(drawer.queryByRole('button', { name: /执行/ })).toBeNull()
   })
 
   it('指令列有最大宽度，悬停弹出完整指令的 Tooltip', async () => {
@@ -420,13 +425,14 @@ describe('CommandTipsPage', () => {
     expect(screen.queryByRole('table')).toBeNull()
   })
 
-  it('/worldinfo 紧跟在 /evil 后面一行', () => {
-    renderPage()
-    const rows = screen.getAllByRole('row').map((row) => row.textContent ?? '')
-    const evil = rows.findIndex((text) => text.includes('/evil'))
-    const worldinfo = rows.findIndex((text) => text.includes('/worldinfo'))
-    expect(evil).toBeGreaterThanOrEqual(0)
-    expect(worldinfo).toBe(evil + 1)
+  it('每个分区的指令按 a~z 排序', () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    // 世界模式分区（折叠行用前缀参与排序）：/evil → /hardmode → /worldinfo → /worldmode
+    fireEvent.click(groupList().getByRole('button', { name: /^世界模式/ }))
+    const shown = [...screen.getByRole('table').querySelectorAll('tbody tr')].map(
+      (tr) => tr.querySelector('span.font-mono')?.textContent ?? '',
+    )
+    expect(shown).toEqual(['/evil', '/hardmode', '/worldinfo', '/worldmode'])
   })
 
   it('事件 / 入侵二级 / 节日 / 世界模式 / 时间风 的指令都能填进浮窗', () => {
@@ -495,16 +501,18 @@ describe('CommandTipsPage', () => {
 
   it('参考行：/give 的语法来自内置指令表，详情里只能复制', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
+    // `/give` + `/item` 折成一行，展开才看得到各自语法
+    expandAllGroups()
     const give = '/give <item type/id> <player> [item amount] [prefix id/name]'
     expect(table().getByText(give)).toBeTruthy()
-    // 说明列直接用 TShock 的中文帮助（data/commands.json 的 helpZh）
+    // 说明列用 TShock 的中文帮助（data/commands.json 的 helpZh）
     expect(table().getByText('给另一位玩家一件物品。')).toBeTruthy()
-    // /item 是 allowServer=false：备注列标「仅游戏内」
-    expect(table().getAllByText('仅游戏内').length).toBeGreaterThan(0)
+    // /item 是 allowServer=false：说明列里跟一句「仅游戏内」（备注已并入说明）
+    expect(table().getAllByText(/仅游戏内/).length).toBeGreaterThan(0)
     expect(table().getByText(/^\/item /)).toBeTruthy()
 
     const dialog = openDetail(give)
-    expect(dialog.queryByRole('button', { name: /填入指令浮窗/ })).toBeNull()
+    expect(dialog.queryByRole('button', { name: /执行/ })).toBeNull()
     // 指令块上的复制按钮（点了不会填浮窗）
     fireEvent.click(dialog.getByTestId('command-detail-copy'))
     expect(screen.queryByTestId('terminal-window')).toBeNull()
@@ -518,10 +526,10 @@ describe('CommandTipsPage', () => {
     expect(table().getByText('/register <password>')).toBeTruthy()
     expect(table().getByText('/accountinfo <username>')).toBeTruthy()
 
-    // 分组提示（只能游戏内执行 / 需要超管）在详情里
+    // 自助指令各说各的：不套分区的语法与提示
     const accountDetail = openDetail('/register <password>')
-    expect(accountDetail.getByText(/这四条只能在游戏内执行/)).toBeTruthy()
-    expect(accountDetail.getByText(/查在线玩家用 \/userinfo/)).toBeTruthy()
+    expect(accountDetail.queryByText('使用提示')).toBeNull()
+    expect(accountDetail.queryByText('指令语法')).toBeNull()
     fireEvent.click(accountDetail.getByRole('button', { name: 'Close' }))
 
     fill('/user help')
@@ -532,9 +540,15 @@ describe('CommandTipsPage', () => {
     expect(table().queryByText(/默认 -a -u -ip/)).toBeNull()
     expect(table().getByText('/mute <player> [reason]')).toBeTruthy()
     expect(table().getByText('/kick <player> [reason]')).toBeTruthy()
-    const banDetail = openDetail('/mute <player> [reason]')
+    // `/kick` `/mute` 不套 `/ban` 的语法与提示
+    const muteDetail = openDetail('/mute <player> [reason]')
+    expect(muteDetail.queryByText('指令语法')).toBeNull()
+    expect(muteDetail.queryByText('使用提示')).toBeNull()
+    fireEvent.click(muteDetail.getByRole('button', { name: 'Close' }))
+
+    // `/ban` 自己的提示还在
+    const banDetail = openDetail('/ban list')
     expect(banDetail.getByText(/默认 -a -u -ip/)).toBeTruthy()
-    expect(banDetail.getByText(/再执行一次 \/mute 就是解除禁言/)).toBeTruthy()
     fireEvent.click(banDetail.getByRole('button', { name: 'Close' }))
 
     fill('/ban list')
@@ -574,6 +588,132 @@ describe('CommandTipsPage', () => {
     const drawer = openDetail('/group addperm default lookbag')
     expect(drawer.getByText(/\/group addperm <组> <权限\.\.\.>/)).toBeTruthy()
     expect(drawer.getByText('tshock.admin.group')).toBeTruthy()
+  })
+
+  it('主表有权限列：没有权限写 `-`，折叠行整组一致才显示', () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    // 折叠行整组权限一致 → 显示那一个
+    expect(findRow('data-fold', '/time')?.textContent).toContain('tshock.world.time.set')
+
+    fireEvent.click(groupList().getByRole('button', { name: /^服务器与权限/ }))
+    const cells = (command: string) => {
+      const row = findRow('data-command', command)
+      if (!row) throw new Error(`找不到行：${command}`)
+      return [...row.querySelectorAll('td')].map((td) => td.textContent)
+    }
+    // 有权限照写，无权限（`/help`）写 `-`
+    expect(cells('/save').at(2)).toBe('tshock.world.save')
+    expect(cells('/help <command/page>').at(2)).toBe('-')
+  })
+
+  it('同一条指令的两个方向也折叠：/give 收 /item、/buff 收 /gbuff', () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    for (const stem of ['/give', '/buff']) {
+      expect(findRow('data-fold', stem)).toBeTruthy()
+    }
+    // 展开后子行仍是完整指令
+    expandAllGroups()
+    expect(findRow('data-command', '/item <item name/id> [item amount] [prefix id/name]')).toBeTruthy()
+    expect(findRow('data-command', '/gbuff <player> <buff> [duration]')).toBeTruthy()
+  })
+
+  it('说明列把备注并进来（列名「说明」、内容 `主说明 · 备注`）', () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    const headers = [...screen.getByRole('table').querySelectorAll('thead th')].map(
+      (th) => th.textContent,
+    )
+    expect(headers).toEqual(['指令', '说明', '权限'])
+
+    // `/home` 只能游戏内 → 说明里跟一句「仅游戏内」；`/worldinfo` 能在网页跑 → 不带
+    const home = [...(findRow('data-command', '/home')?.querySelectorAll('td') ?? [])].map(
+      (td) => td.textContent ?? '',
+    )
+    expect(home[1]).toContain('将你传送到你的出生点。')
+    expect(home[1]).toContain('仅游戏内')
+    const worldinfo = [...(findRow('data-command', '/worldinfo')?.querySelectorAll('td') ?? [])].map(
+      (td) => td.textContent ?? '',
+    )
+    expect(worldinfo[1]).not.toContain('仅游戏内')
+  })
+
+  it('详情：节日开关互相关联，并关联 /worldevent', () => {
+    renderPage()
+    const drawer = openDetail('/forcehalloween')
+    expect(drawer.getByText('相关指令（2）')).toBeTruthy()
+    // 关联按钮显示指令名（`/worldevent` 一族取第一行，但标签不变）
+    expect(drawer.getByRole('button', { name: '/forcexmas' })).toBeTruthy()
+    const worldevent = drawer.getByRole('button', { name: '/worldevent' })
+    fireEvent.click(worldevent)
+    // 点了切到世界事件那一条（不关弹框）：取的是该族第一行
+    const next = within(screen.getByTestId('command-detail'))
+    expect(next.getByRole('button', { name: '/forcexmas' })).toBeTruthy()
+  })
+
+  it('详情：参数是 NPC 的指令给「在数据 ID → NPC 里查更多」入口', () => {
+    const { onNavigate } = renderPage()
+    const drawer = openDetail('/spawnboss twins')
+    fireEvent.click(drawer.getByRole('button', { name: /在数据 ID → NPC 里查更多/ }))
+    expect(onNavigate).toHaveBeenCalledWith('dataid')
+
+    // 不是 NPC 指令就没有这个入口
+    const other = openDetail('/hardmode')
+    expect(other.queryByRole('button', { name: /在数据 ID → NPC 里查更多/ })).toBeNull()
+  })
+
+  it('详情：相关指令点了会切到那一条（不关弹框）', () => {
+    renderPage()
+    const drawer = openDetail('/maxspawns 5')
+    expect(drawer.getByText('相关指令（1）')).toBeTruthy()
+    fireEvent.click(drawer.getByRole('button', { name: '/spawnrate' }))
+
+    const next = within(screen.getByTestId('command-detail'))
+    expect(next.getByText('/spawnrate')).toBeTruthy()
+    expect(next.getByText('查询刷怪率')).toBeTruthy()
+  })
+
+  it('详情：别名单独一行（上标签、下别名）', () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    const drawer = openDetail('/godmode')
+    expect(drawer.getByText('别名').tagName).toBe('DT')
+    expect(drawer.getByText('/god')).toBeTruthy()
+  })
+
+  it('没有语法的指令不在详情里编语法', () => {
+    renderPage()
+    for (const command of ['/hardmode', '/evil', '/worldinfo', '/forcehalloween', '/forcexmas']) {
+      const drawer = openDetail(command)
+      expect(drawer.queryByText('指令语法')).toBeNull()
+      fireEvent.click(drawer.getByRole('button', { name: 'Close' }))
+    }
+  })
+
+  it('刷怪率：/maxspawns 与 /spawnrate 各显示自己的语法', () => {
+    renderPage()
+    let drawer = openDetail('/maxspawns 5')
+    expect(drawer.getByText('/maxspawns [数量|default]')).toBeTruthy()
+    expect(drawer.queryByText('/spawnrate [数量|default]')).toBeNull()
+    fireEvent.click(drawer.getByRole('button', { name: 'Close' }))
+
+    drawer = openDetail('/spawnrate 600')
+    expect(drawer.getByText('/spawnrate [数量|default]')).toBeTruthy()
+    expect(drawer.queryByText('/maxspawns [数量|default]')).toBeNull()
+  })
+
+  it('多子项参考行的说明用子命令标签（/warp /region /itemban /projban /tileban /group）', () => {
+    renderPage(makeTestDataset({ commands: realCommands }))
+    expandAllGroups()
+    for (const label of [
+      '定义区域',
+      '添加传送点',
+      '添加物品禁令',
+      '添加弹幕禁令',
+      '添加图格禁令',
+      '列出用户组权限',
+    ]) {
+      expect(table().getByText(label)).toBeTruthy()
+    }
+    // 首行没有子命令标签时仍用 TShock 中文帮助
+    expect(table().getByText('将你传送到一个传送点或者管理传送点。')).toBeTruthy()
   })
 
   it('表格不在卡片里，也不自己滚：整页交给 AppShell 的 `<main>`', () => {

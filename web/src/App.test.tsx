@@ -659,7 +659,7 @@ it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 
   fold('/spawnboss')
   fireEvent.click(row('/spawnboss "king slime"'))
   const detail = await screen.findByTestId('command-detail')
-  fireEvent.click(within(detail).getByRole('button', { name: /填入指令浮窗/ }))
+  fireEvent.click(within(detail).getByRole('button', { name: /执行/ }))
   const win = await screen.findByTestId('terminal-window')
   const input = within(win).getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
   expect(input.value).toBe('/spawnboss "king slime"')
@@ -668,7 +668,7 @@ it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 
   fold('/tpnpc')
   fireEvent.click(row('/tpnpc Angler'))
   const detail2 = await screen.findByTestId('command-detail')
-  fireEvent.click(within(detail2).getByRole('button', { name: /填入指令浮窗/ }))
+  fireEvent.click(within(detail2).getByRole('button', { name: /执行/ }))
   expect(input.value).toBe('/tpnpc Angler')
 })
 it('「聊天」已并入「指令」：侧栏没有聊天，老地址 #/chat 落到指令页', async () => {

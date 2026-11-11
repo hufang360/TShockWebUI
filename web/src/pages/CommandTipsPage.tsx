@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { Check, ChevronRight, Copy, ListFilter, Search, Terminal, X } from 'lucide-react'
+import { Check, ChevronRight, Copy, ExternalLink, ListFilter, Search, Terminal, X } from 'lucide-react'
 import {
+  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -26,9 +27,11 @@ import { PageHelp } from '@/components/PageHelp'
 import { SearchInput } from '@/components/SearchInput'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { TIPS_GROUPS, type TipsGroup } from '@/lib/commandTips'
+import { TIPS_GROUPS, RELATED_COMMANDS, type TipsGroup } from '@/lib/commandTips'
+import { enumLabelsFor } from '@/lib/commandMeta'
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
+import { readDataIdState, rememberDataIdState } from '@/lib/dataIdState'
 import { useI18n } from '@/lib/i18n'
 import { useSearchIntent } from '@/lib/searchIntent'
 import {
@@ -52,13 +55,53 @@ import {
   WORLD_MODE_COMMANDS,
   type CommandTip,
 } from '@/lib/worldCommandTips'
-import type { CommandDef, Dataset, Npc } from '@/types'
+import type { CommandDef, Dataset, Npc, TabId } from '@/types'
+
+/** 参考行的说明：取子命令标签（`/region define` → 定义区域）；占位符开头的（`/warp <warpname>`）没有。 */
+function subcommandLabel(syntax: string, labels: Record<string, string>): string {
+  const first = syntax.trim().split(/\s+/)[1] ?? ''
+  if (!first || /^[<[（(]/.test(first)) return ''
+  return labels[first.toLowerCase()] ?? ''
+}
+
+/**
+ * 详情里的「指令语法」：行自己的覆盖 > 分区里给这条指令的语法 > 分区语法行。
+ * `selfOnly` 的指令（`/kick` `/mute`）返回行本身 ⇒ 等于 `row.command`，详情里不再重复。
+ */
+function rowUsage(
+  row: TableRow,
+  group: TipsGroup,
+  sectionUsage: string | undefined,
+  t: (key: string) => string,
+): string | undefined {
+  if (row.usage !== undefined) return row.usage
+  const name = commandName(row.command)
+  if (group.selfOnly === true || group.selfOnly?.includes(name)) return row.command
+  const key = group.usageKeys?.[name]
+  return key ? t(key) : sectionUsage
+}
+
+/** 详情的「使用提示」：`selfOnly` 的指令不套分区提示（`/tempgroup` 不看 `/group` 的提示）。 */
+function rowHint(row: TableRow, group: TipsGroup, sectionHint: string | undefined): string | undefined {
+  if (row.hint !== undefined) return row.hint
+  const name = commandName(row.command)
+  if (group.selfOnly === true || group.selfOnly?.includes(name)) return ''
+  return sectionHint
+}
 
 interface CommandTipsPageProps {
   dataset: Dataset
+  /** 「数据 ID → NPC」入口（详情里的「在数据 ID 里查更多」）。 */
+  onNavigate?: (tab: TabId) => void
   /** 详情里「填入」的去向；默认填进浮动终端，指令页里改为填进页面输入框。 */
   onPick?: (command: string) => void
 }
+
+/**
+ * 详情里额外给「在数据 ID → NPC 里查更多」入口的指令：
+ * 这几条的参数是 NPC 名称 / ID，去 NPC 列表查更准。
+ */
+const NPC_LOOKUP_COMMANDS = new Set(['spawnboss', 'spawnmob', 'tpnpc', 'butcher', 'renamenpc'])
 
 interface TableRow {
   command: string
@@ -66,10 +109,10 @@ interface TableRow {
   note?: string
   /**
    * 参考行：语法带占位符（`/give <物品> <玩家>`），点了也跑不通，
-   * 所以详情里**只给复制**；`false` / 省略 = 详情里可「填入指令浮窗」。
+   * 所以详情里**只给复制**；`false` / 省略 = 详情里可「执行」（填进浮窗）。
    */
   syntax?: boolean
-  /** 详情：这一类指令的**语法**（分区的语法行，如 `/worldevent <事件>`）。 */
+  /** 详情里这一行的「指令语法」：已按分区 / 指令解析好，`''` = 这条指令没有语法。 */
   usage?: string
   /** 详情抽屉：这一组的额外提示（原来表格里的说明行，如「/tpnpc 只认名称」）。 */
   hint?: string
@@ -98,13 +141,14 @@ function toRows(commands: readonly CommandTip[], lang: 'zh' | 'en'): TableRow[] 
     command: row.command,
     label: row.label[lang],
     note: row.note?.[lang],
+    usage: row.usage?.[lang],
     fold: row.fold,
     foldLabel: row.foldLabel?.[lang],
   }))
 }
 
 /**
- * 指令列多短就肯定不会截断（最窄的手机 11rem ≈ 22 个等宽字符）。
+ * 单元格里的等宽文字多短就肯定不会截断（最窄的手机 11rem ≈ 22 个等宽字符）。
  * 更短的不挂 Tooltip —— 一页几百行，逐个挂 Radix Tooltip 会明显拖慢渲染。
  */
 const TRUNCATE_HINT_MIN = 22
@@ -223,7 +267,14 @@ function toRowGroups(
       groups[at]!.rows.push(row)
     }
   })
-  return groups
+  // 按显示出来的指令（折叠行用前缀）排 a~z，保证指令列整体有序。
+  return groups.sort((a, b) => sortKey(a).localeCompare(sortKey(b)))
+}
+
+/** 排序键：去掉开头的 `/` 与引号，大小写不敏感。 */
+function sortKey(entry: RowGroup): string {
+  const text = entry.stem ?? entry.rows[0]?.command ?? ''
+  return text.replace(/^\//, '').replace(/["“”]/g, '').toLowerCase()
 }
 
 /**
@@ -261,10 +312,43 @@ function CommandCell({
 }
 
 /**
- * 指令表格：**指令在第一列**，后面是说明 / 备注。**单击一行打开右侧详情**（复制 / 填入都在详情里）。
+ * 权限列（`md` 起显示，手机太窄）：等宽小字、超出省略；没有权限写 `-`。
+ * 折叠行传 `undefined`（整组权限不一致，不的代表任何一条）；整组一致时传该权限（`null` = 无权限）。
+ */
+function PermissionCell({ permission }: { permission?: string | null }) {
+  return (
+    <td className="hidden w-[10rem] px-2 py-2 align-top md:table-cell">
+      {permission === undefined ? null : permission ? (
+        <PermissionText value={permission} />
+      ) : (
+        <span className="text-2xs text-muted-foreground">-</span>
+      )}
+    </td>
+  )
+}
+
+/** 权限文字：短的不挂 Tooltip（几百行，逐个挂 Radix Tooltip 太重）。 */
+function PermissionText({ value }: { value: string }) {
+  const content = (
+    <span className="block max-w-[10rem] truncate font-mono text-2xs text-foreground">{value}</span>
+  )
+  if (value.length <= TRUNCATE_HINT_MIN) return content
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{content}</TooltipTrigger>
+      <TooltipContent className="max-w-[min(24rem,85vw)] font-mono text-xs break-all">
+        {value}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * 指令表格：**指令在第一列**，后面是说明 / 权限 / 备注。**单击一行打开右侧详情**（复制 / 填入都在详情里）。
  *
  * - 同一前缀的行（`/worldevent invasion …`、`/worldmode …`）默认折成一行，点一下展开；
  *   分组标题不单独占一行，而是折叠行的「说明」（`/worldevent` → 世界事件）；
+ * - 每个分区内的行按**指令列 a~z** 排序（折叠行用它的前缀参与排序）；
  * - 参考行（`syntax` 为真）：语法带占位符，填进浮窗也跑不通，详情里只给复制；
  * - 表格**不在卡片里**，本身也不滚动：整页交给 AppShell 的 `<main>` 滚（浏览器右侧那条滚动条），
  *   表头吸在**工具条下面**（`--page-sticky-top`，实测工具条高度）；
@@ -283,9 +367,6 @@ function CommandTable({
   const { t } = useI18n()
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const onlyInGame = t('commands.onlyInGame')
-  const hasNote = groups.some((group) =>
-    group.rows.some((row) => row.note || ingameOnly(row)),
-  )
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -297,24 +378,27 @@ function CommandTable({
   }
 
   /**
-   * 说明列：单行、超出省略。`w-full max-w-0` 是让单元格能省略的固定写法
+   * 说明列（= 原来的说明 + 备注合并）：`主说明 · 备注`，单行、超出省略。
+   * `w-full max-w-0` 是让单元格能省略的固定写法
    * （单元格自己的 `max-width` 在自动布局表格里不可靠，靠它把剩余宽度吃掉）。
    */
-  const labelCell = (label: string) => (
+  const labelCell = (label: string, note?: string) => (
     <td className="w-full max-w-0 px-2 py-2 text-xs text-foreground">
-      <div className="truncate">{label}</div>
+      <div className="truncate">
+        {label}
+        {note ? <span className="text-2xs"> · {note}</span> : null}
+      </div>
     </td>
   )
 
-  /** 备注列：单行、超出省略（手机端隐藏）。 */
-  const noteCell = (note: string) => (
-    <td className="hidden w-[7.5rem] px-2 py-2 text-2xs text-foreground sm:table-cell">
-      <div className="truncate">{note}</div>
-    </td>
-  )
+  /** 折叠行：整组权限一致才显示那一个，否则留空。 */
+  const sharedPermission = (rows: TableRow[]): string | null | undefined => {
+    const first = rows[0]?.def?.permission ?? null
+    return rows.every((row) => (row.def?.permission ?? null) === first) ? first : undefined
+  }
 
   /**
-   * 一行三格。备注列：行自己的备注（`#22` 等）；**仅游戏内**的标记只给「不缩进的单行」——
+   * 一行三格。备注并入说明列：行自己的备注（`#22` 等）；**仅游戏内**的标记只给「不缩进的单行」——
    * 折叠组里的子行不再重复（父行已经标了）。
    */
   const rowCells = (row: TableRow, text: string, indent: boolean) => {
@@ -322,8 +406,8 @@ function CommandTable({
     return (
       <>
         <CommandCell text={text} className={commandCellClass(ingameOnly(row))} indent={indent} />
-        {labelCell(row.label)}
-        {hasNote && noteCell(note)}
+        {labelCell(row.label, note)}
+        <PermissionCell permission={row.def?.permission ?? null} />
       </>
     )
   }
@@ -340,11 +424,9 @@ function CommandTable({
               <th scope="col" className="px-2 py-2 font-medium">
                 {t('commands.col.name')}
               </th>
-              {hasNote && (
-                <th scope="col" className="hidden px-2 py-2 font-medium sm:table-cell">
-                  {t('commands.col.note')}
-                </th>
-              )}
+              <th scope="col" className="hidden px-2 py-2 font-medium md:table-cell">
+                {t('commands.col.permission')}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -357,7 +439,7 @@ function CommandTable({
                     // 整组都只能在游戏内执行 → 标记只写在折叠行（子行不重复）
                     const allIngame = entry.rows.every(ingameOnly)
                     // 折叠行的「说明」：条目可以自己声明（`/worldevent rain` → 雨），否则用分区标题。
-                    const foldLabel = entry.rows.find((row) => row.foldLabel)?.foldLabel ?? group.title
+                    const foldLabel = entry.rows.find((row) => row.foldLabel)?.foldLabel ?? group.title ?? ''
                     return (
                       <Fragment key={key}>
                         <tr
@@ -381,10 +463,8 @@ function CommandTable({
                               <span className={commandCellClass(allIngame)}>{entry.stem}</span>
                             </button>
                           </td>
-                          <td className="w-full max-w-0 px-2 py-2 text-xs text-foreground">
-                            <div className="truncate">{foldLabel}</div>
-                          </td>
-                          {hasNote && noteCell(allIngame ? onlyInGame : '')}
+                          {labelCell(foldLabel, allIngame ? onlyInGame : '')}
+                          <PermissionCell permission={sharedPermission(entry.rows)} />
                         </tr>
                         {open &&
                           entry.rows.map((row, j) => (
@@ -474,7 +554,7 @@ function GroupList({
  * 参考行（语法带占位符）在详情里只提供复制。
  * 权限与执行结果都由 TShock 判定。
  */
-export function CommandTipsPage({ dataset, onPick }: CommandTipsPageProps) {
+export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPageProps) {
   const { t, lang } = useI18n()
   const { open } = useTerminal()
   const pick = onPick ?? open
@@ -573,7 +653,8 @@ export function CommandTipsPage({ dataset, onPick }: CommandTipsPageProps) {
     /**
      * 参考行：`/give <item type/id> <player> …` 这种语法来自 `data/commands.json` 的 `paramSets`
      * （TShock 源码提取），每个 `paramSet` 一行；`allowServer=false` 的标「仅游戏内」。
-     * 同一条指令的说明只写在该指令的第一行（`/region` 有 10 个子命令，不至于重复 10 次）。
+     * 说明优先用子命令标签（`lib/commandMeta.ts` 的 `LABELS`：`/region define` → 定义区域）；
+     * 首行没有子命令标签时写 TShock 中文帮助（`/warp` 有 6 种写法，不至于重复 6 次）。
      */
     const referenceRows = (group: TipsGroup): TableRow[] => {
       const curated = new Set((curatedRows[group.id] ?? []).map((row) => commandName(row.command)))
@@ -586,10 +667,12 @@ export function CommandTipsPage({ dataset, onPick }: CommandTipsPageProps) {
           ? [...new Set(command.paramSets.map((set) => set.syntax))]
           : [command.name]
         const help = command.helpZh ?? command.help
+        const labels = enumLabelsFor(command.name, lang, dataset.npcs)
         syntaxes.forEach((syntax, index) => {
+          const sub = subcommandLabel(syntax, labels)
           rows.push({
             command: `/${syntax}`,
-            label: index === 0 ? help : '',
+            label: sub || (index === 0 ? help : ''),
             syntax: true,
             def: command,
           })
@@ -600,25 +683,26 @@ export function CommandTipsPage({ dataset, onPick }: CommandTipsPageProps) {
 
     return TIPS_GROUPS.map((group) => {
       const title = t(group.titleKey)
-      const usage = group.usageKey ? t(group.usageKey) : undefined
-      const hint = group.hintKey ? t(group.hintKey) : undefined
+      const sectionUsage = group.usageKey ? t(group.usageKey) : undefined
+      const sectionHint = group.hintKey ? t(group.hintKey) : undefined
       // 详情要「这一类怎么写 / 权限 / 有什么坑」，所以把上下文挂到行上。
+      // 个别指令只讲自己（`/kick` `/mute` 不套 `/ban` 的语法与提示），见 `TipsGroup.selfOnly`。
       const rows = [...(curatedRows[group.id] ?? []), ...referenceRows(group)].map((row) => ({
         ...row,
-        usage,
-        hint,
+        usage: rowUsage(row, group, sectionUsage, t),
+        hint: rowHint(row, group, sectionHint),
         def: row.def ?? commandsByName.get(commandName(row.command)),
       }))
       return {
         id: group.id,
         title,
-        usage,
-        hint,
+        usage: sectionUsage,
+        hint: sectionHint,
         folds: group.folds,
         rows,
       }
     })
-  }, [t, curatedRows, commandsByName])
+  }, [t, curatedRows, commandsByName, lang, dataset.npcs])
 
   const entries = useMemo(
     () => sections.map((section) => ({ id: section.id, title: section.title ?? '', count: section.rows.length })),
@@ -656,6 +740,28 @@ export function CommandTipsPage({ dataset, onPick }: CommandTipsPageProps) {
     const found = TIPS_GROUPS.find((group) => group.id === activeId)
     return found ? t(found.titleKey) : t('commands.groups.all')
   }, [activeId, t])
+
+  /** 指令名 → 第一条行（相关指令跳转用；`/region` 这类多子命令取第一行）。 */
+  const firstRowByName = useMemo(() => {
+    const map = new Map<string, TableRow>()
+    for (const section of sections) {
+      for (const row of section.rows) {
+        const name = commandName(row.command)
+        if (!map.has(name)) map.set(name, row)
+      }
+    }
+    return map
+  }, [sections])
+
+  const relatedRows = useMemo(() => {
+    if (!detail) return []
+    const names = RELATED_COMMANDS[commandName(detail.command)] ?? []
+    return names.flatMap((name) => {
+      const found = firstRowByName.get(name)
+      // 按钮显示**相关的那条指令名**（`/worldevent` 这类一族指令取第一行，但标签不跟着变）
+      return found ? [{ label: `/${name}`, row: found }] : []
+    })
+  }, [detail, firstRowByName])
 
   /** 选中分组：清空搜索（避免「选了组又搜不到」的死路）。 */
   const selectGroup = (id: string | null) => {
@@ -766,7 +872,21 @@ export function CommandTipsPage({ dataset, onPick }: CommandTipsPageProps) {
         </DrawerContent>
       </Drawer>
 
-      <CommandDetailDialog row={detail} onClose={() => setDetail(null)} onPick={pick} />
+      <CommandDetailDialog
+        row={detail}
+        related={relatedRows}
+        onSelect={setDetail}
+        onClose={() => setDetail(null)}
+        onPick={pick}
+        onOpenNpc={
+          onNavigate
+            ? () => {
+                rememberDataIdState({ ...readDataIdState(), kind: 'npc', npcFilter: '', scrollTop: 0 })
+                onNavigate('dataid')
+              }
+            : undefined
+        }
+      />
     </div>
   )
 }
@@ -785,20 +905,28 @@ function DetailField({ label, children }: { label: string; children: ReactNode }
  * 「指令帮助」弹框（居中 dialog）。
  *
  * 一张表里同一类指令很多（`/worldevent bloodmoon`、`/worldevent eclipse` …），
- * 所以先给**这一类怎么写**（指令语法 = 分区的语法行），再给这一条的
+ * 所以先给**这一条怎么写**（指令语法 = 行自己的 / 分区的语法行），再给这一条的
  * 权限（`tshock.world.events` 之类，来自 `data/commands.json`）、能否在网页端执行（`allowServer`）、
- * 这一组的提示与别名。
+ * 提示、别名与相关指令。
  *
  * 用 dialog 而不是右侧抽屉：规范写法 / 权限 / 提示文字都很长，抽屉那点宽度只能频繁折行。
  */
 function CommandDetailDialog({
   row,
+  related,
+  onSelect,
   onClose,
   onPick,
+  onOpenNpc,
 }: {
   row: TableRow | null
+  /** 「相关指令」：标签 + 点一下切到那一条的详情。 */
+  related: readonly { label: string; row: TableRow }[]
+  onSelect: (row: TableRow) => void
   onClose: () => void
   onPick: (command: string) => void
+  /** 「在数据 ID → NPC 里查更多」；没传就不显示这个入口。 */
+  onOpenNpc?: () => void
 }) {
   const { t } = useI18n()
   const def = row?.def
@@ -815,7 +943,7 @@ function CommandDetailDialog({
         data-testid="command-detail"
         // 标题 + 指令就是说明，不再额外渲染 `DialogDescription`。
         aria-describedby={undefined}
-        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-0"
         // Radix 默认聚焦第一个可 Tab 元素（这里是指令旁的复制键）；改成聚焦弹框本身（标题可读）。
         onOpenAutoFocus={(event) => {
           event.preventDefault()
@@ -828,7 +956,11 @@ function CommandDetailDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
           {/* 上段：这条指令怎么用（指令 + 说明 + 使用提示） */}
-          <CommandBlock value={row?.command ?? ''} testId="command-detail-copy" />
+          <CommandBlock
+            value={row?.command ?? ''}
+            testId="command-detail-copy"
+            ingame={row ? ingameOnly(row) : false}
+          />
           {row?.label && <p className="mt-2 text-xs text-foreground">{row.label}</p>}
           {row?.hint && (
             <div className="mt-2 flex flex-col gap-0.5">
@@ -839,7 +971,7 @@ function CommandDetailDialog({
             </div>
           )}
 
-          {/* 下段：技术细节（指令语法 / 权限），字号降一档、颜色变淡 */}
+          {/* 下段：技术细节（指令语法 / 权限 / 别名），字号降一档 */}
           <dl className="mt-4 flex flex-col gap-3 border-t border-border/60 pt-3">
             {canonical && (
               <DetailField label={t('commands.detail.canonical')}>
@@ -858,14 +990,51 @@ function CommandDetailDialog({
                   {t('commands.detail.noPermission')}
                 </DetailField>
               ))}
+            {/* 别名：标签一行、别名一行（没有别名就不占位） */}
+            {def && def.aliases.length > 0 && (
+              <DetailField label={t('commands.detail.aliases')}>
+                <span className="font-mono text-2xs">
+                  {def.aliases.map((alias) => `/${alias}`).join('  ')}
+                </span>
+              </DetailField>
+            )}
           </dl>
 
-          {/* 元信息：别名（没有别名就不占位） */}
-          {def && def.aliases.length > 0 && (
-            <div className="mt-3 text-2xs text-foreground">
-              <span className="font-mono">
-                {t('commands.detail.aliases')} {def.aliases.map((alias) => `/${alias}`).join(' ')}
+          {/* 参数是 NPC 名称 / ID 的指令：给一个去 NPC 列表的入口 */}
+          {onOpenNpc && row && NPC_LOOKUP_COMMANDS.has(commandName(row.command)) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => {
+                onOpenNpc()
+                onClose()
+              }}
+            >
+              <ExternalLink data-icon="inline-start" />
+              {t('commands.detail.npcLink')}
+            </Button>
+          )}
+
+          {/* 相关指令：点一下把弹框切到那一条（不关弹框、不改表格筛选） */}
+          {related.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1">
+              <span className="text-2xs text-foreground">
+                {t('commandLine.withCount', { label: t('commandLine.related'), n: related.length })}
               </span>
+              <div className="flex flex-wrap gap-1">
+                {related.map((item) => (
+                  <Button
+                    key={item.label}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 max-w-full px-2 font-mono text-2xs"
+                    onClick={() => onSelect(item.row)}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -932,14 +1101,30 @@ function CopyOnHover({
  * 详情顶部的**指令本身**：等宽加粗、比正文大一号、无底色。
  * 复制键跟在指令右边，悬停 / 聚焦才出现。
  */
-function CommandBlock({ value, testId }: { value: string; testId?: string }) {
+function CommandBlock({
+  value,
+  testId,
+  ingame,
+}: {
+  value: string
+  testId?: string
+  /** 只能在游戏内执行（`allowServer=false`）：红字 + 徽标。 */
+  ingame: boolean
+}) {
+  const { t } = useI18n()
   const [copied, copy] = useCopy(value)
   return (
     <div className="group/copy flex min-w-0 flex-wrap items-center gap-1">
-      <span className="min-w-0 font-mono text-sm font-semibold break-all text-foreground">
+      <span
+        className={cn(
+          'min-w-0 font-mono text-sm font-semibold break-all',
+          ingame ? 'text-destructive' : 'text-foreground',
+        )}
+      >
         {value}
       </span>
       <CopyOnHover copied={copied} testId={testId} onCopy={copy} />
+      {ingame && <Badge tone="danger">{t('commands.onlyInGame')}</Badge>}
     </div>
   )
 }

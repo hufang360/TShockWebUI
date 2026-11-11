@@ -237,7 +237,7 @@ export function AppRoutes({
         />
       )}
       {activeTab === 'commands' && (
-        <CommandTipsPage dataset={dataset} />
+        <CommandTipsPage dataset={dataset} onNavigate={onNavigate} />
       )}
       {activeTab === 'world' && (
         <CommandModulePage

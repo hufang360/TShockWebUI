@@ -34,6 +34,11 @@ export interface CommandTip {
   fold?: string
   /** 折叠行「说明」列的文字（不给就用分区标题，如 `/worldevent` → 世界事件）。 */
   foldLabel?: { zh: string; en: string }
+  /**
+   * 详情里的「指令语法」，覆盖分区语法行；`''` = 这条指令本来就没有语法（`/hardmode`、`/evil`）。
+   * 不写 = 用分区语法行（`/worldevent <事件>`）。
+   */
+  usage?: { zh: string; en: string }
 }
 
 /** `/worldevent` 的事件（不含入侵，入侵见下）。 */
@@ -68,8 +73,16 @@ export const WORLD_INVASION_COMMANDS: CommandTip[] = [
 
 /** 节日模式：无参数，再执行一次关闭。 */
 export const HOLIDAY_COMMANDS: CommandTip[] = [
-  { command: '/forcehalloween', label: { zh: '万圣节模式（再执行关闭）', en: 'Halloween mode (toggle)' } },
-  { command: '/forcexmas', label: { zh: '圣诞节模式（再执行关闭）', en: 'Christmas mode (toggle)' } },
+  {
+    command: '/forcehalloween',
+    label: { zh: '万圣节模式（再执行关闭）', en: 'Halloween mode (toggle)' },
+    usage: { zh: '', en: '' },
+  },
+  {
+    command: '/forcexmas',
+    label: { zh: '圣诞节模式（再执行关闭）', en: 'Christmas mode (toggle)' },
+    usage: { zh: '', en: '' },
+  },
 ]
 
 /**
@@ -82,9 +95,9 @@ export const WORLD_MODE_COMMANDS: CommandTip[] = [
   { command: '/worldmode expert', label: { zh: '专家', en: 'Expert' } },
   { command: '/worldmode master', label: { zh: '大师', en: 'Master' } },
   { command: '/worldmode journey', label: { zh: '旅途（creative 同义）', en: 'Journey (creative alias)' } },
-  { command: '/hardmode', label: { zh: '切换困难模式', en: 'Toggle hardmode' } },
-  { command: '/evil', label: { zh: '切换腐化 / 猩红', en: 'Toggle corruption / crimson' } },
-  { command: '/worldinfo', label: { zh: '查看世界信息', en: 'World info' } },
+  { command: '/hardmode', label: { zh: '切换困难模式', en: 'Toggle hardmode' }, usage: { zh: '', en: '' } },
+  { command: '/evil', label: { zh: '切换腐化 / 猩红', en: 'Toggle corruption / crimson' }, usage: { zh: '', en: '' } },
+  { command: '/worldinfo', label: { zh: '查看世界信息', en: 'World info' }, usage: { zh: '', en: '' } },
 ]
 
 /** 时间（`/time`）。 */
