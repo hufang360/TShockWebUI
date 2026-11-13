@@ -2,7 +2,7 @@
 
 TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达给在线玩家与服务器，再把游戏内的真实结果带回网页。
 
-> 版本 **0.1.0-rc.9**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
+> 版本 **0.1.0-rc.10**（`WebUI.csproj`）；项目地址：本仓库 `plugin/WebUI/`（TShockWebUI）；目标框架 net9.0 / TShock 6.2.1；
 > 配置 `<TShock SavePath>/WebUI/config.json`。
 
 核心能力：

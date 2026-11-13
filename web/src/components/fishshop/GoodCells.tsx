@@ -56,7 +56,7 @@ export const GOOD_GRID_CLASS: Record<GoodIconSize, string> = {
  * 格子被锁成 36px 高、图标与名称溢出压到下一行（整片商品互相重叠）。所以 `h-auto` 要连 `md:h-auto` 一起写。
  */
 const CELL_CLASS =
-  'group/cell grid h-auto cursor-pointer place-items-center gap-1 rounded-container px-0 py-0 font-normal transition duration-150 hover:-translate-y-0.5 hover:bg-transparent hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-auto'
+  'group/cell grid h-auto cursor-pointer place-items-center gap-1 rounded-container px-0 py-0 font-normal transition duration-150 hover:-translate-y-0.5 hover:bg-transparent hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:h-auto'
 
 /** 图标区：默认无底色（尺寸随档位走）；hover / 键盘聚焦时才铺 `bg-primary/10`（与物品 / NPC 格子一致）。 */
 const ICON_SURFACE_CLASS =

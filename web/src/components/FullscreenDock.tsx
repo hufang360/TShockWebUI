@@ -63,7 +63,7 @@ export function FullscreenDock({ label, children }: FullscreenDockProps) {
             setFocused(true)
             setExpanded(true)
           }}
-          className="block h-14 w-3 cursor-pointer rounded-l-full rounded-r-none bg-border transition-colors hover:bg-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="block h-14 w-3 cursor-pointer rounded-l-full rounded-r-none bg-border transition-colors hover:bg-muted-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring "
         />
       )}
     </div>

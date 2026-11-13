@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { inflateRawSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { buildZip } from '@/lib/spriteSheet/zip'
+import { buildZip } from '@/lib/zipWrite'
 import { readZip } from './zip'
 import {
   LanguagePackError,

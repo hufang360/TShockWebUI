@@ -15,7 +15,6 @@ import type { Dataset, Settings, TabId } from '@/types'
 
 // 首屏只保留首页与指令页；重数据页 / 插件页按导航需求加载。
 const loadCommandModulePage = () => import('@/pages/CommandModulePage')
-const loadCommandTipsPage = () => import('@/pages/CommandTipsPage')
 const loadDataIdPage = () => import('@/pages/DataIdPage')
 const loadFishShopPage = () => import('@/pages/FishShopPage')
 const loadItemsPage = () => import('@/pages/ItemsPage')
@@ -23,14 +22,11 @@ const loadPlayerManagerPage = () => import('@/pages/PlayerManagerPage')
 const loadPlrPage = () => import('@/pages/PlrPage')
 const loadRequisitionPage = () => import('@/pages/RequisitionPage')
 const loadSettingsPage = () => import('@/pages/SettingsPage')
-const loadSpriteSheetPage = () => import('@/pages/SpriteSheetPage')
+const loadTablesPage = () => import('@/pages/TablesPage')
 const loadWorldPage = () => import('@/pages/WorldPage')
 
 const CommandModulePage = lazy(() =>
   loadCommandModulePage().then((m) => ({ default: m.CommandModulePage })),
-)
-const CommandTipsPage = lazy(() =>
-  loadCommandTipsPage().then((m) => ({ default: m.CommandTipsPage })),
 )
 const DataIdPage = lazy(() => loadDataIdPage().then((m) => ({ default: m.DataIdPage })))
 const FishShopPage = lazy(() => loadFishShopPage().then((m) => ({ default: m.FishShopPage })))
@@ -43,9 +39,7 @@ const RequisitionPage = lazy(() =>
   loadRequisitionPage().then((m) => ({ default: m.RequisitionPage })),
 )
 const SettingsPage = lazy(() => loadSettingsPage().then((m) => ({ default: m.SettingsPage })))
-const SpriteSheetPage = lazy(() =>
-  loadSpriteSheetPage().then((m) => ({ default: m.SpriteSheetPage })),
-)
+const TablesPage = lazy(() => loadTablesPage().then((m) => ({ default: m.TablesPage })))
 const WorldPage = lazy(() => loadWorldPage().then((m) => ({ default: m.WorldPage })))
 
 const routeLoaders: Partial<Record<TabId, () => Promise<unknown>>> = {
@@ -53,11 +47,10 @@ const routeLoaders: Partial<Record<TabId, () => Promise<unknown>>> = {
   dataid: loadDataIdPage,
   save: loadPlrPage,
   worldview: loadWorldPage,
-  spritesheet: loadSpriteSheetPage,
+  tables: loadTablesPage,
   players: loadPlayerManagerPage,
   store: loadFishShopPage,
   requisition: loadRequisitionPage,
-  commands: loadCommandTipsPage,
   world: loadCommandModulePage,
   settings: loadSettingsPage,
 }
@@ -205,7 +198,7 @@ export function AppRoutes({
       )}
       {activeTab === 'save' && <PlrPage serverId={serverId} transport={transport} />}
       {activeTab === 'worldview' && <WorldPage serverId={serverId} />}
-      {activeTab === 'spritesheet' && <SpriteSheetPage />}
+      {activeTab === 'tables' && <TablesPage dataset={dataset} onNavigate={onNavigate} />}
       {activeTab === 'players' && (
         <PlayerManagerPage
           key={serverId}
@@ -238,9 +231,6 @@ export function AppRoutes({
           onTokenInvalid={onTokenInvalid}
           onLogin={openLogin}
         />
-      )}
-      {activeTab === 'commands' && (
-        <CommandTipsPage dataset={dataset} onNavigate={onNavigate} />
       )}
       {activeTab === 'world' && (
         <CommandModulePage

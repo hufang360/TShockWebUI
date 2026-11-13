@@ -47,7 +47,7 @@ export function ResizableHandle({
         'group/handle relative flex w-px items-center justify-center bg-border/60 transition-colors',
         // 视觉上 1px，但抓取区左右各 4px（伪元素），鼠标不用瞄准。
         'after:absolute after:inset-y-0 after:left-1/2 after:w-2 after:-translate-x-1/2',
-        'hover:bg-border focus-visible:ring-ring focus-visible:ring-1 focus-visible:outline-none',
+        'hover:bg-border focus-visible:outline-ring focus-visible:outline-1 ',
         'data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full',
         'data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1',
         'data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2',

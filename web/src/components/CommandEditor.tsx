@@ -578,7 +578,7 @@ export function CommandEditor({
                     onMouseEnter={() => setHighlight(idx)}
                     onClick={() => accept(item)}
                     className={cn(
-                      'flex w-full items-center gap-2 px-3 text-left text-sm focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                      'flex w-full items-center gap-2 px-3 text-left text-sm focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
                       item.kind === 'command' ? 'py-2' : 'py-2',
                       idx === highlight ? 'bg-accent' : 'hover:bg-accent',
                     )}

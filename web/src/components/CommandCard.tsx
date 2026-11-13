@@ -248,7 +248,7 @@ export function CommandCard({
                           <span
                             tabIndex={0}
                             data-stale="true"
-                            className="shrink-0 cursor-help rounded-chip tabular-nums text-warning focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            className="shrink-0 cursor-help rounded-chip tabular-nums text-warning focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring "
                           >
                             {lastRunLabel}
                           </span>

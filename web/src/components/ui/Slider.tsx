@@ -41,7 +41,7 @@ export function Slider({
           data-slot="slider-thumb"
           className={cn(
             'block size-4 shrink-0 rounded-full border border-primary bg-background shadow-sm transition-[color,box-shadow]',
-            'hover:ring-4 hover:ring-ring/30 focus-visible:ring-4 focus-visible:ring-ring/40 focus-visible:outline-none',
+            'hover:ring-4 hover:ring-ring/30 focus-visible:outline-4 focus-visible:outline-ring/40 ',
             'disabled:pointer-events-none',
           )}
         />

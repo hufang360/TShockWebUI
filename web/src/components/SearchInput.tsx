@@ -296,7 +296,7 @@ export function SearchInput({
                   else onValueChange(h)
                   setOpen(false)
                 }}
-                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring "
               >
                 <History className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{h}</span>

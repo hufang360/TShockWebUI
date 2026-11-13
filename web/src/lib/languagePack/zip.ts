@@ -1,7 +1,7 @@
 /**
  * 最小 ZIP **读取器**（支持 store / deflate，不支持 zip64 / 加密）。
  *
- * 用途：导入 Terraria 语言材质包（创意工坊 zip）。项目里已有只写 store 的 `spriteSheet/zip.ts`，
+ * 用途：导入 Terraria 语言材质包（创意工坊 zip）。项目里已有只写 store 的 `lib/zipWrite.ts`，
  * 读取这边优先用浏览器原生 `DecompressionStream('deflate-raw')`，避免引入第三方依赖
  * （zip 里的文件基本都是 deflate，见 docs/计划-语言材质包.md §2.2）。
  */

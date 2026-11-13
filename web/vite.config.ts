@@ -22,6 +22,7 @@ function dataDirPlugin(): Plugin {
   const contentTypes: Record<string, string> = {
     '.json': 'application/json; charset=utf-8',
     '.png': 'image/png',
+    '.gif': 'image/gif',
   }
   return {
     name: 'tswui-data-dir',

@@ -11,6 +11,7 @@ build/
 .agents/
 .pi/
 .impeccable/
+.claude/
 
 # 单文件构建时前端产物被拷入此处（server/main.go 用 //go:embed 内嵌），不入库
 server/internal/webdist/*

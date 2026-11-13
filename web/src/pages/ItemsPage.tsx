@@ -107,7 +107,7 @@ function DexSettingField({
               <button
                 type="button"
                 aria-label={`${label}：${hint}`}
-                className="grid size-5 shrink-0 cursor-help place-items-center rounded-chip text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="grid size-5 shrink-0 cursor-help place-items-center rounded-chip text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring "
               >
                 <Info className="size-3.5" />
               </button>

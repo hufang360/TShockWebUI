@@ -267,7 +267,7 @@ export function RecipeRow({
       onKeyDown={pickKeyDown(onPick)}
       className={cn(
         RECIPE_ROW_CLASS,
-        onPick && 'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        onPick && 'cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
       )}
     >
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
@@ -346,7 +346,7 @@ export function ReverseRecipeRow({
       className={cn(
         // 反向配方只靠行内「微光」文案区分，不再用虚线边框（统一成同一种底色）。
         RECIPE_ROW_CLASS,
-        onPick && 'cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        onPick && 'cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
       )}
     >
       <ItemChip id={itemId} dataset={dataset} iconOnly={iconOnly} className="text-foreground" />

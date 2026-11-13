@@ -173,7 +173,7 @@ function RowButton({
             onClick={onClick}
             className={cn(
               'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors md:size-6',
-              'hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+              'hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
             )}
           >
             {children}

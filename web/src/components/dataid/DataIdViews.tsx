@@ -28,7 +28,7 @@ const ICON_GRID =
 const CELL_CLASS =
   'group/cell flex w-18 cursor-pointer flex-col items-center gap-1 rounded-container text-center transition'
 const CELL_HOVER =
-  'hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+  'hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
 /** 图标区：默认**无底色**、无描边，72×72；hover 时才铺 `bg-primary/10`。 */
 const ICON_CELL_BG =
   'flex size-18 items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10'
@@ -38,7 +38,7 @@ const ICON_CELL_BG =
  * `cursor-pointer` 与 `selectableRow()` 的事件配对使用。
  */
 const ROW_CLASS =
-  'cursor-pointer border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-none'
+  'cursor-pointer border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10 focus-visible:bg-primary/10 '
 
 export function NpcCell({
   npc,

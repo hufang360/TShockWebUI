@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ChevronLeft, Copy, History, Search, Terminal as TerminalIcon, X, type LucideIcon } from 'lucide-react'
+import {
+  ArrowRight,
+  ChevronLeft,
+  Delete as DeleteKey,
+  History,
+  Search,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { BuffIcon } from '@/components/BuffIcon'
 import { IconAction } from '@/components/IconAction'
 import { ItemIcon } from '@/components/ItemIcon'
 import { NpcSprite } from '@/components/NpcSprite'
+import { CommandOutput } from '@/components/ResultPanel'
 import {
   Button,
   Command,
@@ -24,12 +33,21 @@ import { toast } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { searchEverything, type GlobalSearchSources, type SearchGroupId, type SearchHit } from '@/lib/globalSearch'
+import {
+  commandInvocation,
+  searchEverything,
+  searchGroup,
+  type GlobalSearchSources,
+  type SearchGroupDetail,
+  type SearchGroupId,
+  type SearchHit,
+} from '@/lib/globalSearch'
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
-import { shortcutLabel } from '@/lib/keyboard'
+import { modKeyLabel, shortcutLabel } from '@/lib/keyboard'
 import type { SearchIntent } from '@/lib/searchIntent'
+import { forgetDrill, recallDrill, rememberDrill } from '@/lib/searchDrill'
 import { StorageKeys } from '@/lib/storage'
 import { useTerminal } from '@/lib/terminalContext'
 import type { CommandResult, TabId } from '@/types'
@@ -42,11 +60,17 @@ import type { CommandResult, TabId } from '@/types'
  *   侧栏收起时快捷键照样能用（不需要先展开侧栏）。
  * - 移动端入口：内容区顶栏的搜索图标（侧栏是抽屉，点里面的入口会叠两层遮罩）。
  *
+ * 弹框内是**三层**：
+ * 1. 一级：按域分组的前几条，被截掉的组末行是「更多」→ 进二级；
+ * 2. 二级：该组的前 `MAX_PER_GROUP_DETAIL` 条，更多的才「更多」（右侧写目标页，跳页 + 预填词）；
+ * 3. 指令的执行结果（只有指令有）：留在弹框里显示输出，`Esc` 回上一层。
+ *
+ * 行的操作**只有键盘**：`Enter` 走主操作（打开 / 查看 / 执行 / 填入终端）、`⌘/Ctrl+C` 复制。
+ * 行上不放图标按钮——每个动作都在底栏写明，不用猜哪个图标是复制。底栏文案跟着**高亮行**变。
+ *
  * 结果列表用 shadcn `Command`（cmdk）：分组、键盘导航、`aria-activedescendant` 由它管；
  * **排序与匹配不交给 cmdk**（`shouldFilter={false}`），我们按域分组 + 固定组顺序 + 自己的打分。
- * 物品就地弹「物品详情」；其余跳页并带预填意图（`lib/searchIntent.ts`）。
  */
-
 const GROUP_LABEL: Record<SearchGroupId, string> = {
   pages: 'search.group.pages',
   items: 'search.group.items',
@@ -58,6 +82,11 @@ const GROUP_LABEL: Record<SearchGroupId, string> = {
   goods: 'search.group.goods',
   collections: 'search.group.collections',
 }
+
+/** 一级「更多」行的 cmdk value（二级没展开时的记忆位置也用它）。 */
+const seeAllValue = (group: SearchGroupId) => `${group}:more`
+/** 二级「更多」行的 value（和一级那行区分开）。 */
+const seeAllPageValue = (group: SearchGroupId) => `${group}:more-page`
 
 function runHit(
   hit: SearchHit,
@@ -105,50 +134,72 @@ function HitIcon({ hit, sources }: { hit: SearchHit; sources: GlobalSearchSource
   return <LucideGlyph aria-hidden className="size-4 shrink-0 text-muted-foreground" />
 }
 
-interface ResultGroupsProps {
-  query: string
-  groups: ReturnType<typeof searchEverything>
+/** 结果行（一级分组与二级组内列表共用，保证两层的行长得一样）。 */
+function HitRow({
+  hit,
+  sources,
+  onPick,
+  label,
+}: {
+  hit: SearchHit
   sources: GlobalSearchSources
   onPick: (hit: SearchHit) => void
-  onNavigate: (tab: TabId, intent?: SearchIntent) => void
-  /** 行内「复制」（ID / 指令）。 */
-  onCopy: (text: string) => void
-  /** 行内「填入浮动终端」（只有指令行有）。 */
-  onFillTerminal: (command: string) => void
-  /** 浮动终端当前不可用（未登录 / 未开启）时，不显示「填入终端」，避免点了没反应。 */
-  canFillTerminal: boolean
+  /** 覆盖显示文字（「执行指令：/wm find …」这种带前缀的整行）。 */
+  label?: string
+}) {
+  const { t } = useI18n()
+  return (
+    <CommandItem
+      value={hit.id}
+      onSelect={() => onPick(hit)}
+      // 仅游戏内（`allowServer === false`）：和「指令小抄」一样用语义红标出来，不自作主张执行。
+      className={cn(hit.inGameOnly && 'text-destructive data-[selected=true]:text-destructive')}
+    >
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        <HitIcon hit={hit} sources={sources} />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label ?? hit.name}</span>
+      {hit.inGameOnly ? (
+        <span className="shrink-0 text-2xs opacity-80">{t('commands.onlyInGame')}</span>
+      ) : (
+        hit.meta && (
+          // 真正贴右（名字 `flex-1` 吃掉剩余空间，不在右侧留预留位）。
+          <span className="max-w-[45%] shrink-0 truncate text-2xs text-muted-foreground">
+            {hit.meta}
+          </span>
+        )
+      )}
+    </CommandItem>
+  )
 }
 
 /**
- * 行内操作按钮。
- *
- * 为什么是 `span` + `onClick` 而不是 `<button>`：cmdk 的行是 `role="option"`，ARIA 规定其子元素
- * 都是「呈现型」的，放真按钮屏幕阅读器也读不到。所以这里做成**鼠标**辅助（`aria-hidden`），
- * 键盘路径是 `Enter` 打开该行（详情 / 数据 ID / 指令小抄页里都有复制入口）。
+ * 「更多」一行：一级进二级，二级却要离开弹框。
+ * 右侧弱化信息负责说清差别——一级是命中数，二级是目标页面名。
  */
-function RowAction({
-  label,
-  icon: Icon,
-  onClick,
+function SeeAllRow({
+  value,
+  aside,
+  onSelect,
 }: {
-  label: string
-  icon: LucideIcon
-  onClick: () => void
+  value: string
+  /** 右侧弱化文字（计数 / 目标页名）。 */
+  aside?: string
+  onSelect: () => void
 }) {
+  const { t } = useI18n()
   return (
-    <span
-      aria-hidden
-      role="presentation"
-      title={label}
-      onClick={(event) => {
-        // 阻止冒泡，否则这一行会被当成「选中」并执行主操作。
-        event.stopPropagation()
-        onClick()
-      }}
-      className="flex size-5 cursor-pointer items-center justify-center rounded-chip text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+    <CommandItem
+      value={value}
+      onSelect={onSelect}
+      className="gap-1.5 py-1 text-2xs text-muted-foreground"
     >
-      <Icon className="size-3.5" />
-    </span>
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        <ArrowRight aria-hidden className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{t('search.global.seeMore')}</span>
+      {aside && <span className="shrink-0 tabular-nums">{aside}</span>}
+    </CommandItem>
   )
 }
 
@@ -157,16 +208,25 @@ function pageLabelOf(sources: GlobalSearchSources, tab: TabId): string {
   return sources.pages.find((page) => page.id === tab)?.label ?? tab
 }
 
-/** 有搜索词时的结果：分组 + 每组的「全部」出口 + 空态（在 `CommandList` 里）。 */
+interface ResultGroupsProps {
+  query: string
+  groups: ReturnType<typeof searchEverything>
+  sources: GlobalSearchSources
+  onPick: (hit: SearchHit) => void
+  /** 进二级（组内列表）。 */
+  onDrill: (group: SearchGroupId) => void
+  /** 上面已经有一行「执行指令」：它就是这个查询的答案，不再说「没有找到」。 */
+  hasInvocation?: boolean
+}
+
+/** 一级结果：分组 + 每组末尾的「更多」。 */
 function ResultGroups({
   query,
   groups,
   sources,
   onPick,
-  onNavigate,
-  onCopy,
-  onFillTerminal,
-  canFillTerminal,
+  onDrill,
+  hasInvocation = false,
 }: ResultGroupsProps) {
   const { t } = useI18n()
   return (
@@ -174,64 +234,64 @@ function ResultGroups({
       {groups.map((group) => (
         <CommandGroup key={group.id} heading={t(GROUP_LABEL[group.id])}>
           {group.hits.map((hit) => (
-            <CommandItem
-              key={hit.id}
-              value={hit.id}
-              onSelect={() => onPick(hit)}
-              className="group/hit"
-            >
-              <span className="flex size-6 shrink-0 items-center justify-center">
-                <HitIcon hit={hit} sources={sources} />
-              </span>
-              <span className="min-w-0 flex-1 truncate">{hit.name}</span>
-              {hit.meta && (
-                // 真正贴右（名字 `flex-1` 吃掉剩余空间，不在右侧留预留位）。
-                // 悬停 / 高亮时淡出，把位置让给下面的操作按钮。
-                <span className="max-w-[45%] shrink-0 truncate text-2xs text-muted-foreground transition-opacity group-hover/hit:opacity-0 group-data-[selected=true]/hit:opacity-0">
-                  {hit.meta}
-                </span>
-              )}
-              {/* 操作按钮**浮在右侧元素的位置上**（绝对定位，不占布局）：
-                  既不会把 ID 挤到左边，也不会在右侧留一条空白。 */}
-              <span className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover/hit:opacity-100 group-data-[selected=true]/hit:opacity-100">
-                {hit.copy && (
-                  <RowAction
-                    label={t(hit.command ? 'search.action.copyCommand' : 'search.action.copyId')}
-                    icon={Copy}
-                    onClick={() => onCopy(hit.copy!)}
-                  />
-                )}
-                {hit.command && canFillTerminal && (
-                  <RowAction
-                    label={t('search.action.fillTerminal')}
-                    icon={TerminalIcon}
-                    onClick={() => onFillTerminal(hit.command!)}
-                  />
-                )}
-              </span>
-            </CommandItem>
+            <HitRow key={hit.id} hit={hit} sources={sources} onPick={onPick} />
           ))}
           {group.seeAll && (
-            <CommandItem
-              value={`${group.id}:see-all`}
-              onSelect={() => onNavigate(group.seeAll!.tab, group.seeAll!.intent)}
-              className="gap-1.5 py-1 text-2xs text-muted-foreground"
-            >
-              <span className="flex size-6 shrink-0 items-center justify-center">
-                <ArrowRight aria-hidden className="size-3.5" />
-              </span>
-              <span className="min-w-0 flex-1 truncate">
-                {/* 明确写着会去哪个页面，别只写「全部」（用户不知道点了会发生什么）。 */}
-                {t('search.global.seeAllIn', { page: pageLabelOf(sources, group.seeAll!.tab) })}
-              </span>
-            </CommandItem>
+            <SeeAllRow
+              value={seeAllValue(group.id)}
+              aside={String(group.total)}
+              onSelect={() => onDrill(group.id)}
+            />
           )}
         </CommandGroup>
       ))}
-      {groups.length === 0 && (
+      {groups.length === 0 && !hasInvocation && (
         <CommandEmpty>{t('search.global.noResults', { query: query.trim() })}</CommandEmpty>
       )}
     </>
+  )
+}
+
+interface GroupDetailProps {
+  detail: SearchGroupDetail
+  query: string
+  sources: GlobalSearchSources
+  onPick: (hit: SearchHit) => void
+  onBack: () => void
+  /** 二级里命中仍超过上限时的跳页出口。 */
+  onSeeAllPage: (tab: TabId, intent?: SearchIntent) => void
+}
+
+/** 二级：某一组的前 20 条（`Enter` 主操作和一级一致）。 */
+function GroupDetail({ detail, query, sources, onPick, onBack, onSeeAllPage }: GroupDetailProps) {
+  const { t } = useI18n()
+  return (
+    <div className="flex max-h-[inherit] flex-col" data-testid="global-search-group">
+      <div className="flex items-center gap-2 px-1 py-1">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft data-icon="inline-start" />
+          {t('action.back')}
+        </Button>
+        <span className="ml-auto truncate text-2xs text-muted-foreground tabular-nums">
+          {t(GROUP_LABEL[detail.group])} · {t('search.group.count', { n: detail.total })}
+        </span>
+      </div>
+      <CommandList className="min-h-0 flex-1">
+        {detail.hits.map((hit) => (
+          <HitRow key={hit.id} hit={hit} sources={sources} onPick={onPick} />
+        ))}
+        {detail.seeAll && (
+          <SeeAllRow
+            value={seeAllPageValue(detail.group)}
+            aside={pageLabelOf(sources, detail.seeAll.tab)}
+            onSelect={() => onSeeAllPage(detail.seeAll!.tab, detail.seeAll!.intent)}
+          />
+        )}
+        {detail.hits.length === 0 && (
+          <CommandEmpty>{t('search.global.noResults', { query: query.trim() })}</CommandEmpty>
+        )}
+      </CommandList>
+    </div>
   )
 }
 
@@ -239,12 +299,33 @@ interface RunViewProps {
   command: string
   /** `null` = 还在执行。 */
   result: CommandResult | null
+  /** 富文本要的图集 / 词缀（和结果面板同一份数据）。 */
+  sources: GlobalSearchSources
+  /** 这条指令在数据里标了必填参数（失败时多给一个「填入终端」——可能只是少写了参数）。 */
+  needsArgs?: boolean
+  /** 浮动终端可用时才给「填入终端」。 */
+  canFillTerminal: boolean
   onBack: () => void
+  /** 执行失败时给一条「查看用法」（跳到指令小抄）。 */
+  onUsage: () => void
+  /** 填入浮动终端（补参数后重跑）。 */
+  onFillTerminal: () => void
 }
 
-/** 二级页：指令执行结果（留在弹框里，不跳页）。 */
-function RunView({ command, result, onBack }: RunViewProps) {
+/** 三级：指令执行结果（留在弹框里，不跳页）。 */
+function RunView({
+  command,
+  result,
+  sources,
+  needsArgs = false,
+  canFillTerminal,
+  onBack,
+  onUsage,
+  onFillTerminal,
+}: RunViewProps) {
   const { t } = useI18n()
+  // 成功就不给这两个退路：它们是失败时的补妆，不是第二条主路径。
+  const failed = Boolean(result) && (result!.status !== 'ok' || Boolean(result!.message))
   return (
     <div className="flex max-h-[inherit] flex-col" data-testid="global-search-run">
       <div className="flex items-center gap-2 px-1 py-1">
@@ -262,13 +343,34 @@ function RunView({ command, result, onBack }: RunViewProps) {
           </p>
         ) : (
           <>
-            {result.message && <p className="py-1 text-xs text-destructive">{result.message}</p>}
-            {result.output.length === 0 && !result.message ? (
-              <p className="py-1 text-xs text-muted-foreground">{t('result.noOutput')}</p>
-            ) : (
-              <pre className="py-1 font-mono text-xs whitespace-pre-wrap text-foreground">
-                {result.output.join('\n')}
-              </pre>
+            {/* 和「指令」页的结果面板同一套渲染：`[c/..]` 上色、`[i:..]` 出物品图标。 */}
+            <CommandOutput
+              result={result}
+              itemsById={sources.dataset.itemsById}
+              prefixesById={sources.dataset.prefixesById}
+              atlas={sources.dataset.atlas}
+            />
+            {failed && (
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="px-1 text-2xs text-muted-foreground"
+                  onClick={onUsage}
+                >
+                  {t('search.run.usage')}
+                </Button>
+                {needsArgs && canFillTerminal && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="px-1 text-2xs text-muted-foreground"
+                    onClick={onFillTerminal}
+                  >
+                    {t('search.action.fillTerminal')}
+                  </Button>
+                )}
+              </div>
             )}
           </>
         )}
@@ -332,13 +434,72 @@ function RecentGroup({ history, onRecent, onRemove }: RecentGroupProps) {
   )
 }
 
-/** 输入词 / 结果 / 最近搜索（高亮由 cmdk 管，这里只管数据和写历史）。 */
+/**
+ * 底栏的一个键位提示：键帽 + 文案。
+ *
+ * 键帽用符号 / 图标而不是英文单词（`⏎` 代替 `Enter`、delete 图标代替 `Delete`）：
+ * 中文界面里不冒英文；组合键（`⌘` + `C`）拆成两个键帽，和系统提示的写法一致。
+ */
+function Hint({
+  keys,
+  icon: Icon,
+  label,
+}: {
+  /** 键帽文字（`⏎` / `Esc` / `↑` …）；用 `icon` 时省略。 */
+  keys?: string
+  /** 键帽里画图标（如 delete 键）；和 `keys` 二选一。 */
+  icon?: LucideIcon
+  label: string
+}) {
+  return (
+    <span className="flex items-center gap-1">
+      <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">
+        {Icon ? <Icon aria-hidden className="size-3" /> : keys}
+      </Kbd>
+      {label}
+    </span>
+  )
+}
+
+/** 组合键（`⌘` + `C` / `Ctrl` + `C`）拆成两个键帽。 */
+function ModHint({ keyName, label }: { keyName: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">
+        {modKeyLabel()}
+      </Kbd>
+      <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">{keyName}</Kbd>
+      {label}
+    </span>
+  )
+}
+
+/**
+ * 高亮行的 `Enter` 文案。四种动作各自写明：执行 / 填入终端 / 打开 / 查看。
+ *
+ * 不写字图标（行里没有按钮），所以这里必须准确——它就是这个行唯一的行为说明。
+ */
+function enterHintOf(hit: SearchHit | undefined, canRunCommands: boolean): string {
+  if (!hit) return 'search.global.keys.open'
+  if (hit.command && !hit.inGameOnly && canRunCommands) {
+    return hit.runnable ? 'search.action.run' : 'search.global.keys.open'
+  }
+  // 物品就地弹详情 = 打开；NPC / Buff / 图格 / 墙 / 商品是「跳到那边看」= 查看。
+  if (hit.action.kind === 'item') return 'search.global.keys.open'
+  return hit.copy ? 'search.global.keys.view' : 'search.global.keys.open'
+}
+
+/**
+ * 输入词 / 结果 / 最近搜索（高亮由 cmdk 管，这里只管数据和写历史）。
+ * 每次打开弹框都是空词：二级位置记忆只在**同一次会话内**用（见 `lib/searchDrill.ts`）。
+ */
 function useSearchState(sources: GlobalSearchSources) {
   const { history, remember, remove } = useSearchHistory(StorageKeys.globalSearchHistory)
   const [query, setQuery] = useState('')
-  const debounced = useDebouncedValue(query, 120)
-  const groups = useMemo(() => searchEverything(sources, debounced), [sources, debounced])
-  return { query, setQuery, groups, history, remember, removeHistory: remove }
+  /** 真正用于匹配的词（防抖后，二级也用同一个词，避免两层显示不一致）。 */
+  const applied = useDebouncedValue(query, 120)
+  const groups = useMemo(() => searchEverything(sources, applied), [sources, applied])
+  return { query, setQuery, applied, groups, history, remember, removeHistory: remove }
 }
 
 interface GlobalSearchTriggerProps {
@@ -401,7 +562,7 @@ interface GlobalSearchDialogProps {
   sources: GlobalSearchSources
   onNavigate: (tab: TabId, intent?: SearchIntent) => void
   onOpenItem: (itemId: number) => void
-  /** 浮动终端是否可用（未登录时不可用：入口都不在，别给一个点了没反应的按钮）。 */
+  /** 浮动终端是否可用（未登录 / 该页不显示浮动终端时为 false）。 */
   canFillTerminal: boolean
   /** 当前能不能直接执行指令（要登录）——不能时回车仍然只是跳到「指令小抄」查用法。 */
   canRunCommands: boolean
@@ -409,7 +570,17 @@ interface GlobalSearchDialogProps {
   onRunCommand: (command: string) => Promise<CommandResult>
 }
 
-/** 搜索弹框（桌面 / 移动共用）：输入框 + 分组结果，「取消」或 `Esc` 关闭。 */
+/** 执行结果页的来源：返回时要把高亮放回触发它的那一行。 */
+interface RunState {
+  command: string
+  result: CommandResult | null
+  /** 触发执行的行（`SearchHit.id`）。 */
+  origin: string
+  /** 数据里标了必填参数：失败时多给一个「填入终端」。 */
+  needsArgs?: boolean
+}
+
+/** 搜索弹框（桌面 / 移动共用）：输入框 + 分组结果，`Esc` 逐级返回 / 关闭。 */
 export function GlobalSearchDialog({
   open,
   onOpenChange,
@@ -425,24 +596,63 @@ export function GlobalSearchDialog({
   const inputRef = useRef<HTMLInputElement>(null)
   const state = useSearchState(sources)
   const typed = state.query.trim().length > 0
+  /** 当前展开的组（`null` = 一级）。**不跨弹框恢复**：重开就该是空面板。 */
+  const [drill, setDrill] = useState<SearchGroupId | null>(null)
+  const [run, setRun] = useState<RunState | null>(null)
+  const detail = useMemo(
+    () => (drill ? searchGroup(sources, drill, state.applied) : null),
+    [drill, sources, state.applied],
+  )
+  /** 层级切换后要重新高亮的行（cmdk 默认会选第一条，跨层后不一定有选中项）。 */
+  const restoreTarget = useRef<string | null>(null)
   /** 包住 listbox 的容器（观察高亮变化用）。 */
   const listHostRef = useRef<HTMLDivElement>(null)
 
-  /** 行内「复制」：成功给 toast（不关弹框，方便连着复制几条）；失败不假装成功。 */
+  /** 行内复制（`⌘/Ctrl+C`）：成功给 toast，失败不假装成功。 */
   const copyToClipboard = (text: string) => {
     void copyText(text).then((ok) => {
       if (ok) toast.success(t('dex.copied'))
       else toast.error(t('search.action.copyFailed'))
     })
   }
-  const fillTerminal = (command: string) => terminal.open(command)
+
+  /** 离开弹框（跳页 / 填终端）时把记忆清掉，免得下次打开突然回到旧位置。 */
+  const leave = () => {
+    forgetDrill()
+    state.setQuery('')
+    onOpenChange(false)
+  }
+
+  const fillTerminal = (command: string) => {
+    terminal.open(command)
+    leave()
+  }
+  const goPage = (tab: TabId, intent?: SearchIntent) => {
+    onNavigate(tab, intent)
+    leave()
+  }
   /** 高亮行（从 DOM 读：cmdk 的 `onValueChange` 只在受控用法下才回调）。 */
   const selectedValue = (root: HTMLElement | EventTarget | null): string | null => {
     if (!(root instanceof HTMLElement)) return null
     return root.querySelector('[cmdk-item][aria-selected="true"]')?.getAttribute('data-value') ?? null
   }
-  /** 当前能扫到的所有行（组数很少，直接展平，不额外建 Map 避免每次渲染都造新引用）。 */
-  const flatHits = state.groups.flatMap((group) => group.hits)
+  /**
+   * 「执行」组：查询本身就是一行指令（`/help 4` / `.help 4`）。
+   * 置顶且默认高亮，所以输完整命令行直接 `Enter` 就跑了。
+   */
+  const invocation = useMemo(
+    () => (canRunCommands ? commandInvocation(sources, state.applied) : null),
+    [canRunCommands, sources, state.applied],
+  )
+
+  /** 当前层能扫到的所有行（组数很少，直接展平，不额外建 Map）。 */
+  const visibleHits = useMemo(
+    () =>
+      detail
+        ? detail.hits
+        : [...(invocation ? [invocation] : []), ...state.groups.flatMap((group) => group.hits)],
+    [detail, invocation, state.groups],
+  )
 
   /**
    * 当前高亮行的 value。
@@ -469,24 +679,86 @@ export function GlobalSearchDialog({
       window.clearTimeout(timer)
       observer.disconnect()
     }
-  }, [state.groups])
+  }, [state.groups, detail])
 
-  /**
-   * 底部的复制提示跟着**高亮行**走：
-   * 高亮到指令 → 「复制指令」；高亮到物品 / NPC / Buff / 图格 / 墙 → 「复制 ID」；
-   * 高亮到没有复制功能的行（页面、物品集合、玩家）→ 不显示。
-   */
-  const copyHintKey = useMemo(() => {
-    // cmdk 默认选中第一条，但它的选中在 commit 之后才落到 DOM：读不到就当第一条。
-    const hit = (selectedId ? flatHits.find((item) => item.id === selectedId) : undefined) ?? flatHits[0]
-    if (!hit?.copy) return null
-    return hit.command ? 'search.action.copyCommand' : 'search.action.copyId'
-  }, [selectedId, flatHits])
+  /** 切层级后把高亮放在正确的地方（记住的那行 → 已有选中项 → 第一条）。 */
+  useEffect(() => {
+    const wanted = restoreTarget.current
+    restoreTarget.current = null
+    const timer = window.setTimeout(() => {
+      const host = listHostRef.current
+      if (!host) return
+      const items = [...host.querySelectorAll('[cmdk-item]')]
+      const marked = host.querySelector('[cmdk-item][aria-selected="true"]')
+      // cmdk 没有「按 value 选中」的公开 API，走它自己的 pointermove 路径。
+      const target =
+        (wanted ? items.find((el) => el.getAttribute('data-value') === wanted) : undefined) ??
+        marked ??
+        items[0]
+      target?.dispatchEvent(new MouseEvent('pointermove', { bubbles: true }))
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [drill, run])
+
+  /** 二级位置记忆：在二级里每移动一次高亮都刷新（离开后 60s 内能回到这儿）。 */
+  useEffect(() => {
+    if (!drill) return
+    rememberDrill({ query: state.query, group: drill, selected: selectedId })
+  }, [drill, state.query, selectedId])
+
+  /** 输入词清空（或只剩空白）就回一级：不留一个「某组 + 空词」的空列表。 */
+  const changeQuery = (value: string) => {
+    state.setQuery(value)
+    if (!value.trim()) {
+      setDrill(null)
+      // 清空 = 放弃那个二级位置：下次再进同一组不要跳回旧的那一行。
+      forgetDrill()
+    }
+  }
+
+  /** 进二级：同一组 + 同一个词、且刚离开过，就回到原来那一行。 */
+  const enterDrill = (group: SearchGroupId) => {
+    const memory = recallDrill()
+    restoreTarget.current =
+      memory && memory.group === group && memory.query === state.query ? memory.selected : null
+    setDrill(group)
+  }
+
+  /** 高亮行（cmdk 默认选中第一条，但它的选中在 commit 之后才落到 DOM：读不到就当第一条）。 */
+  const selectedHit = useMemo(() => {
+    const id = selectedId ?? visibleHits[0]?.id
+    return id ? visibleHits.find((item) => item.id === id) : undefined
+  }, [selectedId, visibleHits])
+
+  /** 底栏右侧：高亮行能做什么。 */
+  const copyHintKey = selectedHit?.copy
+    ? selectedHit.command
+      ? 'search.action.copyCommand'
+      : 'search.action.copyId'
+    : null
+
+  /** 从执行结果回到触发它的列表（高亮回到那一行）。 */
+  const backFromRun = () => {
+    if (!run) return
+    restoreTarget.current = run.origin
+    setRun(null)
+  }
+
+  /** 从二级回一级：高亮停回那组的「更多」行。 */
+  const backFromDrill = () => {
+    if (!drill) return
+    restoreTarget.current = seeAllValue(drill)
+    rememberDrill({ query: state.query, group: drill, selected: selectedId })
+    setDrill(null)
+  }
 
   /**
    * 快捷键（只在弹框内）：
    * - `Delete` / `Backspace`：空查询时删掉高亮的那条最近搜索（有词时这两个键属于输入框）；
    * - `Ctrl/Cmd+C`：复制高亮行的 ID / 指令（输入框里没有选中文本时才接管）。
+   *
+   * `Esc` 不在这里：Radix 的 DismissableLayer 在 document **捕获阶段**已经处理掉 Escape，
+   * 必须用 `DialogContent` 的 `onEscapeKeyDown` 才能拦下它（见下面的 `onEscapeKeyDown`）。
    */
   const handleRootKeyDown = (event: React.KeyboardEvent) => {
     const mod = event.metaKey || event.ctrlKey
@@ -495,13 +767,13 @@ export function GlobalSearchDialog({
       // 输入框里有选中文本：这是「复制搜到的字」，别抢。
       if (input && input.selectionStart !== input.selectionEnd) return
       const value = selectedValue(event.currentTarget)
-      const hit = value ? flatHits.find((item) => item.id === value) : undefined
+      const hit = value ? visibleHits.find((item) => item.id === value) : undefined
       if (!hit?.copy) return
       event.preventDefault()
       copyToClipboard(hit.copy)
       return
     }
-    if (typed) return
+    if (detail || typed) return
     if (event.key !== 'Delete' && event.key !== 'Backspace') return
     const recent = queryOfRecent(selectedValue(event.currentTarget))
     if (!recent) return
@@ -509,25 +781,20 @@ export function GlobalSearchDialog({
     state.removeHistory(recent)
   }
 
-  /**
-   * 二级页：把「执行结果」留在弹框里（不跳到指令页），`null` = 还停在结果列表。
-   * 只在「可裸跑的指令 + 已登录」时才走这条路，其余保持原来的跳转行为。
-   */
-  const [run, setRun] = useState<{ command: string; result: CommandResult | null } | null>(null)
-
-  const execute = async (command: string) => {
-    setRun({ command, result: null })
+  const execute = async (hit: SearchHit) => {
+    const command = hit.command
+    if (!command) return
+    setRun({ command, result: null, origin: hit.id, needsArgs: hit.needsArgs })
+    // 结果回来时用户可能已经 `Esc` 回列表了：只有还停在这条指令的结果页时才填进去。
+    const settle = (result: CommandResult) =>
+      setRun((prev) => (prev && prev.command === command ? { ...prev, result } : prev))
     try {
-      const result = await onRunCommand(command)
-      setRun({ command, result })
+      settle(await onRunCommand(command))
     } catch (err) {
-      setRun({
-        command,
-        result: {
-          status: 'unavailable',
-          output: [],
-          message: err instanceof Error ? err.message : String(err),
-        },
+      settle({
+        status: 'unavailable',
+        output: [],
+        message: err instanceof Error ? err.message : String(err),
       })
     }
   }
@@ -535,14 +802,19 @@ export function GlobalSearchDialog({
   const pick = (hit: SearchHit) => {
     const keyword = state.query.trim()
     if (keyword) state.remember(keyword)
-    if (hit.runnable && canRunCommands && hit.command) {
-      void execute(hit.command)
+    // 登录后一律执行（除仅游戏内）：缺参数就让 TShock 回一句用法错误，
+    // 不靠数据里的 `required` 替用户判定「跑不了」。
+    if (hit.command && !hit.inGameOnly && hit.runnable && canRunCommands) {
+      void execute(hit)
       return
     }
     runHit(hit, onNavigate, onOpenItem)
-    state.setQuery('')
-    onOpenChange(false)
+    leave()
   }
+
+  const showingRecent = !run && !detail && !typed && state.history.length > 0
+  /** 刚打开、什么都没有：只有这时候才给「↑↓ 选择 / Esc 取消」这种通用提示。 */
+  const showIntro = !run && !detail && !typed && !showingRecent
 
   // 圆角比通用弹框（`rounded-modal`，24px）小一档：命令面板要更紧凑。
   return (
@@ -552,15 +824,31 @@ export function GlobalSearchDialog({
         radius="container"
         // `z-[60]`：要盖在商品详情 / 物品详情这类抽屉（Sheet / Drawer，z-50）之上——
         // 用户会边看详情边搜，不该强迫先关掉抽屉。
-        className="top-[12%] z-[60] max-w-xl translate-y-0 gap-2 p-3"
+        className="top-[12%] z-[60] max-w-xl translate-y-0 gap-2 p-0"
         data-testid="global-search-dialog"
+        /* `Esc` 逐级返回（执行结果 → 二级 → 一级），一级才关弹框。
+           必须写在这里：Radix 在 document 捕获阶段就处理了 Escape。 */
+        onEscapeKeyDown={(event) => {
+          if (run) {
+            event.preventDefault()
+            backFromRun()
+            return
+          }
+          if (drill) {
+            event.preventDefault()
+            backFromDrill()
+          }
+        }}
       >
         <DialogTitle className="sr-only">{t('search.global.title')}</DialogTitle>
         <Command
           shouldFilter={false}
           loop
           label={t('search.global.title')}
-          className="gap-2 bg-transparent"
+          /* `min-w-0` + 弹框 `p-0`（内边距交给子元素）：
+             底栏要用 `border-t` 做通栏分割线，若靠 `-mx-3` 抵消 `p-3`，那份额外宽度会加入
+             grid 轨道的内部尺寸计算，把整个弹框撑宽、出现横向滚动条。 */
+          className="min-w-0 gap-2 bg-transparent px-3 pt-3"
           onKeyDown={handleRootKeyDown}
         >
           <InputGroup className="h-8 w-full">
@@ -570,7 +858,7 @@ export function GlobalSearchDialog({
             <CommandInput
               ref={inputRef}
               value={state.query}
-              onValueChange={state.setQuery}
+              onValueChange={changeQuery}
               placeholder={t('search.global.placeholder')}
               aria-label={t('search.global.title')}
               className="px-3 text-xs"
@@ -583,7 +871,7 @@ export function GlobalSearchDialog({
                   label={t('editor.clear')}
                   icon={X}
                   onClick={() => {
-                    state.setQuery('')
+                    changeQuery('')
                     inputRef.current?.focus()
                   }}
                 />
@@ -595,80 +883,88 @@ export function GlobalSearchDialog({
               <RunView
                 command={run.command}
                 result={run.result}
-                onBack={() => {
-                  setRun(null)
-                  inputRef.current?.focus()
-                }}
+                sources={sources}
+                needsArgs={run.needsArgs}
+                canFillTerminal={canFillTerminal}
+                onBack={backFromRun}
+                onUsage={() => goPage('tables', { query: run.command.replace(/^\//, '') })}
+                onFillTerminal={() => fillTerminal(run.command)}
+              />
+            ) : detail ? (
+              <GroupDetail
+                detail={detail}
+                query={state.query}
+                sources={sources}
+                onPick={pick}
+                onBack={backFromDrill}
+                onSeeAllPage={goPage}
               />
             ) : (
-            <CommandList>
-              {typed ? (
-                <ResultGroups
-                  query={state.query}
-                  groups={state.groups}
-                  sources={sources}
-                  onPick={pick}
-                  onNavigate={(tab, intent) => {
-                    onNavigate(tab, intent)
-                    state.setQuery('')
-                    onOpenChange(false)
-                  }}
-                  onCopy={copyToClipboard}
-                  canFillTerminal={canFillTerminal}
-                  onFillTerminal={(command) => {
-                    fillTerminal(command)
-                    onOpenChange(false)
-                  }}
-                />
-              ) : state.history.length > 0 ? (
-                <RecentGroup
-                  history={state.history}
-                  onRecent={(value) => {
-                    state.setQuery(value)
-                    inputRef.current?.focus()
-                  }}
-                  onRemove={state.removeHistory}
-                />
-              ) : (
-                <CommandEmpty>{t('search.global.hint')}</CommandEmpty>
-              )}
-            </CommandList>
+              <CommandList>
+                {typed ? (
+                  <>
+                    {invocation && (
+                      <HitRow
+                        hit={invocation}
+                        sources={sources}
+                        onPick={pick}
+                        label={t('search.run.line', { command: invocation.command ?? '' })}
+                      />
+                    )}
+                    <ResultGroups
+                      query={state.query}
+                      groups={state.groups}
+                      sources={sources}
+                      onPick={pick}
+                      onDrill={enterDrill}
+                      /** 有「执行指令」那一行时，不再补一行「没有找到」。 */
+                      hasInvocation={Boolean(invocation)}
+                    />
+                  </>
+                ) : state.history.length > 0 ? (
+                  <RecentGroup
+                    history={state.history}
+                    onRecent={(value) => {
+                      changeQuery(value)
+                      inputRef.current?.focus()
+                    }}
+                    onRemove={state.removeHistory}
+                  />
+                ) : (
+                  <CommandEmpty>{t('search.global.hint')}</CommandEmpty>
+                )}
+              </CommandList>
             )}
           </div>
         </Command>
         {/*
-          底部提示：左侧是通用键（选择 / 打开 / 取消排在一起），
-          只和当前模式有关的额外操作（复制快捷键、删除最近搜索）全部靠右。
+          底栏：**没有内容时不提示「能做什么」**（那时没什么可做），一有内容就只留右侧的
+          「这行能做什么」——按键提示跟着高亮行走，行里不再放图标按钮。
         */}
         <div
-          className="-mx-3 -mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-b-modal border-t px-3 py-2 text-2xs text-muted-foreground"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3 py-2 text-2xs text-muted-foreground"
           data-testid="global-search-keys"
         >
-          <span className="flex items-center gap-1">
-            <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">↑</Kbd>
-            <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">↓</Kbd>
-            {t('search.global.keys.select')}
-          </span>
-          <span className="flex items-center gap-1">
-            <Kbd className="h-5 border border-border/60 bg-background/70 px-1">Enter</Kbd>
-            {t('search.global.keys.open')}
-          </span>
-          <span className="flex items-center gap-1">
-            <Kbd className="h-5 border border-border/60 bg-background/70 px-1">Esc</Kbd>
-            {t('search.global.keys.close')}
-          </span>
+          {showIntro && (
+            <>
+              <Hint keys="↑ ↓" label={t('search.global.keys.select')} />
+              <Hint keys="Esc" label={t('search.global.keys.close')} />
+            </>
+          )}
           <span className="ml-auto flex items-center gap-3">
-            {copyHintKey && (
-              <span className="flex items-center gap-1">
-                <Kbd className="h-5 border border-border/60 bg-background/70 px-1">{shortcutLabel('C')}</Kbd>
-                {t(copyHintKey)}
-              </span>
-            )}
-            {!typed && state.history.length > 0 && (
-              <span className="flex items-center gap-1">
-                <Kbd className="h-5 border border-border/60 bg-background/70 px-1">Delete</Kbd>
-                {t('search.global.keys.remove')}
-              </span>
+            {run ? (
+              <Hint keys="Esc" label={t('action.back')} />
+            ) : showingRecent ? (
+              <>
+                <Hint keys="⏎" label={t('search.global.keys.search')} />
+                <Hint icon={DeleteKey} label={t('search.global.keys.remove')} />
+              </>
+            ) : (
+              <>
+                {selectedHit && <Hint keys="⏎" label={t(enterHintOf(selectedHit, canRunCommands))} />}
+                {copyHintKey && <ModHint keyName="C" label={t(copyHintKey)} />}
+                {detail && <Hint keys="Esc" label={t('action.back')} />}
+              </>
             )}
           </span>
         </div>

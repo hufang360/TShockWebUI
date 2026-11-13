@@ -1,6 +1,5 @@
 import {
   Fragment,
-  useCallback,
   useMemo,
   useRef,
   useState,
@@ -16,8 +15,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Dialog,
+  DialogContent,
   Popover,
-  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
   Tooltip,
@@ -32,10 +32,10 @@ import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll
 import { TIPS_GROUPS, RELATED_COMMANDS, type TipsGroup } from '@/lib/commandTips'
 import { enumLabelsFor } from '@/lib/commandMeta'
 import { copyText } from '@/lib/clipboard'
+import { DATA_ROW_CLASS, dataRowStripe } from '@/lib/tableRowStyles'
 import { cn } from '@/lib/cn'
 import { readDataIdState, rememberDataIdState } from '@/lib/dataIdState'
 import { useI18n } from '@/lib/i18n'
-import { useSearchIntent } from '@/lib/searchIntent'
 import {
   SPAWN_BOSS_TIPS,
   SPAWN_MOB_EXAMPLES,
@@ -97,6 +97,8 @@ interface CommandTipsPageProps {
   onNavigate?: (tab: TabId) => void
   /** 详情里「填入」的去向；默认填进浮动终端，指令页里改为填进页面输入框。 */
   onPick?: (command: string) => void
+  /** 从全局搜索带进来的搜索词（容器页消费意图后传下来）。 */
+  searchQuery?: string
 }
 
 /**
@@ -212,12 +214,7 @@ const FOLD_MAX_DEPTH = 2
  * 行外观：斑马纹（奇行浅底，与物品 / 数据 ID 表格同一套）+ 悬停加深。
  * 折叠行、子行、普通行共用，展开收起后条纹自动重排。
  */
-/** 行的公共样式；斑马纹由渲染时的行序号决定（`stripeClass`），不用 `odd:`——插入详情行会让条纹跳。 */
-const ROW_CLASS =
-  'group/row cursor-pointer border-t border-border/40 align-top transition-colors hover:bg-accent/25'
-
-/** 数据行斑马纹（详情行不计数、也不上色）。 */
-const stripeClass = (index: number) => (index % 2 === 1 ? 'bg-muted/25' : '')
+/** 行的公共样式；斑马纹由渲染时的行序号决定（`dataRowStripe`），不用 `odd:`——插入详情行会让条纹跳。 */
 
 
 /** 一个分区的显示项：折叠组（`stem` 非空）或单行（`stem` 为空）。 */
@@ -500,7 +497,12 @@ function CommandRow({
   const { t } = useI18n()
   const note = row.note ?? (!indent && ingameOnly(row) ? t('commands.onlyInGame') : '')
   return (
-    <tr data-command={row.command} data-row-key={rowKey} onClick={onClick} className={cn(ROW_CLASS, stripe)}>
+    <tr
+      data-command={row.command}
+      data-row-key={rowKey}
+      onClick={onClick}
+      className={cn(DATA_ROW_CLASS, 'divide-x divide-border/60', stripe)}
+    >
       <CommandCellBody row={row} indent={indent} />
       <td className="w-full max-w-0 px-2 py-2 text-xs text-foreground">
         <div className="truncate">
@@ -543,33 +545,11 @@ function CommandTable({
   const { t } = useI18n()
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   /** 详情浮层：看哪一条 + **弹出时的鼠标坐标**（浮层跟着鼠标位置走，不锚在单元格上）。 */
-  const [detail, setDetail] = useState<{ row: TableRow; x: number; y: number } | null>(null)
+  const [detail, setDetail] = useState<TableRow | null>(null)
   const onlyInGame = t('commands.onlyInGame')
 
-  // Radix 的虚拟锚点：把浮层定位到鼠标点（0 尺寸矩形）。
-  const anchorRef = useRef({
-    getBoundingClientRect: () => {
-      const { x, y } = mousePoint.current
-      return {
-        x,
-        y,
-        top: y,
-        left: x,
-        right: x,
-        bottom: y,
-        width: 0,
-        height: 0,
-        toJSON: () => ({}),
-      }
-    },
-  })
-  const mousePoint = useRef({ x: 0, y: 0 })
-
-  /** 单击数据行：记下鼠标位置并弹出详情浮层（点同一条 = 收起）。 */
-  const openDetailAt = (row: TableRow, event: ReactMouseEvent) => {
-    mousePoint.current = { x: event.clientX, y: event.clientY }
-    setDetail((prev) => (prev?.row === row ? null : { row, x: event.clientX, y: event.clientY }))
-  }
+  /** 单击数据行：弹出详情弹框。 */
+  const openDetail = (row: TableRow) => setDetail(row)
 
   /**
    * 整表条目：先按分区算出折叠项，再把**所有分区**合并成一条列表按指令列 a~z 排序
@@ -608,14 +588,17 @@ function CommandTable({
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="min-w-0">
+      <div className="min-w-0 overflow-clip rounded-container border border-border/60">
         <table className="w-full border-collapse text-left">
-          <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background">
-            <tr className="border-b border-border/60 text-2xs text-muted-foreground">
+          <thead
+            className="sticky z-10 bg-background"
+            style={{ top: 'var(--page-sticky-top,0px)' }}
+          >
+            <tr className="divide-x divide-border/60 border-b border-border/60 bg-muted/50 text-2xs font-semibold text-muted-foreground">
               <th scope="col" className="px-2 py-2 font-medium">
                 {t('commands.col.command')}
               </th>
-              <th scope="col" className="px-2 py-2 font-medium">
+              <th scope="col" className="w-full max-w-0 px-2 py-2 font-medium">
                 {t('commands.col.name')}
               </th>
             </tr>
@@ -623,7 +606,7 @@ function CommandTable({
           <tbody>
             {tableEntries.map(({ group, entry }, i) => {
               const key = `${group.id}:${entry.stem ?? entry.rows[0]!.command}:${i}`
-              const stripe = stripeClass(i)
+              const stripe = dataRowStripe(i)
               if (entry.stem) {
                 const open = expandAll || expanded.has(key)
                 // 整组都只能在游戏内执行 → 标记只写在折叠行（子行不重复）
@@ -635,7 +618,7 @@ function CommandTable({
                     <tr
                       data-fold={entry.stem}
                       onClick={() => toggle(key)}
-                      className={cn(ROW_CLASS, stripe)}
+                      className={cn(DATA_ROW_CLASS, 'divide-x divide-border/60', stripe)}
                     >
                       <td className="px-2 py-2 align-top">
                         {/* 按钮只是为了键盘可用：单击冒泡到整行，所以这里不再挂 onClick。 */}
@@ -665,7 +648,7 @@ function CommandTable({
                               rowKey={rowKey}
                               stripe={stripe}
                               indent
-                              onClick={(event) => openDetailAt(row, event)}
+                              onClick={() => openDetail(row)}
                             />
                           </Fragment>
                         )
@@ -680,7 +663,7 @@ function CommandTable({
                     row={row}
                     rowKey={key}
                     stripe={stripe}
-                    onClick={(event) => openDetailAt(row, event)}
+                    onClick={() => openDetail(row)}
                   />
                 </Fragment>
               )
@@ -688,35 +671,23 @@ function CommandTable({
           </tbody>
         </table>
 
-        {/* 详情浮层：位置跟鼠标（虚拟锚点），内容就是这一条的完整信息 */}
-        <Popover
+        {/* 详情弹框：整条指令的完整信息 */}
+        <Dialog
           open={detail !== null}
           onOpenChange={(next) => {
             if (!next) setDetail(null)
           }}
-          // 点别的数据行由行自己的 onClick 换内容；别让 Radix 先把浮层关掉（同一个 tick 里会互相抵消）
-          modal={false}
         >
-          <PopoverAnchor virtualRef={anchorRef as never} />
-          <PopoverContent
+          <DialogContent
             data-testid="command-detail"
-            side="bottom"
-            align="start"
-            sideOffset={8}
-            collisionPadding={8}
-            className="w-[min(26rem,calc(100vw-1rem))] p-3"
-            // 打开时不要把焦点送到第一个可聚焦元素（那是指令旁的复制键）
+            radius="container"
+            className="max-w-md"
+            // 打开时不要把焦点送回弹框（焦点留在被点的那一行，键盘可以继续上下走）
             onOpenAutoFocus={(event) => event.preventDefault()}
-            // 点表格里的其它行时不要先关：让它换内容；点别处才关
-            onInteractOutside={(event) => {
-              if ((event.target as HTMLElement | null)?.closest('tr[data-command]')) {
-                event.preventDefault()
-              }
-            }}
           >
             {detail && (
               <RowPopoverBody
-                row={detail.row}
+                row={detail}
                 onNavigate={onNavigate}
                 onFilter={(query) => {
                   onFilter(query)
@@ -728,8 +699,8 @@ function CommandTable({
                 }}
               />
             )}
-          </PopoverContent>
-        </Popover>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   )
@@ -788,21 +759,15 @@ function GroupList({
  * 参考行（语法带占位符）只提供复制。
  * 权限与执行结果都由 TShock 判定。
  */
-export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPageProps) {
+export function CommandTipsPage({ dataset, onNavigate, onPick, searchQuery }: CommandTipsPageProps) {
   const { t, lang } = useI18n()
   const { open } = useTerminal()
   const pick = onPick ?? open
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(searchQuery ?? '')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [groupOpen, setGroupOpen] = useState(false)
 
-  // 全局搜索选了某条指令：落到本页并带上搜索词（不再单独维护「跳转到某一行」）。
-  useSearchIntent(
-    'commands',
-    useCallback((intent) => {
-      if (intent.query != null) setQuery(intent.query)
-    }, []),
-  )
+  // 容器页（常用表格）从全局搜索拿到词后传进来；容器用 `key` 换实例，这里只当作初始值。
   // 页面不固定高度：内容多就把页面撑高，滚动交给主内容区（浏览器右侧那条滚动条）。
   const rootRef = useRef<HTMLDivElement>(null)
   // 工具条吸在顶栏（`top-12`）下面，表头再吸在工具条下面 → 实测工具条高度写进 CSS 变量。
@@ -1003,7 +968,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
             ref={toolbarRef}
             className="sticky top-12 z-20 flex items-center gap-2 bg-background py-1.5"
           >
-            <div className="min-w-0 flex-1">
+            <div className="w-full max-w-sm min-w-0">
               <SearchInput
                 value={query}
                 onValueChange={(value) => {
@@ -1016,15 +981,13 @@ export function CommandTipsPage({ dataset, onNavigate, onPick }: CommandTipsPage
                 shortcut
               />
             </div>
-            {/* 分组：图标按钮开 popover（宽屏也不再常驻右栏） */}
+            {/* 分组：右侧按钮（图标 + 文字）开 popover */}
             <Popover open={groupOpen} onOpenChange={setGroupOpen}>
               <PopoverTrigger asChild>
-                <IconAction
-                  label={t('commands.groups')}
-                  icon={ListFilter}
-                  active={groupOpen || activeId !== null}
-                  aria-expanded={groupOpen}
-                />
+                <Button variant="secondary" size="sm" aria-expanded={groupOpen} className="ml-auto">
+                  <ListFilter data-icon="inline-start" />
+                  {t('commands.groups')}
+                </Button>
               </PopoverTrigger>
               <PopoverContent
                 side="bottom"

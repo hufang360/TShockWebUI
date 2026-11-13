@@ -443,13 +443,13 @@ export function SettingsPage({
             variant="line"
             className="w-full justify-start"
           >
-            <TabsTrigger value="builtin" variant="line" className="flex-none">
+            <TabsTrigger value="builtin" className="flex-none">
               {t('modules.tab.builtin')}
             </TabsTrigger>
-            <TabsTrigger value="plugin" variant="line" className="flex-none">
+            <TabsTrigger value="plugin" className="flex-none">
               {t('modules.tab.plugin')}
             </TabsTrigger>
-            <TabsTrigger value="custom" variant="line" className="flex-none">
+            <TabsTrigger value="custom" className="flex-none">
               {t('modules.tab.custom')}
             </TabsTrigger>
           </TabsList>

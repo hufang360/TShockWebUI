@@ -11,7 +11,7 @@ import type { TabId } from '@/types'
  */
 export const PAGE_SCROLL_TABS: ReadonlySet<TabId> = new Set<TabId>([
   'editor',
-  'commands',
   'items',
   'dataid',
+  'tables',
 ])

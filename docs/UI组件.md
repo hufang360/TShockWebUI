@@ -34,7 +34,7 @@
 | Alert | `ui/Alert.tsx` | cva | Callout / banner / 错误提示；变体 `default/muted/destructive/warning/success/info` |
 | Select | `ui/Select.tsx` | radix select | **全项目唯一的下拉组件**（原生 `<select>` / 旧的 `NativeSelect` 已全部移除）：`SelectTrigger size="sm"` 用于紧凑区；表单字段把 `id` 给 `SelectTrigger`、`Label htmlFor` 指过去即可；值统一是**字符串**（数字 / 枚举自己 `String()` / 解析回去） |
 | Pagination | `ui/Pagination.tsx` | Button | 复用 Button（`<button>` + `disabled`）；页码窗口见 `lib/pagination.ts` 的 `paginationRange` |
-| Tabs | `ui/Tabs.tsx` | radix tabs | 真正切换视图 / 面板时用；`TabsTrigger` 自带 `cursor-pointer`（可点击）与图标尺寸兜底 |
+| Tabs | `ui/Tabs.tsx` | radix tabs | 真正切换视图 / 面板时用；`TabsTrigger` 自带 `cursor-pointer`（可点击）与图标尺寸兜底。**`variant` 只写在 `TabsList` 上**（`default` 胶囊 / `line` 下划线），list 带 `data-variant`，trigger 用 `group-data-[variant=…]/tabs-list:` 继承——**不要再给 `TabsTrigger` 传 `variant`**。`line` 的下划线是贴在 list 底边的一条 2px `after:` 伪元素（激活淡入），list 本身不画底边轨道线，激活**不加粗**（只变字色） |
 | Switch | `ui/Switch.tsx` | radix switch | |
 | Dialog | `ui/Dialog.tsx` | radix dialog | 每个 Dialog 必须有 `DialogTitle`；`DialogFooter` = 底部操作区（`bg-background` + `border-t`）；`DialogContent` 支持 `overlay={false}`（不画暗色遮罩，配 `modal={false}` 用，行为接近 popover）与 `hideClose`（不画右上角 ×，调用方自己提供更合适的关闭入口）；`radius="container"` 换成 16px 圆角（默认 `modal` 24px，给命令面板这类紧凑弹框用——写成属性是因为 `rounded-modal` / `rounded-container`是两个独立工具类，同时写只会由 CSS 顺序决定谁生效） |
 | DropdownMenu | `ui/DropdownMenu.tsx` | radix dropdown-menu | 菜单项包在 `DropdownMenuGroup` 里；侧栏底部账号卡片（`SidebarAccountMenu`）用它 |
@@ -113,7 +113,7 @@
 - **勾选项（Checkbox + 文字）用 `Field orientation="horizontal"` + `FieldLabel htmlFor`**：
   `Field` 加 `w-auto` 才不会被 `w-full` 撑满整行，工具栏里可横向排列；`FieldLabel` 默认带 `text-foreground`，
   放进 `text-muted-foreground` 容器时需显式覆盖颜色。**不要**裸 `<label>` 包 `Checkbox` 再重复写 `aria-label`。
-- **页面级分类导航用 `Tabs variant="line"`**：放在页面标题下方的第一行，主分类靠左；右侧可放同类工具（如页面设置 / 全屏按钮）；NPC 子分类使用胶囊 Tabs，视图类 Checkbox 收进页面设置 Popover。移动端保持单行横向滚动，不为控件另起多行。
+- **页面级分类导航用 `Tabs variant="line"`**：放在页面标题下方的第一行，主分类靠左；右侧可放同类工具（如页面设置 / 全屏按钮）；NPC 子分类使用胶囊 Tabs，视图类 Checkbox 收进页面设置 Popover。移动端保持单行横向滚动，不为控件另起多行。变体写在 `TabsList` 上，`TabsTrigger` 不要再重复传。
 - **卡片管理里的“自动执行”用 `Checkbox`**，与“显示/隐藏”的 `Switch` 语义分开；新增卡片和编辑自定义卡片都按需展开，不常驻表单。
 
 ## 图标按钮（`components/IconAction.tsx`）
@@ -195,6 +195,8 @@
 | `components/ItemTooltipContent.tsx` | 右上角 ⭐ / ⓘ 是手写 `<button>`，不是 `IconAction` | 深色游戏风格提示上语义令牌不成立（`text-muted-foreground` 看不见），颜色按游戏原样写死；见上一条 |
 | `components/ui/*` 内建 `aria-label`（`Close` / `Loading` / `pagination` …） | 英文硬编码 | 这些是 shadcn 原样组件，不依赖 `lib/i18n`（避免 ui 层耦合业务 i18n）。**业务侧调用时用 `aria-label` / `title` 覆盖**（如 `AppShell` 给 `SidebarTrigger` / `SidebarRail` 传 `nav.toggleSidebar` / `nav.railToggle`） |
 | `components/ui/Card.tsx` | `Card` / `CardHeader` / `CardTitle` / `CardBody`，没有 `CardContent` / `CardFooter` | 项目自有命名（见组件清单）；布局语义一致，`CardFooter` 由 `DialogFooter` / `SheetFooter` 承担 |
+| `components/ui/Tabs.tsx` | `TabsTrigger` 用 `text-xs`（shadcn 原样是 `text-sm`），图标兜底 `size-3.5`（原样 `size-4`） | 全站密排取向（见本文「字号角色」）；下划线 tabs 与表格 / 密集工具栏同一行高度 |
+| `components/ui/Tabs.tsx` | `line` 变体的焦点环改成 `ring-1 ring-inset ring-ring/40`（原样是 `ring-[3px] ring-ring/50` + `border-ring` + `outline`） | Radix 点 tab 会把焦点移到 trigger 上，外圈 ring 会画成一个整块的「黑框」，看着像误触 |
 | `components/ui/Drawer.tsx` | 依赖 **Base UI**（`@base-ui/react/drawer`），项目其余组件都是 radix；类名与 CSS 变量取自 shadcn 官方 Base UI 版 | `components.json` 的 base 仍是 `radix`。选它唯一原因是**可堆叠嵌套**：radix 侧（`Sheet` / vaul）没有「父抽屉缩小留在后面」的实现，且 vaul 已停止维护。只有物品详情用它，其它浮层继续走 radix，不要混用；Drawer 的替换元素用 Base UI 的 `render`（不是 `asChild`）|
 
 ## 字号角色（不要临时加字号）
@@ -409,7 +411,7 @@
   「填名称 + 主指令」创建，并自动生成一张「帮助」卡片（`/xx help`）；创建后可在列表中**直接改名称 / 主指令 / 顶部说明**（
   `desc` 留空则回退默认提示），改主指令会同步「帮助」卡片；激活后进侧边栏。
 - 模块内的「用户添加的指令卡片」统一存 `tswui:moduleCards`（`lib/moduleCards.ts`，`byServer[serverId][moduleId]`）。
-- 侧边栏使用轻量分组（只有两处标题）：**无标题首组**（首页 / 指令 / 聊天 / 物资申请，按使用频率排）→ **工具**（物品 ID / 数据 ID / 指令小抄 / 玩家存档 / 世界存档 / 精灵图；查询类 + 纯本地文件的公开工具）→ **扩展**（鱼店 / 玩家管理 / 世界管理 / 已激活自定义模块）→ **系统**（设置，恒在末尾，无标题）；空分类不渲染。
+- 侧边栏使用轻量分组（只有两处标题）：**无标题首组**（首页 / 指令 / 聊天 / 物资申请，按使用频率排）→ **工具**（物品 ID / 数据 ID / 指令小抄 / 玩家存档 / 世界存档；查询类 + 纯本地文件的公开工具）→ **扩展**（鱼店 / 玩家管理 / 世界管理 / 已激活自定义模块）→ **系统**（设置，恒在末尾，无标题）；空分类不渲染。
 - 自定义模块在设置页支持拖拽排序，并提供「上移 / 下移」按钮；数组顺序直接决定侧栏顺序，仍存 `tswui:customModules`。
 - 通用页 `pages/CommandModulePage.tsx` + `components/ModuleCardsPanel.tsx`：世界管理与自定义模块共用，
   支持逐张刷新 / 刷新全部 / 添加删除卡片 / 批量执行。鱼店右侧卡片（`FishCommandCards`）也用同一份 `moduleCards`
@@ -681,26 +683,6 @@
   字段网格（`grid-cols-2 sm:grid-cols-3 xl:grid-cols-4`，每格「标签 `text-2xs` + 值 `text-sm`」，值空则整格不渲染）→
   `Separator` → Boss 进度徽章（`tone="success"`，没有就一句话）。
 - 导出图片复用同一份位图（`canvas.toBlob` → 下载 `<世界名>.png`），不需要重新渲染。
-
-## 精灵图（`pages/SpriteSheetPage.tsx`，分割 / 合并 / GIF）
-
-- 侧边栏「工具 › 精灵图」（`ScissorsLineDashed`），地址 `#/slice`；公开工具、**纯本地**（不上传、不需要登录）。
-- 页首左上角是**下划线 `Tabs`（分割 / 合并 / GIF）**，与「数据ID」同款；三个 tab 用 `hidden` 常驻挂载，
-  切回来图片 / 帧序列还在，tab 记在 `tswui:spriteSheetTab`。
-- 「合并」：工具条（导入多选 / 张数 / 输出尺寸 / 排列 `ToggleGroup` / 列数 / 间距 / 导出）+ 棋盘格预览 + 顺序列表（↑ ↓ ×）；
-  「GIF」：工具条（导入 / 尺寸 · 帧数 · 循环 / 导出全部）+ 选中帧预览 + 帧缩略图条。
-- **工具条与画布同一张卡**（没有独立的导入卡）：`size="sm"` 的**导入 PNG**（primary）+ 原图尺寸 +
-  `[网格 | 框选]` `ToggleGroup`（`h-7`）+ 提示小字（容器 ≥820px 才显示）+ 右侧「缩放」`Select`（适应 / 50–800%，
-  「适应」按宽高双约束）；整页可拖放（`data-testid="slice-drop"`）。
-- 两栏（容器 ≥1100px 时右栏 **300px**，否则堆叠）：左「预览 canvas」（棋盘格底；网格按去重边界画细线、
-  微调过的切片琥珀虚线、选中切片「聚光灯」+ 白晕主色框、左上角序号徽标；点击选中、方向键微调、
-  框选模式拖出矩形新建切片），右栏**控件一律小号**（输入 `h-7`、按钮 `size="sm"`）：
-  「切分设置」（行列 / 边距 / 间距 / 单元格尺寸 / 自动猜测 / 跳过全透明）+「切片 #n」
-  （名称输入 + 72px 放大预览 + X / Y / 宽 / 高 + 微移四键 + 恢复 / 删除 + 导出）+「GIF 动画」
-  （帧序列 chips + 加入 / 清空 + 96px 自动循环预览 + 帧间隔 / 循环 + 导出 GIF，≥2 帧才可导出）。
-  下方整宽的「切片列表」横向滚动缩略图（点选 / 双击导出；命名过的在缩略图底部显示名字），
-  统计「共 N 张 · 已微调 M 张 · 手动 K 张」放在标题行右侧（不单独占行）。
-- 计算 / 微调 / 导出规则见 [`页面-精灵图.md`](页面-精灵图.md)。
 
 ## 指令页
 

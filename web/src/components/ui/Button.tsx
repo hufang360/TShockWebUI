@@ -8,7 +8,7 @@ export const buttonVariants = cva(
   // 图标按钮的尺寸只由 size 变体决定：调用点 className 不要再写 size-* / h-* / w-*。
   // 只写 base 会留下变体的 `md:size-*`（不同修饰符组，twMerge 不会消掉），结果是「手机小而桌面大」——正好反了。
   // 规范见 docs/计划-图标按钮规格.md §1.1。
-  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-control font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
+  'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
   {
     variants: {
       variant: {

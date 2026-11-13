@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, ScissorsLineDashed, ScrollText, Search, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
+import { BookOpen, BookText, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, Search, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
 import { CommandTerminal } from '@/components/CommandTerminal'
 import { TerminalTopBarButton } from '@/components/TerminalTopBarButton'
 import { AppShell, type NavItem } from '@/components/AppShell'
@@ -276,6 +276,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     const raw = (hashTab ?? ui.activeTab) as string
     if (raw === 'history' || raw === 'favorites') return 'editor'
     if (raw === 'npcs' || raw === 'tiles' || raw === 'codex') return 'dataid'
+    // 「指令小抄」已并入常用表格，成为其中一张表。
+    if (raw === 'commands') return 'tables'
     // 所有模块（含玩家管理）都严格跟随侧边栏开关；关闭后直达 URL 也回到首页。
     if (
       (raw === 'players' ||
@@ -313,11 +315,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       // 工具：查询类 + 纯本地文件的公开工具（都不读 TShock、不跟随模块开关）。
       { id: 'items', label: t('nav.items'), icon: BookOpen, group: 'tools', onPrefetch: preloadItems },
       { id: 'dataid', label: t('nav.dataId'), icon: LayoutGrid, group: 'tools', onPrefetch: () => preloadRoute('dataid') },
-      // 指令小抄：跟着「数据 ID」放（查完 NPC / 图格，顺手看对应指令）。
-      { id: 'commands', label: t('nav.commands'), icon: ScrollText, group: 'tools', onPrefetch: () => preloadRoute('commands') },
+      // 常用表格（指令小抄 + 资料表）紧跟「数据 ID」：都是查完就走的知识性页面。
+      { id: 'tables', label: t('nav.tables'), icon: BookText, group: 'tools', onPrefetch: () => preloadRoute('tables') },
       { id: 'save', label: t('nav.save'), icon: UserRound, group: 'tools', onPrefetch: () => preloadRoute('save') },
       { id: 'worldview', label: t('nav.worldView'), icon: MapIcon, group: 'tools', onPrefetch: () => preloadRoute('worldview') },
-      { id: 'spritesheet', label: t('nav.slice'), icon: ScissorsLineDashed, group: 'tools', onPrefetch: () => preloadRoute('spritesheet') },
     ]
     const icons: Record<string, typeof House> = { players: Users, store: Fish, requisition: ClipboardList, world: Globe2 }
     const groups: Record<string, NavItem['group']> = {

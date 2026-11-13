@@ -198,7 +198,7 @@ export function ItemSearchPanel({
                       className={cn(
                         'h-auto w-full cursor-pointer justify-start gap-2 rounded-none px-2 py-2 font-normal',
                         // 选中 / 键盘高亮只用**更深的底色**表示：不要描边（默认聚焦光圈会画出一圈深色框）。
-                        'focus-visible:ring-0 focus-visible:ring-offset-0',
+                        'focus-visible:outline-0 ',
                         selected?.id === item.id || activeIndex === index
                           ? 'bg-foreground/10'
                           : 'hover:bg-foreground/5',

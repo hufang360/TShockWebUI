@@ -424,10 +424,10 @@ export function RequisitionPage({
       {canReview ? (
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList variant="line" className="w-full justify-start" aria-label={t('requests.sections')}>
-            <TabsTrigger value="mine" variant="line" className="flex-none" disabled={!canSubmit}>
+            <TabsTrigger value="mine" className="flex-none" disabled={!canSubmit}>
               {t('requests.mine')}
             </TabsTrigger>
-            <TabsTrigger value="review" variant="line" className="flex-none">
+            <TabsTrigger value="review" className="flex-none">
               {t('requests.review')}
             </TabsTrigger>
           </TabsList>
@@ -538,7 +538,7 @@ export function RequisitionPage({
                                   addItem(item)
                                   setFavoritesOpen(false)
                                 }}
-                                className="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="flex w-full cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                               >
                                 <ItemIcon item={item} atlas={atlas} size={24} />
                                 <span className="min-w-0 flex-1 truncate text-sm">{item.name}</span>
@@ -574,7 +574,7 @@ export function RequisitionPage({
                       <li key={item.id}>
                         <button
                           type="button"
-                          className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                          className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring "
                           onClick={() => addItem(item)}
                         >
                           <ItemIcon item={item} atlas={atlas} size={28} />
@@ -764,10 +764,10 @@ export function RequisitionPage({
               className="w-auto justify-start"
               aria-label={t('requests.filterScope')}
             >
-              <TabsTrigger value="pending" variant="line" className="flex-none">
+              <TabsTrigger value="pending" className="flex-none">
                 {t('requests.filter.pending')}
               </TabsTrigger>
-              <TabsTrigger value="all" variant="line" className="flex-none">
+              <TabsTrigger value="all" className="flex-none">
                 {t('requests.filter.all')}
               </TabsTrigger>
             </TabsList>

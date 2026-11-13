@@ -409,7 +409,7 @@ export function ResultPanel({
       onClick={scrollToBottom}
       className={cn(
         'flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-2xs text-primary-foreground shadow-md',
-        'hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
         pageScroll && 'pointer-events-auto',
       )}
     >

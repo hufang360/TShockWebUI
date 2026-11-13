@@ -12,7 +12,7 @@ export function Input({ className, id, name, ...props }: ComponentProps<'input'>
       className={cn(
         'h-9 w-full rounded-control bg-accent px-3 text-sm text-foreground',
         'placeholder:text-muted-foreground',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         className,
       )}
       {...props}

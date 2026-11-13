@@ -172,7 +172,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const dataset = useDataset()
   const [ui, setUi] = useModuleState<FishUiState>(serverId, 'store', DEFAULT_STATE)
 
-  // 全局搜索选了「鱼店商品」/点了「前往鱼店查看更多」：把词填进这里的搜索框（不自动打开详情）。
+  // 全局搜索选了「鱼店商品」/点了「更多」：把词填进这里的搜索框（不自动打开详情）。
   useSearchIntent(
     'store',
     useCallback((intent) => {

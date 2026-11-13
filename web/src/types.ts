@@ -663,12 +663,11 @@ export interface UiState {
 export type TabId =
   | 'home'
   | 'editor'
-  | 'commands'
   | 'items'
   | 'dataid'
   | 'save'
   | 'worldview'
-  | 'spritesheet'
+  | 'tables'
   | 'players'
   | 'store'
   | 'requisition'

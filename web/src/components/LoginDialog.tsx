@@ -225,7 +225,7 @@ export function LoginDialog({
     <button
       type="button"
       onClick={() => setServerOpen(true)}
-      className="flex w-full cursor-pointer items-center gap-2 rounded-control bg-accent/50 px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex w-full cursor-pointer items-center gap-2 rounded-control bg-accent/50 px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       aria-label={`${t('login.server')}: ${serverLabel}`}
     >
       <Server className="size-4 shrink-0 text-muted-foreground" />
@@ -426,7 +426,7 @@ export function LoginDialog({
               {submitting && mode === 'online' && (
                 <button
                   type="button"
-                  className="mx-auto cursor-pointer rounded-chip text-xs font-medium text-foreground/75 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="mx-auto cursor-pointer rounded-chip text-xs font-medium text-foreground/75 transition-colors hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   onClick={cancelWait}
                 >
                   {t('login.onlineCancel')}
@@ -478,7 +478,7 @@ export function LoginDialog({
                       type="button"
                       onPointerEnter={openHelp}
                       onPointerLeave={scheduleCloseHelp}
-                      className="flex cursor-pointer items-center gap-1 rounded-chip text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex cursor-pointer items-center gap-1 rounded-chip text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     >
                       <CircleHelp className="size-3.5" />
                       {t('login.help')}

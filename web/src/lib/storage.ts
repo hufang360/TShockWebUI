@@ -115,10 +115,6 @@ export const StorageKeys = {
   playersCompact: 'playersCompact',
   /** 玩家管理各分区（银行 / 配装）的折叠状态 { [key]: collapsed }。 */
   playersCollapsed: 'playersCollapsed',
-  /** 精灵图上次用的切分参数 / GIF 参数（图片本身不存）。 */
-  spriteSheet: 'spriteSheet',
-  /** 精灵图页面上次打开的 tab（split / merge / gif）。 */
-  spriteSheetTab: 'spriteSheetTab',
   /**
    * 语言材质包的启用状态与优先级顺序 `{ order: string[], enabled: string[] }`。
    * 词条本体在 IndexedDB（`tswui` / `languagePacks`），不进 localStorage。

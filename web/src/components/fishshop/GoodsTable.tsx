@@ -53,7 +53,7 @@ export function GoodsTable({
               event.preventDefault()
               onSelect(good)
             }}
-            className="cursor-pointer border-b border-border/40 align-middle transition-colors odd:bg-muted/25 hover:bg-accent/25 focus-visible:bg-accent/25 focus-visible:outline-none"
+            className="cursor-pointer border-b border-border/40 align-middle transition-colors odd:bg-muted/25 hover:bg-accent/25 focus-visible:bg-accent/25 "
           >
             <td className="px-2 py-1.5 font-pixel text-2xs whitespace-nowrap text-muted-foreground">
               #{good.serial}

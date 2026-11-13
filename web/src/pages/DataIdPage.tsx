@@ -522,7 +522,7 @@ export function DataIdPage({
                 href={dataWikiLink.href}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex rounded-control border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="inline-flex rounded-control border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring "
               >
                 {dataWikiLink.label}
               </a>
@@ -534,7 +534,7 @@ export function DataIdPage({
                   href={link.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-control border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="rounded-control border border-border/60 px-2 py-1 text-xs text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring "
                 >
                   {link.label}
                 </a>
@@ -589,16 +589,16 @@ export function DataIdPage({
             className="w-full shrink-0 gap-0 pt-1.5"
           >
               <TabsList aria-label={t('dataId.tabs')} variant="line" className="w-full justify-start">
-                <TabsTrigger value="npc" variant="line" className="flex-none">
+                <TabsTrigger value="npc" className="flex-none">
                   {t('dataId.tab.npc')}
                 </TabsTrigger>
-                <TabsTrigger value="tile" variant="line" className="flex-none">
+                <TabsTrigger value="tile" className="flex-none">
                   {t('dataId.tab.tile')}
                 </TabsTrigger>
-                <TabsTrigger value="wall" variant="line" className="flex-none">
+                <TabsTrigger value="wall" className="flex-none">
                   {t('dataId.tab.wall')}
                 </TabsTrigger>
-                <TabsTrigger value="buff" variant="line" className="flex-none">
+                <TabsTrigger value="buff" className="flex-none">
                   {t('dataId.tab.buff')}
                 </TabsTrigger>
               </TabsList>

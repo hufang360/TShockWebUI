@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
  * 尺寸与同排的 `Button` / `ToggleGroup` 对齐（`sm` = 手机 36 / 桌面 28 那一档）。
  */
 const toggleVariants = cva(
-  'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-control text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-3.5',
+  'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-control text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-3.5',
   {
     variants: {
       variant: {

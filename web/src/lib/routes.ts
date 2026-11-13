@@ -1,5 +1,6 @@
 import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
 import { requestEditorView } from '@/lib/editorView'
+import { requestTablesView } from '@/lib/tablesView'
 import { readJson, StorageKeys } from '@/lib/storage'
 import type { TabId } from '@/types'
 
@@ -14,13 +15,12 @@ import type { TabId } from '@/types'
 /** 内置 tab → hash 片段。 */
 const TAB_SEGMENT: Record<string, string> = {
   editor: 'cmd',
-  commands: 'commands',
   save: 'plr',
   worldview: 'wld',
   players: 'pm',
   world: 'wm',
   store: 'fish',
-  spritesheet: 'slice',
+  tables: 'ref',
 }
 
 /** 短名 / 旧名 → tab。 */
@@ -39,9 +39,14 @@ const SEGMENT_TAB: Record<string, TabId> = {
   world: 'world',
   fish: 'store',
   store: 'store',
-  slice: 'spritesheet',
-  commands: 'commands',
-  spawn: 'commands',
+  // 「精灵图」已移除（迁往独立项目）：老书签 / 老地址回到首页。
+  slice: 'home',
+  // 「参考」页（原「常用表格」）：#/ref 是正式地址，老 #/tables 继续可用。
+  ref: 'tables',
+  tables: 'tables',
+  // 「指令小抄」已并入参考页（成为第一张表）：老地址落到同一页并由页面打开那张表。
+  commands: 'tables',
+  spawn: 'tables',
   history: 'editor',
   favorites: 'editor',
   npcs: 'dataid',
@@ -97,6 +102,8 @@ export function readTabFromHash(
   }
   // 老的「聊天」地址（`#/chat`）：除了落到指令页，还要让页面一进来就停在聊天那一块。
   if (segment === 'chat') requestEditorView('chat')
+  // 老的「指令小抄」地址：落到常用表格页，并打开那一张表。
+  if (segment === 'commands' || segment === 'spawn') requestTablesView('tips')
   return SEGMENT_TAB[segment] ?? (decoded as TabId)
 }
 

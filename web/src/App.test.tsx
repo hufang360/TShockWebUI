@@ -623,27 +623,28 @@ it('「玩家存档」是独立侧边栏菜单：未登录也能用，不依赖�
   expect(screen.getByRole('button', { name: /导入 \.plr/ })).toBeTruthy()
 })
 
-it('侧边栏「指令小抄」：排在「数据 ID」下一行，分组列出 Boss，点终端填进浮窗', async () => {
+it('「指令小抄」是常用表格页的第一张表：分组列出 Boss，点终端填进浮窗', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
   await loginAsAlice()
 
-  fireEvent.click(screen.getAllByRole('button', { name: '指令小抄' })[0])
-  // 没有顶部 tab / 常驻分组栏：分组在搜索框旁边的图标按钮里。
+  fireEvent.click(screen.getAllByRole('button', { name: '常用表格' })[0])
+  // 指令小抄是这一页的第一张表；分组在搜索框旁边的图标按钮里。
   expect(await screen.findByPlaceholderText('搜索指令或名称')).toBeTruthy()
-  expect(screen.queryByRole('tablist')).toBeNull()
-  expect(window.location.hash).toBe('#/commands')
+  expect(screen.getByRole('tab', { name: '指令' }).getAttribute('aria-selected')).toBe('true')
+  expect(window.location.hash).toBe('#/ref')
   fireEvent.click(screen.getByRole('button', { name: '分组' }))
   expect(
     within(screen.getByTestId('commands-groups')).getByRole('button', { name: /召唤 Boss/ }),
   ).toBeTruthy()
-  // 侧栏顺序：指令小抄紧跟「数据 ID」。
+  // 侧栏不再单列「指令小抄」入口。
   const sidebar = screen.getByTestId('sidebar')
   const labels = Array.from(sidebar.querySelectorAll('[data-slot="sidebar-menu"] button')).map((b) =>
     b.textContent?.trim(),
   )
-  expect(labels.indexOf('指令小抄')).toBe(labels.indexOf('数据 ID') + 1)
+  expect(labels).toContain('常用表格')
+  expect(labels).not.toContain('指令小抄')
 
   // 同一前缀的行默认折叠（`/spawnboss …`、`/tpnpc …`），先展开再点。
   const fold = (stem: string) =>
@@ -688,12 +689,12 @@ it('「聊天」已并入「指令」：侧栏没有聊天，老地址 #/chat �
   expect(await screen.findByText(/加入了服务器/)).toBeTruthy()
 })
 
-it('旧的「召唤NPC」地址回落到「指令小抄」', async () => {
+it('旧的「召唤NPC」地址回落到常用表格页里的指令小抄', async () => {
   mockFetch()
   window.history.replaceState(null, '', '#/spawn')
   render(<App transport={new MockTransport()} />)
   expect(await screen.findByPlaceholderText('搜索指令或名称')).toBeTruthy()
-  await waitFor(() => expect(window.location.hash).toBe('#/commands'))
+  await waitFor(() => expect(window.location.hash).toBe('#/ref'))
 })
 
 it('「世界存档」是独立侧边栏菜单：未登录也能用，排在「世界管理」之前', async () => {
@@ -714,17 +715,5 @@ it('「世界存档」是独立侧边栏菜单：未登录也能用，排在「�
   fireEvent.click(screen.getAllByRole('button', { name: '世界存档' })[0])
   expect(await screen.findByTestId('world-drop')).toBeTruthy()
   expect(window.location.hash).toBe('#/wld')
-  expect(screen.queryByText('请先登录！')).toBeNull()
-})
-
-it('「精灵图」是独立侧边栏菜单：未登录也能用，地址 #/slice', async () => {
-  mockFetch()
-  render(<App transport={new MockTransport()} />)
-  await screen.findByText('WebUI')
-
-  fireEvent.click(screen.getAllByRole('button', { name: '精灵图' })[0])
-  expect(await screen.findByTestId('slice-drop')).toBeTruthy()
-  expect(window.location.hash).toBe('#/slice')
-  expect(screen.getByText('还没有选择精灵图')).toBeTruthy()
   expect(screen.queryByText('请先登录！')).toBeNull()
 })

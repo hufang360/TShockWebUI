@@ -29,7 +29,7 @@ export function SelectTrigger({
       data-size={size}
       className={cn(
         'flex w-fit cursor-pointer items-center justify-between gap-2 rounded-control bg-accent whitespace-nowrap text-foreground',
-        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
         'data-[placeholder]:text-muted-foreground',
         '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-3.5',

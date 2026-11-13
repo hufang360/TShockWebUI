@@ -88,7 +88,7 @@ function ItemTable({
               tabIndex={0}
               {...selectableRow(() => onSelect(item))}
               className={cn(
-                'cursor-pointer border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-none',
+                'cursor-pointer border-t border-border/50 transition-colors odd:bg-muted/25 hover:bg-primary/10 focus-visible:bg-primary/10 ',
                 selectedId === item.id && 'bg-primary/10',
               )}
             >

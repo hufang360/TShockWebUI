@@ -11,7 +11,8 @@ export function DialogOverlay({ className, ...props }: ComponentProps<typeof Dia
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn('fixed inset-0 z-50 bg-black/60 backdrop-blur-sm', className)}
+      // 与鱼店抽屉的遮罩（`ContentScrim`）同一个观感：半透明黑、不模糊。
+      className={cn('fixed inset-0 z-50 bg-black/50', className)}
       {...props}
     />
   )
@@ -56,7 +57,7 @@ export function DialogContent({
           <DialogPrimitive.Close
             className={cn(
               'absolute top-3 right-3 cursor-pointer rounded-control p-1 text-muted-foreground transition-colors',
-              'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+              'hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
             )}
             aria-label="Close"
           >

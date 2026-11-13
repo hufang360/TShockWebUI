@@ -387,7 +387,7 @@ export function CommandPage({
       {text.trim().length > 0 && !chat.sending && (
         <button
           type="button"
-          className="shrink-0 cursor-pointer rounded-chip underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 cursor-pointer rounded-chip underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           onClick={submit}
         >
           {t('feed.chatRetry')}

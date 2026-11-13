@@ -206,7 +206,7 @@ export function ItemTooltipContent({
   const iconBtnClass = cn(
     'grid size-6 shrink-0 cursor-pointer place-items-center rounded-control transition-colors',
     'text-zinc-500 hover:bg-white/10',
-    'focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 ',
   )
   const favoriteButton = favorites ? (
     <button

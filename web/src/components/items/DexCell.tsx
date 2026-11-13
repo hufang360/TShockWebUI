@@ -13,7 +13,7 @@ export const ICON_SIZE = 64
  * 平时没有底色。与「数据 ID → NPC」共用同一套尺寸：格子宽 72、图标 64。
  */
 export const CELL_CLASS =
-  'group/cell grid w-18 cursor-pointer place-items-center gap-1 rounded-container transition duration-150 hover:-translate-y-0.5 hover:bg-transparent focus-visible:-translate-y-0.5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+  'group/cell grid w-18 cursor-pointer place-items-center gap-1 rounded-container transition duration-150 hover:-translate-y-0.5 hover:bg-transparent focus-visible:-translate-y-0.5 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
 export const CELL_SELECTED = 'bg-primary/20'
 export const ICON_SURFACE_CLASS =
   'relative flex size-18 items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10 group-focus-visible/cell:bg-primary/10'

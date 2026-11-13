@@ -105,7 +105,8 @@ function groupList() {
 
 /** 展开所有折叠组（`/worldevent …`、`/worldmode …` 这类同前缀的行默认收起）。 */
 function expandAllGroups() {
-  for (const button of screen.getAllByRole('button', { expanded: false })) {
+  // 已经全展开时这里会拿到空数组——用 queryAll 而不是 getAll（后者对空结果会抛错）。
+  for (const button of screen.queryAllByRole('button', { expanded: false })) {
     fireEvent.click(button)
   }
 }
@@ -131,6 +132,11 @@ function openDetail(command: string) {
   fireEvent.click(row(command))
   const panel = screen.getByTestId('command-detail')
   return within(panel)
+}
+
+/** 关掉详情弹框（模态：不关掉就点不到页面其它地方）。 */
+function closeDetail() {
+  fireEvent.click(within(screen.getByTestId('command-detail')).getByRole('button', { name: 'Close' }))
 }
 
 /** 当前是否开着详情浮层。 */
@@ -271,7 +277,7 @@ describe('CommandTipsPage', () => {
     expect(child?.textContent).toContain('哥布林入侵')
   })
 
-  it('单击一行弹出详情浮层（单开，再点收起）', () => {
+  it('单击一行弹出详情弹框（单开，Esc 关闭）', () => {
     renderPage()
     expect(hasDetail()).toBe(false)
 
@@ -281,14 +287,11 @@ describe('CommandTipsPage', () => {
     // 单击行不会填浮窗
     expect(screen.queryByTestId('terminal-window')).toBeNull()
 
-    // 点另一条：只开一个（锚到新行）
+    // 关掉再点另一条：始终只开一个
+    fireEvent.click(within(screen.getByTestId('command-detail')).getByRole('button', { name: 'Close' }))
     fireEvent.click(row('/evil'))
     expect(screen.getAllByTestId('command-detail')).toHaveLength(1)
     expect(screen.getByTestId('command-detail').textContent).toContain('/evil')
-
-    // 再点同一行收起
-    fireEvent.click(row('/evil'))
-    expect(hasDetail()).toBe(false)
   })
 
   it('多子项的指令折成一行（/warp /region /itemban /projban /tileban /group /tp /death）', () => {
@@ -338,23 +341,22 @@ describe('CommandTipsPage', () => {
 
   it('详情浮层打开时，焦点不落在复制键上', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
-    fireEvent.click(row('/hardmode'), { clientX: 100, clientY: 200 })
+    fireEvent.click(row('/hardmode'))
     const active = document.activeElement as HTMLElement | null
-    // 不能是浮层里的复制 / 执行按钮
-    expect(active?.closest('[data-slot="popover-content"]')).toBeNull()
+    // 不能是弹框里的复制 / 执行按钮
+    expect(active?.closest('[data-slot="dialog-content"]')).toBeNull()
     expect(active?.getAttribute('aria-label')).not.toBe('复制指令')
   })
 
-  it('详情是 popover（不是 dialog / 抽屉），也不占表格行', () => {
+  it('详情是 dialog（不是抽屉），也不占表格行', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
     expandAllGroups()
     const before = document.querySelectorAll('tbody tr').length
     // 用 data-command 直接点（该行已在展开的折叠组里）
     fireEvent.click(findRow('data-command', '/worldevent invasion goblins')!)
-    expect(document.querySelector('[data-slot="dialog-content"]')).toBeNull()
+    expect(document.querySelector('[data-slot="dialog-content"]')).toBeTruthy()
     expect(document.querySelector('[data-slot="drawer-content"]')).toBeNull()
-    expect(document.querySelector('[data-slot="popover-content"]')).toBeTruthy()
-    // 浮层不往表格里插行
+    // 弹框不往表格里插行
     expect(document.querySelectorAll('tbody tr').length).toBe(before)
   })
 
@@ -563,9 +565,10 @@ describe('CommandTipsPage', () => {
     expect(table().getByText('/accountinfo <username>')).toBeTruthy()
 
     // 自助指令各说各的：不套分区的语法与提示
-    const accountDetail = openDetail('/register <password>')
+    const accountDetail = openDetail('/accountinfo <username>')
     expect(accountDetail.queryByText('使用提示')).toBeNull()
     expect(accountDetail.queryByText('指令语法')).toBeNull()
+    closeDetail()
 
     fill('/user help')
     expect(inputValue()).toBe('/user help')
@@ -575,14 +578,17 @@ describe('CommandTipsPage', () => {
     expect(table().queryByText(/默认 -a -u -ip/)).toBeNull()
     expect(table().getByText('/mute <player> [reason]')).toBeTruthy()
     expect(table().getByText('/kick <player> [reason]')).toBeTruthy()
+
     // `/kick` `/mute` 不套 `/ban` 的语法与提示
     const muteDetail = openDetail('/mute <player> [reason]')
     expect(muteDetail.queryByText('指令语法')).toBeNull()
     expect(muteDetail.queryByText('使用提示')).toBeNull()
+    closeDetail()
 
     // `/ban` 自己的提示还在
     const banDetail = openDetail('/ban list')
     expect(banDetail.getByText(/默认 -a -u -ip/)).toBeTruthy()
+    closeDetail()
 
     fill('/ban list')
     expect(inputValue()).toBe('/ban list')

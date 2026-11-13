@@ -5,9 +5,12 @@ import { makeDataset, testItems } from '@/test/fixtures'
 import { ITEM_COLLECTIONS } from './collections'
 import {
   MAX_PER_GROUP,
+  MAX_PER_GROUP_DETAIL,
   MAX_TOTAL,
   rank,
+  commandInvocation,
   searchEverything,
+  searchGroup,
   type GlobalSearchSources,
 } from './globalSearch'
 import type { FishGood } from '@/lib/tshock'
@@ -19,7 +22,7 @@ function sources(overrides: Partial<GlobalSearchSources> = {}): GlobalSearchSour
       { id: 'home', label: '首页', icon: House },
       { id: 'items', label: '物品 ID', icon: House },
       { id: 'dataid', label: '数据 ID', icon: House },
-      { id: 'commands', label: '指令小抄', icon: House },
+      { id: 'tables', label: '常用表格', icon: House },
     ],
     dataset: makeDataset(),
     goods: [],
@@ -71,12 +74,19 @@ describe('searchEverything', () => {
     expect(pages?.hits.map((hit) => hit.action)).toContainEqual({ kind: 'page', tab: 'dataid' })
   })
 
-  it('指令：名称与别名都匹配，跳到指令小抄并带上词', () => {
+  it('指令：/help、.help、/help 4 都命中 help（TShock 的两种前缀）', () => {
+    for (const query of ['/help', '.help', '/help 4']) {
+      const commands = searchEverything(sources(), query).find((g) => g.id === 'commands')
+      expect(commands?.hits.map((h) => h.id)).toContain('commands:help')
+    }
+  })
+
+  it('指令：名称与别名都匹配，跳到常用表格并带上词', () => {
     const groups = searchEverything(sources(), 'g')
     const commands = groups.find((g) => g.id === 'commands')
     expect(commands?.hits[0].action).toEqual({
       kind: 'prefill',
-      tab: 'commands',
+      tab: 'tables',
       intent: { query: 'give' },
     })
   })
@@ -200,5 +210,82 @@ describe('searchEverything', () => {
     const pageGroups = searchEverything(sources(), '物品')
     expect(pageGroups[0].id).toBe('pages')
     expect(ids(pageGroups[0].hits)).toContain('pages:items')
+  })
+})
+
+describe('commandInvocation', () => {
+  it('/help 4 / .help 4 归一成可执行的一行', () => {
+    const hit = commandInvocation(sources(), '/help 4')
+    expect(hit?.command).toBe('/help 4')
+    expect(hit?.runnable).toBe(true)
+    // `.` 是 TShock 游戏内前缀，网页侧统一成 `/`。
+    expect(commandInvocation(sources(), '.help 4')?.command).toBe('/help 4')
+    // 连续空白不制造两条不同的指令。
+    expect(commandInvocation(sources(), '/help   4')?.command).toBe('/help 4')
+  })
+
+  it('必填参数不拦执行：裸 `/give` 也给（缺参数让 TShock 回用法错误）', () => {
+    expect(commandInvocation(sources(), 'help 4')).toBeNull()
+    const bare = commandInvocation(sources(), '/give')
+    expect(bare?.command).toBe('/give')
+    expect(bare?.runnable).toBe(true)
+    // 数据里仍有 needsArgs，只用于失败后给「填入终端」。
+    expect(bare?.needsArgs).toBe(true)
+  })
+
+  it('仅游戏内的指令：给一行但标红且不可执行（回车只是去看用法）', () => {
+    const hit = commandInvocation(sources(), '/item 29')
+    expect(hit?.inGameOnly).toBe(true)
+    expect(hit?.runnable).toBe(false)
+    // 指令组里的那行同样带上标记，列表里标红。
+    const row = searchEverything(sources(), 'item').find((g) => g.id === 'commands')?.hits[0]
+    expect(row?.inGameOnly).toBe(true)
+    expect(row?.runnable).toBe(false)
+  })
+
+  it('未收录的插件指令也放行（Tier A 交给 TShock 校验）', () => {
+    const hit = commandInvocation(sources(), '.wm 4')
+    expect(hit?.command).toBe('/wm 4')
+    expect(hit?.runnable).toBe(true)
+  })
+})
+
+describe('searchGroup', () => {
+  const many = (count: number): Item[] =>
+    Array.from({ length: count }, (_, i) => ({
+      ...testItems[0],
+      id: 100 + i,
+      key: `Stone${i}`,
+      name: `石头${i}`,
+    }))
+
+  it('二级给前 20 条，超过才给「前往页面」出口', () => {
+    const dataset = makeDataset({ items: many(25) })
+    const detail = searchGroup(sources({ dataset }), 'items', '石头')
+    expect(detail.hits).toHaveLength(MAX_PER_GROUP_DETAIL)
+    expect(detail.total).toBe(25)
+    expect(detail.seeAll).toEqual({ tab: 'items', intent: { query: '石头' } })
+
+    // 没超过上限：全部都在二级里，不给出口。
+    const fits = searchGroup(sources({ dataset: makeDataset({ items: many(8) }) }), 'items', '石头')
+    expect(fits.hits).toHaveLength(8)
+    expect(fits.seeAll).toBeUndefined()
+  })
+
+  it('空词返回空；不支持展开的组（页面）没有出口', () => {
+    expect(searchGroup(sources(), 'items', '   ')).toEqual({ group: 'items', hits: [], total: 0 })
+    const pages = searchGroup(sources(), 'pages', '页')
+    expect(pages.hits.length).toBeGreaterThan(0)
+    expect(pages.seeAll).toBeUndefined()
+  })
+
+  it('指令二级：必填参数只做标记（needsArgs），不阻止执行', () => {
+    const detail = searchGroup(sources(), 'commands', 'give')
+    const give = detail.hits.find((hit) => hit.name === '/give')
+    expect(give?.runnable).toBe(true)
+    expect(give?.needsArgs).toBe(true)
+    const help = searchGroup(sources(), 'commands', 'help').hits.find((hit) => hit.name === '/help')
+    expect(help?.runnable).toBe(true)
+    expect(help?.needsArgs).toBe(false)
   })
 })

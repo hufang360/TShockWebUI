@@ -57,7 +57,7 @@ export function SheetContent({
         <SheetPrimitive.Close
           className={cn(
             'absolute top-3 right-3 cursor-pointer rounded-control p-1 text-muted-foreground transition-colors',
-            'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+            'hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
           )}
           aria-label="Close"
         >
