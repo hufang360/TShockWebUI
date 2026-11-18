@@ -252,11 +252,69 @@ describe('GlobalSearchDialog', () => {
     expect(onRunCommand).toHaveBeenCalledWith('/help')
     const view = await screen.findByTestId('global-search-run')
     expect(await within(view).findByText('服务器时间：中午')).toBeTruthy()
+    // 结果页上没有返回按钮：焦点留在输入框（底栏写着重跑 / 返回）。
+    const input = screen.getByRole('combobox')
+    expect(document.activeElement).toBe(input)
+    expect(within(view).queryByRole('button', { name: '返回' })).toBeNull()
 
-    // 「返回」回到结果列表（不关弹框）
-    fireEvent.click(within(view).getByRole('button', { name: '返回' }))
+    // `Esc` 回到结果列表（不关弹框）
+    fireEvent.keyDown(input, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByTestId('global-search-run')).toBeNull())
     expect(screen.getByRole('combobox')).toBeTruthy()
+  })
+
+  it('结果页再按 Enter 就再跑一遍：结果追加（不覆盖）；改成搜索词才回列表', async () => {
+    const onRunCommand = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 'ok' as const, output: ['服务器时间：中午'] })
+      .mockResolvedValueOnce({ status: 'ok' as const, output: ['服务器时间：傍晚'] })
+      .mockResolvedValue({ status: 'ok' as const, output: ['用法：/help 1'] })
+    render(
+      <I18nProvider lang="zh">
+        <GlobalSearchDialog
+          open
+          onOpenChange={() => {}}
+          sources={sources()}
+          onNavigate={vi.fn()}
+          onOpenItem={() => {}}
+          canFillTerminal
+          canRunCommands
+          onRunCommand={onRunCommand}
+        />
+      </I18nProvider>,
+    )
+    const input = screen.getByRole('combobox')
+    fireEvent.change(input, { target: { value: '/help' } })
+    const row = await screen.findByRole('option', { name: /执行指令：\/help/ })
+    await waitFor(() => expect(row.getAttribute('aria-selected')).toBe('true'))
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const view = await screen.findByTestId('global-search-run')
+    expect(await within(view).findByText('服务器时间：中午')).toBeTruthy()
+    // 输入框一直有焦点：同一个 Enter 就是再跑一遍，新结果接在后面（按 Esc 回列表前都留着）。
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(onRunCommand).toHaveBeenCalledTimes(2))
+    expect(onRunCommand).toHaveBeenLastCalledWith('/help')
+    expect(await within(view).findByText('服务器时间：傍晚')).toBeTruthy()
+    expect(within(view).getByText('服务器时间：中午')).toBeTruthy()
+    expect(view.querySelectorAll('[data-run-entry]').length).toBe(2)
+
+    // 列表底部固定的退路只跟最新一条走（这里两条都成功，所以没有）。
+    expect(within(view).queryByRole('button', { name: '查看用法' })).toBeNull()
+
+    // 补参数（`/help` → `/help 1`）**不丢已有结果**：还是结果页，Enter 就追加第三条。
+    fireEvent.change(input, { target: { value: '/help 1' } })
+    expect(screen.getByTestId('global-search-run')).toBeTruthy()
+    expect(within(view).getByText('服务器时间：中午')).toBeTruthy()
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(onRunCommand).toHaveBeenLastCalledWith('/help 1'))
+    expect(await within(view).findByText('用法：/help 1')).toBeTruthy()
+    expect(view.querySelectorAll('[data-run-entry]').length).toBe(3)
+    // 每条自己带指令行，不会全写成输入框里最后那条。
+    expect(within(view).getAllByText('/help', { selector: 'code' }).length).toBe(2)
+
+    // 改成普通搜索词：离开结果页（否则 Enter 会跑错东西）。
+    fireEvent.change(input, { target: { value: '石头' } })
+    await waitFor(() => expect(screen.queryByTestId('global-search-run')).toBeNull())
   })
 
   it('执行结果用富文本渲染（`[c/..]` 上色、`[i:..]` 出物品图标）', async () => {

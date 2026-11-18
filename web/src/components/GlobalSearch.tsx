@@ -43,6 +43,7 @@ import {
   type SearchHit,
 } from '@/lib/globalSearch'
 import { copyText } from '@/lib/clipboard'
+import { formatClock } from '@/lib/clock'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
 import { modKeyLabel, shortcutLabel } from '@/lib/keyboard'
@@ -295,86 +296,119 @@ function GroupDetail({ detail, query, sources, onPick, onBack, onSeeAllPage }: G
   )
 }
 
-interface RunViewProps {
+/** 结果页的一条执行记录（`result === null` = 还在跑）。 */
+interface RunEntry {
+  /** 这一条跑的指令行（可能是 `/help`，也可能是补了参数的 `/help 1`）。 */
   command: string
-  /** `null` = 还在执行。 */
+  /** 触发它的行（`SearchHit.id`）：`Esc` 返回时把高亮放回去。 */
+  origin: string
+  /** 这条指令在数据里标了必填参数：失败时多给一个「填入终端」。 */
+  needsArgs?: boolean
+  /** 结果落地的时间；多条记录靠它区分。 */
+  ts: number
   result: CommandResult | null
+}
+
+interface RunViewProps {
+  /** 按执行顺序排列：每次 `Enter` 追加一条（按 `Esc` 回列表才清掉）。 */
+  entries: RunEntry[]
   /** 富文本要的图集 / 词缀（和结果面板同一份数据）。 */
   sources: GlobalSearchSources
-  /** 这条指令在数据里标了必填参数（失败时多给一个「填入终端」——可能只是少写了参数）。 */
-  needsArgs?: boolean
   /** 浮动终端可用时才给「填入终端」。 */
   canFillTerminal: boolean
-  onBack: () => void
-  /** 执行失败时给一条「查看用法」（跳到指令小抄）。 */
+  /** 最新一条执行失败时给一条「查看用法」（跳到指令小抄）。 */
   onUsage: () => void
-  /** 填入浮动终端（补参数后重跑）。 */
+  /** 填入浮动终端（补参数后重跑）；是否给看最新一条有没有标必填参数。 */
   onFillTerminal: () => void
 }
 
-/** 三级：指令执行结果（留在弹框里，不跳页）。 */
+/**
+ * 三级：指令执行结果（留在弹框里，不跳页）。
+ *
+ * 每次 `Enter` **追加**一条（与「指令」页的结果列表同一个思路），不是刷新同一张卡：
+ * 一条条的对比才是重跑的目的。多了就在框内滚（停在新的一条）。
+ *
+ * 这里**没有返回按钮**：焦点始终留在输入框，`Esc` 回列表（底栏有提示）。
+ */
 function RunView({
-  command,
-  result,
+  entries,
   sources,
-  needsArgs = false,
   canFillTerminal,
-  onBack,
   onUsage,
   onFillTerminal,
 }: RunViewProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const listRef = useRef<HTMLDivElement>(null)
+  const latest = entries[entries.length - 1]
+  const latestResult = latest?.result ?? null
   // 成功就不给这两个退路：它们是失败时的补妆，不是第二条主路径。
-  const failed = Boolean(result) && (result!.status !== 'ok' || Boolean(result!.message))
+  const failed =
+    Boolean(latestResult) &&
+    (latestResult!.status !== 'ok' || Boolean(latestResult!.message))
+  // 多条时每条前面标时间，否则「哪次是哪次」就分不出来了。
+  const stamped = entries.length > 1
+  // 新一条进来就贴到底（和结果列表一样，先看最新的）。
+  useEffect(() => {
+    const el = listRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [entries])
   return (
     <div className="flex max-h-[inherit] flex-col" data-testid="global-search-run">
-      <div className="flex items-center gap-2 px-1 py-1">
-        <Button variant="ghost" size="sm" onClick={onBack} autoFocus>
-          <ChevronLeft data-icon="inline-start" />
-          {t('action.back')}
-        </Button>
-        <code className="ml-auto truncate text-2xs text-muted-foreground">{command}</code>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
-        {result === null ? (
-          <p className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
-            <Spinner aria-hidden />
-            {t('editor.running')}
-          </p>
-        ) : (
-          <>
-            {/* 和「指令」页的结果面板同一套渲染：`[c/..]` 上色、`[i:..]` 出物品图标。 */}
-            <CommandOutput
-              result={result}
-              itemsById={sources.dataset.itemsById}
-              prefixesById={sources.dataset.prefixesById}
-              atlas={sources.dataset.atlas}
-            />
-            {failed && (
-              <div className="mt-1 flex flex-wrap items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="px-1 text-2xs text-muted-foreground"
-                  onClick={onUsage}
-                >
-                  {t('search.run.usage')}
-                </Button>
-                {needsArgs && canFillTerminal && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="px-1 text-2xs text-muted-foreground"
-                    onClick={onFillTerminal}
-                  >
-                    {t('search.action.fillTerminal')}
-                  </Button>
-                )}
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-2">
+        <div className="flex flex-col gap-3">
+          {entries.map((entry, index) =>
+            entry.result === null ? (
+              <p
+                key={index}
+                className="flex items-center gap-2 py-1 text-xs text-muted-foreground"
+              >
+                <Spinner aria-hidden />
+                {t('editor.running')}
+              </p>
+            ) : (
+              <div key={index} className="flex flex-col gap-1" data-run-entry="">
+                {/* 每条自己带指令行：输入框里可能已经是下一条（要补参数的）。 */}
+                <span className="flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
+                  <code className="min-w-0 truncate font-pixel text-foreground/70">
+                    {entry.command}
+                  </code>
+                  {stamped && <span className="shrink-0 tabular-nums">{formatClock(lang, entry.ts)}</span>}
+                </span>
+                {/* 和「指令」页的结果面板同一套渲染：`[c/..]` 上色、`[i:..]` 出物品图标。 */}
+                <CommandOutput
+                  result={entry.result}
+                  itemsById={sources.dataset.itemsById}
+                  prefixesById={sources.dataset.prefixesById}
+                  atlas={sources.dataset.atlas}
+                />
               </div>
-            )}
-          </>
-        )}
+            ),
+          )}
+        </div>
       </div>
+      {/* 失败退路钉在框内底部：结果再多也不会被滚走；只看最新那一条。 */}
+      {failed && (
+        <div className="flex shrink-0 flex-wrap items-center gap-1 px-3 pb-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-1 text-2xs text-muted-foreground"
+            onClick={onUsage}
+          >
+            {t('search.run.usage')}
+          </Button>
+          {failed && latest?.needsArgs && canFillTerminal && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-1 text-2xs text-muted-foreground"
+              onClick={onFillTerminal}
+            >
+              {t('search.action.fillTerminal')}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -570,14 +604,10 @@ interface GlobalSearchDialogProps {
   onRunCommand: (command: string) => Promise<CommandResult>
 }
 
-/** 执行结果页的来源：返回时要把高亮放回触发它的那一行。 */
+/** 执行结果页：把每次执行的输出摞在一起看，`Esc` 才回列表。 */
 interface RunState {
-  command: string
-  result: CommandResult | null
-  /** 触发执行的行（`SearchHit.id`）。 */
-  origin: string
-  /** 数据里标了必填参数：失败时多给一个「填入终端」。 */
-  needsArgs?: boolean
+  /** 这个结果页里的所有执行记录（`Enter` 一次追加一条）。 */
+  entries: RunEntry[]
 }
 
 /** 搜索弹框（桌面 / 移动共用）：输入框 + 分组结果，`Esc` 逐级返回 / 关闭。 */
@@ -709,6 +739,12 @@ export function GlobalSearchDialog({
   /** 输入词清空（或只剩空白）就回一级：不留一个「某组 + 空词」的空列表。 */
   const changeQuery = (value: string) => {
     state.setQuery(value)
+    // 结果页只在「还是一行能跑的指令」时留着：`/help` → `/help 1` 就是同一条指令补参数，
+    // 结果照旧摆在上面；改成搜索词（`石头`）才回列表，否则 `Enter` 会跑错东西。
+    if (run) {
+      const next = commandInvocation(sources, value)
+      if (!next?.runnable) setRun(null)
+    }
     if (!value.trim()) {
       setDrill(null)
       // 清空 = 放弃那个二级位置：下次再进同一组不要跳回旧的那一行。
@@ -737,10 +773,10 @@ export function GlobalSearchDialog({
       : 'search.action.copyId'
     : null
 
-  /** 从执行结果回到触发它的列表（高亮回到那一行）。 */
+  /** 从执行结果回到触发它的列表（高亮回到最后一次执行的那一行）。 */
   const backFromRun = () => {
     if (!run) return
-    restoreTarget.current = run.origin
+    restoreTarget.current = run.entries[run.entries.length - 1]?.origin ?? null
     setRun(null)
   }
 
@@ -761,6 +797,19 @@ export function GlobalSearchDialog({
    * 必须用 `DialogContent` 的 `onEscapeKeyDown` 才能拦下它（见下面的 `onEscapeKeyDown`）。
    */
   const handleRootKeyDown = (event: React.KeyboardEvent) => {
+    // 结果页：焦点就在输入框里，`Enter` 重跑（刷新结果卡片），其它键照常。
+    if (run) {
+      // 只接管输入框里的 Enter：`查看用法` / `填入终端` 这些按钮的回车不能被吃掉。
+      if (
+        event.key === 'Enter' &&
+        event.target === inputRef.current &&
+        !event.nativeEvent.isComposing
+      ) {
+        event.preventDefault()
+        rerun()
+      }
+      return
+    }
     const mod = event.metaKey || event.ctrlKey
     if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
       const input = inputRef.current
@@ -781,13 +830,22 @@ export function GlobalSearchDialog({
     state.removeHistory(recent)
   }
 
-  const execute = async (hit: SearchHit) => {
-    const command = hit.command
-    if (!command) return
-    setRun({ command, result: null, origin: hit.id, needsArgs: hit.needsArgs })
-    // 结果回来时用户可能已经 `Esc` 回列表了：只有还停在这条指令的结果页时才填进去。
+  const execute = async (command: string, meta: { origin: string; needsArgs?: boolean }) => {
+    const entry: RunEntry = { command, ...meta, ts: Date.now(), result: null }
+    // 结果页是一个**会话日志**：不论跑的是同一条还是补了参数的变体，都往后追加。
+    setRun((prev) => ({ entries: [...(prev?.entries ?? []), entry] }))
+    // 结果页上**没有按钮**：焦点始终交给输入框（`Enter` 重跑 / 直接改词再搜）。
+    inputRef.current?.focus()
+    // 结果回来时用户可能已经 `Esc` 回列表了：找不到记录就丢掉（不篡改新一次的结果页）。
     const settle = (result: CommandResult) =>
-      setRun((prev) => (prev && prev.command === command ? { ...prev, result } : prev))
+      setRun((prev) => {
+        if (!prev) return prev
+        const index = prev.entries.findIndex((item) => item === entry)
+        if (index < 0) return prev
+        const entries = [...prev.entries]
+        entries[index] = { ...entry, ts: Date.now(), result }
+        return { ...prev, entries }
+      })
     try {
       settle(await onRunCommand(command))
     } catch (err) {
@@ -799,13 +857,24 @@ export function GlobalSearchDialog({
     }
   }
 
+  /**
+   * 结果页的 `Enter`：跑**输入框里现在这条**（`/help` → `/help 1` 就是换成补了参数那条，
+   * 结果追加在后面）；还在跑就不重复发。
+   */
+  const rerun = () => {
+    if (!run || run.entries.some((entry) => entry.result === null)) return
+    const next = commandInvocation(sources, state.query)
+    if (!next?.command || !next.runnable) return
+    void execute(next.command, { origin: next.id, needsArgs: next.needsArgs })
+  }
+
   const pick = (hit: SearchHit) => {
     const keyword = state.query.trim()
     if (keyword) state.remember(keyword)
     // 登录后一律执行（除仅游戏内）：缺参数就让 TShock 回一句用法错误，
     // 不靠数据里的 `required` 替用户判定「跑不了」。
     if (hit.command && !hit.inGameOnly && hit.runnable && canRunCommands) {
-      void execute(hit)
+      void execute(hit.command, { origin: hit.id, needsArgs: hit.needsArgs })
       return
     }
     runHit(hit, onNavigate, onOpenItem)
@@ -881,14 +950,15 @@ export function GlobalSearchDialog({
           <div ref={listHostRef} className="max-h-[60vh] overflow-hidden">
             {run ? (
               <RunView
-                command={run.command}
-                result={run.result}
+                entries={run.entries}
                 sources={sources}
-                needsArgs={run.needsArgs}
                 canFillTerminal={canFillTerminal}
-                onBack={backFromRun}
-                onUsage={() => goPage('tables', { query: run.command.replace(/^\//, '') })}
-                onFillTerminal={() => fillTerminal(run.command)}
+                onUsage={() =>
+                  goPage('tables', {
+                    query: (run.entries[run.entries.length - 1]?.command ?? '').replace(/^\//, ''),
+                  })
+                }
+                onFillTerminal={() => fillTerminal(run.entries[run.entries.length - 1]?.command ?? '')}
               />
             ) : detail ? (
               <GroupDetail
@@ -953,7 +1023,10 @@ export function GlobalSearchDialog({
           )}
           <span className="ml-auto flex items-center gap-3">
             {run ? (
-              <Hint keys="Esc" label={t('action.back')} />
+              <>
+                <Hint keys="⏎" label={t('search.run.again')} />
+                <Hint keys="Esc" label={t('action.back')} />
+              </>
             ) : showingRecent ? (
               <>
                 <Hint keys="⏎" label={t('search.global.keys.search')} />
