@@ -2,7 +2,7 @@
 
 > 这里是**全量历史**。每个版本的详细更新与对外发布说明分别见 `docs/changelog/<版本>.md`、`docs/release/<版本>.md`。
 
-## 未发布（v0.1.0-rc.11）
+## 20261118（v0.1.0-rc.11）
 
 - **权限节点统一加 `hf.` 前缀**
   - 信使插件自定义的 4 个节点改名：`webui.use` → `hf.webui.use`、`webui.admin` → `hf.webui.admin`、

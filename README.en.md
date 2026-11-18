@@ -47,15 +47,15 @@ Allow regular players to use the REST API and execute commands through it (repla
 - `tshock.rest.useapi`: allows creating a token (logging in)
 - `tshock.rest.command`: allows executing commands
 
-Install the messenger plugin: [WebUI-0.1.0-rc.10.dll](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.10/WebUI-0.1.0-rc.10.dll).
+Install the messenger plugin: [WebUI-0.1.0-rc.11.dll](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.11/WebUI-0.1.0-rc.11.dll).
 
 ---
 
 **Desktop**
 Download a desktop build, for example:
 
-- Windows: [tswui-0.1.0-rc.10-windows-amd64.exe](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.10/tswui-0.1.0-rc.10-windows-amd64.exe)
-- macOS: [tswui-0.1.0-rc.10-darwin-arm64](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.10/tswui-0.1.0-rc.10-darwin-arm64)
+- Windows: [tswui-0.1.0-rc.11-windows-amd64.exe](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.11/tswui-0.1.0-rc.11-windows-amd64.exe)
+- macOS: [tswui-0.1.0-rc.11-darwin-arm64](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.11/tswui-0.1.0-rc.11-darwin-arm64)
 Double-click to start; a console window opens — keep it open!
 (This executable bundles the frontend build, `data/*.json` and the atlases; no Node.js or other runtime is needed.)
 On first start it writes `config.json` to the current directory (the exe's folder when double-clicked):
@@ -78,8 +78,8 @@ This page has no Go backend and cannot communicate with a TShock server.
 
 ```bash
 # Pull the image
-# docker pull hufang360/tshockwebui:0.1.0-rc.10
-docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.10
+# docker pull hufang360/tshockwebui:0.1.0-rc.11
+docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.11
 
 # Start the container
 # http://<server-ip>:18080
@@ -90,7 +90,7 @@ docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.10
 docker run -d --name tswui -p 18080:18080 \
   -e TSHOCK_URL=http://host.docker.internal:7878 \
   -e TSHOCK_ALLOW_CUSTOM_TARGETS=true \
-  ghcr.io/hufang360/tshockwebui:0.1.0-rc.10
+  ghcr.io/hufang360/tshockwebui:0.1.0-rc.11
 ```
 
 ## Architecture
