@@ -10,6 +10,8 @@
 #   PORT=8081 scripts/dev-container.sh    # 换宿主机端口
 #   TSHOCK_METHOD=GET scripts/dev-container.sh   # 出站改回 GET（默认 POST）
 #   LOGS=1 scripts/dev-container.sh       # 前台跟随日志（Ctrl+C 停止）
+#   TSWUI_ALLOW_INGAME_COMMANDS=true TSWUI_INGAME_COMMANDS=spawnboss,spawnmob \
+#     scripts/dev-container.sh            # 只放行「网页刷 Boss / 刷怪」
 #   CONTAINER=tswui-dev2 ...              # 多开一个实例
 #
 # 原理：
@@ -32,6 +34,8 @@ TRUST_PROXY=${TRUST_PROXY:-false}
 TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-1}
 ALLOW_CUSTOM_TARGETS=${TSHOCK_ALLOW_CUSTOM_TARGETS:-true}
 ALLOW_INGAME_COMMANDS=${TSWUI_ALLOW_INGAME_COMMANDS:-false}
+# Tier B 放行名单（逗号分隔，指令名或别名）；留空 = 不限定。
+INGAME_COMMANDS=${TSWUI_INGAME_COMMANDS:-}
 LOG_LEVEL=${LOG_LEVEL:-debug}
 NETWORK=${NETWORK:-}
 LOGS=${LOGS:-0}
@@ -108,6 +112,7 @@ RUN_ARGS=(
   -e "TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS}"
   -e "TSHOCK_ALLOW_CUSTOM_TARGETS=${ALLOW_CUSTOM_TARGETS}"
   -e "TSWUI_ALLOW_INGAME_COMMANDS=${ALLOW_INGAME_COMMANDS}"
+  -e "TSWUI_INGAME_COMMANDS=${INGAME_COMMANDS}"
   -e "LOG_LEVEL=${LOG_LEVEL}"
   -v "$DEV_DIR/tswui:/tswui:ro"
   -v "$ROOT_DIR/web/dist:/webdist:ro"
