@@ -43,6 +43,20 @@ export const MOCK_PLAYERS = ['Alice', 'Bob', 'Steve', '小美', 'Alex']
 /** Mock 的事件库实例标识（固定值，避免被当成「换服」而反复重拉）。 */
 const MOCK_INSTANCE = 'mock'
 
+/**
+ * Mock 的能力矩阵（演示环境的「服务器配置」）：与生产推荐的部署一致 ——
+ * 只放行刷 Boss / 刷怪两条，演示也不会声称 `/item` 能刷物品。
+ *
+ * 导出成常量而不是写死在方法里：**改了这里的默认值，测试要跟着变**。
+ * 断言「某条指令能不能执行」的用例请引用它（见 `App.test.tsx`），
+ * 别再硬编码「应该有 / 不该有『执行』」—— rc.11 就是因为硬编码 + 时序偶然性，CI 才挂的。
+ */
+export const MOCK_BATCH_CAPABILITIES: BatchCapabilities = {
+  plugin: true,
+  ingame: true,
+  ingameCommands: ['spawnboss', 'spawnmob'],
+}
+
 export class MockTransport implements BackendTransport {
   readonly mock = true
   readonly label = 'Mock（演示，未连接真实服务器）'
@@ -116,8 +130,7 @@ export class MockTransport implements BackendTransport {
 
   async batchCapabilities(): Promise<BatchCapabilities> {
     await delay(40)
-    // 与生产推荐的部署一致：只放行刷 Boss / 刷怪两条（演示也不会声称 /item 能刷物品）。
-    return { plugin: true, ingame: true, ingameCommands: ['spawnboss', 'spawnmob'] }
+    return MOCK_BATCH_CAPABILITIES
   }
 
   async runBatch(cmds: string[]): Promise<CommandResult[]> {

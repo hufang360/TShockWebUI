@@ -50,6 +50,6 @@ cat <<EOF
 下一步：
 1. 填两份文档（规则见 docs/发布流程.md）；
 2. 根 changelog.md 定稿：## 未发布（v${VERSION}）→ ## $(date +%Y%m%d)（v${VERSION}）；
-3. make release-check && make docs-check；
+3. make docs-release-check && make docs-check；
 4. 全量验证后提交、打 tag（未 push 前可随时改）。
 EOF

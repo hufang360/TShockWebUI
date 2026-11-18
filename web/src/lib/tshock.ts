@@ -44,7 +44,7 @@ export type {
 } from './transport'
 export { TshockRequestError, resultFromError, emptyPlayerLook } from './transport'
 export { HttpTransport } from './httpTransport'
-export { MockTransport, MOCK_PLAYERS } from './mockTransport'
+export { MockTransport, MOCK_BATCH_CAPABILITIES, MOCK_PLAYERS } from './mockTransport'
 
 export function createTransport(): BackendTransport {
   const mode = (import.meta.env.VITE_TRANSPORT as string | undefined) ?? 'http'

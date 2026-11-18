@@ -35,7 +35,7 @@ API_TARGET ?= http://127.0.0.1:$(API_PORT)
 
 .PHONY: help data web server lint test bundle-check plugin image binary \
         dev dev-web dev-all dev-container dev-container-frontend dev-container-backend \
-        release-docs release-check docs-check clean
+        release-docs release-check docs-release-check docs-check verify clean
 
 help:
 	@echo "TShockWebUI 任务："
@@ -47,7 +47,8 @@ help:
 	@echo "  make plugin        构建信使插件 WebUI.dll"
 	@echo "  —— 校验 ——"
 	@echo "  make lint          go vet + 前端 typecheck/lint"
-	@echo "  make test          后端 go test -race + 前端 vitest"
+	@echo "  make test          后端 go test -race + 前端 vitest（与 CI 同一条命令）"
+	@echo "  make verify        发版前一条命令跑完 CI 同等检查（lint + test + plugin + build + bundle-check）"
 	@echo "  make bundle-check  首屏体积护栏（需先 cd web && npm run build）"
 	@echo "  —— 开发（改代码）——"
 	@echo "  make dev-all       一条命令：容器后端 :$(API_PORT) + vite 页面 :$(WEB_PORT)（前台）"
@@ -61,7 +62,7 @@ help:
 	@echo "  make binary        构建单文件二进制（scripts/build-binary.sh）"
 	@echo "  —— 发版 ——"
 	@echo "  make release-docs  按当前版本生成两份单版本文档（不覆盖已有）"
-	@echo "  make release-check 检查单版本文档 + 三段标题 + 版本号"
+	@echo "  make docs-release-check 检查单版本文档 + 三段标题 + 版本号"
 	@echo "  make docs-check    全仓 md 相对链接死链检查"
 	@echo "  make clean         清理构建产物"
 
@@ -180,12 +181,24 @@ release-docs:
 	scripts/new-release-docs.sh
 
 # 发版前检查：两份单版本文档存在、release 含「新增 / 改进 / 修复」、标题含版本号。
-release-check:
+docs-release-check:
 	scripts/check-release-docs.sh
+
+# 旧名字（脚本 / 文档里还有引用）：等价于 `make docs-release-check`。
+release-check: docs-release-check
 
 # 全仓 Markdown 相对链接死链（跳过模板与构建产物）。
 docs-check:
 	node scripts/check-docs-links.mjs
+
+# 发版前一条命令跑完 CI 同等检查。
+# 重点：`make test` 用的是 `npm run test:run`（**不限并发**），与 CI 完全一致 ——
+# 迭代期用 `npx vitest run --maxWorkers=4` 省 CPU 会掩盖「高并发才暴露」的问题（rc.11 就栽在这上面）。
+# 打 tag 之前先跑它；CI 绿了再打 tag（见 docs/发布流程.md §6）。
+verify: lint test
+	cd plugin/WebUI && dotnet build -c Release
+	cd web && npm run build
+	$(MAKE) bundle-check
 
 # ---- 清理 ----------------------------------------------------------------
 # 只删构建产物与 server/internal/webdist 里的注入内容，不动 data/ 与源码。

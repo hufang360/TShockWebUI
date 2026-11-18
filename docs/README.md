@@ -112,4 +112,4 @@
 - [`release/`](release/) — **单版本**对外发布说明（三段式：新增 / 改进 / 修复），GitHub Release 直接使用
   - [`v0.1.0-rc.8.md`](release/v0.1.0-rc.8.md)
   - 模板：[`_TEMPLATE.md`](release/_TEMPLATE.md)
-- [`发布流程.md`](发布流程.md) — 发版步骤与验收（`make release-docs` / `release-check` / `docs-check`）
+- [`发布流程.md`](发布流程.md) — 发版步骤与验收（`make release-docs` / `docs-release-check` / `docs-check` / `verify`）

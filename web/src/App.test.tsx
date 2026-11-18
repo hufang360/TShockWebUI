@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, expect, it, vi } from 'vitest'
 import { toast } from '@/components/ui'
 import App from './App'
-import { HttpTransport, MockTransport } from '@/lib/tshock'
+import { HttpTransport, MOCK_BATCH_CAPABILITIES, MockTransport } from '@/lib/tshock'
 
 // vitest 的 cwd 为 web/，数据在仓库根的 data/
 const dataDir = path.resolve(process.cwd(), '../data') + path.sep
@@ -623,6 +623,13 @@ it('「玩家存档」是独立侧边栏菜单：未登录也能用，不依赖�
   expect(screen.getByRole('button', { name: /导入 \.plr/ })).toBeTruthy()
 })
 
+/**
+ * Mock 能力矩阵是否放行某条「仅游戏内」指令。
+ * 断言「执行」按钮是否存在时用它，别再硬编码 `toBeTruthy` / `toBeNull`。
+ */
+const mockAllowsIngame = (cmd: string) =>
+  (MOCK_BATCH_CAPABILITIES.ingameCommands ?? []).includes(cmd.replace(/^\//, ''))
+
 it('「指令小抄」是常用表格页的第一张表：分组列出 Boss，点终端填进浮窗', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
@@ -658,15 +665,18 @@ it('「指令小抄」是常用表格页的第一张表：分组列出 Boss，�
       (el) => el.getAttribute('data-command') === command,
     )!
 
-  // `MockTransport` 的能力矩阵放行了刷 Boss / 刷怪两条（与推荐部署一致）：
-  // 登录后 `/spawnboss` 详情里应有「执行」（点它只是填进浮窗，不自动发）。
   fold('/spawnboss')
   fireEvent.click(row('/spawnboss "king slime"'))
   const detail = await screen.findByTestId('command-detail')
   expect(detail.textContent).toContain('/spawnboss "king slime"')
   expect(within(detail).getByRole('button', { name: '复制指令' })).toBeTruthy()
-  // 能力探测是异步的：等它落地再断言，否则就成了「碰巧还没探到」。
-  await waitFor(() => expect(within(detail).getByRole('button', { name: '执行' })).toBeTruthy())
+  // 「有没有『执行』」由 Mock 的能力矩阵决定（`MOCK_BATCH_CAPABILITIES`）：
+  // 跟着常量断言，改了 Mock 的放行名单这条会自动调整；并且要等能力探测落地再断言，
+  // 否则就成了「碰巧还没探到」的假绿（rc.11 的 CI 就是栽在这里）。
+  await waitFor(() => {
+    const run = within(detail).queryByRole('button', { name: '执行' })
+    expect(Boolean(run)).toBe(mockAllowsIngame('/spawnboss'))
+  })
 
   // 换一条：浮层内容是新的（单开，换内容而不是叠加）
   fold('/tpnpc')

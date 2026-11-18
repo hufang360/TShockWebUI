@@ -52,6 +52,8 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
 - 必须全量又不想把机器占满：`npx vitest run --maxWorkers=4`（~28s，CPU 约 130s）。
 - 纯逻辑测试（不碰 DOM）在文件头写 `// @vitest-environment node`：省掉每个文件 ~0.3s 的 jsdom 建文档开销。
 - **`tsc -b` 可常跑**（~4s）；**`vite build` 只在交付前**跑一次。
+- **发版前用 `make verify`**：一条命令跑完 CI 同等检查（其中 vitest 是 `npm run test:run`，**不限并发**）。
+  迭代期 `--maxWorkers=4` 只证明「低并发下通过」——高并发才暴露的过期断言曾让 rc.11 第一次推 tag 时 Release 直接红。
 - **不启浏览器、不留后台进程**：收尾 `ps` 确认一遍（vite / 无头 Chrome / vitest）。
 - **只在不确定的情况才截图查看界面**（改布局没把握时）；能靠代码或测试判断的不要开浏览器，
   视觉细节以用户截图为唯一依据。
@@ -98,7 +100,7 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
 - **每个版本两份单版本文件**（发版前必须齐备）：
   - `docs/changelog/<版本>.md`：按功能模块的详细更新；
   - `docs/release/<版本>.md`：**三段式**（新增 / 改进 / 修复）对外发布说明，GitHub Release 用它。
-  用 `make release-docs` 从模板生成、`make release-check` 校验；完整流程见 `docs/发布流程.md`。
+  用 `make release-docs` 从模板生成、`make docs-release-check` 校验（旧名 `release-check` 仍可用）；完整流程见 `docs/发布流程.md`。
   根 `changelog.md` 是**全量历史**，单版本文件以它的该版本段落为准。
 
 ## 文档
