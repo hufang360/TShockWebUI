@@ -130,20 +130,21 @@ type FishGood struct {
 	// Shop 是店名，**只有 `/fishshop/ask` 返回**（list 的店名在顶层 name）。
 	Shop string `json:"shop,omitempty"`
 
-	// ── 个人状态字段（**仅上游 `?self=1` 时返回**；见 docs/REST-API.md §2.2） ──
-	// CanBuy 为 nil = 这次没带 self（不知道能不能买）；false 时 BlockReason 是上游给的原因。
-	// 用指针是为了把「没带」与「不能买」区分开。
+	// ── 个人进度字段（**仅上游 `?self=1` 时返回**；见 docs/REST-API.md §2.2） ──
+	// CanBuy / BlockReason 只为兼容老插件（v1.6.6 带）保留：新版插件不再回「能不能买」，
+	// 前端也不据此禁用购买按钮（货架是快照，判定由 buy 当场给）。
 	CanBuy      *bool  `json:"canBuy,omitempty"`
 	BlockReason string `json:"blockReason,omitempty"`
 	// MyCount / ServerCount：该玩家已买过几次 / 全服已卖出几个（按商品 id 统计）。
-	MyCount     int `json:"myCount,omitempty"`
-	ServerCount int `json:"serverCount,omitempty"`
+	// 用指针：0 也是有意义的进度（没买过），不能被 omitempty 当成「没这个字段」。
+	MyCount     *int `json:"myCount,omitempty"`
+	ServerCount *int `json:"serverCount,omitempty"`
 	// MyRemain / ServerRemain：还能买几次 / 全服还能卖几个；**-1 = 不限**。
-	MyRemain     int `json:"myRemain,omitempty"`
-	ServerRemain int `json:"serverRemain,omitempty"`
+	MyRemain     *int `json:"myRemain,omitempty"`
+	ServerRemain *int `json:"serverRemain,omitempty"`
 	// MyCdRemain / ServerCdRemain：个人 / 全服冷却剩余秒数（0 = 可买）。
-	MyCdRemain     int `json:"myCdRemain,omitempty"`
-	ServerCdRemain int `json:"serverCdRemain,omitempty"`
+	MyCdRemain     *int `json:"myCdRemain,omitempty"`
+	ServerCdRemain *int `json:"serverCdRemain,omitempty"`
 }
 
 // FishShop 是 `/fishshop/list` 的规范化结果。

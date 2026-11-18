@@ -661,7 +661,7 @@ describe('FishShopPage', () => {
   })
 
   it('个人状态：显示还能买几次 / 冷却剩余', async () => {
-    const good: FishGood = { ...GOOD, limit: 3, myCount: 2, myRemain: 1, myCdRemain: 30, canBuy: true }
+    const good: FishGood = { ...GOOD, limit: 3, myCount: 2, myRemain: 1, myCdRemain: 30 }
     renderPage(fakeTransport({ fishList: async () => shopOf([good]) }))
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     const dialog = await screen.findByRole('dialog')
@@ -674,7 +674,7 @@ describe('FishShopPage', () => {
   it('买完刷新货架后，弹框里的「我的进度」跟着更新', async () => {
     let remain = 1
     const fishList = vi.fn(async () =>
-      shopOf([{ ...GOOD, limit: 3, myRemain: remain, myCount: 3 - remain, canBuy: true }]),
+      shopOf([{ ...GOOD, limit: 3, myRemain: remain, myCount: 3 - remain }]),
     )
     const fishBuy = vi.fn(async () => {
       remain = 0
@@ -689,17 +689,30 @@ describe('FishShopPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '购买' }))
     fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
 
-    // 刷新后回到「还能买 0 次」（上游 canBuy 仍是 true，Mock 没改它）
+    // 刷新后回到「还能买 0 次」（货架只报进度，买没买成看 buy 的结果）
     await waitFor(() => expect(within(dialog).getByText(/还能买 0 次/)).toBeTruthy())
   })
 
-  it('个人状态：上游说买不了时显示原因并禁用购买', async () => {
-    const good: FishGood = { ...GOOD, canBuy: false, blockReason: '已达个人限购', myRemain: 0 }
-    renderPage(fakeTransport({ fishList: async () => shopOf([good]) }))
+  it('货架不预判能不能买：点购买后由上游在 buy 时报原因', async () => {
+    // 限购已满也不在货架上拦（快照会过期），按钮照常能点，原因来自 buy 的报错。
+    const good: FishGood = { ...GOOD, limit: 3, myCount: 3, myRemain: 0 }
+    renderPage(
+      fakeTransport({
+        fishList: async () => shopOf([good]),
+        fishBuy: async () => {
+          throw new TshockRequestError('validation', '暂时不能购买，因为: 已达个人限购', 400)
+        },
+      }),
+    )
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText('已达个人限购')).toBeTruthy()
-    expect((within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(within(dialog).getByText(/还能买 0 次/)).toBeTruthy()
+    const buy = within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement
+    expect(buy.disabled).toBe(false)
+
+    fireEvent.click(buy)
+    fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
+    expect(await within(dialog).findByText(/已达个人限购/)).toBeTruthy()
   })
 
   it('参数按插件的引号规则数：引号里的空格不算多一个参数', async () => {

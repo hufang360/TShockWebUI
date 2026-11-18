@@ -126,9 +126,39 @@ func TestFishListSelfState(t *testing.T) {
 	if g.CanBuy == nil || *g.CanBuy {
 		t.Fatalf("canBuy = %v，期望 false", g.CanBuy)
 	}
-	if g.BlockReason != "个人冷却中，还需 30 秒" || g.MyRemain != 1 || g.MyCount != 2 ||
-		g.ServerRemain != -1 || g.MyCdRemain != 30 {
-		t.Fatalf("个人状态 = %+v", g)
+	if g.BlockReason != "个人冷却中，还需 30 秒" || g.MyRemain == nil || *g.MyRemain != 1 ||
+		g.MyCount == nil || *g.MyCount != 2 || g.ServerRemain == nil || *g.ServerRemain != -1 ||
+		g.MyCdRemain == nil || *g.MyCdRemain != 30 {
+		t.Fatalf("个人进度 = %+v", g)
+	}
+}
+
+// 个人进度里的 0 也是有意义的值（没买过 / 冷却结束），必须原样留在 JSON 里，
+// 前端靠「有没有 myCount」判断这次有没有带 self。
+func TestFishListSelfStateKeepsZeroCounts(t *testing.T) {
+	c := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"status": 200,
+			"response": map[string]any{
+				"name": "鱼店", "total": 1,
+				"goods": []map[string]any{{
+					"serial": 1, "name": "生命水晶",
+					"myCount": 0, "myRemain": -1, "serverCount": 0, "serverRemain": -1,
+					"myCdRemain": 0, "serverCdRemain": 0,
+				}},
+			},
+		})
+	}), time.Second)
+
+	shop, err := c.FishList(context.Background(), "tok", true)
+	if err != nil {
+		t.Fatalf("FishList: %v", err)
+	}
+	body, _ := json.Marshal(shop.Goods[0])
+	for _, key := range []string{"myCount", "myRemain", "serverCount", "myCdRemain"} {
+		if !strings.Contains(string(body), `"`+key+`":0`) && !strings.Contains(string(body), `"`+key+`":-1`) {
+			t.Fatalf("个人进度里的 0 被丢了（%s）：%s", key, body)
+		}
 	}
 }
 
@@ -153,8 +183,10 @@ func TestFishListWithoutSelfHasNoPersonalState(t *testing.T) {
 		t.Fatalf("canBuy 应为 nil，实际 %v", *shop.Goods[0].CanBuy)
 	}
 	body, _ := json.Marshal(shop.Goods[0])
-	if strings.Contains(string(body), "canBuy") {
-		t.Fatalf("没有个人状态时不该序列化 canBuy：%s", body)
+	for _, key := range []string{"canBuy", "blockReason", "myCount", "myRemain", "myCdRemain"} {
+		if strings.Contains(string(body), key) {
+			t.Fatalf("没有个人进度时不该序列化 %s：%s", key, body)
+		}
 	}
 }
 

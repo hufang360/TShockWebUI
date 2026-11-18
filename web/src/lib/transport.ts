@@ -317,11 +317,8 @@ export interface FishGood {
   /** 店名（**只有 `ask` 返回**；list 的店名在顶层 name）。 */
   shop?: string
 
-  // ── 个人状态（**仅请求带 `self=1` 时返回**；缺省 = 不知道，不是「不能买」） ──
-  /** 粗判能否买（只算限购 / 冷却 / 白名单 / 生死昼夜，不含商品的 `check`）。`undefined` = 没带 self。 */
-  canBuy?: boolean
-  /** `canBuy === false` 时上游给的原因文案（如「已达个人限购」）。 */
-  blockReason?: string
+  // ── 个人进度（**仅请求带 `self=1` 时返回**；缺省 = 没带 self，不是「没有进度」） ──
+  // 「能不能买」不在这里判：货架是快照，NPC / 昼夜 / 生态随时会变，判定一律由 `buy` 当场给。
   /** 该玩家已买过几次（按商品 id 统计）。 */
   myCount?: number
   /** 全服已卖出几个。 */
@@ -579,8 +576,8 @@ export interface BackendTransport {
   /**
    * 查看鱼店货架（新版插件不需要额外权限；老版本需要 fishshop.rest.use）。
    *
-   * `self: true` → 让上游按「当前登录玩家」算限购 / 冷却，每条多返回个人状态
-   * （`canBuy` / `myRemain` / `myCdRemain` …）。代价是该玩家必须在线，否则上游 400。
+   * `self: true` → 让上游按「当前登录玩家」算限购 / 冷却，每条多返回个人进度
+   * （`myRemain` / `myCdRemain` …）。代价是该玩家必须在线，否则上游 400。
    */
   fishList(opts?: { self?: boolean }): Promise<FishShop>
   /** 询价单条商品（`self` 同 `fishList`）。 */

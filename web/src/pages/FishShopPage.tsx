@@ -441,10 +441,9 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     [needArgs],
   )
 
-  // 个人状态（只有货架带 `canBuy` 时才有；没带 = 不知道，不能当成「不能买」）。
-  const hasSelfState = selected?.canBuy !== undefined
-  // 上游已明确说不能买（限购已满 / 售完 / 冷却中 / 死了 / 昼夜不对…）→ 别让玩家白点一次。
-  const blocked = selected?.canBuy === false
+  // 个人进度（只有货架带 `myCount` 时才有；没带 = 这次没要 self，不显示进度）。
+  const hasSelfState = selected?.myCount !== undefined
+  // 能否购买由上游 `buy` 当场判：货架只是快照，NPC 在场 / 昼夜 / 生态这些都可能在两次刷新之间变。
   // 降级条目：商品自身配置有误时插件只回基础字段（其余为空），点进去也买不了。
   const degraded = isDegradedGood(selected)
   // 从「买过 / 收藏」打开、但货架上已经没有这件：只能看快照，不能买。
@@ -1068,15 +1067,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 )}
               </dl>
 
-              {/* 上游已判定不能买（限购满了 / 售完 / 冷却中 / 死了 / 昼夜不对）：先说清楚，别让玩家白点 */}
+              {/* 已下架 / 降级条目：这两个是商品本身的状态，不是「现在买不了」 */}
               {offShelf && !confirming && (
                 <Alert>
                   <AlertDescription>{t('fish.offShelf')}</AlertDescription>
-                </Alert>
-              )}
-              {blocked && !confirming && (
-                <Alert>
-                  <AlertDescription>{selected?.blockReason || t('fish.cannotBuy')}</AlertDescription>
                 </Alert>
               )}
               {degraded && !confirming && (
@@ -1225,7 +1219,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                     ref={buyRef}
                     variant="primary"
                     className="h-8"
-                    disabled={!argsReady || buyCooldown > 0 || blocked || degraded || unresolved}
+                    disabled={!argsReady || buyCooldown > 0 || degraded || unresolved}
                     onClick={() => setConfirming(true)}
                   >
                     <ShoppingCart data-icon="inline-start" />

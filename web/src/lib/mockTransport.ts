@@ -652,20 +652,15 @@ const MOCK_GOODS: FishGood[] = [
   },
 ]
 
-/** Mock 的「个人状态」（对照插件 `?self=1` 的 8 个字段）。 */
+/** Mock 的「个人进度」（对照插件 `?self=1` 的 6 个字段；能不能买不在这里判）。 */
 function mockSelfState(good: FishGood): Pick<
   FishGood,
-  'canBuy' | 'blockReason' | 'myCount' | 'serverCount' | 'myRemain' | 'serverRemain' | 'myCdRemain' | 'serverCdRemain'
+  'myCount' | 'serverCount' | 'myRemain' | 'serverRemain' | 'myCdRemain' | 'serverCdRemain'
 > {
   const myCount = 1
   const myRemain = (good.limit ?? 0) > 0 ? Math.max(0, (good.limit ?? 0) - myCount) : -1
   const serverRemain = (good.serverLimit ?? 0) > 0 ? Math.max(0, (good.serverLimit ?? 0) - 1) : -1
-  // 只挑几条会真的拦人的：限购售完、以及「只能夜晚买」的商品。
-  const blockReason =
-    myRemain === 0 ? '已达个人限购' : serverRemain === 0 ? '全服已售完' : good.needNight ? '只能在晚上购买！' : ''
   return {
-    canBuy: blockReason === '',
-    blockReason,
     myCount,
     serverCount: 1,
     myRemain,
