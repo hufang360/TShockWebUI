@@ -10,7 +10,7 @@ gen-brand-assets.py — 从物品图集裁出「猛爪手套」图标，生成�
 输入：
   data/items.json        找到 key = FeralClaws 的 icon（贴图 id）
   data/items-atlas.json  该贴图的裁切区域 [x, y, w, h]
-  data/items-atlas.png   图集本体
+  data/items-atlas.webp  图集本体
 
 输出：
   web/public/favicon.png      48×48，整数倍最近邻放大后居中（透明底，留 2px 左右边距）
@@ -39,7 +39,7 @@ PROJECT = os.path.dirname(HERE)
 
 DEFAULT_ITEMS = os.path.join(PROJECT, "data", "items.json")
 DEFAULT_ATLAS_JSON = os.path.join(PROJECT, "data", "items-atlas.json")
-DEFAULT_ATLAS_PNG = os.path.join(PROJECT, "data", "items-atlas.png")
+DEFAULT_ATLAS_IMAGE = os.path.join(PROJECT, "data", "items-atlas.webp")
 DEFAULT_FAVICON = os.path.join(PROJECT, "web", "public", "favicon.png")
 DEFAULT_LOGIN_ART = os.path.join(PROJECT, "web", "public", "login-art.png")
 
@@ -63,7 +63,7 @@ def main():
     ap.add_argument("--item", default="FeralClaws", help="物品内部 key，默认 FeralClaws（猛爪手套）")
     ap.add_argument("--items", default=DEFAULT_ITEMS)
     ap.add_argument("--atlas-json", default=DEFAULT_ATLAS_JSON)
-    ap.add_argument("--atlas-png", default=DEFAULT_ATLAS_PNG)
+    ap.add_argument("--atlas-image", default=DEFAULT_ATLAS_IMAGE)
     ap.add_argument("--favicon", default=DEFAULT_FAVICON)
     ap.add_argument("--login-art", default=DEFAULT_LOGIN_ART)
     ap.add_argument("--favicon-size", type=int, default=48, help="favicon 方框边长，默认 48")
@@ -85,7 +85,7 @@ def main():
         sys.exit(f"图集里找不到贴图 id = {icon}（{args.item}）的裁切区域")
 
     x, y, w, h = region
-    with Image.open(args.atlas_png) as sheet:
+    with Image.open(args.atlas_image) as sheet:
         sprite = sheet.crop((x, y, x + w, y + h)).convert("RGBA")
 
     favicon, fscale = fit_square(sprite, args.favicon_size)

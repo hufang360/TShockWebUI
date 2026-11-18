@@ -267,7 +267,7 @@ describe('DataIdPage', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
     expect(screen.getByTitle('黑曜石皮 #1')).toBeTruthy()
     expect(screen.getByTitle('再生 #2')).toBeTruthy()
-    // 图标来自 `data/buff-atlas.png`（`BuffIcon` 画 canvas），网格图标 64×64
+    // 图标来自 `data/buff-atlas.webp`（`BuffIcon` 画 canvas），网格图标 64×64
     const canvas = screen.getByTitle('黑曜石皮 #1').querySelector('canvas') as HTMLCanvasElement
     expect(canvas).toBeTruthy()
     expect(canvas.style.width).toBe('64px')

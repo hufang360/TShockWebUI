@@ -16,9 +16,14 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
+		// frame-ancestors 只认响应头（浏览器忽略 meta 里的同名指令），而 default-src
+		// 不覆盖它 —— 少这一条浏览器默认允许被任意站点 iframe 嵌入，配上「一键执行指令」
+		// 的界面就是点击劫持。X-Frame-Options 只是给不认 CSP 的老浏览器兜底。
+		h.Set("X-Frame-Options", "DENY")
 		h.Set("Content-Security-Policy",
 			"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; "+
-				"script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'")
+				"script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; "+
+				"object-src 'none'; frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -219,11 +224,11 @@ func (l *rateLimiter) Allow(key string) bool {
 	return true
 }
 
-// clientIP 依据 TRUST_PROXY 决定是否信任 X-Forwarded-For。
+// clientIP 依据 TRUST_PROXY 决定是否信任 X-Forwarded-For（取哪一段见 xffClientIP）。
 func (s *Server) clientIP(r *http.Request) string {
 	if s.cfg.TrustProxy {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			return strings.TrimSpace(strings.Split(xff, ",")[0])
+		if ip := xffClientIP(r.Header.Get("X-Forwarded-For"), s.cfg.TrustProxyHops); ip != "" {
+			return ip
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -231,4 +236,32 @@ func (s *Server) clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// xffClientIP 从 X-Forwarded-For 里取真实客户端 IP，取不到就返回空串（交 RemoteAddr 兜底）。
+//
+// XFF 是逐跳**追加**的链：nginx 的 $proxy_add_x_forwarded_for 等于
+// 「客户端带来的整段 + 自己的 $remote_addr」。所以**最左段是客户端自带的**，可以随便伪造——
+// 按最左段限流，攻击者每次换个值就能绕过 LOGIN_MAX_PER_MIN 的按 IP 计数（也是唯一的口令爆破防线），
+// 伪造值还会经 /api/login/online 透传给信使插件做限流。
+//
+// 正确做法是从右往左跳过自己可控的代理层：hops 是自己可控的层数（默认 1，CDN+反代时设 2），
+// 越过的第一个地址才是真实来源。链比 hops 短说明请求没经过预期的代理（或配置不符），
+// 此时返回空串、退回 RemoteAddr，绝不猜。
+func xffClientIP(header string, hops int) string {
+	if header == "" {
+		return ""
+	}
+	if hops < 1 {
+		hops = 1
+	}
+	parts := strings.Split(header, ",")
+	if len(parts) < hops {
+		return ""
+	}
+	ip := strings.TrimSpace(parts[len(parts)-hops])
+	if net.ParseIP(ip) == nil {
+		return ""
+	}
+	return ip
 }

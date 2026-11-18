@@ -16,7 +16,7 @@ gen-player-atlas.py — 把「玩家全身图」需要的角色部件 / 发型�
   - 站立帧：`UICharacter.UpdateAnim` 把 body/leg/head 帧 Y 置 0。
 
 产出：
-  data/player-atlas.png   图集（不入库，构建时生成）
+  data/player-atlas.webp  图集（不入库，构建时生成；无损 WebP）
   data/player-atlas.json  裁切信息，键：
     "b:<variant>:<part>:<role>"  角色部件（变体 0..11，部件号见 PlayerTextureID）
     "h:<hair>"                   发型（hair 为 0 基，对应 Player_Hair_<hair+1>.png 第 0 帧）
@@ -47,7 +47,7 @@ PROJECT = os.path.dirname(HERE)
 
 DEFAULT_SPRITE = os.path.join(PROJECT, "..", "tr-sprite-1458", "Content", "Images")
 DEFAULT_OUT_JSON = os.path.join(PROJECT, "data", "player-atlas.json")
-DEFAULT_OUT_PNG = os.path.join(PROJECT, "data", "player-atlas.png")
+DEFAULT_OUT_IMAGE = os.path.join(PROJECT, "data", "player-atlas.webp")
 
 FRAME_W, FRAME_H = 40, 56
 VARIANT_COUNT = 12
@@ -178,7 +178,7 @@ def main():
     ap = argparse.ArgumentParser(description="生成玩家角色图集")
     ap.add_argument("--sprite-dir", default=DEFAULT_SPRITE, help="Player_<v>_<part>.png 所在目录")
     ap.add_argument("--out-json", default=DEFAULT_OUT_JSON)
-    ap.add_argument("--out-png", default=DEFAULT_OUT_PNG)
+    ap.add_argument("--out-image", default=DEFAULT_OUT_IMAGE)
     ap.add_argument("--limit-width", type=int, default=1024, help="图集最大宽度，默认 1024")
     ap.add_argument("--padding", type=int, default=1, help="每格之间的留白像素，默认 1（防缩放插值采到邻居）")
     ap.add_argument("--max-height", type=int, default=8192, help="超过此高度只告警")
@@ -207,10 +207,10 @@ def main():
         atlas.paste(im.crop(box), (px, py))
     print(f"合成用时 {time.time() - t0:.2f}s")
 
-    os.makedirs(os.path.dirname(args.out_png), exist_ok=True)
-    atlas.save(args.out_png, optimize=True)
-    png_hash = hashlib.md5(open(args.out_png, "rb").read()).hexdigest()[:12]
-    print(f"写出 {args.out_png}（{os.path.getsize(args.out_png) / 1e6:.2f} MB）")
+    os.makedirs(os.path.dirname(args.out_image), exist_ok=True)
+    atlas.save(args.out_image, "WEBP", lossless=True, quality=100, method=6)
+    atlas_hash = hashlib.md5(open(args.out_image, "rb").read()).hexdigest()[:12]
+    print(f"写出 {args.out_image}（{os.path.getsize(args.out_image) / 1e6:.2f} MB）")
 
     regions = {}
     for key, path, col, row in entries:
@@ -229,8 +229,8 @@ def main():
             "variants": VARIANT_COUNT,
             "hairs": HAIR_COUNT,
             "regions": len(regions),
-            "sheet": os.path.basename(args.out_png),
-            "hash": png_hash,
+            "sheet": os.path.basename(args.out_image),
+            "hash": atlas_hash,
             "generatedBy": "tools/gen-player-atlas.py",
             "note": "键 b:<variant>:<part>:<role> 为角色部件，h:<hair> 为发型；值 [x,y,40,56]。"
                     "都是灰度遮罩，绘制时用玩家颜色相乘着色；不含盔甲 / 饰品。",

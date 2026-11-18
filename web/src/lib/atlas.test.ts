@@ -34,7 +34,7 @@ class FakeImage {
 }
 
 /** 每个用例用不同哈希：lib/atlas 的图集缓存是模块级单例，跨用例不能共用 URL。 */
-const atlasWith = (hash: string) => ({ meta: { sheet: 'npc-atlas.png', hash, width: 1162, height: 5054 } })
+const atlasWith = (hash: string) => ({ meta: { sheet: 'npc-atlas.webp', hash, width: 1162, height: 5054 } })
 
 describe('lib/atlas', () => {
   afterEach(() => {
@@ -45,8 +45,8 @@ describe('lib/atlas', () => {
 
   it('裁切表 JSON 请求绕过 HTTP 缓存（避免旧坐标 + 新 PNG）', () => {
     expect(ATLAS_JSON_FETCH.cache).toBe('no-store')
-    expect(atlasImageUrl('npc-atlas.png', 'abc123')).toBe('/data/npc-atlas.png?v=abc123')
-    expect(atlasImageUrl('npc-atlas.png')).toBe('/data/npc-atlas.png')
+    expect(atlasImageUrl('npc-atlas.webp', 'abc123')).toBe('/data/npc-atlas.webp?v=abc123')
+    expect(atlasImageUrl('npc-atlas.webp')).toBe('/data/npc-atlas.webp')
   })
 
   it('尺寸与裁切表一致时直接用缓存哈希 URL', async () => {
@@ -54,7 +54,7 @@ describe('lib/atlas', () => {
     FakeImage.sizeFor = () => [1162, 5054]
     const img = await loadVerifiedAtlasImage(atlasWith('h1'))
     expect(img.naturalWidth).toBe(1162)
-    expect(FakeImage.requests).toEqual(['/data/npc-atlas.png?v=h1'])
+    expect(FakeImage.requests).toEqual(['/data/npc-atlas.webp?v=h1'])
     expect(FakeImage.decodes).toBe(1)
   })
 

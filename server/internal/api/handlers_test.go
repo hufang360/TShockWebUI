@@ -991,8 +991,12 @@ func TestSecurityHeadersAndStatic(t *testing.T) {
 	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatal("缺少 nosniff")
 	}
-	if rec.Header().Get("Content-Security-Policy") == "" {
-		t.Fatal("缺少 CSP")
+	// 防点击劫持：CSP 的 frame-ancestors 不靠 default-src 兜底，必须显式写。
+	if csp := rec.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "frame-ancestors 'none'") {
+		t.Fatalf("CSP 缺少 frame-ancestors 'none'：%s", csp)
+	}
+	if rec.Header().Get("X-Frame-Options") != "DENY" {
+		t.Fatalf("X-Frame-Options = %q，期望 DENY", rec.Header().Get("X-Frame-Options"))
 	}
 }
 
@@ -2038,10 +2042,10 @@ func doWithHeader(h http.Handler, method, path, key, value string) *httptest.Res
 func TestDataJSONETagAnd304(t *testing.T) {
 	web := func(body string) fs.FS {
 		return fstest.MapFS{
-			"index.html":            &fstest.MapFile{Data: []byte("ok")},
-			"data/commands.json":    &fstest.MapFile{Data: []byte(body)},
-			"data/player-atlas.png": &fstest.MapFile{Data: []byte("PNG")},
-			"assets/app-1.js":       &fstest.MapFile{Data: []byte("js")},
+			"index.html":             &fstest.MapFile{Data: []byte("ok")},
+			"data/commands.json":     &fstest.MapFile{Data: []byte(body)},
+			"data/player-atlas.webp": &fstest.MapFile{Data: []byte("WEBP")},
+			"assets/app-1.js":        &fstest.MapFile{Data: []byte("js")},
 		}
 	}
 	h := newServerWithWeb(t, web(`{"a":1}`)).Handler()
@@ -2086,9 +2090,15 @@ func TestDataJSONETagAnd304(t *testing.T) {
 		t.Fatalf("body = %q", got)
 	}
 
-	// 其他静态资源的缓存语义不变：图集 PNG 长缓存、/assets/* immutable。
-	if cc := do(h, http.MethodGet, "/data/player-atlas.png", nil, nil, false).Header().Get("Cache-Control"); cc != "public, max-age=604800" {
-		t.Fatalf("图集 PNG Cache-Control = %q", cc)
+	// 其他静态资源的缓存语义不变：图集长缓存、/assets/* immutable。
+	atlas := do(h, http.MethodGet, "/data/player-atlas.webp", nil, nil, false)
+	if cc := atlas.Header().Get("Cache-Control"); cc != "public, max-age=604800" {
+		t.Fatalf("图集 Cache-Control = %q", cc)
+	}
+	// 图集是无损 WebP：依赖 Go 标准库自带的 mime 表认出 image/webp（不认就会回 octet-stream，
+	// 浏览器虽然多半仍能解码，但反代 / CDN 的内容类型嗅探与预加载会跟着出错）。
+	if ct := atlas.Header().Get("Content-Type"); ct != "image/webp" {
+		t.Fatalf("图集 Content-Type = %q，期望 image/webp", ct)
 	}
 	if cc := do(h, http.MethodGet, "/assets/app-1.js", nil, nil, false).Header().Get("Cache-Control"); cc != "public, max-age=31536000, immutable" {
 		t.Fatalf("/assets Cache-Control = %q", cc)

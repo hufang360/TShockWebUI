@@ -35,24 +35,65 @@ func TestRateLimiter(t *testing.T) {
 }
 
 func TestClientIP(t *testing.T) {
-	s := &Server{cfg: config.Config{TrustProxy: false}}
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "10.0.0.1:5555"
-	r.Header.Set("X-Forwarded-For", "8.8.8.8, 9.9.9.9")
-	if got := s.clientIP(r); got != "10.0.0.1" {
-		t.Fatalf("不信任代理时应使用 RemoteAddr，得到 %q", got)
+	newReq := func(xff string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "10.0.0.1:5555"
+		if xff != "" {
+			r.Header.Set("X-Forwarded-For", xff)
+		}
+		return r
 	}
 
-	s.cfg.TrustProxy = true
-	if got := s.clientIP(r); got != "8.8.8.8" {
-		t.Fatalf("信任代理时应取 XFF 第一段，得到 %q", got)
-	}
+	t.Run("不信任代理时只看 RemoteAddr", func(t *testing.T) {
+		s := &Server{cfg: config.Config{TrustProxy: false, TrustProxyHops: 1}}
+		if got := s.clientIP(newReq("8.8.8.8, 9.9.9.9")); got != "10.0.0.1" {
+			t.Fatalf("不信任代理时应使用 RemoteAddr，得到 %q", got)
+		}
+	})
 
-	r.RemoteAddr = "not-a-hostport"
-	r.Header.Del("X-Forwarded-For")
-	if got := s.clientIP(r); got != "not-a-hostport" {
-		t.Fatalf("无法解析时应回退原值，得到 %q", got)
-	}
+	t.Run("单层反代取最右段（客户端伪造的最左段不算）", func(t *testing.T) {
+		s := &Server{cfg: config.Config{TrustProxy: true, TrustProxyHops: 1}}
+		// nginx 的 $proxy_add_x_forwarded_for = 客户端带来的整段 + 自己的 $remote_addr：
+		// 9.9.9.9 是攻击者自己写的，5.6.7.8 才是反代写进去的真实来源。
+		if got := s.clientIP(newReq("9.9.9.9, 5.6.7.8")); got != "5.6.7.8" {
+			t.Fatalf("应取最右段 5.6.7.8，得到 %q", got)
+		}
+		// 客户端没带 XFF 时反代只写一段。
+		if got := s.clientIP(newReq("5.6.7.8")); got != "5.6.7.8" {
+			t.Fatalf("单段 XFF 应原样使用，得到 %q", got)
+		}
+	})
+
+	t.Run("两层反代（CDN + nginx）hop=2", func(t *testing.T) {
+		s := &Server{cfg: config.Config{TrustProxy: true, TrustProxyHops: 2}}
+		// [攻击者伪造, CDN 写入的真实来源, nginx 写入的 CDN 边节点]
+		if got := s.clientIP(newReq("1.2.3.4, 5.6.7.8, 9.9.9.9")); got != "5.6.7.8" {
+			t.Fatalf("hop=2 应取倒数第二段 5.6.7.8，得到 %q", got)
+		}
+	})
+
+	t.Run("链比 hops 短时不猜，退回 RemoteAddr", func(t *testing.T) {
+		s := &Server{cfg: config.Config{TrustProxy: true, TrustProxyHops: 3}}
+		if got := s.clientIP(newReq("1.2.3.4, 5.6.7.8")); got != "10.0.0.1" {
+			t.Fatalf("链不足 hops 时必须退回 RemoteAddr，得到 %q", got)
+		}
+	})
+
+	t.Run("不是 IP 的值一律不信", func(t *testing.T) {
+		s := &Server{cfg: config.Config{TrustProxy: true, TrustProxyHops: 1}}
+		if got := s.clientIP(newReq("unknown")); got != "10.0.0.1" {
+			t.Fatalf("非法 IP 必须退回 RemoteAddr，得到 %q", got)
+		}
+	})
+
+	t.Run("RemoteAddr 无法解析时原样回退", func(t *testing.T) {
+		s := &Server{cfg: config.Config{TrustProxy: false, TrustProxyHops: 1}}
+		r := newReq("")
+		r.RemoteAddr = "not-a-hostport"
+		if got := s.clientIP(r); got != "not-a-hostport" {
+			t.Fatalf("无法解析时应回退原值，得到 %q", got)
+		}
+	})
 }
 
 func TestIsCompressible(t *testing.T) {
@@ -99,10 +140,10 @@ func TestGzipMiddleware(t *testing.T) {
 
 func TestGzipSkipsBinary(t *testing.T) {
 	handler := gzipMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		_, _ = w.Write([]byte("PNGDATA"))
+		w.Header().Set("Content-Type", "image/webp")
+		_, _ = w.Write([]byte("WEBPDATA"))
 	}))
-	req := httptest.NewRequest(http.MethodGet, "/data/items-atlas.png", nil)
+	req := httptest.NewRequest(http.MethodGet, "/data/items-atlas.webp", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -110,7 +151,7 @@ func TestGzipSkipsBinary(t *testing.T) {
 	if rec.Header().Get("Content-Encoding") == "gzip" {
 		t.Fatal("二进制不应 gzip")
 	}
-	if rec.Body.String() != "PNGDATA" {
+	if rec.Body.String() != "WEBPDATA" {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }

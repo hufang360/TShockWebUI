@@ -288,7 +288,7 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
         padding: 0,
         textures: items.length,
         items: items.length,
-        sheet: 'items-atlas.png',
+        sheet: 'items-atlas.webp',
         generatedBy: 'test',
         note: '',
       },

@@ -25,7 +25,9 @@
 #   Linux 上必需（Docker Desktop 自带该域名，写了也无害，保持两边命令一致）。
 # - TShock 若也在 Docker 里：TSHOCK_URL 改成 http://tshock:7878，并补上
 #   networks（同 deploy/docker-compose.example.yml 所在网络，通常是 tshock_default）。
-# - 前面有 HTTPS 反代时：COOKIE_SECURE 改 "true"、TRUST_PROXY 改 "true"。
+# - 前面有 HTTPS 反代时：COOKIE_SECURE 改 "true"、TRUST_PROXY 改 "true"；
+#   如果前面还挂了 CDN（或两层反代），再把 TRUST_PROXY_HOPS 改成层数（默认 1），
+#   否则按 IP 的登录限流会全算在 CDN 边节点头上。
 # - 公网部署建议 TSHOCK_ALLOW_CUSTOM_TARGETS 改 "false"，只允许 TSHOCK_URL。
 # - 容器默认不读写 config.json（镜像里 TSWUI_CONFIG=none）；想用它就取消下面 volumes
 #   那两行的注释，并在 environment 里加一行 TSWUI_CONFIG: "/config/config.json"。
@@ -57,6 +59,8 @@ services:
       # 每个已登录玩家每分钟可执行的指令数（按会话计数，经反代也不会互相影响）
       COMMAND_MAX_PER_MIN: "60"
       TRUST_PROXY: "false"        # 前面有自己可控的 TLS 反代时改为 "true"
+      # 反代层数：CDN + 反代两层时设 "2"，否则真实 IP 会取成 CDN 边节点。
+      TRUST_PROXY_HOPS: "1"
       # 允许浏览器在界面上新增/切换 TShock 上游（多服务器快速切换）。
       # 仅自用/内网开启；公网部署建议 "false" 只允许 TSHOCK_URL。
       TSHOCK_ALLOW_CUSTOM_TARGETS: "true"

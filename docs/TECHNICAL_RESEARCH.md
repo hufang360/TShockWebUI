@@ -207,7 +207,7 @@ PlayerManager 不是 Pryaxis 官方组件；服务器未安装时，TShock 对 `
 - 裁切 key 是**贴图 id**（`items.json` 里的 `item.icon`）；动画物品的 `w/h` 已是单帧尺寸。
 - 62 个无自身贴图的物品通过 `icon` 复用回退贴图的区域，不需要额外名额。
 - 高度 4906 < 8192，单张图集在所有主流浏览器可用；若将来超过需分页（或调小每格 padding）。
-- 输出 `items-atlas.png` + `items-atlas.json`（均随仓库提交）。
+- 输出 `items-atlas.webp`（无损 WebP）+ `items-atlas.json`（均随仓库提交）。
 
 ## 6. `[i:...]` 标签语法
 

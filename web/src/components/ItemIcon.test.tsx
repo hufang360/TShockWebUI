@@ -13,7 +13,7 @@ const atlas: Atlas = {
     padding: 1,
     textures: 3,
     items: 3,
-    sheet: 'items-atlas.png',
+    sheet: 'items-atlas.webp',
     generatedBy: 'test',
     note: '',
   },

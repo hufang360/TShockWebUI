@@ -18,11 +18,13 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
 
 ## 仓库策略（是否入库）
 
-`data/` 由脚本生成，但**全部提交进仓库**（含图集 `items-atlas.png` / `player-atlas.png`，约 8.7MB），
+`data/` 由脚本生成，但**全部提交进仓库**（含图集 `items-atlas.webp` / `player-atlas.webp`，约 7.4MB），
 目的是让**没有游戏源码 / 解包资源**的机器也能直接构建前端与单文件二进制。代价是仓库体积与生成数据的 diff 噪音。
 
-- 图集 PNG 版权属 **Re-Logic**，随仓库提交，仅随本项目使用（见 `LICENSE`）。
-- 四个图集（items / player / npc / buff）的 `*-atlas.json` 里都有 `meta.hash`（PNG 的内容哈希）：前端用 `?v=<hash>` 拉 PNG，图集一变 URL 就变，避免「新坐标 + 旧 PNG」的图标错位。
+- 图集版权属 **Re-Logic**，随仓库提交，仅随本项目使用（见 `LICENSE`）。
+- 图集是**无损 WebP**（像素与 PNG 逐字节一致，体积小约 60%）：像素画不能用有损编码，
+  换编码器时务必验证「解码后 RGBA 逐字节相等」。
+- 四个图集（items / player / npc / buff）的 `*-atlas.json` 里都有 `meta.hash`（图集文件的内容哈希）：前端用 `?v=<hash>` 拉图集，图集一变 URL 就变，避免「新坐标 + 旧图」的图标错位。
 - 升级游戏版本后必须按上文重新生成，并核对 `meta.json` 的 `gameVersion`。
 - 若后续想瘦身：可把生成物移出仓库、改由 CI / Docker 构建时生成（代价：构建机需备齐游戏资源）。
 
@@ -64,13 +66,13 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
 | `loc.en-US.json` | 官方本地化（同上） | — |
 | `meta.json` | 版本、来源路径、统计 | — |
 | `items-atlas.json` | 图标图集裁切信息 `{regions:{贴图id:[x,y,w,h]}}` | 6133 |
-| `items-atlas.png` | 图标图集（已入库；版权 Re-Logic） | — |
+| `items-atlas.webp` | 图标图集（无损 WebP，已入库；版权 Re-Logic） | — |
 | `player-atlas.json` | 玩家角色图集裁切信息 `{regions:{"b:<variant>:<part>:<role>" / "h:<hair>":[x,y,40,56]}}` | 507 |
-| `player-atlas.png` | 玩家角色图集（已入库；灰度遮罩，绘制时用玩家颜色相乘着色） | — |
+| `player-atlas.webp` | 玩家角色图集（无损 WebP，已入库；灰度遮罩，绘制时用玩家颜色相乘着色） | — |
 | `npc-atlas.json` | NPC 贴图图集裁切信息 `{regions:{npcId:[x,y,w,h]}}`（第一帧） | 694 |
-| `npc-atlas.png` | NPC 贴图图集（已入库；版权 Re-Logic） | — |
+| `npc-atlas.webp` | NPC 贴图图集（无损 WebP，已入库；版权 Re-Logic） | — |
 | `buff-atlas.json` | Buff 图标图集裁切信息 `{regions:{buffId:[x,y,w,h]}}` | 400 |
-| `buff-atlas.png` | Buff 图标图集（已入库；版权 Re-Logic，1022×428） | — |
+| `buff-atlas.webp` | Buff 图标图集（无损 WebP，已入库；版权 Re-Logic，1022×428） | — |
 
 ### commands.json 结构
 
@@ -304,7 +306,7 @@ Boss 还会从 TShock `SpawnBoss()` 的 switch 解析出 `/sb` 信息（供「�
 「数据图鉴」用一张图集展示每个 NPC 的样子（第一帧）：
 ```jsonc
 {
-  "meta": { "gameVersion": "1.4.5.8", "count": 694, "sheet": "npc-atlas.png", ... },
+  "meta": { "gameVersion": "1.4.5.8", "count": 694, "sheet": "npc-atlas.webp", ... },
   "regions": { "1": [0, 0, 32, 26], "4": [64, 0, 110, 166] }  // npcId -> [x, y, w, h]
 }
 ```
@@ -364,7 +366,7 @@ $SPRITE_DIR/Item_<icon>.png
 
 ## 图标图集（sprite）
 
-所有图标合成 **一张** `items-atlas.png`，前端按 `items-atlas.json` 裁切第一帧。
+所有图标合成 **一张** `items-atlas.webp`（无损 WebP），前端按 `items-atlas.json` 裁切第一帧。
 参考本机 `FishShopConfig` 的 `items.png` / `itemsPngInfo` 方案，但全自动且覆盖全部物品 ID。
 
 - 尺寸：**1024 × 4906**（唯一贴图 6133 张，约 2.0 MB）。

@@ -11,7 +11,7 @@ Buff 图标是游戏 `Content/Images/Buff_<id>.png` 里的静态贴图（1.4.5.8
   2. 逐张打开 `Buff_<id>.png`（保留原始尺寸），按「高降序、宽升序」逐行摆放，
      超过 limit-width 换行，每格之间留 1px 透明缝（防缩放插值采到邻居）；
   3. 输出：
-       data/buff-atlas.png    图集（随仓库提交；版权 Re-Logic）
+       data/buff-atlas.webp   图集（随仓库提交；无损 WebP；版权 Re-Logic）
        data/buff-atlas.json   裁切信息 { regions: { buffId: [x, y, w, h] } } + 内容哈希
 
 依赖：Pillow
@@ -40,7 +40,7 @@ PROJECT = os.path.dirname(HERE)
 DEFAULT_BUFFS = os.path.join(PROJECT, "data", "buffs.json")
 DEFAULT_SPRITE = os.path.join(PROJECT, "..", "tr-sprite-1458", "Content", "Images")
 DEFAULT_OUT_JSON = os.path.join(PROJECT, "data", "buff-atlas.json")
-DEFAULT_OUT_PNG = os.path.join(PROJECT, "data", "buff-atlas.png")
+DEFAULT_OUT_IMAGE = os.path.join(PROJECT, "data", "buff-atlas.webp")
 
 
 def pack(regions, limit_width, padding):
@@ -66,7 +66,7 @@ def main():
     ap.add_argument("--buffs", default=DEFAULT_BUFFS, help="data/buffs.json 路径")
     ap.add_argument("--sprite-dir", default=os.environ.get("SPRITE_DIR", DEFAULT_SPRITE))
     ap.add_argument("--out-json", default=DEFAULT_OUT_JSON)
-    ap.add_argument("--out-png", default=DEFAULT_OUT_PNG)
+    ap.add_argument("--out-image", default=DEFAULT_OUT_IMAGE)
     ap.add_argument("--limit-width", type=int, default=1024, help="图集最大宽度，默认 1024")
     ap.add_argument("--padding", type=int, default=1, help="每格之间的留白像素，默认 1（防缩放插值采到邻居）")
     ap.add_argument("--max-height", type=int, default=8192, help="超过此高度只告警，不自动切图")
@@ -102,8 +102,8 @@ def main():
     for bid, im in sprites.items():
         x, y, _, _ = placed[bid]
         atlas.alpha_composite(im, (x, y))
-    atlas.save(args.out_png)
-    png_hash = hashlib.md5(open(args.out_png, "rb").read()).hexdigest()[:12]
+    atlas.save(args.out_image, "WEBP", lossless=True, quality=100, method=6)
+    atlas_hash = hashlib.md5(open(args.out_image, "rb").read()).hexdigest()[:12]
 
     payload = {
         "meta": {
@@ -114,8 +114,8 @@ def main():
             "padding": args.padding,
             "count": len(placed),
             "missing": len(missing),
-            "sheet": os.path.basename(args.out_png),
-            "hash": png_hash,
+            "sheet": os.path.basename(args.out_image),
+            "hash": atlas_hash,
             "generatedBy": "tools/gen-buff-atlas.py",
             "source": "Terraria Content/Images/Buff_<id>.png（静态图标，无动画帧）",
             "note": "regions[buffId] = [x, y, w, h]；键与 data/buffs.json 的 id 一致。",
@@ -126,7 +126,7 @@ def main():
         json.dump(payload, f, ensure_ascii=False, indent=1)
         f.write("\n")
 
-    print(f"Buff 图集：{len(placed)} 个 / 缺图标 {len(missing)} 个 -> {args.out_png} ({total_w}×{total_h})")
+    print(f"Buff 图集：{len(placed)} 个 / 缺图标 {len(missing)} 个 -> {args.out_image} ({total_w}×{total_h})")
     if missing:
         print("缺图标 id:", missing[:50], file=sys.stderr)
 
