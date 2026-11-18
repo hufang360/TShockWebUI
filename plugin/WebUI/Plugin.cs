@@ -155,6 +155,10 @@ namespace WebUI
             if (string.IsNullOrEmpty(Config.Secret))
                 TShock.Log.ConsoleWarn("[WebUI] 未设置 Secret（tshock/WebUI/config.json）：请确保 REST 端口 7878 不对公网暴露，或设置 Secret 并在后端配置 TSWUI_AUTH_SECRET。");
 
+            // Tier B 状态：服主排「/spawnboss 网页上跑不了」时最需要看的一行
+            // （后端总闸是另一侧，还要看 WebUI 容器的 TSWUI_ALLOW_INGAME_COMMANDS / TSWUI_INGAME_COMMANDS）。
+            TShock.Log.ConsoleInfo("[WebUI] Tier B（网页执行 allowServer=false 指令）：" + DescribeIngameOnly());
+
             // 权限 / 初始化体检：只在真有问题时才提，不刷屏。
             var missing = new List<string>();
             if (!AnyGroupHasPermission(WebUiPermissions.Use)) missing.Add(WebUiPermissions.Use);
@@ -164,6 +168,26 @@ namespace WebUI
 
             if (missing.Count > 0)
                 TShock.Log.ConsoleWarn($"[WebUI] 没有任何用户组拥有：{string.Join("、", missing)}。玩家侧需要的权限可用 /web init 一键补到默认组（管理类需手动授予）。");
+        }
+
+        /// <summary>
+        /// 一行说明执行侧放行范围：全部 / 仅列出的几条 / 关闭。
+        /// 注意这只回答「插件允许什么」；后端是否把指令转过来由 WebUI 容器的
+        /// <c>TSWUI_ALLOW_INGAME_COMMANDS</c> + <c>TSWUI_INGAME_COMMANDS</c> 决定。
+        /// </summary>
+        private static string DescribeIngameOnly()
+        {
+            if (Config == null) return "配置未加载";
+            if (Config.AllowInGameOnlyCommands) return "全部放行（AllowInGameOnlyCommands=true）";
+
+            var allow = Config.InGameOnlyAllowlist;
+            if (allow == null || allow.Count == 0)
+                return "关闭（AllowInGameOnlyCommands=false 且 InGameOnlyAllowlist 为空）";
+
+            var names = allow.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => "/" + n.Trim()).ToList();
+            return names.Count == 0
+                ? "关闭（InGameOnlyAllowlist 里没有有效指令名）"
+                : $"仅放行 {string.Join("、", names)}（InGameOnlyAllowlist）";
         }
 
         private static bool AnyGroupHasPermission(string permission)

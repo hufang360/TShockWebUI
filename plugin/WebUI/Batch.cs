@@ -56,6 +56,23 @@ namespace WebUI
             if (!all && allowlist.Count == 0)
                 return new RestObject("200") { { "code", "disabled" }, { "error", "服务器未开启「游戏内指令」执行" } };
 
+            // 名单校验放在「玩家是否在线」之前：配置问题与人在不在线无关，
+            // 先报「这条根本没放行」比先报「你不在线」更好排查。
+            var blocked = new bool[cmds.Count];
+            var anyAllowed = false;
+            for (var i = 0; i < cmds.Count; i++)
+            {
+                if (all || IsAllowed(CommandName(cmds[i]), allowlist)) anyAllowed = true;
+                else blocked[i] = true;
+            }
+            if (!anyAllowed)
+            {
+                var rejectedAll = new List<Dictionary<string, object>>(cmds.Count);
+                for (var i = 0; i < cmds.Count; i++)
+                    rejectedAll.Add(NotInAllowlist(cmds[i]));
+                return new RestObject("200") { { "results", rejectedAll } };
+            }
+
             var online = TShock.Players.FirstOrDefault(p =>
                 p != null && p.Active && p.Account != null &&
                 string.Equals(p.Account.Name, token.Username, StringComparison.OrdinalIgnoreCase));
@@ -63,16 +80,12 @@ namespace WebUI
                 return new RestObject("200") { { "code", "player_offline" }, { "error", "该玩家不在线，无法执行仅限游戏内的指令" } };
 
             var results = new List<Dictionary<string, object>>(cmds.Count);
-            foreach (var raw in cmds)
+            for (var i = 0; i < cmds.Count; i++)
             {
-                // 名单校验在**执行前**：即使总开关开了，也只放行名单内的（名单空则不额外限制）。
-                if (!all && !IsAllowed(CommandName(raw), allowlist))
+                var raw = cmds[i];
+                if (blocked[i])
                 {
-                    results.Add(new Dictionary<string, object>
-                    {
-                        { "cmd", raw },
-                        { "output", new List<string> { "该指令不在服务器放行的游戏内指令名单中" } },
-                    });
+                    results.Add(NotInAllowlist(raw));
                     continue;
                 }
 
@@ -86,6 +99,15 @@ namespace WebUI
                 results.Add(new Dictionary<string, object> { { "cmd", raw }, { "output", executor.Output } });
             }
             return new RestObject("200") { { "results", results } };
+        }
+
+        private static Dictionary<string, object> NotInAllowlist(string raw)
+        {
+            return new Dictionary<string, object>
+            {
+                { "cmd", raw },
+                { "output", new List<string> { "该指令不在服务器放行的游戏内指令名单中" } },
+            };
         }
 
         /// <summary>名单归一：去空白 / 前导斜杠、转小写。</summary>
