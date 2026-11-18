@@ -78,7 +78,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:run
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: web/dist/
@@ -115,7 +115,7 @@ jobs:
         run: |
           NAME="tswui-${VERSION}-${GOOS}-${GOARCH}${{ matrix.ext }}"
           SKIP_WEB=1 OUT="dist/$NAME" scripts/build-binary.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bin-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/*
@@ -140,7 +140,7 @@ jobs:
           mkdir -p release-assets
           cp plugin/WebUI/bin/Release/net9.0/WebUI.dll "release-assets/WebUI-${VERSION}.dll"
           ls -la release-assets
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plugin-dll
           path: release-assets/*.dll
