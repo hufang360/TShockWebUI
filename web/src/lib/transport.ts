@@ -42,6 +42,8 @@ export interface BatchCapabilities {
   plugin: boolean
   /** 后端是否允许把 allowServer=false 的指令交给插件以真实玩家身份执行。 */
   ingame?: boolean
+  /** 这条通道放行的指令名（小写、规范名）；空数组 = 不限定。 */
+  ingameCommands?: string[]
 }
 
 /** `GET /api/commands`：TShock 运行时指令目录（含插件指令）。 */

@@ -1425,7 +1425,11 @@ const zh: Dict = {
 
   'reason.empty': '请输入指令',
   'reason.unverified': '未知指令 /{token}（不在内置白名单，将交由 TShock 校验）',
-  'reason.inGameOnly': '/{name} 只能在游戏内执行，WebUI 无法通过 REST 执行',
+  'reason.inGameOnly': '/{name} 只能在游戏内执行',
+  'reason.inGameUnreachable': '/{name} 只能在游戏内执行：暂时连不上服务器，无法确认网页能否执行',
+  'reason.inGameNoPlugin': '/{name} 只能在游戏内执行：服务器没装 WebUI 信使插件',
+  'reason.inGameDisabled': '/{name} 只能在游戏内执行：服务器没开「网页执行游戏内指令」（TSWUI_ALLOW_INGAME_COMMANDS）',
+  'reason.inGameNotInList': '/{name} 不在服务器放行的游戏内指令名单里（TSWUI_INGAME_COMMANDS）',
   'editor.notLoggedIn': '请先登录后再执行指令',
 }
 
@@ -2855,7 +2859,11 @@ const en: Dict = {
 
   'reason.empty': 'Enter a command',
   'reason.unverified': 'Unknown command /{token} (not in the built-in whitelist; TShock will validate it)',
-  'reason.inGameOnly': '/{name} can only be run in-game; WebUI cannot run it over REST',
+  'reason.inGameOnly': '/{name} can only be run in-game',
+  'reason.inGameUnreachable': '/{name} can only be run in-game: server unreachable, cannot confirm web execution',
+  'reason.inGameNoPlugin': '/{name} can only be run in-game: the WebUI messenger plugin is not installed',
+  'reason.inGameDisabled': '/{name} can only be run in-game: web execution of in-game commands is off (TSWUI_ALLOW_INGAME_COMMANDS)',
+  'reason.inGameNotInList': '/{name} is not in the server allow-list for web execution (TSWUI_INGAME_COMMANDS)',
   'editor.notLoggedIn': 'Please sign in before running commands',
 }
 

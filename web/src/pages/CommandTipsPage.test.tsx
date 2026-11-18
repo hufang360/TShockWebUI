@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommandTerminal } from '@/components/CommandTerminal'
 import { makeDataset } from '@/test/fixtures'
+import { NO_INGAME, type IngamePolicy } from '@/lib/ingame'
 import { I18nProvider } from '@/lib/i18n'
 import { TerminalProvider } from '@/lib/terminalContext'
 import { playerStubs } from '@/test/playerStubs'
@@ -65,11 +66,15 @@ const transport = {
   ...playerStubs,
 } as unknown as BackendTransport
 
-function renderPage(dataset: Dataset = makeTestDataset(), onNavigate = vi.fn()) {
+function renderPage(
+  dataset: Dataset = makeTestDataset(),
+  onNavigate = vi.fn(),
+  ingame: IngamePolicy = NO_INGAME,
+) {
   const view = render(
     <I18nProvider lang="zh">
       <TerminalProvider>
-        <CommandTipsPage dataset={dataset} onNavigate={onNavigate} />
+        <CommandTipsPage dataset={dataset} onNavigate={onNavigate} ingame={ingame} />
         <CommandTerminal
           visible
           dataset={dataset}
@@ -77,7 +82,7 @@ function renderPage(dataset: Dataset = makeTestDataset(), onNavigate = vi.fn()) 
           authenticated
           serverId="default"
           players={[]}
-          ingameAllowed={false}
+          ingame={{ enabled: false, commands: [] }}
           runtimeValues={{}}
           settings={settings}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
@@ -396,6 +401,20 @@ describe('CommandTipsPage', () => {
     const detail = openDetail('/register <password>')
     expect(detail.queryByText('指令语法')).toBeNull()
     expect(detail.queryByText('使用提示')).toBeNull()
+  })
+
+  it('服务器放行刷怪指令后：不再标「仅游戏内」，详情里有「执行」', () => {
+    const ingame: IngamePolicy = { enabled: true, commands: ['spawnboss', 'spawnmob'] }
+    renderPage(makeTestDataset({ commands: realCommands }), vi.fn(), ingame)
+
+    // 折叠行的备注里不再出现「仅游戏内」（整组已放行）。
+    const boss = findRow('data-fold', '/spawnboss')
+    expect(boss?.textContent).not.toContain('仅游戏内')
+
+    // 详情里恢复「执行」（点它只是把指令填进浮窗，不自动发）。
+    expandAllGroups()
+    const detail = openDetail('/spawnboss "king slime"')
+    expect(detail.getByRole('button', { name: '执行' })).toBeTruthy()
   })
 
   it('指令列有最大宽度，悬停弹出完整指令的 Tooltip', async () => {

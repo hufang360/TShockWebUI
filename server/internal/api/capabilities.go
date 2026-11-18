@@ -51,15 +51,25 @@ func (s *Server) probeMessenger(ctx context.Context, client *tshock.Client) (*ts
 
 // probeBatch 探测「批量执行」能力（信使插件 /webui/batch）。
 func (s *Server) probeBatch(ctx context.Context, client *tshock.Client) (tshock.BatchCapability, error) {
+	// 配置字段无论探测结果如何都如实回传：插件没装 / 总闸没开时，前端才能给出具体原因，
+	// 而不是笼统说一句「只能在游戏内执行」。
+	cmds := s.cfg.IngameCommands
+	if cmds == nil {
+		// 空名单 = 不限定；始终给数组，免得前端要处理 null。
+		cmds = []string{}
+	}
+	cap := tshock.BatchCapability{Ingame: s.cfg.AllowIngameCommands, IngameCommands: cmds}
+
 	err := client.BatchProbe(ctx)
 	if err == nil {
-		return tshock.BatchCapability{Plugin: true, Ingame: s.cfg.AllowIngameCommands}, nil
+		cap.Plugin = true
+		return cap, nil
 	}
 	var e *tshock.APIError
 	if errors.As(err, &e) && e.Kind == tshock.KindNotFound {
-		return tshock.BatchCapability{}, nil
+		return cap, nil
 	}
-	return tshock.BatchCapability{}, err
+	return cap, err
 }
 
 // probePlayer 探测 PlayerManager（/pm/*）与 playermanager 权限。

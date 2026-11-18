@@ -57,7 +57,7 @@ function renderEditor(
           settings={settings}
           serverId="default"
           players={[]}
-          ingameAllowed={false}
+          ingame={{ enabled: false, commands: [] }}
           onTokenInvalid={onTokenInvalid}
           onLogin={onLogin}
         />
@@ -138,7 +138,7 @@ describe('CommandPage 未登录', () => {
             settings={settings}
             serverId="default"
             players={[]}
-            ingameAllowed={false}
+            ingame={{ enabled: false, commands: [] }}
             onTokenInvalid={vi.fn().mockResolvedValue(true)}
             onLogin={vi.fn()}
           />
@@ -588,7 +588,7 @@ describe('CommandPage 物品面板', () => {
           settings={settings}
           serverId="default"
           players={[]}
-          ingameAllowed={false}
+          ingame={{ enabled: false, commands: [] }}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
           onLogin={vi.fn()}
           onOpenInDex={onOpenInDex}
@@ -893,7 +893,7 @@ describe('CommandPage 结果持久化', () => {
           settings={settings}
           serverId="default"
           players={[]}
-          ingameAllowed={false}
+          ingame={{ enabled: false, commands: [] }}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
           onLogin={vi.fn()}
         />
@@ -928,7 +928,7 @@ describe('CommandPage 结果持久化', () => {
           settings={settings}
           serverId={serverId}
           players={[]}
-          ingameAllowed={false}
+          ingame={{ enabled: false, commands: [] }}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
           onLogin={vi.fn()}
         />

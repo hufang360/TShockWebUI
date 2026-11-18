@@ -5,6 +5,7 @@ import { makeDataset } from '@/test/fixtures'
 import { I18nProvider } from '@/lib/i18n'
 import type { BackendTransport } from '@/lib/tshock'
 import type { CommandResult, Dataset, HistoryEntry } from '@/types'
+import { NO_INGAME, type IngamePolicy } from '@/lib/ingame'
 import { useCommandRunner } from './useCommandRunner'
 
 const dataset: Dataset = makeDataset()
@@ -16,7 +17,7 @@ function fakeTransport(runCommand: (cmd: string, ingame?: boolean) => Promise<Co
 function setup(overrides: {
   runCommand?: (cmd: string, ingame?: boolean) => Promise<CommandResult>
   authenticated?: boolean
-  ingameAllowed?: boolean
+  ingame?: IngamePolicy
   onTokenInvalid?: () => Promise<boolean>
   ds?: Dataset
 } = {}) {
@@ -36,7 +37,7 @@ function setup(overrides: {
         dataset: overrides.ds ?? dataset,
         transport: fakeTransport(runCommand),
         authenticated: overrides.authenticated ?? true,
-        ingameAllowed: overrides.ingameAllowed ?? false,
+        ingame: overrides.ingame ?? NO_INGAME,
         onTokenInvalid,
         appendResult,
         pushHistory,
@@ -82,12 +83,83 @@ describe('useCommandRunner', () => {
     expect(lastHistory(pushHistory)).toMatchObject({ cmd: '/item 29', status: 'rejected', ok: false })
   })
 
-  it('Tier B 打开后 allowServer=false 的指令以 ingame 身份执行', async () => {
-    const { result, runCommand } = setup({ ingameAllowed: true })
+  it('放行（名单为空 = 不限定）时 allowServer=false 的指令以 ingame 身份执行', async () => {
+    const { result, runCommand } = setup({ ingame: { enabled: true, commands: [] } })
     await act(async () => {
       await result.current.run('/item 29')
     })
     expect(runCommand).toHaveBeenCalledWith('/item 29', true)
+  })
+
+  it('名单放行的指令走 ingame（别名也算），名单外的仍在前端拒绝', async () => {
+    const { result, runCommand } = setup({ ingame: { enabled: true, commands: ['item'] } })
+    await act(async () => {
+      await result.current.run('/item 29')
+    })
+    expect(runCommand).toHaveBeenCalledWith('/item 29', true)
+
+    // 别名同样命中：`/i` 是 item 的别名（数据里的定义带 aliases）。
+    await act(async () => {
+      await result.current.run('/i 29')
+    })
+    expect(runCommand).toHaveBeenCalledWith('/i 29', true)
+  })
+
+  it('名单不含这条时仍按 Tier A 拒绝，不发请求', async () => {
+    const { result, runCommand, appendResult } = setup({
+      ingame: { enabled: true, commands: ['spawnboss', 'spawnmob'] },
+    })
+    let outcome = { dispatched: true }
+    await act(async () => {
+      outcome = await result.current.run('/item 29')
+    })
+    expect(outcome.dispatched).toBe(false)
+    expect(runCommand).not.toHaveBeenCalled()
+    expect(appendResult).toHaveBeenCalledWith(
+      '/item 29',
+      expect.objectContaining({ status: 'rejected' }),
+    )
+  })
+
+  it('仅游戏内被拦时，文案指出真正的原因（总闸 / 插件 / 名单）', async () => {
+    const messages: string[] = []
+    const collect = (overrides: Parameters<typeof setup>[0]) =>
+      setup({
+        ...overrides,
+        runCommand: async () => ({ status: 'ok', output: [] }),
+      })
+
+    for (const policy of [
+      { enabled: false, commands: [], plugin: true },
+      { enabled: false, commands: [], plugin: false },
+      { enabled: true, commands: ['spawnmob'], plugin: true },
+      { enabled: true, commands: [], plugin: true, reachable: false },
+    ]) {
+      const { result, appendResult } = collect({ ingame: policy })
+      await act(async () => {
+        await result.current.run('/item 29')
+      })
+      messages.push(
+        (appendResult.mock.calls.at(-1)?.[1] as { message: string }).message,
+      )
+    }
+
+    expect(messages[0]).toContain('TSWUI_ALLOW_INGAME_COMMANDS')
+    expect(messages[1]).toContain('信使插件')
+    expect(messages[2]).toContain('不在服务器放行的游戏内指令名单里')
+    expect(messages[3]).toContain('连不上服务器')
+  })
+
+  it('未登录时「仅游戏内」指令先提示登录（能力矩阵还没拿到，别误报服务器没开）', async () => {
+    const { result, appendResult, runCommand } = setup({ authenticated: false })
+    await act(async () => {
+      await result.current.run('/item 29')
+    })
+    expect(runCommand).not.toHaveBeenCalled()
+    expect(appendResult).toHaveBeenCalledWith(
+      '/item 29',
+      expect.objectContaining({ status: 'rejected', message: '请先登录后再执行指令' }),
+    )
   })
 
   it('未登录时不发请求，只追加 rejected', async () => {

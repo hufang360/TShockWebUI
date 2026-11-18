@@ -658,7 +658,7 @@ it('「指令小抄」是常用表格页的第一张表：分组列出 Boss，�
       (el) => el.getAttribute('data-command') === command,
     )!
 
-  // `/spawnboss` 只能在游戏内执行（allowServer=false），浮层里没有「执行」，只有复制。
+  // 未登录时拿不到服务器放行名单：`/spawnboss`（allowServer=false）只有复制，没有「执行」。
   fold('/spawnboss')
   fireEvent.click(row('/spawnboss "king slime"'))
   const detail = await screen.findByTestId('command-detail')

@@ -17,8 +17,9 @@ TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达�
 4. **物资申请**：玩家提交物品申请（物品 / 数量 / 用途）→ 服主在游戏内 `/web req ...` 或网页「待审核」
    审核 → 在线立即发放 / 离线下次登录发放；权限 `webui.request.use` / `webui.request.review`，
    发放用 TShock 的 `GiveItemCheck`（尊重 item ban）。
-5. **Tier B（可选，默认关）**：`AllowInGameOnlyCommands=true` 时，以**真实在线玩家**身份执行
-   `AllowServer=false` 的指令（权限仍是 token 用户组，不提权）。
+5. **Tier B（可选，默认关）**：以**真实在线玩家**身份执行 `AllowServer=false` 的指令（权限仍是 token 用户组，不提权）。
+   `AllowInGameOnlyCommands=true` 表示全部放行；只放行部分指令时改用 `InGameOnlyAllowlist`，
+   例如 `["spawnboss", "spawnmob"]` 只允许从网页刷 Boss / 刷怪。
 
 > 授权请求 1 分钟内没有任何操作则自动失效；玩家不在线直接提示「该玩家不在线」。
 
@@ -87,6 +88,7 @@ docker restart tshock
   "MaxPendingTickets": 64,
   "TokenTTLMinutes": 0,
   "AllowInGameOnlyCommands": false,
+  "InGameOnlyAllowlist": [],
   "AllowChatConfirm": true,
   "RecordChat": true
 }
@@ -103,7 +105,8 @@ docker restart tshock
 | `MaxRequestsPerMinutePerIp` | 同一来源 IP 每分钟请求上限（后端会传 `ip`）；0 = 不限。 |
 | `MaxPendingTickets` | 同时存在的未完成票据上限（防内存增长）；0 = 不限。 |
 | `TokenTTLMinutes` | 本插件铸造的 web token 有效期（分钟）。0 = 不过期（跟随后端会话/手动退出）。 |
-| `AllowInGameOnlyCommands` | Tier B：是否允许以**真实在线玩家**身份执行 `AllowServer=false` 的指令（默认关；权限不多一分）。 |
+| `AllowInGameOnlyCommands` | Tier B 总开关：是否允许以**真实在线玩家**身份执行**任何** `AllowServer=false` 的指令（默认关；权限不多一分）。 |
+| `InGameOnlyAllowlist` | Tier B 放行名单（指令名或别名，大小写不敏感）：只放行这里列出的。为空且总开关关 = 全部不放行；总开关开则忽略名单。 |
 | `AllowChatConfirm` | 是否允许玩家直接回复 `y`/`n` 确认（无需输入 `/web auth` 验证码）。 |
 | `RecordChat` | 是否把玩家聊天记入「服务器动态」（事件流 `type=chat`，默认开）。仅普通聊天、不含指令；关掉即完全不采集聊天。 |
 | `PersistEvents` | 是否把事件按天写入 `tshock/WebUI/events/*.jsonl`（默认开，重启不清空）；关掉退回纯内存。 |

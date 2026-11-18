@@ -732,6 +732,19 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, tshock.Result{Status: tshock.StatusRejected, Output: []string{}, Message: msg})
 			return
 		}
+		// TSWUI_INGAME_COMMANDS 白名单：只放行明确列出的指令（空 = 不限定）。
+		if !s.ingameCommandAllowed(req.Cmd, outcome.Def) {
+			name := tshock.FirstToken(req.Cmd)
+			if outcome.Def != nil {
+				name = outcome.Def.Name
+			}
+			writeJSON(w, http.StatusOK, tshock.Result{
+				Status:  tshock.StatusRejected,
+				Output:  []string{},
+				Message: fmt.Sprintf("/%s 不在服务器放行的游戏内指令名单中", name),
+			})
+			return
+		}
 		s.runIngameCommand(w, r, &sess, req.Cmd)
 		return
 	}
@@ -766,6 +779,31 @@ func (s *Server) handleCommand(w http.ResponseWriter, r *http.Request) {
 	}
 	// 指令结果一律 HTTP 200 + status（API_SPEC §6）。
 	writeJSON(w, http.StatusOK, res)
+}
+
+// ingameCommandAllowed 判断这条指令是否在 TSWUI_INGAME_COMMANDS 名单内（空名单 = 不限定）。
+//
+// 名单按名字匹配，但玩家输入的是别名（`/sb`、`/sm`）：已知指令用内置索引把名字 / 别名都算上，
+// 免得名单里写规范名、玩家敲别名就被拒。未知命令（插件指令）只能用输入的首 token 比对。
+func (s *Server) ingameCommandAllowed(cmd string, def *tshock.CommandDef) bool {
+	if len(s.cfg.IngameCommands) == 0 {
+		return true
+	}
+	names := []string{strings.ToLower(tshock.FirstToken(cmd))}
+	if def != nil {
+		names = append(names, strings.ToLower(def.Name))
+		for _, alias := range def.Aliases {
+			names = append(names, strings.ToLower(alias))
+		}
+	}
+	for _, allowed := range s.cfg.IngameCommands {
+		for _, name := range names {
+			if name != "" && name == allowed {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // runIngameCommand 把一条 allowServer=false 的指令交给信使插件，
@@ -902,7 +940,7 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 
 // handleBatchCapabilities 探测服务器是否安装了支持批量执行的信使插件：
 //
-//	GET /api/batch/capabilities → {"plugin": true|false}
+//	GET /api/batch/capabilities → {"plugin": true|false, "ingame": true|false, "ingameCommands": [...]}
 func (s *Server) handleBatchCapabilities(w http.ResponseWriter, r *http.Request) {
 	client, ok := s.clientFor(w, r)
 	if !ok {

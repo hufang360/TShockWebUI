@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using TShockAPI;
@@ -58,6 +59,13 @@ namespace WebUI
         /// （用真实在线玩家身份，权限不多一分）。默认关闭：这会把「只能在游戏内做的事」搬到网页。
         /// </summary>
         public bool AllowInGameOnlyCommands = false;
+
+        /// <summary>
+        /// 仅这些指令可以经 <c>/webui/batch?mode=player</c> 执行（指令名或别名，大小写不敏感）。
+        /// 非空时即使<see cref="AllowInGameOnlyCommands"/> = false 也只放行这里列出的；
+        /// <see cref="AllowInGameOnlyCommands"/> = true 时忽略本名单（全部放行）。
+        /// </summary>
+        public List<string> InGameOnlyAllowlist = new List<string>();
 
         /// <summary>是否允许玩家直接回复 y / n 确认（无需输入 /web auth 验证码）。</summary>
         public bool AllowChatConfirm = true;
@@ -186,6 +194,7 @@ namespace WebUI
             if (RequestHistoryDays < 0) RequestHistoryDays = 0;
             if (string.IsNullOrWhiteSpace(ChatPrefix)) ChatPrefix = "[WebUI]";
             if (Secret == null) Secret = "";
+            if (InGameOnlyAllowlist == null) InGameOnlyAllowlist = new List<string>();
             return this;
         }
 

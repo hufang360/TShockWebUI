@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { NO_INGAME } from '@/lib/ingame'
 import { I18nProvider } from '@/lib/i18n'
 import { resetSearchIntent, requestSearchIntent } from '@/lib/searchIntent'
 import { makeDataset } from '@/test/fixtures'
@@ -21,7 +22,7 @@ function renderPage(lang: Lang = 'zh') {
   return render(
     <I18nProvider lang={lang}>
       <TerminalProvider>
-        <TablesPage dataset={makeDataset()} onNavigate={vi.fn()} />
+        <TablesPage dataset={makeDataset()} onNavigate={vi.fn()} ingame={NO_INGAME} />
       </TerminalProvider>
     </I18nProvider>,
   )

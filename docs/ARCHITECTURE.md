@@ -156,7 +156,8 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 - 内嵌 `commands.json`（与前端同一份数据）。
 - 解析指令首 token（去前导 `/`，取别名），查表：
   - 未知/插件指令（不在表内）→ **放行**，交由 TShock 判定（不存在 → `command_not_found`）。
-  - `allowServer === false` → `{status:"rejected", message:"只能在游戏内执行"}`，不调用 TShock。
+  - `allowServer === false` → 若 Tier B 开启且该指令在 `TSWUI_INGAME_COMMANDS` 内，走插件 `mode=player`；
+    否则 `{status:"rejected", message:"只能在游戏内执行"}`，不调用 TShock。
   - 允许 → 调 `RawCmd`。
 - 这是纵深防御，不是权限边界；真正权限在 TShock（token 用户组的 `CanRun`）。
 

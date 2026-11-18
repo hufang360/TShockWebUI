@@ -38,6 +38,7 @@ import { DATA_ROW_CLASS, dataRowStripe } from '@/lib/tableRowStyles'
 import { consumeTablesView, useTablesViewRequest, type TablesView } from '@/lib/tablesView'
 import { useSearchIntent } from '@/lib/searchIntent'
 import type { Dataset, TabId } from '@/types'
+import type { IngamePolicy } from '@/lib/ingame'
 import { CommandTipsPage } from './CommandTipsPage'
 
 const BASE = import.meta.env.BASE_URL
@@ -52,9 +53,12 @@ const BASE = import.meta.env.BASE_URL
 export function TablesPage({
   dataset,
   onNavigate,
+  ingame,
 }: {
   dataset: Dataset
   onNavigate?: (tab: TabId) => void
+  /** 哪些 allowServer=false 的指令可以在网页里执行（后端 + 插件名单）。 */
+  ingame: IngamePolicy
 }) {
   const { t, lang } = useI18n()
   const [view, setView] = useState<TablesView>(() => consumeTablesView() ?? 'tips')
@@ -111,6 +115,7 @@ export function TablesPage({
         <LinkTable />
       ) : view === 'tips' || !table ? (
         <CommandTipsPage
+          ingame={ingame}
           key={`tips:${tipQuery}`}
           dataset={dataset}
           onNavigate={onNavigate}

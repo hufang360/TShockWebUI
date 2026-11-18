@@ -56,6 +56,7 @@ import { clearEditorViewRequest, useEditorViewRequest } from '@/lib/editorView'
 import { ItemFavoritesProvider } from '@/lib/itemFavoritesContext'
 import { formatItemTag } from '@/lib/items'
 import { useI18n } from '@/lib/i18n'
+import { ingameAllowsCommand, type IngamePolicy } from '@/lib/ingame'
 import { StorageKeys } from '@/lib/storage'
 import type { BackendTransport } from '@/lib/tshock'
 import type { CompletionItem } from '@/lib/completion'
@@ -76,8 +77,8 @@ interface CommandPageProps {
   /** 当前 TShock 上游 id；结果列表 / 聊天事件流按服务器分开。 */
   serverId: string
   players: string[]
-  /** 是否允许执行 allowServer=false 的指令（走插件真实玩家模式）。 */
-  ingameAllowed: boolean
+  /** 哪些 allowServer=false 的指令可以执行（走插件真实玩家模式，按服务器名单）。 */
+  ingame: IngamePolicy
   /** 当前登录玩家名（聊天预览里显示「谁说的」）。 */
   username?: string | null
   /** 运行时补全数据（区域 / 传送点，来自信使插件 /api/data）。 */
@@ -118,7 +119,7 @@ export function CommandPage({
   settings,
   serverId,
   players,
-  ingameAllowed,
+  ingame,
   username,
   runtimeValues,
   onTokenInvalid,
@@ -152,7 +153,7 @@ export function CommandPage({
     dataset,
     transport,
     authenticated,
-    ingameAllowed,
+    ingame,
     onTokenInvalid,
     appendResult,
     pushHistory,
@@ -419,7 +420,11 @@ export function CommandPage({
         maxLength={chatMode ? CHAT_MAX_LENGTH : undefined}
         atlas={dataset.atlas}
         fontSize={settings.fontSize}
-        invalid={!chatMode && check.executability === 'in_game_only' && !ingameAllowed}
+        invalid={
+          !chatMode &&
+          check.executability === 'in_game_only' &&
+          !ingameAllowsCommand(ingame, check.normalized, check.def)
+        }
         insertRequest={insertRequest}
         onInsertHandled={() => setInsertRequest(null)}
         focusRequest={focusSeq}
@@ -677,6 +682,7 @@ export function CommandPage({
           onRemoveFavorite={removeFavorite}
           onRemoveHistory={removeHistory}
           onClearHistory={clearHistory}
+          ingame={ingame}
         />
       </div>
     </ItemFavoritesProvider>

@@ -66,7 +66,7 @@ function renderPage(transport: BackendTransport) {
           settings={settings}
           serverId="default"
           players={[]}
-          ingameAllowed={false}
+          ingame={{ enabled: false, commands: [] }}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}
           onLogin={vi.fn()}
         />

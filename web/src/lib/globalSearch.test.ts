@@ -233,6 +233,18 @@ describe('commandInvocation', () => {
     expect(bare?.needsArgs).toBe(true)
   })
 
+  it('服务器放行了某条仅游戏内指令：它变得可执行（且不再标「仅游戏内」）', () => {
+    const allowed = sources({ ingame: { enabled: true, commands: ['item'] } })
+    const hit = commandInvocation(allowed, '/item 29')
+    expect(hit?.inGameOnly).toBe(false)
+    expect(hit?.runnable).toBe(true)
+    // 别名同样命中。
+    expect(commandInvocation(allowed, '/i 29')?.runnable).toBe(true)
+    // 名单外的仍然标红。
+    const row = searchEverything(allowed, 'give').find((g) => g.id === 'commands')?.hits[0]
+    expect(row?.inGameOnly).toBe(false)
+  })
+
   it('仅游戏内的指令：给一行但标红且不可执行（回车只是去看用法）', () => {
     const hit = commandInvocation(sources(), '/item 29')
     expect(hit?.inGameOnly).toBe(true)

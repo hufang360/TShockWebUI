@@ -11,7 +11,8 @@ import type { Npc } from '@/types'
  * - `/tpnpc`：同文件 `TPNpc()` → **只接受名称**（服务器语言名或英文名，前缀匹配），**不接受 ID**。
  *
  * 三条指令都是 `allowServer=false`：默认只能在游戏内执行。所以这里只负责**生成指令**，
- * 由页面把它追加到右下角「指令」浮窗（服主开启「允许执行游戏内指令」后才能直接在网页里跑）。
+ * 由页面把它追加到右下角「指令」浮窗。`/spawnboss`、`/spawnmob` 在服务器配好 Tier B 名单
+ * （后端 `TSWUI_INGAME_COMMANDS` + 插件 `InGameOnlyAllowlist`）后可以直接在网页里跑；`/tpnpc` 仍不行。
  */
 
 export interface SpawnBossTip {

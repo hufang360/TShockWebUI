@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { inspectCommand, type CommandCheck } from '@/lib/commands'
+import { ingameDenialOfCommand, type IngameDenial, type IngamePolicy } from '@/lib/ingame'
 import { useI18n } from '@/lib/i18n'
 import { resultFromError, type BackendTransport } from '@/lib/tshock'
 import type { CommandResult, Dataset, HistoryEntry } from '@/types'
@@ -16,6 +17,27 @@ export function rejectedMessage(check: CommandCheck, t: T): string {
   return check.message
 }
 
+/**
+ * 「仅游戏内」指令被拦住时，说清**到底是哪一环没开**（未装插件 / 总闸关 / 这条不在名单 / 上游不可达），
+ * 别把四种原因混成一句「服务器没把它放进放行名单」。
+ */
+export function ingameRejectedMessage(
+  denial: IngameDenial,
+  name: string,
+  t: T,
+): string {
+  switch (denial) {
+    case 'unreachable':
+      return t('reason.inGameUnreachable', { name })
+    case 'no_plugin':
+      return t('reason.inGameNoPlugin', { name })
+    case 'disabled':
+      return t('reason.inGameDisabled', { name })
+    case 'not_in_list':
+      return t('reason.inGameNotInList', { name })
+  }
+}
+
 export interface RunOutcome {
   /** 是否真的发起了执行（空输入 / 游戏内专用 / 未登录 / 并发时都是 false）。 */
   dispatched: boolean
@@ -26,8 +48,8 @@ export interface UseCommandRunnerOptions {
   dataset: Dataset
   transport: BackendTransport
   authenticated: boolean
-  /** 信使插件是否允许 `allowServer=false` 的指令以在线玩家身份执行（Tier B）。 */
-  ingameAllowed: boolean
+  /** 哪些 `allowServer=false` 的指令可以以真实在线玩家身份执行（服务器名单，空 = 不限定）。 */
+  ingame: IngamePolicy
   onTokenInvalid: () => Promise<boolean>
   /** 追加一条结果（被前置校验拒绝的也会追加，让玩家看到原因）。 */
   appendResult: (command: string, result: CommandResult) => void
@@ -49,7 +71,7 @@ export function useCommandRunner({
   dataset,
   transport,
   authenticated,
-  ingameAllowed,
+  ingame,
   onTokenInvalid,
   appendResult,
   pushHistory,
@@ -74,25 +96,34 @@ export function useCommandRunner({
         })
         return { dispatched: false }
       }
-      if (inspected.executability === 'in_game_only' && !ingameAllowed) {
+      // 未登录先提示登录：此时能力矩阵还没拿到，说「服务器没开」只会误导。
+      if (!authenticated) {
         appendResult(inspected.normalized, {
           status: 'rejected',
           output: [],
-          message: rejectedMessage(inspected, t),
+          message: t('editor.notLoggedIn'),
+        })
+        return { dispatched: false }
+      }
+      const denial =
+        inspected.executability === 'in_game_only'
+          ? ingameDenialOfCommand(ingame, inspected.normalized, inspected.def)
+          : null
+      if (denial) {
+        appendResult(inspected.normalized, {
+          status: 'rejected',
+          output: [],
+          message: ingameRejectedMessage(
+            denial,
+            inspected.def?.name ?? inspected.parsed.token,
+            t,
+          ),
         })
         pushHistory({
           cmd: inspected.normalized,
           ts: Date.now(),
           ok: false,
           status: 'rejected',
-        })
-        return { dispatched: false }
-      }
-      if (!authenticated) {
-        appendResult(inspected.normalized, {
-          status: 'rejected',
-          output: [],
-          message: t('editor.notLoggedIn'),
         })
         return { dispatched: false }
       }
@@ -137,7 +168,7 @@ export function useCommandRunner({
       pushHistory,
       appendResult,
       t,
-      ingameAllowed,
+      ingame,
     ],
   )
 

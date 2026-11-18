@@ -47,7 +47,7 @@ function tree(
           authenticated={opts.authenticated ?? true}
           serverId="default"
           players={[]}
-          ingameAllowed={false}
+          ingame={{ enabled: false, commands: [] }}
           runtimeValues={{}}
           settings={settings}
           onTokenInvalid={vi.fn().mockResolvedValue(true)}

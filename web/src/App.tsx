@@ -34,6 +34,7 @@ import { clearSearchIntent, requestSearchIntent, type SearchIntent } from '@/lib
 import { resultFromError, TshockRequestError } from '@/lib/transport'
 import { loadLoginMemory, saveLoginMemory } from '@/lib/credentials'
 import { loadDataset, reconcileDataVersion, withRuntimeCommands } from '@/lib/dataset'
+import { ingamePolicyFrom, type IngamePolicy } from '@/lib/ingame'
 import { useLanguagePacks } from '@/lib/languagePack/useLanguagePacks'
 import { CommandResultsProvider } from '@/lib/commandResults'
 import { DatasetProvider } from '@/lib/datasetContext'
@@ -119,8 +120,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   const [dataset, setDataset] = useState<Dataset | null>(null)
   // 运行时指令目录（登录后从信使插件拉取，补全插件指令）。
   const [runtimeCommands, setRuntimeCommands] = useState<RuntimeCommand[]>([])
-  // 后端是否允许把 allowServer=false 的指令交给插件以真实玩家身份执行。
-  const [ingameAllowed, setIngameAllowed] = useState(false)
+  // 哪些 allowServer=false 的指令可以交给插件以真实玩家身份执行（后端名单 + 插件名单）。
+  const [ingame, setIngame] = useState<IngamePolicy>(() => ingamePolicyFrom(null))
   // 运行时补全数据（区域 / 传送点）——只在 TShock 运行时存在。
   const [runtimeParams, setRuntimeParams] = useState<{ regions?: string[]; warps?: string[] }>({})
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -520,7 +521,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   useEffect(() => {
     if (!dataset || !session.authenticated) {
       setRuntimeCommands([])
-      setIngameAllowed(false)
+      setIngame(ingamePolicyFrom(null))
       setRuntimeParams({})
       return
     }
@@ -538,7 +539,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         const caps = await transport.capabilities(forceCapsRef.current)
         forceCapsRef.current = false
         if (!cancelled) {
-          setIngameAllowed(caps.batch.ingame === true)
+          setIngame(ingamePolicyFrom(caps.batch, caps.reachable))
           // 「统一执行」：检测到信使插件后自动开启（用户手动关过则保持其选择）。
           const { mode, userSet } = batchPrefsRef.current
           if (caps.batch.plugin === true && !userSet && !mode) setBatchMode(true)
@@ -556,7 +557,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
           }
         }
       } catch {
-        if (!cancelled) setIngameAllowed(false)
+        if (!cancelled) setIngame(ingamePolicyFrom(null))
       }
       // 区域 / 传送点（插件缺失或权限不足时为空，不影响其它补全）。
       try {
@@ -613,8 +614,9 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       pages: nav.map((item) => ({ id: item.id, label: item.label, icon: item.icon })),
       dataset: base,
       goods: session.authenticated ? (searchGoods ?? []) : [],
+      ingame,
     }
-  }, [nav, effectiveDataset, dataset, session.authenticated, searchGoods])
+  }, [nav, effectiveDataset, dataset, session.authenticated, searchGoods, ingame])
 
   const handleTokenInvalid = useCallback(
     () => requireLogin('app.tokenInvalid'),
@@ -892,7 +894,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             modules={modules}
             settings={settings}
             players={players}
-            ingameAllowed={ingameAllowed}
+            ingame={ingame}
             runtimeValues={runtimeParams}
             customModules={customModules}
             dexFocus={dexFocus}
@@ -928,7 +930,7 @@ export default function App({ transport: transportProp }: AppProps = {}) {
           authenticated={session.authenticated}
           serverId={activeServerId}
           players={players}
-          ingameAllowed={ingameAllowed}
+          ingame={ingame}
           runtimeValues={runtimeParams}
           settings={settings}
           onTokenInvalid={handleTokenInvalid}

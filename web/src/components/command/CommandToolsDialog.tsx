@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { BookOpen, Hammer, History, Star, Tag, Terminal, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import type { IngamePolicy } from '@/lib/ingame'
 import { CommandPickerPanel } from '@/components/CommandPickerPanel'
 import { FavoriteRecipesPanel } from '@/components/FavoriteRecipesPanel'
 import { ConfirmButton } from '@/components/ConfirmButton'
@@ -99,6 +100,8 @@ interface CommandToolsDialogProps {
   onRemoveFavorite: (cmd: string) => void
   onRemoveHistory: (entry: HistoryEntry) => void
   onClearHistory: () => void
+  /** 哪些 allowServer=false 的指令能在网页里执行（指令库分组用）。 */
+  ingame: IngamePolicy
 }
 
 /**
@@ -132,6 +135,7 @@ export function CommandToolsDialog({
   onRemoveFavorite,
   onRemoveHistory,
   onClearHistory,
+  ingame,
 }: CommandToolsDialogProps) {
   const { t } = useI18n()
   const contentRef = useRef<HTMLDivElement>(null)
@@ -256,7 +260,7 @@ export function CommandToolsDialog({
           {/* 面板外包一层 `p-1`：搜索框的聚焦光圈画在框外 2–3px，
               贴着 `overflow-hidden` 的边就会被切掉（两边看着像被剪断）。 */}
           <TabsContent value="commands" className="min-h-0 flex-1 overflow-hidden p-1">
-            <CommandPickerPanel view="commands" dataset={dataset} onLoad={onLoad} />
+            <CommandPickerPanel view="commands" dataset={dataset} onLoad={onLoad} ingame={ingame} />
           </TabsContent>
           <TabsContent value="favorites" className="min-h-0 flex-1 overflow-hidden p-1">
             <CommandPickerPanel
@@ -265,6 +269,7 @@ export function CommandToolsDialog({
               favorites={favorites}
               onRemoveFavorite={onRemoveFavorite}
               onLoad={onLoad}
+              ingame={ingame}
             />
           </TabsContent>
           <TabsContent value="history" className="min-h-0 flex-1 overflow-hidden p-1">

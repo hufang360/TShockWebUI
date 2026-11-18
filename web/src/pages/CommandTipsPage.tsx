@@ -36,6 +36,7 @@ import { DATA_ROW_CLASS, dataRowStripe } from '@/lib/tableRowStyles'
 import { cn } from '@/lib/cn'
 import { readDataIdState, rememberDataIdState } from '@/lib/dataIdState'
 import { useI18n } from '@/lib/i18n'
+import { ingameAllowsCommand, type IngamePolicy } from '@/lib/ingame'
 import {
   SPAWN_BOSS_TIPS,
   SPAWN_MOB_EXAMPLES,
@@ -93,6 +94,8 @@ function rowHint(row: TableRow, group: TipsGroup, sectionHint: string | undefine
 
 interface CommandTipsPageProps {
   dataset: Dataset
+  /** 哪些 allowServer=false 的指令可以在网页里执行（服务器名单）；没放行的标「仅游戏内」。 */
+  ingame: IngamePolicy
   /** 「数据 ID → NPC」入口（详情里的「在数据 ID 里查更多」）。 */
   onNavigate?: (tab: TabId) => void
   /** 详情里「填入」的去向；默认填进浮动终端，指令页里改为填进页面输入框。 */
@@ -157,9 +160,12 @@ function toRows(commands: readonly CommandTip[], lang: 'zh' | 'en'): TableRow[] 
  */
 const TRUNCATE_HINT_MIN = 22
 
-/** 只能在游戏内执行（`allowServer=false`）：指令用红色标出来（语义色 `text-destructive`）。 */
-function ingameOnly(row: TableRow): boolean {
-  return row.def?.allowServer === false
+/**
+ * 只能在游戏内执行：`allowServer=false` 且服务器没放行这条（Tier B 关 / 不在名单里）。
+ * 这类指令用红色标出来（语义色 `text-destructive`），详情里只给复制。
+ */
+function ingameOnly(row: TableRow, ingame: IngamePolicy): boolean {
+  return row.def?.allowServer === false && !ingameAllowsCommand(ingame, row.command, row.def)
 }
 
 /**
@@ -301,9 +307,17 @@ function RowCopyAction({ value, label }: { value: string; label: string }) {
  * 左边固定留出折叠箭头的宽度，这样数据行与折叠行的指令仍从同一条竖线开始。
  * 只有**可能被截断**的才挂 Tooltip：一页几百行，逐个挂 Radix Tooltip 太重。
  */
-function CommandCellBody({ row, indent }: { row: TableRow; indent?: boolean }) {
+function CommandCellBody({
+  row,
+  indent,
+  ingame,
+}: {
+  row: TableRow
+  indent?: boolean
+  ingame: IngamePolicy
+}) {
   const text = row.command
-  const content = <span className={commandCellClass(ingameOnly(row))}>{text}</span>
+  const content = <span className={commandCellClass(ingameOnly(row, ingame))}>{text}</span>
   return (
     <td className={cn('px-2 py-2 align-top', indent && 'pl-6')}>
       <div className="flex min-w-0 items-start gap-1">
@@ -362,11 +376,13 @@ function InlineCopy({ value, testId }: { value: string; testId?: string }) {
  */
 function RowPopoverBody({
   row,
+  ingame,
   onNavigate,
   onFilter,
   onPick,
 }: {
   row: TableRow
+  ingame: IngamePolicy
   onNavigate?: (tab: TabId) => void
   /** 点「相关指令」：把表格过滤到那条，并关掉浮层。 */
   onFilter: (query: string) => void
@@ -376,7 +392,7 @@ function RowPopoverBody({
   const def = row.def
   const canonical = row.usage && row.usage !== row.command ? row.usage : ''
   const related = RELATED_COMMANDS[commandName(row.command)] ?? []
-  const runnable = !row.syntax && !ingameOnly(row)
+  const runnable = !row.syntax && !ingameOnly(row, ingame)
   const showNpc = Boolean(onNavigate) && NPC_LOOKUP_COMMANDS.has(commandName(row.command))
 
   return (
@@ -386,7 +402,7 @@ function RowPopoverBody({
         <span
           className={cn(
             'min-w-0 font-mono text-sm font-semibold break-all',
-            ingameOnly(row) ? 'text-destructive' : 'text-foreground',
+            ingameOnly(row, ingame) ? 'text-destructive' : 'text-foreground',
           )}
         >
           {row.command}
@@ -401,7 +417,7 @@ function RowPopoverBody({
           {row.note ? <span className="text-2xs"> · {row.note}</span> : null}
         </p>
       )}
-      {ingameOnly(row) && <Badge tone="danger">{t('commands.onlyInGame')}</Badge>}
+      {ingameOnly(row, ingame) && <Badge tone="danger">{t('commands.onlyInGame')}</Badge>}
       {row.hint && (
         <p className="text-2xs leading-relaxed whitespace-pre-line text-muted-foreground">
           {row.hint}
@@ -483,19 +499,21 @@ function RowPopoverBody({
  */
 function CommandRow({
   row,
+  ingame,
   rowKey,
   stripe,
   indent,
   onClick,
 }: {
   row: TableRow
+  ingame: IngamePolicy
   rowKey: string
   stripe: string
   indent?: boolean
   onClick: (event: ReactMouseEvent) => void
 }) {
   const { t } = useI18n()
-  const note = row.note ?? (!indent && ingameOnly(row) ? t('commands.onlyInGame') : '')
+  const note = row.note ?? (!indent && ingameOnly(row, ingame) ? t('commands.onlyInGame') : '')
   return (
     <tr
       data-command={row.command}
@@ -503,7 +521,7 @@ function CommandRow({
       onClick={onClick}
       className={cn(DATA_ROW_CLASS, 'divide-x divide-border/60', stripe)}
     >
-      <CommandCellBody row={row} indent={indent} />
+      <CommandCellBody row={row} indent={indent} ingame={ingame} />
       <td className="w-full max-w-0 px-2 py-2 text-xs text-foreground">
         <div className="truncate">
           {row.label}
@@ -527,12 +545,14 @@ function CommandRow({
  */
 function CommandTable({
   groups,
+  ingame,
   expandAll,
   onPick,
   onNavigate,
   onFilter,
 }: {
   groups: TableSection[]
+  ingame: IngamePolicy
   /** 搜索时强制展开：否则命中的行藏在折叠组里。 */
   expandAll: boolean
   /** 行内「执行」：只是把指令填进浮窗，不自动发出。 */
@@ -610,7 +630,7 @@ function CommandTable({
               if (entry.stem) {
                 const open = expandAll || expanded.has(key)
                 // 整组都只能在游戏内执行 → 标记只写在折叠行（子行不重复）
-                const allIngame = entry.rows.every(ingameOnly)
+                const allIngame = entry.rows.every((row) => ingameOnly(row, ingame))
                 // 折叠行的「说明」：条目可以自己声明（`/worldevent rain` → 雨），否则用分区标题。
                 const foldLabel = entry.rows.find((row) => row.foldLabel)?.foldLabel ?? group.title ?? ''
                 return (
@@ -645,6 +665,7 @@ function CommandTable({
                           <Fragment key={rowKey}>
                             <CommandRow
                               row={row}
+                              ingame={ingame}
                               rowKey={rowKey}
                               stripe={stripe}
                               indent
@@ -661,6 +682,7 @@ function CommandTable({
                 <Fragment key={key}>
                   <CommandRow
                     row={row}
+                    ingame={ingame}
                     rowKey={key}
                     stripe={stripe}
                     onClick={() => openDetail(row)}
@@ -687,6 +709,7 @@ function CommandTable({
           >
             {detail && (
               <RowPopoverBody
+                ingame={ingame}
                 row={detail}
                 onNavigate={onNavigate}
                 onFilter={(query) => {
@@ -759,7 +782,13 @@ function GroupList({
  * 参考行（语法带占位符）只提供复制。
  * 权限与执行结果都由 TShock 判定。
  */
-export function CommandTipsPage({ dataset, onNavigate, onPick, searchQuery }: CommandTipsPageProps) {
+export function CommandTipsPage({
+  dataset,
+  ingame,
+  onNavigate,
+  onPick,
+  searchQuery,
+}: CommandTipsPageProps) {
   const { t, lang } = useI18n()
   const { open } = useTerminal()
   const pick = onPick ?? open
@@ -1024,6 +1053,7 @@ export function CommandTipsPage({ dataset, onNavigate, onPick, searchQuery }: Co
           ) : (
             <CommandTable
               groups={visible}
+              ingame={ingame}
               expandAll={q.length > 0}
               onPick={pick}
               onNavigate={onNavigate}

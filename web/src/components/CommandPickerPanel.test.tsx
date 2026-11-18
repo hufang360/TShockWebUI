@@ -1,17 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { NO_INGAME, type IngamePolicy } from '@/lib/ingame'
 import { makeDataset } from '@/test/fixtures'
 import { CommandPickerPanel } from './CommandPickerPanel'
 
 // 面板会记忆搜索词（`tswui:toolsMemory`）：用例之间要清掉，否则前一个用例的词会带过来。
 beforeEach(() => localStorage.removeItem('tswui:toolsMemory'))
 
-function renderPanel() {
+function renderPanel(ingame: IngamePolicy = NO_INGAME) {
   const onLoad = vi.fn()
   render(
     <I18nProvider lang="zh">
-      <CommandPickerPanel view="commands" dataset={makeDataset()} onLoad={onLoad} />
+      <CommandPickerPanel view="commands" dataset={makeDataset()} onLoad={onLoad} ingame={ingame} />
     </I18nProvider>,
   )
   return { onLoad }
@@ -65,6 +66,15 @@ describe('CommandPickerPanel（指令列表）', () => {
     fireEvent.click(all)
     expect(all.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByText('/help')).toBeNull()
+  })
+
+  it('服务器放行了某条游戏内指令：它回到普通列表、不再标红', () => {
+    renderPanel({ enabled: true, commands: ['item'] })
+    // /item 直接可见（没被收进折叠组），且不是红字。
+    const name = screen.getByText('/item')
+    expect(name.className).not.toContain('text-destructive')
+    // 测试数据里只有 /item 是 allowServer=false：放行后整个「游戏内指令」分组都不该出现。
+    expect(screen.queryByRole('button', { name: /游戏内指令（\d+）/ })).toBeNull()
   })
 
   it('游戏内指令名用红色（不再挂「游戏内」badge）', () => {

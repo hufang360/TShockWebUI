@@ -34,9 +34,13 @@ const maxBatchQueryBytes = 6000
 type BatchCapability struct {
 	// Plugin 为 true 表示服务器已安装支持批量执行的信使插件。
 	Plugin bool `json:"plugin"`
-	// Ingame 为 true 表示后端允许把 allowServer=false 的指令交给插件、
-	// 以真实在线玩家身份执行（还需插件侧 AllowInGameOnlyCommands=true）。
+	// Ingame 为 true 表示后端总闸开着（`TSWUI_ALLOW_INGAME_COMMANDS`），即允许把
+	// allowServer=false 的指令交给插件、以真实在线玩家身份执行。
+	// 是否真的可执行还要看 `Plugin`（插件在装）与 `IngameCommands`（放行名单）。
 	Ingame bool `json:"ingame"`
+	// IngameCommands 是这条通道实际放行的指令名（小写，动词/别名均归一成规范名）。
+	// 空数组 = 不限定（Ingame=true 时全部 allowServer=false 指令都可走）。
+	IngameCommands []string `json:"ingameCommands"`
 }
 
 // RunBatch 调用 /webui/batch 执行多条指令，返回与 cmds 等长、同序的结果。

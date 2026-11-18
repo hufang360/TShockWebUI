@@ -10,6 +10,7 @@ import { useI18n } from '@/lib/i18n'
 import type { DetailEntry } from '@/lib/itemDetailContext'
 import { PLUGIN_LINKS } from '@/lib/pluginLinks'
 import { MODULE_BY_ID, isModuleEnabled, type ModuleId, type ModulesPrefs } from '@/lib/modules'
+import type { IngamePolicy } from '@/lib/ingame'
 import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset, Settings, TabId } from '@/types'
 
@@ -95,8 +96,8 @@ export interface AppRoutesProps {
   modules: ModulesPrefs
   settings: Settings
   players: string[]
-  /** 信使插件是否允许以在线玩家身份执行（Tier B）。 */
-  ingameAllowed: boolean
+  /** 哪些 allowServer=false 的指令可以以真实在线玩家身份执行。 */
+  ingame: IngamePolicy
   /** 运行时补全数据（区域 / 传送点）。 */
   runtimeValues: { regions?: string[]; warps?: string[] }
   customModules: CustomModule[]
@@ -129,7 +130,7 @@ export function AppRoutes({
   modules,
   settings,
   players,
-  ingameAllowed,
+  ingame,
   runtimeValues,
   customModules,
   dexFocus,
@@ -175,7 +176,7 @@ export function AppRoutes({
           settings={settings}
           serverId={serverId}
           players={players}
-          ingameAllowed={ingameAllowed}
+          ingame={ingame}
           username={username}
           runtimeValues={runtimeValues}
           onTokenInvalid={onTokenInvalid}
@@ -198,7 +199,9 @@ export function AppRoutes({
       )}
       {activeTab === 'save' && <PlrPage serverId={serverId} transport={transport} />}
       {activeTab === 'worldview' && <WorldPage serverId={serverId} />}
-      {activeTab === 'tables' && <TablesPage dataset={dataset} onNavigate={onNavigate} />}
+      {activeTab === 'tables' && (
+        <TablesPage dataset={dataset} onNavigate={onNavigate} ingame={ingame} />
+      )}
       {activeTab === 'players' && (
         <PlayerManagerPage
           key={serverId}

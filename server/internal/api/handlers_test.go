@@ -1848,6 +1848,41 @@ func TestBatchCapabilitiesMissingPlugin(t *testing.T) {
 	}
 }
 
+// 探测结果里必须如实带回配置：插件没装 / 总闸没开时，前端才能说清原因。
+func TestBatchCapabilitiesReportsIngameConfig(t *testing.T) {
+	routes := okLoginRoutes()
+	routes["/webui/batch"] = func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 401, map[string]any{"error": "需要令牌"})
+	}
+	f := newFake(routes)
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	// 总闸关、名单已配：ingame=false 但名单要带回去（前端据此区分「没开总闸」和「不在名单」）。
+	srv, _ := newServer(t, ts.URL, func(c *config.Config) {
+		c.AllowIngameCommands = false
+		c.IngameCommands = []string{"spawnboss", "spawnmob"}
+	})
+
+	rec := do(srv.Handler(), http.MethodGet, "/api/batch/capabilities", nil, nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Plugin         bool     `json:"plugin"`
+		Ingame         bool     `json:"ingame"`
+		IngameCommands []string `json:"ingameCommands"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("解析失败：%v", err)
+	}
+	if !out.Plugin || out.Ingame {
+		t.Fatalf("plugin/ingame 不符：%s", rec.Body.String())
+	}
+	if len(out.IngameCommands) != 2 || out.IngameCommands[0] != "spawnboss" {
+		t.Fatalf("名单未回传：%s", rec.Body.String())
+	}
+}
+
 func TestBatchRequiresCSRFHeader(t *testing.T) {
 	srv, _ := newServer(t, "http://127.0.0.1:1", nil)
 	rec := do(srv.Handler(), http.MethodPost, "/api/batch", map[string]any{"cmds": []string{"/who"}}, nil, false)
@@ -1924,6 +1959,52 @@ func TestCommandIngameDisabled(t *testing.T) {
 	}
 	if f.count("/webui/batch") != 0 {
 		t.Fatalf("未开启时不应调用插件 /webui/batch")
+	}
+}
+
+// TSWUI_INGAME_COMMANDS 白名单：只放行列出的指令，别名同样命中；不在名单的不发请求。
+func TestCommandIngameAllowlist(t *testing.T) {
+	routes := okLoginRoutes()
+	var calls int
+	routes["/webui/batch"] = func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		writeJSON(w, 200, map[string]any{
+			"status":  "200",
+			"results": []map[string]any{{"cmd": "/sb eye", "output": []string{"You spawned the Eye of Cthulhu 1 time."}}},
+		})
+	}
+	f := newFake(routes)
+	ts := httptest.NewServer(f)
+	defer ts.Close()
+	srv, _ := newServer(t, ts.URL, func(c *config.Config) {
+		c.AllowIngameCommands = true
+		c.IngameCommands = []string{"spawnboss", "spawnmob"}
+	})
+	h := srv.Handler()
+	cookie := loginCookie(t, h, "alice", "pw")
+
+	// 别名 `/sb` 归一成 spawnboss → 命中白名单，走插件 player 模式。
+	rec := do(h, http.MethodPost, "/api/command", map[string]any{"cmd": "/sb eye"}, cookie, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	if calls != 1 {
+		t.Fatalf("命中白名单应调用插件 1 次，实际 %d", calls)
+	}
+	if !strings.Contains(rec.Body.String(), "Eye of Cthulhu") {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+
+	// `/i 1`（= /item）不在白名单：直接 rejected，不能发给插件。
+	rec = do(h, http.MethodPost, "/api/command", map[string]any{"cmd": "/i 1", "ingame": true}, cookie, true)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "rejected") {
+		t.Fatalf("HTTP %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "不在服务器放行的游戏内指令名单中") {
+		t.Fatalf("应给出名单拒绝原因：%s", rec.Body.String())
+	}
+	if calls != 1 {
+		t.Fatalf("名单外的指令不应调用插件，实际 %d 次", calls)
 	}
 }
 

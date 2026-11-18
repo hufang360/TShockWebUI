@@ -23,6 +23,7 @@ import { useCommandRunner } from '@/hooks/useCommandRunner'
 import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useI18n } from '@/lib/i18n'
+import { ingameAllowsCommand, type IngamePolicy } from '@/lib/ingame'
 import { StorageKeys, writeJson } from '@/lib/storage'
 import { useTerminal } from '@/lib/terminalContext'
 import {
@@ -42,7 +43,7 @@ interface CommandTerminalProps {
   authenticated: boolean
   serverId: string
   players: string[]
-  ingameAllowed: boolean
+  ingame: IngamePolicy
   runtimeValues: { regions?: string[]; warps?: string[] }
   settings: Settings
   onTokenInvalid: () => Promise<boolean>
@@ -74,7 +75,7 @@ export function CommandTerminal({
   authenticated,
   serverId,
   players,
-  ingameAllowed,
+  ingame,
   runtimeValues,
   settings,
   onTokenInvalid,
@@ -93,7 +94,7 @@ export function CommandTerminal({
     dataset,
     transport,
     authenticated,
-    ingameAllowed,
+    ingame,
     onTokenInvalid,
     appendResult: append,
     pushHistory,
@@ -329,7 +330,10 @@ export function CommandTerminal({
             busy={running}
             atlas={dataset.atlas}
             fontSize={settings.fontSize}
-            invalid={check.executability === 'in_game_only' && !ingameAllowed}
+            invalid={
+              check.executability === 'in_game_only' &&
+              !ingameAllowsCommand(ingame, check.normalized, check.def)
+            }
             focusRequest={focusToken}
             compact
             history={history.map((h) => h.cmd)}

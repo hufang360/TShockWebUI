@@ -22,6 +22,8 @@ import { useRovingFocus } from '@/hooks/useRovingFocus'
 import { usePanelMemory } from '@/hooks/useToolsMemory'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import type { IngamePolicy } from '@/lib/ingame'
+import { ingameAllowsCommand } from '@/lib/ingame'
 import type { Dataset, FavoriteEntry } from '@/types'
 
 interface CommandPickerPanelProps {
@@ -33,6 +35,8 @@ interface CommandPickerPanelProps {
   onRemoveFavorite?: (cmd: string) => void
   /** 用指令替换编辑器内容（并把焦点移回输入框）。 */
   onLoad: (cmd: string) => void
+  /** 哪些 allowServer=false 的指令能在网页里执行；没放行的才收进「仅游戏内」分组。 */
+  ingame: IngamePolicy
 }
 
 /**
@@ -47,6 +51,7 @@ export function CommandPickerPanel({
   favorites = [],
   onRemoveFavorite,
   onLoad,
+  ingame,
 }: CommandPickerPanelProps) {
   const { t } = useI18n()
   // 搜索词 + 滚动位置按页记忆（关掉弹框再打开还在）。
@@ -75,13 +80,17 @@ export function CommandPickerPanel({
     )
   }, [dataset.commands, keyword])
 
-  // `allowServer=false` 的指令（只能游戏内执行）统一排到最下，收进可折叠分组。
+  // 只能在游戏内执行的指令（`allowServer=false` 且服务器没放行这条）统一排到最下，收进可折叠分组。
   const { runnable, inGame } = useMemo(() => {
     const ok: typeof commands = []
     const blocked: typeof commands = []
-    for (const cmd of commands) (cmd.allowServer === false ? blocked : ok).push(cmd)
+    for (const cmd of commands) {
+      const blockedInGame =
+        cmd.allowServer === false && !ingameAllowsCommand(ingame, `/${cmd.name}`, cmd)
+      ;(blockedInGame ? blocked : ok).push(cmd)
+    }
     return { runnable: ok, inGame: blocked }
-  }, [commands])
+  }, [commands, ingame])
   // 关掉弹框时把滚动位置落盘（滚动事件里只记内存）。
   useEffect(() => flushScroll, [flushScroll])
 
@@ -119,7 +128,7 @@ export function CommandPickerPanel({
 
   /** 一行指令：**指令与说明同一行**（说明占满剩余宽度、超出截断，hover 出完整说明）。 */
   const renderRow = (cmd: Dataset['commands'][number], index: number) => {
-    const inGameOnly = cmd.allowServer === false
+    const inGameOnly = cmd.allowServer === false && !ingameAllowsCommand(ingame, `/${cmd.name}`, cmd)
     const help = cmd.helpZh ?? cmd.help
     return (
       <li key={cmd.name}>

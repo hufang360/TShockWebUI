@@ -521,7 +521,9 @@ v1.6.2 ~ v1.6.6，现已删除，避免每次调用多打一次空请求）。
 后端行为：
 1. 解析 `cmd` 首 token（去 `/`、查别名，用内嵌 `commands.json`）。
 2. 空指令 → `{status:"rejected", message:"请输入指令"}`，**不调用 TShock**。
-3. `allowServer === false` → `{status:"rejected", message:"/<name> 只能在游戏内执行"}`，**不调用 TShock**。
+3. `allowServer === false` → Tier B 开启且该指令在放行名单内（空名单 = 不限定）时，
+   改走 `/webui/batch?mode=player`（见 §6.5）；否则
+   `{status:"rejected", message:"/<name> 只能在游戏内执行"}`，**不调用 TShock**。
 4. 未知/插件指令（不在 `commands.json`，如 `/fish`）→ **不拒绝**，交由 TShock 判定（不存在 → `command_not_found`）。
 5. 否则 `POST {TSHOCK_URL}/v3/server/rawcmd?cmd=<urlenc>&token=<token>`，按上表映射。
 6. `token_invalid` 时删除会话并清 Cookie（响应里仍返回 200 + status）。
@@ -555,7 +557,8 @@ v1.6.2 ~ v1.6.6，现已删除，避免每次调用多打一次空请求）。
 ] }
 ```
 - 每条结果的 `status` 语义与 `/api/command` 完全相同（`ok` / `command_not_found` / `command_error` / `no_permission` / …）。
-- Tier A：已知 `allowServer=false` 的指令由后端直接标为 `rejected`，**不发往插件**；其余发往 `/webui/batch`。
+- Tier A：已知 `allowServer=false` 的指令由后端直接标为 `rejected`，**不发往插件**（批量执行不走 Tier B；
+  只有单条 `/api/command` 会按放行名单改走 `mode=player`）；其余发往 `/webui/batch`。
 - 逐条权限仍由 TShock 按当前 token 用户组判定（与 rawcmd 一致，**不提权、不绕过 `AllowServer`**）。
 
 失败（请求级，统一错误信封）：
@@ -601,11 +604,15 @@ v1.6.2 ~ v1.6.6，现已删除，避免每次调用多打一次空请求）。
 探测服务器是否安装了支持批量执行的信使插件（无需会话）：
 
 ```json
-{ "plugin": true, "ingame": false }
+{ "plugin": true, "ingame": true, "ingameCommands": ["spawnboss", "spawnmob"] }
 ```
 - 后端用**不带 token** 调一次插件 `/webui/batch`：404 = 未安装，401/403 = 已安装。
-- `ingame` = 后端 `TSWUI_ALLOW_INGAME_COMMANDS=true` 且插件已装（允许把 `allowServer=false` 的指令
-  交给插件、以真实在线玩家身份执行；还需插件侧 `AllowInGameOnlyCommands=true`）。
+- `ingame` = 后端总闸 `TSWUI_ALLOW_INGAME_COMMANDS=true`。**只表示配置意图**：真正可执行还要求
+  `plugin=true`（插件在装）、该指令在 `ingameCommands` 里、玩家在线、且插件侧 `AllowInGameOnlyCommands=true`
+  或该指令在插件 `InGameOnlyAllowlist` 里。
+- `ingameCommands` = 这条通道放行的指令名（小写、规范名）；**空数组 = 不限定**（老后端没有这个字段，同样按不限定处理）。
+  它**总是**按后端配置回传（插件没装、总闸没开也照样回），前端才能把「没装插件 / 没开总闸 / 这条不在名单 / 上游不可达」
+  分开说清；名单内的「仅游戏内」指令可以直接执行，名单外的仍然只标红、不发请求。
 - 前端据此决定首页「统一执行」勾选框、以及编辑器能否执行仅限游戏内的指令；**切换服务器后必须重新探测**。
 
 ---
@@ -753,7 +760,9 @@ invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosse
 
 `cmd` 之外可传 `ingame: true`，表示这条指令 `allowServer=false`，请以**真实在线玩家**身份执行。
 - 仅当 `TSWUI_ALLOW_INGAME_COMMANDS=true`（且插件侧开启）时生效；否则返回 `rejected`。
-- 后端也会对内置白名单里已知 `allowServer=false` 的指令自动走此路径。
+- `TSWUI_INGAME_COMMANDS` 非空时，只放行名单内的指令（指令名或别名）；名单外的返回
+  `{status:"rejected", message:"/<name> 不在服务器放行的游戏内指令名单中"}`，且不发出站请求。
+- 后端也会对内置白名单里已知 `allowServer=false` 的指令自动走此路径（同样受放行名单约束）。
 - 权限仍是 token 用户组，**不提权**；玩家必须在线，否则 `rejected` + 「该玩家不在线」。
 
 ---

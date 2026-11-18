@@ -1,6 +1,7 @@
 import { Boxes as BoxesIcon, ShoppingCart as CartIcon, Terminal as TerminalIcon } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { ITEM_COLLECTIONS } from '@/lib/collections'
+import { ingameAllowsCommand, NO_INGAME, type IngamePolicy } from '@/lib/ingame'
 import { searchItems } from '@/lib/items'
 import type { SearchIntent } from '@/lib/searchIntent'
 import { wallDisplayName } from '@/lib/tiles'
@@ -118,6 +119,11 @@ export interface GlobalSearchSources {
   dataset: Dataset
   /** 鱼店货架（`lib/fishGoodsCache` 里懒加载的那份）；为空时整组不出现。 */
   goods: FishGood[]
+  /**
+   * 哪些 `allowServer=false` 的指令能在网页里执行（服务器名单）。
+   * 缺省 = 一条都不放行：`/item` 这类只标红、回车只去看用法。
+   */
+  ingame?: IngamePolicy
 }
 
 /** 页面别名：中文习惯叫法 / 英文关键词，帮用户用「搜索」而不是「UI 里的词」找到页面。 */
@@ -268,8 +274,10 @@ export function commandInvocation(
   const [name] = body.split(' ')
   if (!name) return null
   const command = findCommand(sources, name)
-  const inGameOnly = command?.allowServer === false
   const line = `/${body}`
+  const inGameOnly =
+    command?.allowServer === false &&
+    !ingameAllowsCommand(sources.ingame ?? NO_INGAME, line, command)
   return hit(
     'commands',
     'invocation',
@@ -305,6 +313,9 @@ function matchCommands(sources: GlobalSearchSources, q: string): SearchHit[] {
     const score = rank(cq, command.name, ...command.aliases, command.help, command.helpZh ?? undefined, command.helpEn ?? undefined)
     if (score < 0) continue
     const needsArgs = hasRequiredArgs(command)
+    const inGameOnly =
+      command.allowServer === false &&
+      !ingameAllowsCommand(sources.ingame ?? NO_INGAME, `/${command.name}`, command)
     rows.push({
       score,
       order: command.name.length,
@@ -318,9 +329,9 @@ function matchCommands(sources: GlobalSearchSources, q: string): SearchHit[] {
           icon: { kind: 'lucide', icon: TerminalIcon },
           copy: `/${command.name}`,
           command: `/${command.name}`,
-          runnable: command.allowServer !== false,
+          runnable: !inGameOnly,
           needsArgs,
-          inGameOnly: command.allowServer === false,
+          inGameOnly,
         },
       ),
     })

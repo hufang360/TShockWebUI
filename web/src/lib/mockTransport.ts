@@ -116,7 +116,8 @@ export class MockTransport implements BackendTransport {
 
   async batchCapabilities(): Promise<BatchCapabilities> {
     await delay(40)
-    return { plugin: true, ingame: true }
+    // 与生产推荐的部署一致：只放行刷 Boss / 刷怪两条（演示也不会声称 /item 能刷物品）。
+    return { plugin: true, ingame: true, ingameCommands: ['spawnboss', 'spawnmob'] }
   }
 
   async runBatch(cmds: string[]): Promise<CommandResult[]> {
