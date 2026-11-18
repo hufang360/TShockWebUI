@@ -130,6 +130,34 @@ function DexSettingField({
 /** ⭐ 收藏模式里的三份内容：物品（格子）/ 合成表（收藏的合成记录）/ 常用（常用合成表）。 */
 type FavoriteKind = 'items' | 'recipes' | 'common'
 
+/**
+ * 横向滚动区两侧还有没有内容 —— 有才画边界渐隐，滑到头就收起。
+ * `active` 是「这个滚动区当前挂载了没」（左上角页签行只在非收藏模式渲染），
+ * 挂载后重新测一次；jsdom 里 scrollWidth / clientWidth 都是 0，自然测成「没有」。
+ */
+function useHorizontalEdges(ref: React.RefObject<HTMLElement | null>, active: boolean) {
+  const [edges, setEdges] = useState({ start: false, end: false })
+  useEffect(() => {
+    const el = ref.current
+    if (!active || !el) return
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth
+      setEdges({ start: el.scrollLeft > 1, end: el.scrollLeft < max - 1 })
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : undefined
+    ro?.observe(el)
+    return () => {
+      el.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+      ro?.disconnect()
+    }
+  }, [ref, active])
+  return edges
+}
+
 export function ItemsPage({
   dataset,
   transport = null,
@@ -194,6 +222,9 @@ export function ItemsPage({
 
   const rootRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // 左上角制作界面页签行：窄屏横向滚动，两侧有内容时渐隐。
+  const tabRowRef = useRef<HTMLDivElement>(null)
+  const tabRowEdges = useHorizontalEdges(tabRowRef, !state.favoritesOnly)
   // 工具条吸在顶栏下面，表头再吸在工具条下面。
   const toolbarRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -942,7 +973,7 @@ export function ItemsPage({
           data-testid="dex-page"
           data-fullscreen={resultsFullscreen || undefined}
           className={cn(
-            'flex min-h-[360px] flex-col gap-3',
+            'flex min-h-[360px] flex-col gap-2',
             // 全屏：页面自己就是滚动区；常规：整页交给 AppShell 的 `<main>` 滚（浏览器右侧那条滚动条）。
             resultsFullscreen && 'fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-4',
           )}
@@ -1086,6 +1117,51 @@ export function ItemsPage({
             onKeyDown={showFavoriteRecipes ? undefined : handleGridKeyDown}
             className="px-1 py-1"
           >
+            {/* 非收藏模式的左上角：制作界面的 11 个页签直接可选（与收藏的分类切换同一位置）。
+                分组抽屉里的「制作界面」分区照旧保留，两处是同一份状态。
+                窄屏不换行：整行横向滚动（滚动条隐掉，免得白占一行高度）。 */}
+            {!state.favoritesOnly && (
+              <div className="relative mb-2 px-1">
+                <div
+                  ref={tabRowRef}
+                  className="flex items-center overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  <ToggleGroup
+                    size="sm"
+                    value={gameMode ? effectiveGroupTab : ''}
+                    onValueChange={(next) => (next ? selectGameTab(next) : clearGroup())}
+                    aria-label={t('dex.tabs')}
+                    className="flex-nowrap"
+                  >
+                    {groupTabs.map((tab) => (
+                      <ToggleGroupItem
+                        key={tab.id}
+                        value={tab.id}
+                        className="flex-none"
+                        data-testid={`dex-game-tab-${tab.id}`}
+                      >
+                        {t(`dex.tab.${tab.id}`)}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </div>
+                {/* 边界渐隐：贴到色块与页面底色一致，滑到头那一侧自动不画。 */}
+                {tabRowEdges.start && (
+                  <div
+                    aria-hidden
+                    data-testid="dex-tab-fade-start"
+                    className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"
+                  />
+                )}
+                {tabRowEdges.end && (
+                  <div
+                    aria-hidden
+                    data-testid="dex-tab-fade-end"
+                    className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+                  />
+                )}
+              </div>
+            )}
             {/* ⭐ 收藏模式的左上角：物品 / 合成表 两份收藏切换（数量直接写在按钮上）。 */}
             {state.favoritesOnly && (
               <div className="mb-2 flex items-center px-1">

@@ -62,6 +62,9 @@ function openGroupDrawer() {
   fireEvent.click(screen.getByLabelText('分组'))
 }
 
+/** 分组侧抽屉本身（结果区左上角的页签行同名，查询要限定范围）。 */
+const drawer = () => screen.getByTestId('dex-group-drawer')
+
 /** 直接点分组抽屉里的具体集合（自动展开所属分区，并切到该分组）。 */
 function chooseCollection(name: string | RegExp, group: string) {
   openGroupDrawer()
@@ -597,16 +600,22 @@ describe('ItemsPage 图鉴', () => {
       button.className.includes('w-full'),
     )
     expect(close?.className).toContain('border-border')
+    // 桌面端：不画自带全屏遮罩，改用只盖内容区的 `ContentScrim`（左侧边栏露着、可点）。
+    expect(document.querySelector('[data-slot="drawer-overlay"]')).toBeNull()
+    const scrim = screen.getByTestId('dex-group-scrim')
+    expect(scrim.className).toContain('bg-black/50')
+    expect(scrim.className).toContain('md:left-[var(--content-left,0px)]')
+    expect(scrim.className).not.toContain('backdrop-blur')
     // 五个分区标题都在；默认只展开第一个「制作界面」
     for (const group of ['制作界面', '集合', '职业', '水友专属', 'ID 范围']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${group}`) })).toBeTruthy()
     }
-    expect(screen.getByRole('button', { name: /^工具/ })).toBeTruthy()
+    expect(within(drawer()).getByRole('button', { name: /^工具/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /🫙 mix/ })).toBeNull()
 
     // 点「水友专属」标题 → 只展开该区，其他区收起
     fireEvent.click(screen.getByRole('button', { name: /^水友专属/ }))
-    expect(screen.queryByRole('button', { name: /^工具/ })).toBeNull()
+    expect(within(drawer()).queryByRole('button', { name: /^工具/ })).toBeNull()
     fireEvent.click(screen.getAllByRole('button', { name: /🫙 mix/ })[0])
     expect(names().sort()).toEqual(['物品1358', '物品2161', '物品987'])
     // 选择后 Popover 关闭，按钮显示当前归属
@@ -616,7 +625,7 @@ describe('ItemsPage 图鉴', () => {
     // 再次打开：自动展开当前选中的「水友专属」，而不是默认的制作界面
     openGroupDrawer()
     expect(screen.getAllByRole('button', { name: /🫙 mix/ }).length).toBeGreaterThan(0)
-    expect(screen.queryByRole('button', { name: /^工具/ })).toBeNull()
+    expect(within(drawer()).queryByRole('button', { name: /^工具/ })).toBeNull()
   })
 
   it('分组支持搜索，并在选择后记录最近使用', () => {
@@ -634,6 +643,31 @@ describe('ItemsPage 图鉴', () => {
     openGroupDrawer()
     expect(screen.getByText('最近使用')).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /工具/ }).length).toBeGreaterThan(0)
+  })
+
+  it('分组抽屉：桌面端非模态（点遮罩关、点页面别处不关），手机端仍模态', async () => {
+    renderPage(makeItems(5))
+    openGroupDrawer()
+
+    // 点页面别处不关（点左侧导航是要切页，不是关抽屉）。
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    expect(screen.getByTestId('dex-group-drawer')).toBeTruthy()
+
+    // 点遮罩关，并清掉抽屉里的搜索词。
+    fireEvent.click(screen.getByTestId('dex-group-scrim'))
+    await waitFor(() => expect(screen.queryByTestId('dex-group-drawer')).toBeNull())
+  })
+
+  it('分组抽屉：窄屏仍是模态（自带遮罩，不画 ContentScrim）', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 480 })
+    renderPage(makeItems(5))
+    openGroupDrawer()
+
+    expect(screen.queryByTestId('dex-group-scrim')).toBeNull()
+    const overlay = document.querySelector<HTMLElement>('[data-slot="drawer-overlay"]')
+    expect(overlay?.className).toContain('bg-black/50')
+    expect(overlay?.className).not.toContain('backdrop-blur')
   })
 
   it('网格支持方向键导航', () => {
@@ -708,19 +742,79 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.getByRole('button', { name: /^制作界面/ })).toBeTruthy()
     // 没有「全部」页签；尚未进入游戏分组时没有页签处于选中态
     expect(screen.queryByRole('button', { name: '全部' })).toBeNull()
-    expect(screen.getByRole('button', { name: /^工具/ }).getAttribute('aria-pressed')).toBe('false')
+    expect(
+      within(drawer()).getByRole('button', { name: /^工具/ }).getAttribute('aria-pressed'),
+    ).toBe('false')
     // 页签也显示物品数量：武器 1、材料 2
-    expect(screen.getByRole('button', { name: /^武器/ }).textContent).toContain('1')
-    expect(screen.getByRole('button', { name: /^材料/ }).textContent).toContain('2')
+    expect(within(drawer()).getByRole('button', { name: /^武器/ }).textContent).toContain('1')
+    expect(within(drawer()).getByRole('button', { name: /^材料/ }).textContent).toContain('2')
 
-    fireEvent.click(screen.getByRole('button', { name: /^武器/ }))
+    fireEvent.click(within(drawer()).getByRole('button', { name: /^武器/ }))
     expect(names()).toEqual(['物品4956'])
     expect(screen.getByLabelText('分组').textContent).toContain('制作界面')
 
     // 选页签后 Popover 关闭；重新打开选「材料」
     openGroupDrawer()
-    fireEvent.click(screen.getByRole('button', { name: /^材料/ }))
+    fireEvent.click(within(drawer()).getByRole('button', { name: /^材料/ }))
     expect(names().sort()).toEqual(['物品29', '物品75'])
+  })
+
+  it('非收藏模式：制作界面 11 个页签在结果区左上角直接可选', () => {
+    // 29 = 消耗品+材料，75 = 材料，4956 = 武器（见 test/fixtures.ts 的 itemGroups）
+    renderPage([makeItem(29), makeItem(75), makeItem(4956)])
+    const names = () => gridIcons().map((el) => el.getAttribute('aria-label'))
+    const tabs = within(screen.getByTestId('dex-list')).getByRole('radiogroup', {
+      name: '制作界面',
+    })
+    expect(within(tabs).getAllByRole('radio')).toHaveLength(11)
+    // 窄屏不折行：整行横向滚动（不挤成多行，也不给 11 个按钮留占位）
+    expect(tabs.className).toContain('flex-nowrap')
+    expect(tabs.className).not.toContain('flex-wrap')
+    expect(tabs.parentElement?.className).toContain('overflow-x-auto')
+    // 默认「全部物品」：没有页签处于选中态
+    expect(within(tabs).getByRole('radio', { name: '工具' }).getAttribute('data-state')).toBe('off')
+
+    fireEvent.click(within(tabs).getByRole('radio', { name: '武器' }))
+    expect(names()).toEqual(['物品4956'])
+    expect(within(tabs).getByRole('radio', { name: '武器' }).getAttribute('data-state')).toBe('on')
+    expect(screen.getByLabelText('分组').textContent).toContain('制作界面·武器')
+
+    // 再点一次选中的页签 = 取消，回到全部物品
+    fireEvent.click(within(tabs).getByRole('radio', { name: '武器' }))
+    expect(names().sort()).toEqual(['物品29', '物品4956', '物品75'])
+    expect(screen.getByLabelText('分组').textContent).toBe('分组')
+
+    // 收藏模式换回收藏的分类切换，页签行让位
+    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    expect(
+      within(screen.getByTestId('dex-list')).queryByRole('radiogroup', { name: '制作界面' }),
+    ).toBeNull()
+    expect(screen.getByTestId('dex-favorites-kind-items')).toBeTruthy()
+  })
+
+  it('页签行滑出边界时两侧渐隐，滑到头就收起', () => {
+    renderPage([makeItem(29), makeItem(75), makeItem(4956)])
+    const row = within(screen.getByTestId('dex-list')).getByRole('radiogroup', {
+      name: '制作界面',
+    }).parentElement!
+    // jsdom 不做布局：手动给出可视宽 / 内容宽 / 滚动位置
+    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 200 })
+    Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 600 })
+    Object.defineProperty(row, 'scrollLeft', { configurable: true, writable: true, value: 0 })
+
+    fireEvent.scroll(row)
+    expect(screen.queryByTestId('dex-tab-fade-start')).toBeNull()
+    expect(screen.getByTestId('dex-tab-fade-end')).toBeTruthy()
+
+    row.scrollLeft = 200
+    fireEvent.scroll(row)
+    expect(screen.getByTestId('dex-tab-fade-start')).toBeTruthy()
+    expect(screen.getByTestId('dex-tab-fade-end')).toBeTruthy()
+
+    row.scrollLeft = 400
+    fireEvent.scroll(row)
+    expect(screen.getByTestId('dex-tab-fade-start')).toBeTruthy()
+    expect(screen.queryByTestId('dex-tab-fade-end')).toBeNull()
   })
 
   it('切模块再回来保留界面状态（卸载不重置）；刷新回到默认', () => {
@@ -886,7 +980,7 @@ describe('ItemsPage 图鉴', () => {
       </I18nProvider>,
     )
     expect(screen.getByTestId('dex-mode-all').getAttribute('data-state')).toBe('on')
-    // 制作界面不再占据工具条，只在分组 Popover 里出现
+    // 工具条里只有「全部物品 / 收藏」；制作界面页签在结果区左上角，不是工具条按钮
     expect(screen.queryByRole('button', { name: /^制作界面/ })).toBeNull()
   })
 
