@@ -745,7 +745,11 @@ export function DataIdPage({
 
       {/* 遮罩：桌面端只盖内容区（左侧边栏露着、可点，能直接切页）；手机端抽屉自带模态遮罩。 */}
       {selected != null && !isMobileDetail && (
-        <ContentScrim testId="dataid-detail-scrim" onClick={() => setSelected(null)} />
+        <ContentScrim
+          full={resultsFullscreen}
+          testId="dataid-detail-scrim"
+          onClick={() => setSelected(null)}
+        />
       )}
 
       {/* 详情：图格 / 墙仍用右侧抽屉（NPC / Buff 已改为 Popover） */}

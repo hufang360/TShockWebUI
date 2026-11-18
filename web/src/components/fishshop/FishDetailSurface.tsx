@@ -5,6 +5,11 @@ import { Sheet, SheetContent } from '@/components/ui'
 interface FishDetailSurfaceProps {
   /** 桌面端（≥768px）：遮罩只盖内容区、侧栏不动；否则普通模态抽屉。 */
   desktop: boolean
+  /**
+   * 自己画不画那层遮罩。货架全屏时传 `false`：全屏容器是 `z-50` 的层叠上下文，
+   * 画在它外面的遮罩（`z-45`）会被压在下面；这时由页面把遮罩画在全屏容器里。
+   */
+  showScrim?: boolean
   open: boolean
   onClose: () => void
   onOpenAutoFocus: ComponentProps<typeof SheetContent>['onOpenAutoFocus']
@@ -26,6 +31,7 @@ interface FishDetailSurfaceProps {
  */
 export function FishDetailSurface({
   desktop,
+  showScrim = true,
   open,
   onClose,
   onOpenAutoFocus,
@@ -33,7 +39,9 @@ export function FishDetailSurface({
 }: FishDetailSurfaceProps) {
   return (
     <>
-      {desktop && open && <ContentScrim onClick={onClose} testId="fish-detail-scrim" />}
+      {desktop && showScrim && open && (
+        <ContentScrim onClick={onClose} testId="fish-detail-scrim" />
+      )}
       <Sheet
         open={open}
         onOpenChange={(next) => {

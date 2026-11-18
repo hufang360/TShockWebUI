@@ -16,9 +16,11 @@ import {
 } from 'lucide-react'
 import { IconAction } from '@/components/IconAction'
 import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
+import { ContentScrim } from '@/components/ContentScrim'
 import { PageHelp } from '@/components/PageHelp'
 import { PluginHelp } from '@/components/PluginHelp'
 import { TopBarActions } from '@/components/TopBar'
+import { FullscreenDock } from '@/components/FullscreenDock'
 import { ItemIcon } from '@/components/ItemIcon'
 import { LoginGate } from '@/components/LoginGate'
 import { SearchInput } from '@/components/SearchInput'
@@ -811,12 +813,26 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
         {/* 左：货架。REST API 不可用时只影响左侧，右侧指令卡片仍可用。 */}
         <div
+          data-testid="fish-shelf-panel"
           className={cn(
             'flex min-w-0 flex-col gap-2 xl:min-h-0',
-            // 顶栏留着（退出全屏的按钮在顶栏），其余铺满。
-            shelfFullscreen && 'fixed inset-x-0 top-12 bottom-0 z-40 overflow-y-auto bg-background p-3 sm:p-4',
+            // 全屏：连内容区顶栏一起盖住（与「物品 ID」「数据 ID」同一套做法），
+            // 设置 / 退出全屏改放右上角的 `FullscreenDock`（顶栏已被盖住，不能再挂 `TopBarActions`）。
+            shelfFullscreen && 'fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-4',
           )}
         >
+        {/* 全屏是 z-50 的层叠上下文：商品详情的遮罩得画在里面，否则（z-45）会被压在下面。 */}
+        {shelfFullscreen && desktop && selected !== null && (
+          <ContentScrim full testId="fish-detail-scrim" onClick={closeDetail} />
+        )}
+        {/* 全屏盖住了顶栏，设置与退出改放右上角；4 秒无操作收成小竖条。 */}
+        {shelfFullscreen && (
+          <FullscreenDock label={t('dex.showActions')}>
+            {fishSettingsControl}
+            {fullscreenToggle}
+          </FullscreenDock>
+        )}
+
       {checking && (
         <Card>
           <CardBody className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
@@ -859,7 +875,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             ref={toolbarRef}
             className={cn(
               'sticky z-20 flex flex-col gap-2 bg-background p-1 sm:flex-row sm:flex-wrap sm:items-center',
-              shelfFullscreen ? 'top-0' : 'top-12',
+              shelfFullscreen ? 'top-0 pr-12' : 'top-12',
             )}
           >
             <div className="flex w-full min-w-0 items-center gap-2 sm:flex-1">
@@ -1009,16 +1025,20 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           />
           {/* 顶栏挂载顺序 = 显示顺序：卡片那组（上次刷新 / 刷新全部 / 管理卡片）之后、
               全局动作（浮动终端）之前，所以「页面设置 / 全屏」正好夹在两者中间。 */}
-          <TopBarActions>
-            {fishSettingsControl}
-            {fullscreenToggle}
-          </TopBarActions>
+          {/* 全屏时这两个入口在 `FullscreenDock` 里（顶栏已被盖住），不要再挂一份。 */}
+          {!shelfFullscreen && (
+            <TopBarActions>
+              {fishSettingsControl}
+              {fullscreenToggle}
+            </TopBarActions>
+          )}
         </div>
       </div>
       </div>
 
       <FishDetailSurface
         desktop={desktop}
+        showScrim={!shelfFullscreen}
         open={selected !== null}
         onClose={closeDetail}
         onOpenAutoFocus={focusDetailOnOpen}

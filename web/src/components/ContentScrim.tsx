@@ -9,15 +9,20 @@ import { cn } from '@/lib/cn'
  *
  * 层级 `z-[45]`：高于页面内容（20）与浮动终端 / 全屏（40），低于抽屉本身和其它模态层（50）——
  * 这样「展开侧栏」按钮（`z-46`）能浮在遮罩上，抽屉面板仍在遮罩之上。
+ *
+ * `full`：全屏页面里用——侧栏已经被全屏盖住，再留左边一条不压暗就是布局错位。
  */
 export function ContentScrim({
   onClick,
   testId,
   className,
+  full = false,
 }: {
-  onClick?: () => void;
-  testId?: string;
-  className?: string;
+  onClick?: () => void
+  testId?: string
+  className?: string
+  /** 铺满整屏（全屏页面里用），不再从 `--content-left` 起。 */
+  full?: boolean
 }) {
   return (
     <div
@@ -25,7 +30,8 @@ export function ContentScrim({
       data-testid={testId}
       onClick={onClick}
       className={cn(
-        'fixed inset-y-0 right-0 left-0 z-[45] bg-black/50 md:left-[var(--content-left,0px)]',
+        'fixed inset-y-0 right-0 left-0 z-[45] bg-black/50',
+        !full && 'md:left-[var(--content-left,0px)]',
         className,
       )}
     />

@@ -245,6 +245,18 @@ describe('ItemsPage 图鉴', () => {
     expect(page.className).not.toContain('overflow-y-auto')
   })
 
+  it('全屏里打开物品详情：遮罩铺满整屏，不再从侧栏右边开始', async () => {
+    renderPage(makeItems(6))
+    fireEvent.click(screen.getByRole('button', { name: '全屏查看结果' }))
+    fireEvent.click(cell('物品1'))
+    await screen.findByTestId('dex-detail')
+
+    const scrim = screen.getByTestId('items-detail-scrim')
+    // 侧栏已经被全屏盖住：遮罩要盖满整屏（否则左边会留一条没压暗的页面内容）。
+    expect(scrim.className).not.toContain('md:left-[var(--content-left,0px)]')
+    expect(scrim.className).toContain('left-0')
+  })
+
   it('结果个数随筛选更新', () => {
     renderPage(makeItems(1200))
     expect(screen.getByText('1200 个结果')).toBeTruthy()

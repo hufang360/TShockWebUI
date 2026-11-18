@@ -1425,12 +1425,30 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     // 搜索框旁边不再有「最近购买」徽标（记录在「买过」页签里）
     expect(screen.queryByTestId('fish-recent-buys')).toBeNull()
 
-    // 全屏：点开铺满（右列收起），Esc 退出
+    // 全屏：连顶栏一起盖住（`inset-0`），右列收起，退出按钮挪到右上角操作坞；Esc 退出
     fireEvent.click(screen.getByRole('button', { name: '全屏查看货架' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy())
+    const shelf = screen.getByTestId('fish-shelf-panel')
+    expect(shelf.className).toContain('fixed')
+    expect(shelf.className).toContain('inset-0')
+    expect(shelf.className).not.toContain('top-12')
     expect(screen.getByTestId('fish-side').className).toContain('hidden')
+    expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.getByRole('button', { name: '全屏查看货架' })).toBeTruthy())
+  })
+
+  it('全屏里打开商品详情：遮罩画在全屏容器里并铺满整屏', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    fireEvent.click(await screen.findByRole('button', { name: '全屏查看货架' }))
+    fireEvent.click(screen.getByRole('button', { name: '生命水晶' }))
+    await screen.findByRole('dialog')
+
+    const scrim = screen.getByTestId('fish-detail-scrim')
+    // 画在全屏容器内部才有意义：外面那层会被 z-50 的全屏容器压住。
+    expect(screen.getByTestId('fish-shelf-panel').contains(scrim)).toBe(true)
+    expect(scrim.className).not.toContain('md:left-[var(--content-left,0px)]')
+    expect(scrim.className).toContain('left-0')
   })
 
   it('执行「重载配置」卡片后自动重拉一次货架', async () => {

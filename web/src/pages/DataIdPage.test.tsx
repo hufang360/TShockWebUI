@@ -403,6 +403,17 @@ describe('DataIdPage', () => {
     expect(screen.queryByTestId('dataid-detail')).toBeNull()
   })
 
+  it('全屏里打开详情：遮罩铺满整屏（侧栏已被全屏盖住）', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '全屏查看结果' }))
+    fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
+    await screen.findByTestId('dataid-detail')
+
+    const scrim = screen.getByTestId('dataid-detail-scrim')
+    expect(scrim.className).not.toContain('md:left-[var(--content-left,0px)]')
+    expect(scrim.className).toContain('left-0')
+  })
+
   it('详情遮罩只盖内容区：点遮罩关闭，点页面别处不关', async () => {
     renderPage()
     fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))

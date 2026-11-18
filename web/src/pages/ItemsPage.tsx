@@ -1250,7 +1250,11 @@ export function ItemsPage({
               在抽屉里点配方材料 / 产物、或用提示右上角的 ⓘ「物品详情」入口，会再叠一层，关掉即返回上一层。 */}
           {/* 遮罩：桌面端只盖内容区（左侧边栏露着、可点，能直接切页）；手机端抽屉自带模态遮罩。 */}
           {detail.stack.length > 0 && !isMobileDetail && (
-            <ContentScrim testId="items-detail-scrim" onClick={() => closeDetailFrom(0)} />
+            <ContentScrim
+              full={resultsFullscreen}
+              testId="items-detail-scrim"
+              onClick={() => closeDetailFrom(0)}
+            />
           )}
           {detail.stack.length > 0 && (
             <ItemDetailDrawer
