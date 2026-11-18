@@ -205,7 +205,7 @@ jobs:
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v3
       # Dockerfile 使用预构建前端；与二进制 / Release 资产共用同一份 web/dist。
       - uses: actions/download-artifact@v4
