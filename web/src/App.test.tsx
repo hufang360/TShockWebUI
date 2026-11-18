@@ -658,13 +658,15 @@ it('「指令小抄」是常用表格页的第一张表：分组列出 Boss，�
       (el) => el.getAttribute('data-command') === command,
     )!
 
-  // 未登录时拿不到服务器放行名单：`/spawnboss`（allowServer=false）只有复制，没有「执行」。
+  // `MockTransport` 的能力矩阵放行了刷 Boss / 刷怪两条（与推荐部署一致）：
+  // 登录后 `/spawnboss` 详情里应有「执行」（点它只是填进浮窗，不自动发）。
   fold('/spawnboss')
   fireEvent.click(row('/spawnboss "king slime"'))
   const detail = await screen.findByTestId('command-detail')
   expect(detail.textContent).toContain('/spawnboss "king slime"')
   expect(within(detail).getByRole('button', { name: '复制指令' })).toBeTruthy()
-  expect(within(detail).queryByRole('button', { name: '执行' })).toBeNull()
+  // 能力探测是异步的：等它落地再断言，否则就成了「碰巧还没探到」。
+  await waitFor(() => expect(within(detail).getByRole('button', { name: '执行' })).toBeTruthy())
 
   // 换一条：浮层内容是新的（单开，换内容而不是叠加）
   fold('/tpnpc')
