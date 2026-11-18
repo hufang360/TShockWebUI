@@ -70,7 +70,7 @@ echo "==> 目标平台 ${GOOS}/${GOARCH}（宿主 ${HOST_GOOS}/${HOST_GOARCH}）
 # 生成数据随仓库提交；若被删或未生成，这里提前失败并给出生成命令。
 missing=""
 for f in items.json prefixes.json buffs.json commands.json meta.json items-atlas.json \
-  items-atlas.png player-atlas.json player-atlas.png buff-atlas.json buff-atlas.png recipes.json item-stats.json \
+  items-atlas.webp player-atlas.json player-atlas.webp buff-atlas.json buff-atlas.webp recipes.json item-stats.json \
   item-tips.zh-Hans.json item-tips.en-US.json loc.zh-Hans.json loc.en-US.json; do
   [ -f "data/$f" ] || missing="$missing data/$f"
 done

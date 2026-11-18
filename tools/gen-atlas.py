@@ -13,7 +13,7 @@ gen-atlas.py — 把所有物品图标（含动画取第一帧）拼成一张 sp
      **每格之间留 1px 透明缝**（--padding 1）：前端缩小图标时会开插值，紧贴时双线性采样
      会读到相邻精灵的纹素，图标边缘出现 1px 亮/暗线（见 docs/功能-富文本解析.md §6.2）
   4. 输出：
-       data/items-atlas.png    图集（随仓库提交）
+       data/items-atlas.webp   图集（随仓库提交；无损 WebP）
        data/items-atlas.json   裁切信息 { regions: { 贴图id: [x, y, w, h] } }
   5. 前端：item.icon -> regions[icon] -> canvas.drawImage(atlas, x, y, w, h, ...)
      像素风请设 imageSmoothingEnabled = false
@@ -45,7 +45,7 @@ PROJECT = os.path.dirname(HERE)
 DEFAULT_ITEMS = os.path.join(PROJECT, "data", "items.json")
 DEFAULT_SPRITE = os.path.join(PROJECT, "..", "tr-sprite-1458", "Content", "Images")
 DEFAULT_OUT_JSON = os.path.join(PROJECT, "data", "items-atlas.json")
-DEFAULT_OUT_PNG = os.path.join(PROJECT, "data", "items-atlas.png")
+DEFAULT_OUT_IMAGE = os.path.join(PROJECT, "data", "items-atlas.webp")
 
 
 def pack(regions, limit_width, padding):
@@ -71,7 +71,7 @@ def main():
     ap.add_argument("--items", default=DEFAULT_ITEMS, help="data/items.json 路径")
     ap.add_argument("--sprite-dir", default=DEFAULT_SPRITE, help="Item_<id>.png 所在目录")
     ap.add_argument("--out-json", default=DEFAULT_OUT_JSON)
-    ap.add_argument("--out-png", default=DEFAULT_OUT_PNG)
+    ap.add_argument("--out-image", default=DEFAULT_OUT_IMAGE)
     ap.add_argument("--limit-width", type=int, default=1024, help="图集最大宽度，默认 1024")
     ap.add_argument("--padding", type=int, default=1, help="每格之间的留白像素，默认 1（防缩放插值采到邻居）")
     ap.add_argument("--max-height", type=int, default=8192, help="超过此高度只告警，不自动切图")
@@ -112,11 +112,11 @@ def main():
         done += 1
     print(f"合成 {done} 张，用时 {time.time() - t0:.2f}s")
 
-    os.makedirs(os.path.dirname(args.out_png), exist_ok=True)
-    atlas.save(args.out_png, optimize=True)
-    png_hash = hashlib.md5(open(args.out_png, "rb").read()).hexdigest()[:12]
-    size_mb = os.path.getsize(args.out_png) / 1e6
-    print(f"写出 {args.out_png}（{size_mb:.2f} MB）")
+    os.makedirs(os.path.dirname(args.out_image), exist_ok=True)
+    atlas.save(args.out_image, "WEBP", lossless=True, quality=100, method=6)
+    atlas_hash = hashlib.md5(open(args.out_image, "rb").read()).hexdigest()[:12]
+    size_mb = os.path.getsize(args.out_image) / 1e6
+    print(f"写出 {args.out_image}（{size_mb:.2f} MB）")
 
     regions = {str(icon): list(rect) for icon, rect in placed.items()}
     out = {
@@ -128,8 +128,8 @@ def main():
             "padding": args.padding,
             "textures": len(textures),
             "items": len(items),
-            "sheet": os.path.basename(args.out_png),
-            "hash": png_hash,
+            "sheet": os.path.basename(args.out_image),
+            "hash": atlas_hash,
             "generatedBy": "tools/gen-atlas.py",
             "note": "regions 以「贴图 id」为键；前端用 item.icon 取值后再裁剪第一帧",
         },

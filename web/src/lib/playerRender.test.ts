@@ -39,7 +39,7 @@ function atlasWith(keys: string[]): PlayerAtlas {
       variants: 12,
       hairs: 228,
       regions: keys.length,
-      sheet: 'player-atlas.png',
+      sheet: 'player-atlas.webp',
       generatedBy: 'test',
       note: '',
     },

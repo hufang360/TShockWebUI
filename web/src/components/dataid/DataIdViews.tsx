@@ -221,7 +221,7 @@ export function DataTableLayout({
   )
 }
 
-/** Buff 速查表：ID / 图标 / 名称 / 内部名（图标来自 `data/buff-atlas.png`）。行多时同图格一样可排两列。 */
+/** Buff 速查表：ID / 图标 / 名称 / 内部名（图标来自 `data/buff-atlas.webp`）。行多时同图格一样可排两列。 */
 export function BuffTableLayout({
   rows,
   twoCols,

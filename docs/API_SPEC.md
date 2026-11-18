@@ -839,8 +839,10 @@ export interface BackendTransport {
 - [ ] Cookie：`HttpOnly`、`SameSite=Strict`、`Path=/`；HTTPS 时 `Secure`；
       多服务器切换时按上游分名（`tswui_session` / `tswui_session_<hash>`），token 不跨服使用。
 - [ ] 所有非 GET 请求校验 `X-Requested-With: tswui`。
-- [ ] 响应安全头：`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`CSP`。
-- [ ] 登录按 IP 限流；`429` 时不泄露账号信息。
+- [ ] 响应安全头：`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`X-Frame-Options: DENY`、
+      `CSP`（含 `frame-ancestors 'none'`；这条只能走响应头，meta 里写无效）。
+- [ ] 登录按 IP 限流；来源 IP 在 `TRUST_PROXY=true` 时取 `X-Forwarded-For` **右端第 `TRUST_PROXY_HOPS` 段**（默认 1），
+      不取最左段（客户端可伪造，会绕过限流）；`429` 时不泄露账号信息。
 - [ ] 不提供通用 URL 转发 / 代理端点。
 - [ ] 玩家管理（`/api/player/*`）复用**当前会话的 token**，不引入任何管理员身份；
       权限完全由上游 TShock / PlayerManager 判定，后端区分 `plugin_not_installed`(501) 与 `no_permission`(403)。

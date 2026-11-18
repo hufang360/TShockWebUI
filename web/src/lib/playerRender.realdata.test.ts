@@ -25,7 +25,7 @@ describe('真实数据：玩家角色图集', () => {
     expect(atlas.meta.frameHeight).toBe(56)
     expect(atlas.meta.variants).toBe(12)
     expect(atlas.meta.hairs).toBe(228)
-    expect(atlas.meta.sheet).toBe('player-atlas.png')
+    expect(atlas.meta.sheet).toBe('player-atlas.webp')
     expect(Object.keys(atlas.regions).length).toBeGreaterThan(400)
     expect(atlas.meta.width).toBeLessThanOrEqual(atlas.meta.limitWidth)
   })

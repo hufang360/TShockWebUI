@@ -16,7 +16,7 @@ const buffs = JSON.parse(readFileSync(resolve(dataDir, 'buffs.json'), 'utf8')) a
 
 describe('真实数据：Buff 图集', () => {
   it('元信息与规模合理', () => {
-    expect(atlas.meta.sheet).toBe('buff-atlas.png')
+    expect(atlas.meta.sheet).toBe('buff-atlas.webp')
     expect(atlas.meta.hash).toMatch(/^[0-9a-f]{12}$/)
     expect(atlas.meta.count).toBe(Object.keys(atlas.regions).length)
     expect(atlas.meta.missing).toBe(0)

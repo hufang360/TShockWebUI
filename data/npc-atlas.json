@@ -7,8 +7,8 @@
   "padding": 1,
   "count": 694,
   "missing": 0,
-  "sheet": "npc-atlas.png",
-  "hash": "9a33b6f59646",
+  "sheet": "npc-atlas.webp",
+  "hash": "466fce5b7d12",
   "generatedBy": "tools/gen-npc-atlas.py",
   "source": "Terraria NPC_<id>.png 第一帧（帧高 = 高 / Main.npcFrameCount；多列网格见 FRAME_GRIDS）",
   "note": "regions[npcId] = [x, y, w, h]；第一帧为空时回退为整张贴图的紧包围盒；多列网格贴图按 Main.DrawNPCDirect 的 Frame(列, 行) 取左上角一帧。"

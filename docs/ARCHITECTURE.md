@@ -41,7 +41,7 @@
 ```
 浏览器 (React SPA；生产 base=/，GitHub Pages 演示为子路径)
   │  同源 fetch
-  ├─ GET  /data/*.json  /data/items-atlas.png      ← Go 内嵌静态资源
+  ├─ GET  /data/*.json  /data/items-atlas.webp     ← Go 内嵌静态资源
   ├─ GET  /assets/*                                 ← Go 内嵌静态资源
   ├─ POST /api/login      {username,password}       ← 密码只在 body
   ├─ POST /api/login/online {username}              ← 「在线授权」，最多阻塞 60s
@@ -115,7 +115,7 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 - `//go:embed all:webdist` 内嵌 `web/dist` 全部内容（构建期由脚本拷入 `server/internal/webdist/`；Dockerfile 消费预构建的 `web/dist`，不在镜像内跑 Node）。
 - 路由：`/`、`/assets/*`、`/data/*`、`/favicon.png`（猛爪手套物品图标，`tools/gen-brand-assets.py` 生成）。
 - 未命中的非 `/api` 路径回退到 `index.html`（SPA 兜底）。
-- 缓存头：`/assets/*`（带哈希）`Cache-Control: public, max-age=31536000, immutable`；图集 PNG（`data/items-atlas.png` / `player-atlas.png` / `npc-atlas.png`）`max-age=604800`；`/demo/*`（自带 Demo 存档）`max-age=86400`；
+- 缓存头：`/assets/*`（带哈希）`Cache-Control: public, max-age=31536000, immutable`；图集（`data/items-atlas.webp` / `player-atlas.webp` / `npc-atlas.webp` / `buff-atlas.webp`，完整清单见 `setCacheHeaders`）`max-age=604800`；`/demo/*`（自带 Demo 存档）`max-age=86400`；
   `data/*.json`（指令表 / 物品表 / 图集裁切信息）用 **内容哈希弱 ETag + `Cache-Control: no-cache`**：
   每次带 `If-None-Match` 校验，未变回 **304**，变了立刻生效（不会升级后还读一小时旧 `commands.json`）。
   ETag 用 `W/"…"` 是因为同一份 JSON 可能以 gzip / 原样两种编码返回（`Vary: Accept-Encoding`）。
@@ -162,7 +162,10 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 
 ### 4.5 中间件（`internal/api/middleware.go`）
 - 安全响应头（对所有响应）：`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、
-  `Content-Security-Policy`（与前端 meta 一致：`default-src 'self'; ...; connect-src 'self'`）。
+  `X-Frame-Options: DENY`、`Content-Security-Policy`（与前端 meta 基本一致：`default-src 'self'; ...; connect-src 'self'`）。
+  唯一的差异是后端头多一条 `frame-ancestors 'none'`：这条指令**只在响应头生效**，浏览器会忽略 meta 里的同名指令，
+  所以前端 `web/index.html` 里不写它（写了只会在控制台报警），防点击劫持靠后端这一条。
+  `default-src` **不覆盖** `frame-ancestors`，别以为有 `default-src 'self'` 就够了。
   若由外层终止 TLS，CSP 也可在外层下发，二者取一即可（内建更省事）。
 - CSRF：所有 `POST /api/*` 必须带请求头 `X-Requested-With: tswui`，否则 `403 csrf`。
   配合 `SameSite=Strict` Cookie，足以挡住跨站表单提交。
@@ -171,7 +174,12 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 - 会话按上游隔离：`session.Session.Upstream` 记录所属上游，Cookie 名按上游派生
   （默认 `tswui_session`，自定义上游 `tswui_session_<hash>`）；上游不符一律视为未登录，
   绝不把 A 服的 token 发往 B 服（多服务器切换见 `docs/API_SPEC.md` §10）。
-- 登录限流：按客户端 IP（`RemoteAddr`，可选 `X-Forwarded-For` 当 `TRUST_PROXY=true`）每 IP 每分钟 `LOGIN_MAX_PER_MIN` 次，超出 `429 rate_limited`。
+- 登录限流：按客户端 IP 每 IP 每分钟 `LOGIN_MAX_PER_MIN` 次，超出 `429 rate_limited`。
+  来源 IP 由 `clientIP()` 判定（`internal/api/middleware.go`）：`TRUST_PROXY=false` 时用 `RemoteAddr`；
+  `TRUST_PROXY=true` 时从 `X-Forwarded-For` **右端跳过 `TRUST_PROXY_HOPS` 层**取值（默认 1，CDN + 反代设 2）。
+  **绝不能取最左段**：XFF 是逐跳追加的链（nginx 的 `$proxy_add_x_forwarded_for` = 客户端带来的整段 + 自己的 `$remote_addr`），
+  最左段由客户端自带、可随意伪造，取它等于让攻击者每次换个值绕过登录限流（这是唯一的口令爆破防线），
+  伪造值还会经 `/api/login/online` 透传给信使插件做限流。链比 `TRUST_PROXY_HOPS` 短或取到的不是合法 IP 时一律退回 `RemoteAddr`，不猜。
 - 指令执行限流：按**会话**（每个已登录玩家一个桶，`COMMAND_MAX_PER_MIN`/分钟），超出 `429 rate_limited`；
   在会话校验之后判定，未登录请求仍返回 `401`。按会话而非 IP 计数，避免经反代时所有玩家共用来源 IP 而互相限流。
 - 访问日志：`method path status duration`，**绝不记录 query 与 body**。
@@ -197,6 +205,7 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 | `LOGIN_MAX_PER_MIN` | `10` | 每 IP 每分钟登录尝试上限 |
 | `COMMAND_MAX_PER_MIN` | `60` | 每个会话（玩家）每分钟指令执行上限 |
 | `TRUST_PROXY` | `false` | 是否信任 `X-Forwarded-For`（仅当外层是自己可控的反代时开启） |
+| `TRUST_PROXY_HOPS` | `1` | 自己可控的反代层数（1~10）：从 XFF 右端跳过这么多层才是真实客户端。CDN + nginx 两层时设 `2`；仅 `TRUST_PROXY=true` 时有意义 |
 | `TSHOCK_ALLOW_CUSTOM_TARGETS` | `false` | 允许浏览器用 `X-TSWUI-Target` 切换 TShock 上游（多服务器；仅 host:port，见 API_SPEC §10）。公网部署建议保持 `false` |
 | `TSWUI_AUTH_SECRET` | 空 | 与 WebUI 信使插件共享的密钥（插件 `Secret`）。两者都为空时不校验；公网部署务必设置 |
 | `WEBAUTH_TIMEOUT` | `60s` | 「在线授权」等待玩家在游戏内确认的总时长 |

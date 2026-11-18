@@ -7,8 +7,8 @@
   "padding": 1,
   "count": 400,
   "missing": 0,
-  "sheet": "buff-atlas.png",
-  "hash": "2e9c4e77dcfc",
+  "sheet": "buff-atlas.webp",
+  "hash": "2d37aa41d3d7",
   "generatedBy": "tools/gen-buff-atlas.py",
   "source": "Terraria Content/Images/Buff_<id>.png（静态图标，无动画帧）",
   "note": "regions[buffId] = [x, y, w, h]；键与 data/buffs.json 的 id 一致。"

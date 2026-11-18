@@ -29,7 +29,10 @@ type Config struct {
 	// 按**会话**而非 IP 计数：经反代时所有玩家共用一个来源 IP。
 	CommandMaxPerMin int
 	TrustProxy       bool
-	LogLevel         string
+	// TrustProxyHops 是自己可控的反代层数，仅在 TrustProxy=true 时有意义：
+	// 从 X-Forwarded-For 右端跳过这么多层，才是真实客户端 IP（见 api.xffClientIP）。
+	TrustProxyHops int
+	LogLevel       string
 	// TShockAllowCustomTargets 允许浏览器在 /api/* 请求里用 X-TSWUI-Target
 	// 指定 TShock 上游（host[:port]）。关掉后只能用 TSHOCK_URL。
 	TShockAllowCustomTargets bool
@@ -59,6 +62,7 @@ func Default() Config {
 		// 默认 60/分钟：比 TShock 默认的 REST 限流（5/分钟）宽，又不至于让脚本刷屏。
 		CommandMaxPerMin: 60,
 		TrustProxy:       false,
+		TrustProxyHops:   1,
 		LogLevel:         "info",
 		// 默认关闭：多服务器切换需要显式开启（TSHOCK_ALLOW_CUSTOM_TARGETS=true）。
 		TShockAllowCustomTargets: false,
@@ -94,6 +98,9 @@ func Load() (Config, error) {
 		return c, err
 	}
 	if c.TrustProxy, err = envBool("TRUST_PROXY", c.TrustProxy); err != nil {
+		return c, err
+	}
+	if c.TrustProxyHops, err = envInt("TRUST_PROXY_HOPS", c.TrustProxyHops); err != nil {
 		return c, err
 	}
 	if c.AllowIngameCommands, err = envBool("TSWUI_ALLOW_INGAME_COMMANDS", c.AllowIngameCommands); err != nil {
@@ -153,6 +160,10 @@ func (c Config) validate() error {
 	if c.CommandMaxPerMin <= 0 {
 		return errors.New("COMMAND_MAX_PER_MIN 必须为正")
 	}
+	// 上限 10 只为防手滑：每多一层就是「再信一段客户端确实递不到的 XFF」的证据。
+	if c.TrustProxyHops < 1 || c.TrustProxyHops > 10 {
+		return fmt.Errorf("TRUST_PROXY_HOPS 需在 1~10 之间，收到 %d", c.TrustProxyHops)
+	}
 	switch c.LogLevel {
 	case "debug", "info", "warn", "error":
 	default:
@@ -165,9 +176,9 @@ func (c Config) validate() error {
 // TSHOCK_URL 如含 userinfo（http://user:pass@host）会被脱敏。
 func (c Config) LogValue() string {
 	return fmt.Sprintf(
-		"listen=%s tshock_url=%s tshock_timeout=%s tshock_method=%s cookie_secure=%t session_ttl=%s max_sessions=%d login_max_per_min=%d command_max_per_min=%d trust_proxy=%t allow_custom_targets=%t webauth_key_set=%t webauth_timeout=%s allow_ingame_commands=%t log_level=%s web_dist_dir=%q",
+		"listen=%s tshock_url=%s tshock_timeout=%s tshock_method=%s cookie_secure=%t session_ttl=%s max_sessions=%d login_max_per_min=%d command_max_per_min=%d trust_proxy=%t trust_proxy_hops=%d allow_custom_targets=%t webauth_key_set=%t webauth_timeout=%s allow_ingame_commands=%t log_level=%s web_dist_dir=%q",
 		c.Listen, redactURL(c.TShockURL), c.TShockTimeout, c.TShockMethod, c.CookieSecure, c.SessionTTL,
-		c.MaxSessions, c.LoginMaxPerMin, c.CommandMaxPerMin, c.TrustProxy, c.TShockAllowCustomTargets,
+		c.MaxSessions, c.LoginMaxPerMin, c.CommandMaxPerMin, c.TrustProxy, c.TrustProxyHops, c.TShockAllowCustomTargets,
 		c.WebAuthSecret != "", c.WebAuthTimeout, c.AllowIngameCommands, c.LogLevel, c.WebDistDir,
 	)
 }

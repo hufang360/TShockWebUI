@@ -25,7 +25,7 @@ const FRAME_GRIDS: Record<number, [number, number]> = {
 
 describe('真实数据：NPC 图集', () => {
   it('元信息与规模合理', () => {
-    expect(atlas.meta.sheet).toBe('npc-atlas.png')
+    expect(atlas.meta.sheet).toBe('npc-atlas.webp')
     expect(atlas.meta.hash).toMatch(/^[0-9a-f]{12}$/)
     expect(atlas.meta.count).toBe(Object.keys(atlas.regions).length)
   })

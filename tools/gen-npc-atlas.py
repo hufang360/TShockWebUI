@@ -12,7 +12,7 @@ gen-npc-atlas.py —— 把 NPC 贴图的「第一帧」拼成一张 sprite 图�
   - 若按帧裁出来几乎是空的（部分多列 / 特殊布局贴图），回退到「整张贴图的紧包围盒」。
 
 产出：
-  data/npc-atlas.png    图集（随仓库提交；版权 Re-Logic）
+  data/npc-atlas.webp   图集（随仓库提交；无损 WebP；版权 Re-Logic）
   data/npc-atlas.json   裁切信息 { regions: { npcId: [x, y, w, h] } }
 
 依赖：Pillow
@@ -43,7 +43,7 @@ DEFAULT_NPCS = os.path.join(PROJECT, "data", "npcs.json")
 DEFAULT_TR_SRC = os.path.join(PROJECT, "..", "tr-code-1458")
 DEFAULT_SPRITE = os.path.join(PROJECT, "..", "tr-sprite-1458", "Content", "Images")
 DEFAULT_OUT_JSON = os.path.join(PROJECT, "data", "npc-atlas.json")
-DEFAULT_OUT_PNG = os.path.join(PROJECT, "data", "npc-atlas.png")
+DEFAULT_OUT_IMAGE = os.path.join(PROJECT, "data", "npc-atlas.webp")
 # 用户自备的 NPC 贴图覆盖（图片与登记表都入库，保证图集可复现；文件名不要有空格）。
 DEFAULT_OVERRIDES = os.path.join(HERE, "npc-overrides.json")
 DEFAULT_OVERRIDE_DIR = os.path.join(HERE, "npc-overrides")
@@ -201,7 +201,7 @@ def main():
     ap.add_argument("--tr-src", default=os.environ.get("TR_SRC", DEFAULT_TR_SRC))
     ap.add_argument("--sprite-dir", default=os.environ.get("SPRITE_DIR", DEFAULT_SPRITE))
     ap.add_argument("--out-json", default=DEFAULT_OUT_JSON)
-    ap.add_argument("--out-png", default=DEFAULT_OUT_PNG)
+    ap.add_argument("--out-image", default=DEFAULT_OUT_IMAGE)
     ap.add_argument("--overrides", default=DEFAULT_OVERRIDES, help="NPC 贴图覆盖表 json")
     ap.add_argument("--override-dir", default=DEFAULT_OVERRIDE_DIR, help="覆盖图片目录")
     ap.add_argument("--limit-width", type=int, default=1024, help="图集最大宽度，默认 1024")
@@ -268,8 +268,8 @@ def main():
     for nid, crop in sprites.items():
         x, y, _, _ = placed[nid]
         atlas.alpha_composite(crop, (x, y))
-    atlas.save(args.out_png)
-    png_hash = hashlib.md5(open(args.out_png, "rb").read()).hexdigest()[:12]
+    atlas.save(args.out_image, "WEBP", lossless=True, quality=100, method=6)
+    atlas_hash = hashlib.md5(open(args.out_image, "rb").read()).hexdigest()[:12]
 
     payload = {
         "meta": {
@@ -280,8 +280,8 @@ def main():
             "padding": args.padding,
             "count": len(placed),
             "missing": len(missing),
-            "sheet": os.path.basename(args.out_png),
-            "hash": png_hash,
+            "sheet": os.path.basename(args.out_image),
+            "hash": atlas_hash,
             "generatedBy": "tools/gen-npc-atlas.py",
             "source": "Terraria NPC_<id>.png 第一帧（帧高 = 高 / Main.npcFrameCount；多列网格见 FRAME_GRIDS）",
             "note": "regions[npcId] = [x, y, w, h]；第一帧为空时回退为整张贴图的紧包围盒；多列网格贴图按 Main.DrawNPCDirect 的 Frame(列, 行) 取左上角一帧。",
@@ -292,7 +292,7 @@ def main():
         json.dump(payload, f, ensure_ascii=False, indent=1)
         f.write("\n")
 
-    print(f"NPC 图集：{len(placed)} 个 / 缺贴图 {len(missing)} 个 -> {args.out_png} ({total_w}×{total_h})")
+    print(f"NPC 图集：{len(placed)} 个 / 缺贴图 {len(missing)} 个 -> {args.out_image} ({total_w}×{total_h})")
     if used_overrides:
         print(f"使用自备覆盖图片 {len(used_overrides)} 个：{used_overrides}")
     if used_grids:

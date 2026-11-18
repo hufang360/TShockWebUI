@@ -76,9 +76,9 @@ Write-Host "==> 目标平台 $GOOS/$GOARCH（宿主 $hostGoos/$hostGoarch），�
 # 生成数据随仓库提交；若被删或未生成，这里提前失败并给出生成命令。
 $required = @(
   'data\items.json', 'data\prefixes.json', 'data\buffs.json', 'data\commands.json', 'data\meta.json',
-  'data\items-atlas.json', 'data\items-atlas.png',
-  'data\player-atlas.json', 'data\player-atlas.png',
-  'data\buff-atlas.json', 'data\buff-atlas.png',
+  'data\items-atlas.json', 'data\items-atlas.webp',
+  'data\player-atlas.json', 'data\player-atlas.webp',
+  'data\buff-atlas.json', 'data\buff-atlas.webp',
   'data\recipes.json', 'data\item-stats.json',
   'data\item-tips.zh-Hans.json', 'data\item-tips.en-US.json',
   'data\loc.zh-Hans.json', 'data\loc.en-US.json'

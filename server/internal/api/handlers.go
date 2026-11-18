@@ -1089,9 +1089,10 @@ func setCacheHeaders(w http.ResponseWriter, name string) {
 	switch {
 	case strings.HasPrefix(name, "assets/"):
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	case name == "data/items-atlas.png", name == "data/player-atlas.png", name == "data/npc-atlas.png":
-		// 图集 PNG 长缓存；前端用「内容哈希 ?v=...」做缓存失效（见 web/src/lib/atlas.ts），
-		// 图集一变哈希就变，不会出现「新 regions + 旧 PNG」的图标错位。
+	case name == "data/items-atlas.webp", name == "data/player-atlas.webp",
+		name == "data/npc-atlas.webp", name == "data/buff-atlas.webp":
+		// 图集长缓存；前端用「内容哈希 ?v=...」做缓存失效（见 web/src/lib/atlas.ts），
+		// 图集一变哈希就变，不会出现「新 regions + 旧图」的图标错位。
 		w.Header().Set("Cache-Control", "public, max-age=604800")
 	case strings.HasPrefix(name, "data/"):
 		// `data/*.json` 根本不会走到这里（走 serveDataJSON，ETag + no-cache）；

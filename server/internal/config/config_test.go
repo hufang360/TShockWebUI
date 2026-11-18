@@ -10,7 +10,8 @@ func TestLoadDefaults(t *testing.T) {
 	// 清空所有相关 env，确保拿到默认值。
 	for _, k := range []string{
 		"LISTEN", "TSHOCK_URL", "TSHOCK_METHOD", "TSHOCK_TIMEOUT", "COOKIE_SECURE", "SESSION_TTL",
-		"MAX_SESSIONS", "LOGIN_MAX_PER_MIN", "COMMAND_MAX_PER_MIN", "TRUST_PROXY", "LOG_LEVEL", "WEB_DIST_DIR",
+		"MAX_SESSIONS", "LOGIN_MAX_PER_MIN", "COMMAND_MAX_PER_MIN", "TRUST_PROXY", "TRUST_PROXY_HOPS",
+		"LOG_LEVEL", "WEB_DIST_DIR",
 	} {
 		t.Setenv(k, "")
 	}
@@ -33,6 +34,10 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.CommandMaxPerMin != 60 {
 		t.Fatalf("COMMAND_MAX_PER_MIN 默认应为 60：%+v", cfg)
 	}
+	// 默认只当有一层自控反代：XFF 最右段可信。
+	if cfg.TrustProxyHops != 1 {
+		t.Fatalf("TRUST_PROXY_HOPS 默认应为 1：%+v", cfg)
+	}
 }
 
 func TestLoadOverrides(t *testing.T) {
@@ -47,6 +52,7 @@ func TestLoadOverrides(t *testing.T) {
 	t.Setenv("LOGIN_MAX_PER_MIN", "2")
 	t.Setenv("COMMAND_MAX_PER_MIN", "7")
 	t.Setenv("TRUST_PROXY", "1")
+	t.Setenv("TRUST_PROXY_HOPS", "2")
 	t.Setenv("LOG_LEVEL", "DEBUG")
 	t.Setenv("WEB_DIST_DIR", "/tmp/dist")
 
@@ -68,6 +74,9 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.CommandMaxPerMin != 7 {
 		t.Fatalf("COMMAND_MAX_PER_MIN 覆盖失败：%+v", cfg)
+	}
+	if cfg.TrustProxyHops != 2 {
+		t.Fatalf("TRUST_PROXY_HOPS 覆盖失败：%+v", cfg)
 	}
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("日志级别应小写：%q", cfg.LogLevel)
@@ -93,6 +102,9 @@ func TestLoadInvalid(t *testing.T) {
 		{"非法布尔", "COOKIE_SECURE", "maybe"},
 		{"非法日志级别", "LOG_LEVEL", "verbose"},
 		{"非法出站方法", "TSHOCK_METHOD", "PATCH"},
+		{"非法代理层数", "TRUST_PROXY_HOPS", "0"},
+		{"代理层数过大", "TRUST_PROXY_HOPS", "11"},
+		{"非数字代理层数", "TRUST_PROXY_HOPS", "two"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -113,5 +125,9 @@ func TestLogValueHasNoSecrets(t *testing.T) {
 	}
 	if !strings.Contains(v, "tshock_method=POST") {
 		t.Fatalf("LogValue 应包含出站方法：%s", v)
+	}
+	// 排查「限流按哪个 IP 计数」时必须能从启动日志看到层数。
+	if !strings.Contains(v, "trust_proxy_hops=1") {
+		t.Fatalf("LogValue 应包含 TRUST_PROXY_HOPS：%s", v)
 	}
 }
