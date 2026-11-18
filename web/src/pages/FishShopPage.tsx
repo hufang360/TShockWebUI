@@ -668,24 +668,24 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           </div>
           <div className="flex flex-col gap-1 px-2 py-1.5">
             <FieldLabel htmlFor="fish-icon-size" className="font-medium text-foreground">
-              {t('fish.iconSize')}
+              {t('iconSize')}
             </FieldLabel>
             <Select
               value={iconSize}
               onValueChange={(value) => setUi({ iconSize: value as GoodIconSize })}
             >
-              <SelectTrigger id="fish-icon-size" size="sm" className="w-full" aria-label={t('fish.iconSize')}>
+              <SelectTrigger id="fish-icon-size" size="sm" className="w-full" aria-label={t('iconSize')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="lg" data-testid="fish-icon-size-lg">
-                  {t('fish.iconSize.lg')}
+                  {t('iconSize.lg')}
                 </SelectItem>
                 <SelectItem value="md" data-testid="fish-icon-size-md">
-                  {t('fish.iconSize.md')}
+                  {t('iconSize.md')}
                 </SelectItem>
                 <SelectItem value="sm" data-testid="fish-icon-size-sm">
-                  {t('fish.iconSize.sm')}
+                  {t('iconSize.sm')}
                 </SelectItem>
               </SelectContent>
             </Select>

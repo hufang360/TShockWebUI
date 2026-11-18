@@ -4,7 +4,12 @@ import { IconAction } from '@/components/IconAction'
 import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
 import { FavoriteRecipesPanel } from '@/components/FavoriteRecipesPanel'
 import { CommonRecipes, type CommonRecipeEntry } from '@/components/items/CommonRecipes'
-import { DexCell } from '@/components/items/DexCell'
+import {
+  DEFAULT_ITEM_ICON_SIZE,
+  DexCell,
+  ITEM_SIZES,
+  type ItemIconSize,
+} from '@/components/items/DexCell'
 import { DexGroupDrawer } from '@/components/items/DexGroupDrawer'
 import { ContentScrim } from '@/components/ContentScrim'
 import { ItemDetailDrawer, type ItemDetailRecipeOptions } from '@/components/items/ItemDetailDrawer'
@@ -23,6 +28,11 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Separator,
   ToggleGroup,
   ToggleGroupItem,
@@ -63,16 +73,9 @@ import {
   COMMON_RECIPE_MAKE_LIMIT,
 } from '@/lib/commonRecipes'
 import { StorageKeys } from '@/lib/storage'
+import { resolveIconGridSize } from '@/lib/iconGridSize'
 import { computeVirtualGrid } from '@/lib/virtualGrid'
 import type { Dataset, Item } from '@/types'
-
-/** 尺寸与「数据 ID → NPC」一致：格宽 72、图标 64；列间距手机 8px / 桌面 16px，行距 16px。 */
-const CELL_WIDTH = 72
-const CELL_HEIGHT = 72
-const CELL_META_HEIGHT = 106
-const CELL_GAP_DESKTOP = 16
-const CELL_GAP_MOBILE = 8
-
 
 interface DexSettingFieldProps {
   id: string
@@ -216,7 +219,6 @@ export function ItemsPage({
   const debounced = useDebouncedValue(state.query, 180)
   const compactCells = useMediaQuery('(max-width: 639px)')
   const mobileGrid = useMediaQuery('(max-width: 767px)')
-  const gridGap = mobileGrid ? CELL_GAP_MOBILE : CELL_GAP_DESKTOP
   const tableTwoColsAvailable = useMediaQuery('(min-width: 1280px)')
   const effectiveTableTwoCols = tableTwoCols && tableTwoColsAvailable
 
@@ -327,6 +329,15 @@ export function ItemsPage({
     StorageKeys.dexHideItemMeta,
     false,
   )
+  // 图标大小三档（默认「大」= 原来的 64 图标 / 72 格宽）。尺寸的唯一定义在 `DexCell` 的 `ITEM_SIZES`。
+  const [rawIconSize, setIconSize] = useLocalState<ItemIconSize | string>(
+    StorageKeys.dexIconSize,
+    DEFAULT_ITEM_ICON_SIZE,
+  )
+  const iconSize = resolveIconGridSize(rawIconSize)
+  const sizeSpec = ITEM_SIZES[iconSize]
+  /** 列间距随档位收紧（行间距在渲染时从同一份 spec 取）。 */
+  const gapX = mobileGrid ? sizeSpec.gapMobile : sizeSpec.gapDesktop
   // 合成表「显示物品名称」开关（默认不勾选 = 仅图标；跨刷新记忆）。
   const [recipeShowNames, setRecipeShowNames] = useLocalState<boolean>(
     StorageKeys.dexRecipeShowNames,
@@ -698,15 +709,18 @@ export function ItemsPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 与 NPC 格子同尺寸：宽度固定 72；带文字时高 106，只显示图标时高 72。
-  const cellWidth = CELL_WIDTH
-  const cellHeight = hideItemMeta ? CELL_HEIGHT : CELL_META_HEIGHT
+  // 格子尺寸由档位给：小尺寸强制只图标（`showMeta=false`），「隐藏 ID 和名称」只在有文字的档位生效。
+  const showMeta = sizeSpec.showMeta && !hideItemMeta
+  const cellWidth = sizeSpec.cell
+  const cellHeight = showMeta ? sizeSpec.metaHeight : sizeSpec.cell
 
   const layout = computeVirtualGrid({
     count: ordered.length,
     cell: cellWidth,
     cellHeight,
-    gap: gridGap,
+    gap: gapX,
+    gapX,
+    gapY: sizeSpec.gapY,
     viewportWidth,
     viewportHeight: page.viewportHeight,
     scrollTop: page.scrollTop,
@@ -851,6 +865,7 @@ export function ItemsPage({
 
   /** 恢复默认：只重置本弹框里的视图开关；搜索词 / 分组 / 收藏不动。 */
   const resetViewSettings = () => {
+    setIconSize(DEFAULT_ITEM_ICON_SIZE)
     setHideItemMeta(false)
     setTableView(false)
     setTableTwoCols(true)
@@ -886,13 +901,45 @@ export function ItemsPage({
                         <div className="px-2 py-1 text-2xs font-medium text-muted-foreground">
                           {t('dex.viewSection')}
                         </div>
-                        <DexSettingField
-                          id="dex-hide-item-meta"
-                          label={t('dex.hideItemMeta')}
-                          hint={t('dex.hideItemMetaHint')}
-                          checked={hideItemMeta}
-                          onCheckedChange={setHideItemMeta}
-                        />
+                        <div className="flex flex-col gap-1 px-2 py-1.5">
+                          <FieldLabel htmlFor="dex-icon-size" className="font-medium text-foreground">
+                            {t('iconSize')}
+                          </FieldLabel>
+                          <Select
+                            value={iconSize}
+                            onValueChange={(value) => setIconSize(resolveIconGridSize(value))}
+                          >
+                            <SelectTrigger
+                              id="dex-icon-size"
+                              size="sm"
+                              className="w-full"
+                              aria-label={t('iconSize')}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="lg" data-testid="dex-icon-size-lg">
+                                {t('iconSize.lg')}
+                              </SelectItem>
+                              <SelectItem value="md" data-testid="dex-icon-size-md">
+                                {t('iconSize.md')}
+                              </SelectItem>
+                              <SelectItem value="sm" data-testid="dex-icon-size-sm">
+                                {t('iconSize.sm')}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* 小尺寸本来就只有图标：这个开关对它没意义，跟鱼店一样藏起来。 */}
+                        {sizeSpec.showMeta && (
+                          <DexSettingField
+                            id="dex-hide-item-meta"
+                            label={t('dex.hideItemMeta')}
+                            hint={t('dex.hideItemMetaHint')}
+                            checked={hideItemMeta}
+                            onCheckedChange={setHideItemMeta}
+                          />
+                        )}
                         <DexSettingField
                           id="dex-table-view"
                           label={t('dex.tableView')}
@@ -1218,13 +1265,13 @@ export function ItemsPage({
                 {/* 位置还原完成前只占高度、不挂格子（挂载发生在页面高度就绪之后） */}
                 {scrollReady && (
                 <div
-                  className={cn(
-                    'absolute right-0 left-0 grid justify-start gap-y-4',
-                    mobileGrid ? 'gap-x-2' : 'gap-x-4',
-                  )}
+                  className="absolute right-0 left-0 grid justify-start"
                   style={{
                     top: layout.offsetTop,
                     gridTemplateColumns: `repeat(${layout.cols}, ${cellWidth}px)`,
+                    // 间距写成内联：必须与 `computeVirtualGrid` 用的是同一组数，否则行高对不上、滚动会漂。
+                    columnGap: gapX,
+                    rowGap: sizeSpec.gapY,
                   }}
                 >
                   {visible.map((item, index) => (
@@ -1237,6 +1284,7 @@ export function ItemsPage({
                       height={cellHeight}
                       index={layout.startIndex + index}
                       hideMeta={hideItemMeta}
+                      size={iconSize}
                       onSelect={selectCell}
                     />
                   ))}

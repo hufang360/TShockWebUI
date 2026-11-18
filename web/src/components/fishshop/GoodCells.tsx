@@ -17,7 +17,8 @@ export const CELL_ICON_SIZE = 64
 export type GoodIconSize = 'sm' | 'md' | 'lg'
 
 /** 默认「大」：与「物品 ID」的格子同尺寸（图标 64、格子 72）。 */
-export const DEFAULT_GOOD_ICON_SIZE: GoodIconSize = 'lg'
+/** 鱼店默认「中」：一屏能看更多件，图标也还看得清（页面设置可改成大 / 小）。 */
+export const DEFAULT_GOOD_ICON_SIZE: GoodIconSize = 'md'
 
 interface GoodSizeSpec {
   /** 图标边长：32 / 48 / 64，都是游戏 `sizeLimit` 32 的整数倍，放大不糊。 */

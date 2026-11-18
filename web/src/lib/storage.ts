@@ -42,8 +42,12 @@ export const StorageKeys = {
   recipeFavorites: 'recipeFavorites',
   /** 物品图鉴是否隐藏格子中的 ID 与名称（默认关闭，即默认显示）。 */
   dexHideItemMeta: 'dex:hideItemMeta',
+  /** 物品图鉴图标大小（`lg` / `md` / `sm`，默认 `lg`；见 `components/items/DexCell` 的 `ITEM_SIZES`）。 */
+  dexIconSize: 'dex:iconSize',
   /** 数据 ID 是否隐藏图标格中的 ID 与名称（默认关闭，即默认显示）。 */
   dataIdHideMeta: 'dataId:hideMeta',
+  /** 数据 ID 图标大小（`lg` / `md` / `sm`，默认 `lg`；见 `components/dataid/DataIdViews` 的 `DATA_ID_SIZES`）。 */
+  dataIdIconSize: 'dataId:iconSize',
   /** 物品图鉴表格视图开关。 */
   dexTableView: 'dex:tableView',
   /** 物品图鉴两列表格开关。 */

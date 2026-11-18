@@ -4,8 +4,11 @@ import {
   BuffDetail,
   BuffGrid,
   BuffTableLayout,
+  DATA_ID_DEFAULT_SIZES,
+  DATA_ID_SIZES,
   DataDetail,
   DataTableLayout,
+  iconGridStyle,
   NpcCell,
   NpcDetail,
   NpcTableLayout,
@@ -29,6 +32,11 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Separator,
   Sheet,
   SheetContent,
@@ -62,11 +70,10 @@ import {
   isBossNpc,
   npcCollectionName,
 } from '@/lib/npcCollections'
+import { resolveIconGridSize } from '@/lib/iconGridSize'
 import { StorageKeys } from '@/lib/storage'
 import type { TileWallData, TileWallEntry } from '@/types'
 
-/** 格子里的贴图框尺寸（NPC 贴图与物品图标共用，保证两种数据源对齐；默认 64×64）。 */
-const THUMB_SIZE = 64
 const EMPTY_TILEWALL: TileWallData = {
   meta: { gameVersion: '', count: 0, withItem: 0, source: '', generatedBy: '', note: '' },
   entries: [],
@@ -109,6 +116,13 @@ export function DataIdPage({
   const [npcFilter, setNpcFilter] = useState(initial.npcFilter)
   // 图格 / 墙 / Buff 表格是否排成左右两列（默认开）。
   const [hideMeta, setHideMeta] = useLocalState<boolean>(StorageKeys.dataIdHideMeta, false)
+  // 图标大小三档：**没选过时按数据源给默认**（NPC 大、图格 / 墙 / Buff 中），选过就按选的来。
+  // 空串 = 还没选过（`resolveIconGridSize('')` 会回落到「大」，所以这里要显式判断）。
+  // 像素定义在 `DataIdViews` 的 `DATA_ID_SIZES`。
+  const [rawIconSize, setIconSize] = useLocalState<string>(StorageKeys.dataIdIconSize, '')
+  const iconSize = rawIconSize ? resolveIconGridSize(rawIconSize) : DATA_ID_DEFAULT_SIZES[kind]
+  const sizeSpec = DATA_ID_SIZES[iconSize]
+  const mobileGrid = useMediaQuery('(max-width: 767px)')
   const [twoCols, setTwoCols] = useState(initial.twoCols)
   // 「两列表格」只在 xl（≥1280px）真能排成两列；小屏只有一列 → 隐藏开关，也按单列渲染。
   const twoColsAvailable = useMediaQuery('(min-width: 1280px)')
@@ -350,9 +364,8 @@ export function DataIdPage({
   const selectedBuff = selected?.kind === 'buff' ? dataset?.buffsById.get(selected.id) ?? null : null
   const selectedKind: DataIdKind = selected?.kind ?? 'tile'
 
-  // 默认 64×64；Boss 分类放大一倍（128），格子与图标区同步放大。
+  // Boss 分类：贴图 / 格子 / 图标区按档位各放大一倍（大档即原来的 128 / 144）。
   const bossCategory = kind === 'npc' && npcFilter === 'boss'
-  const thumbSize = bossCategory ? THUMB_SIZE * 2 : THUMB_SIZE
 
   // 页面设置统一给出全部 Wiki 入口，不随当前 tab 增删。
   const wiki = (zh: string, en: string) =>
@@ -409,6 +422,8 @@ export function DataIdPage({
 
   /** 恢复默认：只重置本弹框里的视图开关；数据源 tab / 搜索词 / 分类不动。 */
   const resetViewSettings = () => {
+    // 清掉用户选的档位 → 回到「按数据源给的默认」（NPC 大、图格 / 墙 / Buff 中）。
+    setIconSize('')
     setHideMeta(false)
     setTwoCols(true)
     setTableView(false)
@@ -438,18 +453,50 @@ export function DataIdPage({
             {t('dataId.settings.view')}
           </div>
           <FieldGroup className="gap-2">
-            <Field orientation="horizontal" className="w-auto">
-              <Checkbox
-                id="dataid-hide-meta"
-                aria-label={t('dex.hideItemMeta')}
-                checked={hideMeta}
-                onCheckedChange={(v) => setHideMeta(v === true)}
-                data-testid="dataid-hide-meta"
-              />
-              <FieldLabel htmlFor="dataid-hide-meta" className="cursor-pointer font-normal">
-                {t('dex.hideItemMeta')}
+            <div className="flex flex-col gap-1">
+              <FieldLabel htmlFor="dataid-icon-size" className="font-medium">
+                {t('iconSize')}
               </FieldLabel>
-            </Field>
+              <Select
+                value={iconSize}
+                onValueChange={(value) => setIconSize(resolveIconGridSize(value))}
+              >
+                <SelectTrigger
+                  id="dataid-icon-size"
+                  size="sm"
+                  className="w-full"
+                  aria-label={t('iconSize')}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lg" data-testid="dataid-icon-size-lg">
+                    {t('iconSize.lg')}
+                  </SelectItem>
+                  <SelectItem value="md" data-testid="dataid-icon-size-md">
+                    {t('iconSize.md')}
+                  </SelectItem>
+                  <SelectItem value="sm" data-testid="dataid-icon-size-sm">
+                    {t('iconSize.sm')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* 小尺寸本来就只有图标：这个开关对它没意义。 */}
+            {sizeSpec.showMeta && (
+              <Field orientation="horizontal" className="w-auto">
+                <Checkbox
+                  id="dataid-hide-meta"
+                  aria-label={t('dex.hideItemMeta')}
+                  checked={hideMeta}
+                  onCheckedChange={(v) => setHideMeta(v === true)}
+                  data-testid="dataid-hide-meta"
+                />
+                <FieldLabel htmlFor="dataid-hide-meta" className="cursor-pointer font-normal">
+                  {t('dex.hideItemMeta')}
+                </FieldLabel>
+              </Field>
+            )}
             <div className="flex items-center justify-between gap-2">
               <Field orientation="horizontal" className="w-auto">
                 <Checkbox
@@ -692,18 +739,14 @@ export function DataIdPage({
             />
           ) : (
             <div
-              className={cn(
-                'grid gap-x-2 gap-y-4 md:gap-x-4',
-                bossCategory
-                  ? 'grid-cols-[repeat(auto-fill,9rem)]'
-                  : 'grid-cols-[repeat(auto-fill,4.5rem)]',
-              )}
+              className="grid"
+              style={iconGridStyle(iconSize, { large: bossCategory, mobile: mobileGrid })}
             >
               {filteredNpcs.map((npc) => (
                 <NpcCell
                   key={npc.id}
                   npc={npc}
-                  size={thumbSize}
+                  size={iconSize}
                   large={bossCategory}
                   hideMeta={hideMeta}
                   onSelect={(value) => setSelected({ kind: 'npc', id: value.id })}
@@ -715,7 +758,13 @@ export function DataIdPage({
           tableView ? (
             <BuffTableLayout rows={filteredBuffs} twoCols={effectiveTwoCols} onSelect={(buff) => setSelected({ kind: 'buff', id: buff.id })} />
           ) : (
-            <BuffGrid rows={filteredBuffs} hideMeta={hideMeta} onSelect={(buff) => setSelected({ kind: 'buff', id: buff.id })} />
+            <BuffGrid
+              rows={filteredBuffs}
+              size={iconSize}
+              mobile={mobileGrid}
+              hideMeta={hideMeta}
+              onSelect={(buff) => setSelected({ kind: 'buff', id: buff.id })}
+            />
           )
         ) : (kind === 'tile' || kind === 'wall') && !tableView ? (
           <TileIconGrid
@@ -725,6 +774,8 @@ export function DataIdPage({
               dataset?.itemsById.get(e.subId != null ? (e.styleItem ?? -1) : (e.item ?? -1))
             }
             atlas={dataset?.atlas}
+            size={iconSize}
+            mobile={mobileGrid}
             hideMeta={hideMeta}
             onSelect={(entry) => setSelected({ kind, id: entry.id })}
           />

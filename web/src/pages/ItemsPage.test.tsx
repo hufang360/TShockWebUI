@@ -92,22 +92,22 @@ describe('ItemsPage 图鉴', () => {
     expect(document.activeElement).not.toBe(screen.getByLabelText('物品 ID'))
   })
 
-  it('手机尺寸与桌面一致（72 宽 / 图标 64），隐藏 ID 和名称后只显示图标', () => {
+  it('默认中档：手机与桌面一致（56 宽 / 图标 48），隐藏 ID 和名称后只显示图标', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
     renderPage(makeItems(5))
     const first = cell('物品1')
-    expect(first.style.width).toBe('72px')
-    expect(first.style.height).toBe('106px')
+    expect(first.style.width).toBe('56px')
+    expect(first.style.height).toBe('90px')
     expect((within(first).getByRole('img', { name: '物品1' }) as HTMLCanvasElement).style.width).toBe(
-      '64px',
+      '48px',
     )
     expect(within(first).getByText('1')).toBeTruthy()
     expect(within(first).getByText('物品1')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
     fireEvent.click(screen.getByLabelText('隐藏 ID 和名称'))
-    expect(cell('物品1').style.width).toBe('72px')
-    expect(cell('物品1').style.height).toBe('72px')
+    expect(cell('物品1').style.width).toBe('56px')
+    expect(cell('物品1').style.height).toBe('56px')
     expect(within(cell('物品1')).queryByText('1')).toBeNull()
   })
 
@@ -269,11 +269,13 @@ describe('ItemsPage 图鉴', () => {
     const list = screen.getByTestId('dex-list')
     const names = () => gridIcons().map((el) => el.getAttribute('aria-label'))
     const grid = list.querySelector<HTMLElement>('.grid')
-    expect(grid?.className).toContain('gap-x-4')
+    // 间距走内联 style（必须与虚拟滚动用同一组数）：默认中档桌面 = 列 12 / 行 12。
+    expect(grid?.style.columnGap).toBe('12px')
+    expect(grid?.style.rowGap).toBe('12px')
 
-    // jsdom 无布局 → 10 列 / 560px 兜底、显示文字时行高 110+4=114 → 可视 + overscan 共 6 行
+    // jsdom 无布局 → 10 列 / 560px 兜底、显示文字时行高 90+12=102 → 可视 + overscan 共 7 行
     const first = names()
-    expect(first.length).toBe(60)
+    expect(first.length).toBe(70)
     expect(first.length).toBeLessThan(1000)
 
     const host = pageHost()
@@ -290,10 +292,10 @@ describe('ItemsPage 图鉴', () => {
     renderPage(makeItems(10))
     let first = cell('物品1')
     const canvas = within(first).getByRole('img', { name: '物品1' }) as HTMLCanvasElement
-    expect(canvas.style.width).toBe('64px')
-    expect(canvas.style.height).toBe('64px')
-    expect(first.style.width).toBe('72px')
-    expect(first.style.height).toBe('106px')
+    expect(canvas.style.width).toBe('48px')
+    expect(canvas.style.height).toBe('48px')
+    expect(first.style.width).toBe('56px')
+    expect(first.style.height).toBe('90px')
     expect(within(first).getByText('1')).toBeTruthy()
     const name = within(first).getByText('物品1')
     expect(name.className).toContain('truncate')
@@ -301,19 +303,74 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
     fireEvent.click(screen.getByLabelText('隐藏 ID 和名称'))
     first = cell('物品1')
-    expect(first.style.width).toBe('72px')
-    expect(first.style.height).toBe('72px')
+    expect(first.style.width).toBe('56px')
+    expect(first.style.height).toBe('56px')
     expect(within(first).queryByText('1')).toBeNull()
 
     const surface = within(first).getByTestId('dex-icon-surface')
     expect(first.className).toContain('cursor-pointer')
     expect(first.className).toContain('hover:-translate-y-0.5')
-    // 底色只在 72×72 的图标区（hover 时），格子本身不再铺色。
+    // 底色只在图标区（hover 时），格子本身不再铺色；图标区尺寸随档位（默认中 = 56）。
     expect(first.className).not.toContain('hover:bg-primary/10')
-    expect(surface.className).toContain('size-18')
+    expect(surface.style.width).toBe('56px')
+    expect(surface.style.height).toBe('56px')
     expect(surface.className).toContain('group-hover/cell:bg-primary/10')
     expect(surface.className).not.toContain('bg-muted/50')
     expect(surface.className).not.toContain('ring-border/50')
+  })
+
+  it('图标大小三档：默认中，大 72 / 小 40 只显示图标；刷新后记住；恢复默认回到「中」', async () => {
+    const first = renderPage(makeItems(6))
+    const settings = () => {
+      if (!screen.queryByTestId('dex-settings-popover')) {
+        fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+      }
+      return screen.getByTestId('dex-settings-popover')
+    }
+    const pick = (testId: string) => {
+      fireEvent.click(within(settings()).getByRole('combobox', { name: '图标大小' }))
+      fireEvent.click(screen.getByTestId(testId))
+    }
+    const gridGap = () =>
+      screen.getByTestId('dex-list').querySelector<HTMLElement>('.grid')?.style
+
+    // 默认「中」：格子 56 / 90，图标 48
+    expect(cell('物品1').style.width).toBe('56px')
+    expect(cell('物品1').style.height).toBe('90px')
+    expect(
+      (within(cell('物品1')).getByRole('img', { name: '物品1' }) as HTMLCanvasElement).style.width,
+    ).toBe('48px')
+    expect(gridGap()?.columnGap).toBe('12px')
+
+    // 大：格子 72 / 106，图标 64，列间距 16
+    pick('dex-icon-size-lg')
+    expect(cell('物品1').style.width).toBe('72px')
+    expect(cell('物品1').style.height).toBe('106px')
+    expect(gridGap()?.columnGap).toBe('16px')
+    // 大档仍可「隐藏 ID 和名称」
+    expect(within(settings()).getByLabelText('隐藏 ID 和名称')).toBeTruthy()
+
+    // 小：格子 40、只显示图标，「隐藏 ID 和名称」开关不出现（对它没意义）
+    pick('dex-icon-size-sm')
+    const small = cell('物品1')
+    expect(small.style.width).toBe('40px')
+    expect(small.style.height).toBe('40px')
+    expect(within(small).queryByText('物品1')).toBeNull()
+    expect(within(small).queryByText('1')).toBeNull()
+    expect(gridGap()?.columnGap).toBe('8px')
+    expect(within(settings()).queryByLabelText('隐藏 ID 和名称')).toBeNull()
+    const stored = () => JSON.parse(localStorage.getItem('tswui:dex:iconSize') ?? 'null')
+    expect(stored()).toBe('sm')
+
+    // 切模块再回来（重挂载）仍是「小」
+    first.unmount()
+    renderPage(makeItems(6))
+    expect(cell('物品1').style.width).toBe('40px')
+
+    // 恢复默认 → 回到「中」
+    fireEvent.click(within(settings()).getByRole('button', { name: '恢复默认' }))
+    expect(cell('物品1').style.width).toBe('56px')
+    expect(stored()).toBe('md')
   })
 
   it('详情：默认不显示，点格子后弹出 dialog（tips + 复制 + wiki）', () => {
@@ -1155,7 +1212,7 @@ describe('ItemsPage 图鉴', () => {
     const popover = screen.getByTestId('dex-settings-popover')
     // 打开时焦点给第一个设置项，不是标题栏的「恢复默认」（否则一开就高亮它）。
     await waitFor(() =>
-      expect(document.activeElement).toBe(within(popover).getByLabelText('隐藏 ID 和名称')),
+      expect(document.activeElement).toBe(within(popover).getByRole('combobox', { name: '图标大小' })),
     )
 
     fireEvent.click(within(popover).getByLabelText('隐藏 ID 和名称'))

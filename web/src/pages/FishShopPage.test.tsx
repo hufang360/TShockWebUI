@@ -134,9 +134,9 @@ describe('FishShopPage', () => {
     expect(cell.className).toContain('h-auto')
     expect(cell.className).toContain('md:h-auto')
 
-    // 与「物品 ID」同尺寸同排版。默认「大」：格子宽 72、不随窗口拉伸；整格 hover 不铺底色。
-    expect(cell.dataset.size).toBe('lg')
-    expect(cell.style.width).toBe('72px')
+    // 与「物品 ID」同尺寸同排版。默认「中」：格子宽 56、不随窗口拉伸；整格 hover 不铺底色。
+    expect(cell.dataset.size).toBe('md')
+    expect(cell.style.width).toBe('56px')
     expect(cell.className).toContain('hover:bg-transparent')
     // 子节点顺序：图标区 → #编号 → 名称（编号在名称**上面**一行）。
     const parts = [...cell.children].map((el) => el.textContent?.trim() ?? '')
@@ -144,16 +144,16 @@ describe('FishShopPage', () => {
     expect(parts[0]).toBe('')
     expect(parts[1]).toBe('#1')
     expect(parts[2]).toBe('生命水晶')
-    // 底色只挂在 72×72 的图标区上。
+    // 底色只挂在图标区上（中档 = 56）。
     const surface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
-    expect(surface.style.width).toBe('72px')
-    expect(surface.style.height).toBe('72px')
+    expect(surface.style.width).toBe('56px')
+    expect(surface.style.height).toBe('56px')
     expect(surface.className).toContain('group-hover/cell:bg-primary/10')
-    // 网格：列宽固定 72；大尺寸列距 16px、行距 24px（行距放宽给货架板和名称留空间）。
+    // 网格：列宽固定 = 格子宽（默认中档 56）；中档列距 8px、行距 16px（行距放宽给货架板和名称留空间）。
     const grid = cell.parentElement as HTMLElement
-    expect(grid.className).toContain('grid-cols-[repeat(auto-fill,4.5rem)]')
-    expect(grid.className).toContain('gap-x-4')
-    expect(grid.className).toContain('gap-y-6')
+    expect(grid.className).toContain('grid-cols-[repeat(auto-fill,3.5rem)]')
+    expect(grid.className).toContain('gap-x-2')
+    expect(grid.className).toContain('gap-y-4')
 
     // 原生（真物品）的图标仍走物品提示，不再多一层「编号 + 商品名」。
     expect(screen.queryByTestId('good-tooltip')).toBeNull()
@@ -1122,7 +1122,8 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     )
 
     fireEvent.click(within(popover).getByRole('button', { name: '恢复默认' }))
-    await waitFor(() => expect(cell.style.width).toBe('72px'))
+    // 默认「中」：56（不是「大」）。
+    await waitFor(() => expect(cell.style.width).toBe('56px'))
     expect(screen.getByText('#1')).toBeTruthy()
     expect(screen.getByTestId('shop-awning')).toBeTruthy()
     // 货架层板（jsdom 没排版，画不出来；看开关本身）回到勾选。
@@ -1136,20 +1137,22 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     }
   })
 
-  it('图标大小：小 32 / 中 48 / 大 64，小尺寸不显示编号与名称', async () => {
+  it('图标大小：小 32 / 中 48 / 大 64，默认「中」；小尺寸不显示编号与名称', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     const cell = await screen.findByRole('button', { name: '生命水晶' })
-    expect(cell.style.width).toBe('72px')
+    // 默认「中」：图标 48、格子 56，编号与名称照常。
+    expect(cell.style.width).toBe('56px')
+    const defSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
+    expect(defSurface.style.width).toBe('56px')
+    expect(screen.getByText('#1')).toBeTruthy()
+    expect(screen.getByText('生命水晶')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
 
-    // 中：图标 48、格子 56，编号与名称照常。
-    await pickIconSize('中')
-    await waitFor(() => expect(cell.style.width).toBe('56px'))
-    const mdSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
-    expect(mdSurface.style.width).toBe('56px')
+    // 大：图标 64、格子 72。
+    await pickIconSize('大')
+    await waitFor(() => expect(cell.style.width).toBe('72px'))
     expect(screen.getByText('#1')).toBeTruthy()
-    expect(screen.getByText('生命水晶')).toBeTruthy()
 
     // 小：图标 32、格子 40，只剩图标（标题 / 名称都不显示），「隐藏编号和名称」开关也不再出现。
     await pickIconSize('小')
@@ -1159,9 +1162,9 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect(screen.queryByText('#1')).toBeNull()
     expect(screen.queryByLabelText('隐藏编号和名称')).toBeNull()
 
-    // 回到大：图标 64，编号与名称回来。
-    await pickIconSize('大')
-    await waitFor(() => expect(cell.style.width).toBe('72px'))
+    // 回到中：56，编号与名称回来。
+    await pickIconSize('中')
+    await waitFor(() => expect(cell.style.width).toBe('56px'))
     expect(screen.getByText('#1')).toBeTruthy()
   })
 

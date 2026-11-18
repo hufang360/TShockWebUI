@@ -5,11 +5,16 @@ import { NpcSprite } from '@/components/NpcSprite'
 import { Badge } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { DataIdKind } from '@/lib/dataIdState'
+import {
+  DEFAULT_ICON_GRID_SIZE,
+  type IconGridSize,
+} from '@/lib/iconGridSize'
 import { useI18n } from '@/lib/i18n'
 import { gbuffCommand } from '@/lib/commandFormat'
 import { useDataset } from '@/lib/datasetContext'
 import { npcRelatedCommands } from '@/lib/npcRelatedCommands'
 import { selectableRow } from '@/lib/rowSelect'
+import type { CSSProperties } from 'react'
 import type { Atlas, Buff, Item, Npc, TileWallEntry } from '@/types'
 
 /**
@@ -17,21 +22,91 @@ import type { Atlas, Buff, Item, Npc, TileWallEntry } from '@/types'
  * 纯展示：不持有页面状态，数据与回调由 `DataIdPage` 注入。
  */
 
-/** 图标网格：宽度固定 72，间距固定（列 8px / 行 16px）。 */
-const ICON_GRID =
-  'grid grid-cols-[repeat(auto-fill,4.5rem)] gap-x-2 gap-y-4 md:gap-x-4'
+interface DataIdSizeSpec {
+  /** 贴图绘制区边长 */
+  icon: number
+  /** 图标区（hover 底色）边长：比图标大 8px */
+  surface: number
+  /** 格子宽度 = 图标区边长 */
+  cell: number
+  /** 是否显示 ID / 名称：小尺寸不显示（32px 图标下两行字会把格子撑得又高又挤） */
+  showMeta: boolean
+  gapDesktop: number
+  gapMobile: number
+  gapY: number
+}
 
 /**
- * 格子固定 72 宽（= 图标区宽度），ID / 名称都在这个宽度内截断。
- * hover 时**整格**（图标 + 文字）一起上浮，只有 72×72 的图标区在 hover 时才出现底色。
+ * 三档尺寸的唯一定义（页面设置 →「图标大小」）：Boss 分类把 icon / surface / cell 各乘 2
+ * （大档就是原来的 128 贴图 / 144 格子）。物品 ID 与鱼店用同一套档位名，像素各自定义。
+ */
+export const DATA_ID_SIZES: Record<IconGridSize, DataIdSizeSpec> = {
+  lg: {
+    icon: 64,
+    surface: 72,
+    cell: 72,
+    showMeta: true,
+    gapDesktop: 16,
+    gapMobile: 8,
+    gapY: 16,
+  },
+  md: {
+    icon: 48,
+    surface: 56,
+    cell: 56,
+    showMeta: true,
+    gapDesktop: 12,
+    gapMobile: 8,
+    gapY: 12,
+  },
+  sm: {
+    icon: 32,
+    surface: 40,
+    cell: 40,
+    showMeta: false,
+    gapDesktop: 8,
+    gapMobile: 8,
+    gapY: 8,
+  },
+}
+
+/**
+ * 各数据源的默认档位：**NPC 用「大」**（贴图细节多、数量最少），
+ * **图格 / 墙 / Buff 用「中」**（一屏能多铺几行，图标仍是 48px 看得清）。
+ * 用户一旦在页面设置里选过，就按他选的来（见 `DataIdPage` 的 `rawIconSize`）。
+ */
+export const DATA_ID_DEFAULT_SIZES: Record<DataIdKind, IconGridSize> = {
+  npc: 'lg',
+  tile: 'md',
+  wall: 'md',
+  buff: 'md',
+}
+
+/** 图标网格的容器样式：列宽 = 格子宽（`large` 时翻倍），间距按档位给。 */
+export function iconGridStyle(
+  size: IconGridSize,
+  { large = false, mobile = false }: { large?: boolean; mobile?: boolean } = {},
+): CSSProperties {
+  const spec = DATA_ID_SIZES[size]
+  const scale = large ? 2 : 1
+  return {
+    gridTemplateColumns: `repeat(auto-fill, ${spec.cell * scale}px)`,
+    columnGap: mobile ? spec.gapMobile : spec.gapDesktop,
+    rowGap: spec.gapY * scale,
+  }
+}
+
+/**
+ * 格子：宽度 = 图标区宽度（由 `DATA_ID_SIZES` 给），ID / 名称都在这个宽度内截断。
+ * hover 时**整格**（图标 + 文字）一起上浮，只有图标区在 hover 时才出现底色。
  */
 const CELL_CLASS =
-  'group/cell flex w-18 cursor-pointer flex-col items-center gap-1 rounded-container text-center transition'
+  'group/cell flex cursor-pointer flex-col items-center gap-1 rounded-container text-center transition'
 const CELL_HOVER =
   'hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
-/** 图标区：默认**无底色**、无描边，72×72；hover 时才铺 `bg-primary/10`。 */
+/** 图标区：默认**无底色**、无描边；hover 时才铺 `bg-primary/10`。 */
 const ICON_CELL_BG =
-  'flex size-18 items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10'
+  'flex items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10'
 
 /**
  * 数据表格的一行：斑马纹 + hover / 键盘聚焦高亮 + **整行可点**（指针变手型）。
@@ -42,31 +117,38 @@ const ROW_CLASS =
 
 export function NpcCell({
   npc,
-  size,
+  size = DEFAULT_ICON_GRID_SIZE,
   large = false,
   hideMeta = false,
   onSelect,
 }: {
   npc: Npc
-  /** 贴图绘制区边长（64 / Boss 128）。 */
-  size: number
-  /** Boss 分类：格子 / 图标区各放大一倍（144 / 128）。 */
+  /** 图标尺寸档位（贴图 / 格子 / 图标区都从 `DATA_ID_SIZES` 取）。 */
+  size?: IconGridSize
+  /** Boss 分类：贴图 / 格子 / 图标区各放大一倍。 */
   large?: boolean
-  /** 页面设置里「隐藏 ID 和名称」：只留图标。 */
+  /** 页面设置里「隐藏 ID 和名称」：只留图标（小尺寸强制只图标）。 */
   hideMeta?: boolean
   onSelect: (npc: Npc) => void
 }) {
+  const spec = DATA_ID_SIZES[size]
+  const scale = large ? 2 : 1
+  const showMeta = spec.showMeta && !hideMeta
   return (
     <button
       type="button"
       title={`${npc.name} #${npc.id}`}
       onClick={() => onSelect(npc)}
-      className={cn(CELL_CLASS, CELL_HOVER, large ? 'w-36' : 'w-18')}
+      className={cn(CELL_CLASS, CELL_HOVER)}
+      style={{ width: spec.cell * scale }}
     >
-      <span className={cn(ICON_CELL_BG, large ? 'size-36' : 'size-18')}>
-        <NpcSprite id={npc.id} size={size} name={npc.name} />
+      <span
+        className={ICON_CELL_BG}
+        style={{ width: spec.surface * scale, height: spec.surface * scale }}
+      >
+        <NpcSprite id={npc.id} size={spec.icon * scale} name={npc.name} />
       </span>
-      {!hideMeta && (
+      {showMeta && (
         <>
           <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
             {npc.id}
@@ -244,15 +326,23 @@ export function BuffTableLayout({
 /** Buff 图标网格（默认视图）：图标 + BuffID + 名称；点击开 Popover。 */
 export function BuffGrid({
   rows,
+  size = DEFAULT_ICON_GRID_SIZE,
+  mobile = false,
   hideMeta = false,
   onSelect,
 }: {
   rows: Buff[]
+  /** 图标尺寸档位 */
+  size?: IconGridSize
+  /** 窄屏：列间距收紧到 8px（与物品 ID 一致） */
+  mobile?: boolean
   hideMeta?: boolean
   onSelect: (buff: Buff) => void
 }) {
+  const spec = DATA_ID_SIZES[size]
+  const showMeta = spec.showMeta && !hideMeta
   return (
-    <div className={ICON_GRID}>
+    <div className="grid" style={iconGridStyle(size, { mobile })}>
       {rows.map((buff) => (
         <button
           key={buff.id}
@@ -260,11 +350,15 @@ export function BuffGrid({
           title={`${buff.name} #${buff.id}`}
           onClick={() => onSelect(buff)}
           className={cn(CELL_CLASS, CELL_HOVER)}
+          style={{ width: spec.cell }}
         >
-          <span className={ICON_CELL_BG}>
-            <BuffIcon id={buff.id} size={64} name={buff.name} />
+          <span
+            className={ICON_CELL_BG}
+            style={{ width: spec.surface, height: spec.surface }}
+          >
+            <BuffIcon id={buff.id} size={spec.icon} name={buff.name} />
           </span>
-          {!hideMeta && (
+          {showMeta && (
             <>
               <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
                 {buff.id}
@@ -339,6 +433,8 @@ export function TileIconGrid({
   nameOf,
   itemOf,
   atlas,
+  size = DEFAULT_ICON_GRID_SIZE,
+  mobile = false,
   hideMeta = false,
   onSelect,
 }: {
@@ -346,12 +442,18 @@ export function TileIconGrid({
   nameOf: (e: TileWallEntry) => string
   itemOf: (e: TileWallEntry) => Item | undefined
   atlas: Atlas | undefined
+  /** 图标尺寸档位 */
+  size?: IconGridSize
+  /** 窄屏：列间距收紧到 8px（与物品 ID 一致） */
+  mobile?: boolean
   hideMeta?: boolean
   onSelect: (entry: TileWallEntry) => void
 }) {
   const { t } = useI18n()
+  const spec = DATA_ID_SIZES[size]
+  const showMeta = spec.showMeta && !hideMeta
   return (
-    <div className={ICON_GRID}>
+    <div className="grid" style={iconGridStyle(size, { mobile })}>
       {rows.map((entry) => {
         const name = nameOf(entry)
         const item = itemOf(entry)
@@ -363,15 +465,29 @@ export function TileIconGrid({
             title={`${name} #${displayId}`}
             onClick={() => onSelect(entry)}
             className={cn(CELL_CLASS, CELL_HOVER)}
+            style={{ width: spec.cell }}
           >
-            <span className={ICON_CELL_BG}>
+            <span
+              className={ICON_CELL_BG}
+              style={{ width: spec.surface, height: spec.surface }}
+            >
               {item ? (
-                <ItemIcon item={item} atlas={atlas} size={64} name={name} tooltip={false} />
+                <ItemIcon
+                  item={item}
+                  atlas={atlas}
+                  size={spec.icon}
+                  name={name}
+                  tooltip={false}
+                />
               ) : (
-                <span className="inline-block size-16 rounded bg-muted/60" aria-hidden />
+                <span
+                  className="inline-block rounded bg-muted/60"
+                  style={{ width: spec.icon, height: spec.icon }}
+                  aria-hidden
+                />
               )}
             </span>
-            {!hideMeta && (
+            {showMeta && (
               <>
                 <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
                   {displayId}

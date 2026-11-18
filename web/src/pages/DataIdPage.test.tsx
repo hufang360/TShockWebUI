@@ -120,8 +120,75 @@ describe('DataIdPage', () => {
     const hidden = screen.getByTitle('蓝史莱姆 #1')
     expect(within(hidden).queryByText('蓝史莱姆')).toBeNull()
     expect(within(hidden).queryByText('1')).toBeNull()
-    // 只留图标：格子宽度仍是 72（`w-18`）。
-    expect(hidden.className).toContain('w-18')
+    // 只留图标：格子宽度仍是 72（大档，走内联 style）。
+    expect(hidden.style.width).toBe('72px')
+  })
+
+  it('图标大小三档：中 56 / 小 40 只显示图标；刷新后记住；恢复默认回到「大」', async () => {
+    const first = renderPage()
+    const pick = (testId: string) => {
+      fireEvent.click(within(openSettings()).getByRole('combobox', { name: '图标大小' }))
+      fireEvent.click(screen.getByTestId(testId))
+    }
+    const cell = () => screen.getByTitle('蓝史莱姆 #1')
+    const sprite = () =>
+      (within(cell()).getByRole('img', { name: '蓝史莱姆' }) as HTMLCanvasElement).style.width
+    const stored = () => JSON.parse(localStorage.getItem('tswui:dataId:iconSize') ?? 'null')
+
+    // 中：格子 56、贴图 48，仍显示 ID 与名称，「隐藏 ID 和名称」照旧可用
+    pick('dataid-icon-size-md')
+    expect(cell().style.width).toBe('56px')
+    expect(sprite()).toBe('48px')
+    expect(within(cell()).getByText('蓝史莱姆')).toBeTruthy()
+    expect(within(openSettings()).getByLabelText('隐藏 ID 和名称')).toBeTruthy()
+
+    // 小：格子 40、只显示图标，开关对它没意义 → 不渲染
+    pick('dataid-icon-size-sm')
+    expect(cell().style.width).toBe('40px')
+    expect(sprite()).toBe('32px')
+    expect(within(cell()).queryByText('蓝史莱姆')).toBeNull()
+    expect(within(cell()).queryByText('1')).toBeNull()
+    expect(within(openSettings()).queryByLabelText('隐藏 ID 和名称')).toBeNull()
+    expect(stored()).toBe('sm')
+
+    // 重挂载后仍记得「小」
+    first.unmount()
+    renderPage()
+    expect(cell().style.width).toBe('40px')
+
+    // 恢复默认 → 清掉选择，回到该数据源的默认（NPC = 大 72）
+    fireEvent.click(within(openSettings()).getByRole('button', { name: '恢复默认' }))
+    expect(cell().style.width).toBe('72px')
+    expect(stored()).toBe('')
+  })
+
+  it('没选过图标大小时按数据源取默认：NPC 大 72，图格 / 墙 / Buff 中 56', async () => {
+    renderPage()
+    const width = () => (screen.getByTitle('蓝史莱姆 #1') as HTMLElement).style.width
+    const tab = (name: string) => fireEvent.mouseDown(screen.getByRole('tab', { name }))
+    const firstCellWidth = () =>
+      screen
+        .getByTestId('dataid-list')
+        .querySelector<HTMLElement>('button[title]')!.style.width
+
+    expect(width()).toBe('72px')
+
+    tab('图格')
+    expect(firstCellWidth()).toBe('56px')
+    tab('墙')
+    expect(firstCellWidth()).toBe('56px')
+    tab('Buff')
+    expect(firstCellWidth()).toBe('56px')
+
+    // 用户选过之后，切数据源也按选的来（不再回到各自的默认）
+    const pick = (testId: string) => {
+      fireEvent.click(within(openSettings()).getByRole('combobox', { name: '图标大小' }))
+      fireEvent.click(screen.getByTestId(testId))
+    }
+    pick('dataid-icon-size-lg')
+    expect(firstCellWidth()).toBe('72px')
+    tab('NPC')
+    expect(width()).toBe('72px')
   })
 
   it('全屏时隐藏搜索和 Tabs，只保留页面设置 / 退出按钮，图标铺满水平宽度', () => {
@@ -135,7 +202,7 @@ describe('DataIdPage', () => {
     expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy()
     const grid = screen.getByTestId('dataid-list').querySelector<HTMLElement>('.grid')
-    expect(grid?.className).toContain('repeat(auto-fill')
+    expect(grid?.style.gridTemplateColumns).toContain('repeat(auto-fill')
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(page.dataset.fullscreen).toBeUndefined()
@@ -267,11 +334,11 @@ describe('DataIdPage', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
     expect(screen.getByTitle('黑曜石皮 #1')).toBeTruthy()
     expect(screen.getByTitle('再生 #2')).toBeTruthy()
-    // 图标来自 `data/buff-atlas.webp`（`BuffIcon` 画 canvas），网格图标 64×64
+    // 图标来自 `data/buff-atlas.webp`（`BuffIcon` 画 canvas）；Buff 默认「中」= 48×48
     const canvas = screen.getByTitle('黑曜石皮 #1').querySelector('canvas') as HTMLCanvasElement
     expect(canvas).toBeTruthy()
-    expect(canvas.style.width).toBe('64px')
-    expect(canvas.style.height).toBe('64px')
+    expect(canvas.style.width).toBe('48px')
+    expect(canvas.style.height).toBe('48px')
     expect(screen.queryByRole('table')).toBeNull()
 
     enableTable()
@@ -730,7 +797,7 @@ describe('DataIdPage', () => {
     const popover = openSettings()
     // 打开时焦点给第一个设置项，不是标题栏的「恢复默认」。
     await waitFor(() =>
-      expect(document.activeElement).toBe(within(popover).getByTestId('dataid-hide-meta')),
+      expect(document.activeElement).toBe(within(popover).getByRole('combobox', { name: '图标大小' })),
     )
 
     fireEvent.click(within(popover).getByTestId('dataid-hide-meta'))
