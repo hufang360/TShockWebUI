@@ -697,7 +697,7 @@ invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosse
 ## 6.4 物资申请（需登录，自研信使插件 WebUI）
 
 玩家向服主申请建筑 / 装备等物品；审核通过后由插件在游戏内发放（在线直接给，离线下次登录给）。
-权限仍由插件判定：提交需要 `webui.request.use`，审核 / 补发需要 `webui.request.review`。
+权限仍由插件判定：提交需要 `hf.webui.request.use`，审核 / 补发需要 `hf.webui.request.review`。
 
 ### `GET /api/requests/capabilities`
 ```json
@@ -706,8 +706,8 @@ invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosse
 - `plugin=false`：插件未安装 / 旧版插件（无 `requests` 能力）；此时附 `reason` 说明原因
   （`not_installed` / `protocol_mismatch` / `missing_capabilities`，与信使插件握手同一套取值）。
 - 插件声明 `requests` 但缺端点 → `501 plugin_outdated`。
-- `submit=false`：当前用户组缺 `webui.request.use`。
-- `review=false`：当前用户组缺 `webui.request.review`（或旧插件无 `requests_review` 能力）。
+- `submit=false`：当前用户组缺 `hf.webui.request.use`。
+- `review=false`：当前用户组缺 `hf.webui.request.review`（或旧插件无 `requests_review` 能力）。
 
 ### `GET /api/requests?status=pending|approved|delivered|denied|cancelled|all`
 我的申请（最多 50 条，最新在前）：`{ requests: Requisition[] }`。
@@ -730,7 +730,7 @@ invasionType, invasionSize, raining, slimeRain, players, npcCount, maxNpc, bosse
 撤回自己的待审申请：`{ "id": 12 }` → `{ "request": Requisition }`。
 
 ### `GET /api/requests/all?status=...`
-审核列表（最多 100 条，最新在前）：`{ requests: Requisition[] }`；需要 `webui.request.review`。
+审核列表（最多 100 条，最新在前）：`{ requests: Requisition[] }`；需要 `hf.webui.request.review`。
 
 ### `POST /api/requests/review`
 审核：`{ "id": 12, "decision": "approve" | "deny", "reason": "数量太多" }` → `{ "request": Requisition }`。

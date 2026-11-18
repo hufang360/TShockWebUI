@@ -8,7 +8,7 @@ namespace WebUI
     ///
     /// 全部使用 <see cref="SecureRestCommand"/>：调用方必须持有有效 token，
     /// 身份只取 <see cref="SecureRest.TokenData.Username"/>，不信任任何前端传名。
-    /// 提交需要 <c>webui.request.use</c>；审核 / 补发需要 <c>webui.request.review</c>。
+    /// 提交需要 <c>hf.webui.request.use</c>；审核 / 补发需要 <c>hf.webui.request.review</c>。
     /// </summary>
     internal static class RequestRest
     {

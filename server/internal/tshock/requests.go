@@ -4,12 +4,12 @@ package tshock
 //
 // 事实来源：本仓库插件源码 plugin/WebUI/Requisitions.cs 与 RequestRest.cs。
 //
-//   - GET /webui/requests?status=                 → 我的申请（需 webui.request.use）
-//   - GET /webui/requests/create?items=&reason=&note= → 提交申请（需 webui.request.use）
-//   - GET /webui/requests/cancel?id=              → 撤回自己的待审申请（需 webui.request.use）
-//   - GET /webui/requests/all?status=             → 审核列表（需 webui.request.review）
-//   - GET /webui/requests/review?id=&decision=&reason= → 审核（需 webui.request.review）
-//   - GET /webui/requests/deliver?id=             → 补发（需 webui.request.review）
+//   - GET /webui/requests?status=                 → 我的申请（需 hf.webui.request.use）
+//   - GET /webui/requests/create?items=&reason=&note= → 提交申请（需 hf.webui.request.use）
+//   - GET /webui/requests/cancel?id=              → 撤回自己的待审申请（需 hf.webui.request.use）
+//   - GET /webui/requests/all?status=             → 审核列表（需 hf.webui.request.review）
+//   - GET /webui/requests/review?id=&decision=&reason= → 审核（需 hf.webui.request.review）
+//   - GET /webui/requests/deliver?id=             → 补发（需 hf.webui.request.review）
 //
 // 身份完全由 token 决定（插件侧取 SecureRest.TokenData.Username），本层不传玩家名。
 // 发放由插件用 TShock 的 TSPlayer.GiveItemCheck 完成，尊重 item ban，不提权。

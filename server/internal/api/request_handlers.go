@@ -6,7 +6,7 @@ package api
 //   GET  /api/requests?status=      → 我的申请
 //   POST /api/requests              → 提交申请
 //   POST /api/requests/cancel       → 撤回自己的待审申请
-//   GET  /api/requests/all?status=  → 审核列表（需 webui.request.review）
+//   GET  /api/requests/all?status=  → 审核列表（需 hf.webui.request.review）
 //   POST /api/requests/review       → 审核（approve / deny）
 //   POST /api/requests/deliver      → 补发
 //
@@ -277,7 +277,7 @@ func (s *Server) writeRequestError(ctx context.Context, w http.ResponseWriter, s
 		// TShock 的 403 文案是通用的「没有权限使用指定的 API 终结点」，
 		// 这里换成可操作的具体权限节点，避免玩家猜。
 		writeError(w, http.StatusForbidden, codeNoPermission,
-			"缺少物资申请权限：提交需要 webui.request.use，审核 / 补发需要 webui.request.review。请联系服主授予。")
+			"缺少物资申请权限：提交需要 hf.webui.request.use，审核 / 补发需要 hf.webui.request.review。请联系服主授予。")
 	case tshock.KindBadRequest, tshock.KindPluginBusiness:
 		msg := strings.TrimSpace(e.Message)
 		if msg == "" {

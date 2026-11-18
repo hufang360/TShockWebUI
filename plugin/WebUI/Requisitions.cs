@@ -52,7 +52,7 @@ namespace WebUI
     ///
     /// 设计约束：
     ///   - 申请人身份只来自 token（<see cref="SecureRest.TokenData.Username"/>），不信任前端传名；
-    ///   - 审核权限 <c>webui.request.review</c>，提交权限 <c>webui.request.use</c>；
+    ///   - 审核权限 <c>hf.webui.request.review</c>，提交权限 <c>hf.webui.request.use</c>；
     ///   - 发放用 TShock 自己的 <c>TSPlayer.GiveItemCheck</c>（尊重 item ban），不绕过任何限制；
     ///   - 数据落盘 <c>tshock/WebUI/requests.json</c>，原子替换 + 备份，重启不丢；
     ///   - 所有会写库存的操作都在游戏主线程执行。
@@ -233,7 +233,7 @@ namespace WebUI
             }
         }
 
-        /// <summary>GET /webui/requests/all?status=：审核列表（需 webui.request.review）。</summary>
+        /// <summary>GET /webui/requests/all?status=：审核列表（需 hf.webui.request.review）。</summary>
         public static object ListAll(string status)
         {
             var filter = NormalizeStatusFilter(status);

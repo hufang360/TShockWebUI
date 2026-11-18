@@ -93,7 +93,7 @@
 - 定时器每 `RESTRequestBucketDecreaseIntervalMinutes`（**最小 1 分钟**）把所有 IP 计数 −1。
 - 默认 `RESTMaximumRequestsPerInterval = 5` → 桶为空时**只有 3 次尝试**（0→2→4→6，第 4 次即被挡），之后每 1 分钟回 1 点（≈ 每 2 分钟 1 次尝试）。
 - 出处：`Rest.cs:237-241,320-334`、`SecureRest.cs:115-166`、`TShockConfig.cs:650,654`。
-- **装了 WebUI 信使插件后可精确/可放宽**：插件暴露只读端点 `/webui/restlimit`（返回 `limit` 与**调用者自己 IP** 的 `bucket`，源码读 public 的 `Rest.tokenBucket`），后端在密码登录前调用 → 桶满直接判 `rate_limited`；服务端可用 `/web init` 一次性把 `RestApiEnabled` / `LogRest` / 限流（50、每 10 分钟恢复 1）写好并给默认组补权限，或用 `/web limit <值>|unlimited|default` 单独调限流（均需 `webui.admin` + `tshock.rest.cfg`）。见 `docs/插件-信使.md`。
+- **装了 WebUI 信使插件后可精确/可放宽**：插件暴露只读端点 `/webui/restlimit`（返回 `limit` 与**调用者自己 IP** 的 `bucket`，源码读 public 的 `Rest.tokenBucket`），后端在密码登录前调用 → 桶满直接判 `rate_limited`；服务端可用 `/web init` 一次性把 `RestApiEnabled` / `LogRest` / 限流（50、每 10 分钟恢复 1）写好并给默认组补权限，或用 `/web limit <值>|unlimited|default` 单独调限流（均需 `hf.webui.admin` + `tshock.rest.cfg`）。见 `docs/插件-信使.md`。
 
 ## 5. 端点清单（核心，v6.2.1）
 

@@ -67,9 +67,9 @@ namespace WebUI
 
             // 统一入口：/webui（简写 /web），功能指令为二级子命令。
             // 权限（TShock 为 OR 语义，这里列三个，具体子命令在 handler 内再细分）：
-            //   webui.use            玩家：/web auth、/web deny
-            //   webui.admin          管理：/web limit（另需 tshock.rest.cfg）
-            //   webui.request.review 审核：/web req（物资申请审核 / 补发）
+            //   hf.webui.use            玩家：/web auth、/web deny
+            //   hf.webui.admin          管理：/web limit（另需 tshock.rest.cfg）
+            //   hf.webui.request.review 审核：/web req（物资申请审核 / 补发）
             Commands.ChatCommands.Add(new Command(
                 new List<string> { WebUiPermissions.Use, WebUiPermissions.Admin, WebUiPermissions.RequestReview },
                 WebCommand, "webui", "web")
@@ -125,7 +125,7 @@ namespace WebUI
                 TShock.RestApi.Register(new SecureRestCommand("/webui/chat", WebAuthRest.Chat) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/auth/sessions", WebAuthRest.Sessions) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/auth/revoke", WebAuthRest.Revoke) { DoLog = false });
-                // 物资申请：玩家提交 / 查看 / 撤回（webui.request.use）；服主审核 / 补发（webui.request.review）。
+                // 物资申请：玩家提交 / 查看 / 撤回（hf.webui.request.use）；服主审核 / 补发（hf.webui.request.review）。
                 TShock.RestApi.Register(new SecureRestCommand("/webui/requests", RequestRest.ListMine, WebUiPermissions.RequestUse) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/requests/create", RequestRest.Create, WebUiPermissions.RequestUse) { DoLog = false });
                 TShock.RestApi.Register(new SecureRestCommand("/webui/requests/cancel", RequestRest.Cancel, WebUiPermissions.RequestUse) { DoLog = false });
@@ -579,10 +579,10 @@ namespace WebUI
 
                 case "limit":
                 case "restlimit":
-                    // 改的是 TShock 的 config.json：保留 tshock.rest.cfg 要求，另加 webui.admin。
+                    // 改的是 TShock 的 config.json：保留 tshock.rest.cfg 要求，另加 hf.webui.admin。
                     if (!HasAll(args.Player, WebUiPermissions.Admin, RestPermissions.restcfg))
                     {
-                        args.Player?.SendErrorMessage("需要 webui.admin（且 tshock.rest.cfg）权限。");
+                        args.Player?.SendErrorMessage($"需要 {WebUiPermissions.Admin}（且 tshock.rest.cfg）权限。");
                         return;
                     }
                     WebLimit(args, args.Parameters.Skip(1).ToList());
@@ -593,7 +593,7 @@ namespace WebUI
                     // 同样会写 TShock 的 config.json（REST 开关 / 限流 / 日志）+ 改默认组权限。
                     if (!HasAll(args.Player, WebUiPermissions.Admin, RestPermissions.restcfg))
                     {
-                        args.Player?.SendErrorMessage("需要 webui.admin（且 tshock.rest.cfg）权限。");
+                        args.Player?.SendErrorMessage($"需要 {WebUiPermissions.Admin}（且 tshock.rest.cfg）权限。");
                         return;
                     }
                     WebInit(args);
@@ -614,11 +614,11 @@ namespace WebUI
         private static void WebHelp(CommandArgs args)
         {
             args.Player?.SendInfoMessage("网页端信使插件（/webui，简写 /web）：");
-            args.Player?.SendInfoMessage("  /web init  一键初始化：打开 REST / 限流 / 给默认组补权限（需 webui.admin + tshock.rest.cfg）");
-            args.Player?.SendInfoMessage("  /web auth <验证码>  同意网页登录（需 webui.use）");
+            args.Player?.SendInfoMessage($"  /web init  一键初始化：打开 REST / 限流 / 给默认组补权限（需 {WebUiPermissions.Admin} + tshock.rest.cfg）");
+            args.Player?.SendInfoMessage($"  /web auth <验证码>  同意网页登录（需 {WebUiPermissions.Use}）");
             args.Player?.SendInfoMessage("  /web deny <验证码>  拒绝网页登录");
-            args.Player?.SendInfoMessage("  /web limit <上限|unlimited|default>  放宽 REST 建令牌限流（需 webui.admin + tshock.rest.cfg）");
-            args.Player?.SendInfoMessage("  /web req list|show|ok|no|give  物资申请审核（需 webui.request.review）");
+            args.Player?.SendInfoMessage($"  /web limit <上限|unlimited|default>  放宽 REST 建令牌限流（需 {WebUiPermissions.Admin} + tshock.rest.cfg）");
+            args.Player?.SendInfoMessage($"  /web req list|show|ok|no|give  物资申请审核（需 {WebUiPermissions.RequestReview}）");
         }
 
         /// <summary>
@@ -736,7 +736,7 @@ namespace WebUI
 
         /// <summary>
         /// /web limit：查看或放宽 TShock 的建令牌限流（<c>RESTMaximumRequestsPerInterval</c>）。
-        /// 权限：webui.admin + tshock.rest.cfg；改的是 TShock 的 config.json。
+        /// 权限：hf.webui.admin + tshock.rest.cfg；改的是 TShock 的 config.json。
         /// 背景：该限流会把 403 伪装成「账号或密码错误」，放宽后玩家不再莫名登录失败。
         /// </summary>
         private void WebLimit(CommandArgs args, List<string> rest)
@@ -791,14 +791,14 @@ namespace WebUI
         /// <summary>
         /// <see cref="WebInit"/> 给默认注册组补的权限。
         /// 只给「网页端能登录 / 能执行 / 能提交申请」所需的 4 个；
-        /// 管理类（<c>webui.admin</c>、<c>webui.request.review</c>、<c>tshock.rest.cfg</c>）**不自动给**。
+        /// 管理类（<c>hf.webui.admin</c>、<c>hf.webui.request.review</c>、<c>tshock.rest.cfg</c>）**不自动给**。
         /// </summary>
         internal static readonly string[] InitDefaultGroupPermissions =
         {
             RestPermissions.restapi,        // tshock.rest.useapi：建 token
             RestPermissions.restrawcommand, // tshock.rest.command：rawcmd（网页批量执行）
-            WebUiPermissions.Use,           // webui.use：/web auth 确认登录
-            WebUiPermissions.RequestUse,    // webui.request.use：物资申请
+            WebUiPermissions.Use,           // hf.webui.use：/web auth 确认登录
+            WebUiPermissions.RequestUse,    // hf.webui.request.use：物资申请
         };
 
         /// <summary>
@@ -806,7 +806,7 @@ namespace WebUI
         ///   1. TShock 配置：RestApiEnabled=true、LogRest=true、限流 50 / 每 10 分钟恢复 1 → 写 config.json；
         ///   2. 默认注册组补上 <see cref="InitDefaultGroupPermissions"/> 四个权限。
         /// 只往上调、不往下调：已有更大的建令牌上限保持原值。
-        /// 权限：webui.admin + tshock.rest.cfg（会写 TShock 的 config.json）。
+        /// 权限：hf.webui.admin + tshock.rest.cfg（会写 TShock 的 config.json）。
         /// </summary>
         private void WebInit(CommandArgs args)
         {
@@ -921,11 +921,11 @@ namespace WebUI
     /// </summary>
     internal static class WebUiPermissions
     {
-        public const string Use = "webui.use";
-        public const string Admin = "webui.admin";
+        public const string Use = "hf.webui.use";
+        public const string Admin = "hf.webui.admin";
         /// <summary>提交 / 查看 / 撤回自己的物资申请。</summary>
-        public const string RequestUse = "webui.request.use";
+        public const string RequestUse = "hf.webui.request.use";
         /// <summary>审核 / 补发物资申请（游戏内 /web req 与网页审核）。</summary>
-        public const string RequestReview = "webui.request.review";
+        public const string RequestReview = "hf.webui.request.review";
     }
 }

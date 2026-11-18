@@ -77,7 +77,7 @@ describe('RequisitionPage', () => {
     ).toBeTruthy()
   })
 
-  it('无提交权限时提示需要 webui.request.use', async () => {
+  it('无提交权限时提示需要 hf.webui.request.use', async () => {
     renderPage(
       fakeTransport({
         requestCapabilities: async () => ({ plugin: true, submit: false, review: false }),

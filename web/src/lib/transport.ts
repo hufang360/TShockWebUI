@@ -190,9 +190,9 @@ export interface PlayerCapabilities {
 export interface RequestCapabilities {
   /** 服务器插件是否支持物资申请（声明了 requests 能力）。 */
   plugin: boolean
-  /** 当前用户能否提交 / 查看 / 撤回自己的申请（需要 webui.request.use）。 */
+  /** 当前用户能否提交 / 查看 / 撤回自己的申请（需要 hf.webui.request.use）。 */
   submit: boolean
-  /** 当前用户能否审核 / 补发（需要 webui.request.review）。 */
+  /** 当前用户能否审核 / 补发（需要 hf.webui.request.review）。 */
   review: boolean
   /** 不可用原因（空 = 可用）：not_installed / protocol_mismatch / missing_capabilities。 */
   reason?: string
@@ -595,11 +595,11 @@ export interface BackendTransport {
   requestCreate(items: RequisitionItem[], reason: string, note?: string): Promise<Requisition>
   /** 撤回自己的待审申请。 */
   requestCancel(id: number): Promise<Requisition>
-  /** 审核列表（需要 webui.request.review）。 */
+  /** 审核列表（需要 hf.webui.request.review）。 */
   requestListAll(status?: RequisitionStatus | 'all'): Promise<Requisition[]>
-  /** 通过 / 拒绝申请（需要 webui.request.review）。 */
+  /** 通过 / 拒绝申请（需要 hf.webui.request.review）。 */
   requestReview(id: number, decision: 'approve' | 'deny', reason?: string): Promise<Requisition>
-  /** 补发已批准但未发放的申请（需要 webui.request.review）。 */
+  /** 补发已批准但未发放的申请（需要 hf.webui.request.review）。 */
   requestDeliver(id: number): Promise<Requisition>
 }
 

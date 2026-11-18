@@ -130,7 +130,7 @@ func (s *Server) probeRequests(ctx context.Context, token string, client *tshock
 	}
 
 	cap := tshock.RequestCapabilities{Plugin: true}
-	// 用真实端点探测提交权限：403 = 插件在装但缺 webui.request.use。
+	// 用真实端点探测提交权限：403 = 插件在装但缺 hf.webui.request.use。
 	if _, err := client.RequestList(ctx, token, ""); err != nil {
 		if !isRequestNoPermission(err) {
 			return cap, err

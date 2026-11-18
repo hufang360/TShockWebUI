@@ -63,10 +63,10 @@ func TestRequestCapabilitiesAll(t *testing.T) {
 func TestRequestCapabilitiesNoPermission(t *testing.T) {
 	routes := requestMetaRoutes("requests", "requests_review")
 	routes["/webui/requests"] = func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "没有 webui.request.use 权限"})
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "没有 hf.webui.request.use 权限"})
 	}
 	routes["/webui/requests/all"] = func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "没有 webui.request.review 权限"})
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "没有 hf.webui.request.review 权限"})
 	}
 	f := newFake(routes)
 	ts := httptest.NewServer(f)
@@ -256,7 +256,7 @@ func TestRequestReviewBusinessError(t *testing.T) {
 func TestRequestReviewPermission(t *testing.T) {
 	routes := requestMetaRoutes("requests", "requests_review")
 	routes["/webui/requests/review"] = func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "没有 webui.request.review 权限"})
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": "没有 hf.webui.request.review 权限"})
 	}
 	f := newFake(routes)
 	ts := httptest.NewServer(f)

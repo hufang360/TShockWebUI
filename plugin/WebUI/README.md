@@ -15,7 +15,7 @@ TShockWebUI 的**信使插件**（C# / net9.0）：把网页端的请求转达�
 3. **只读信息与会话管理**：运行时指令目录（含插件指令，用于补全）、区域 / 传送点 / NPC / buff 补全数据、
    服务器状态与事件流（`/webui/{commands,me,me/refresh,data,serverinfo,events}`），以及网页会话的自助查看 / 吊销。
 4. **物资申请**：玩家提交物品申请（物品 / 数量 / 用途）→ 服主在游戏内 `/web req ...` 或网页「待审核」
-   审核 → 在线立即发放 / 离线下次登录发放；权限 `webui.request.use` / `webui.request.review`，
+   审核 → 在线立即发放 / 离线下次登录发放；权限 `hf.webui.request.use` / `hf.webui.request.review`，
    发放用 TShock 的 `GiveItemCheck`（尊重 item ban）。
 5. **Tier B（可选，默认关）**：以**真实在线玩家**身份执行 `AllowServer=false` 的指令（权限仍是 token 用户组，不提权）。
    `AllowInGameOnlyCommands=true` 表示全部放行；只放行部分指令时改用 `InGameOnlyAllowlist`，
@@ -160,10 +160,10 @@ docker restart tshock
 | `/webui/events` | `since`、`limit`、`tail`、`token` | `{events:[{seq,type,text,time,source?}],lastSeq,firstSeq?}`；`type ∈ join\|leave\|boss\|announce\|npc\|chat`；`announce` = 世界公告（Boss 苏醒 / 事件开始 / 入侵），`npc` = 旅商到达（其它城镇 NPC 与 NPC 死亡不记）；聊天的 `source ∈ game\|webui`；`tail=N` 取最新 N 条（磁盘历史，需能力 `events_history`） |
 | `/webui/chat` | `text`、`token` | `{name,text,line,id,time,source}`：以配置前缀（默认 `[WebUI]`）广播到游戏内聊天（不伪造身份；在线禁言 → 403；超限流 → 429），并记入事件流 `type=chat, source=webui` |
 | `/webui/auth/sessions` | `token` | `{sessions:[{id,created,expires,current}]}` |
-| `/webui/requests` | `status`、`token` | 我的物资申请（需 `webui.request.use`） |
+| `/webui/requests` | `status`、`token` | 我的物资申请（需 `hf.webui.request.use`） |
 | `/webui/requests/create` | `items`（JSON）、`reason`、`note`、`token` | 提交物资申请 |
 | `/webui/requests/cancel` | `id`、`token` | 撤回自己的待审申请 |
-| `/webui/requests/all` | `status`、`token` | 审核列表（需 `webui.request.review`） |
+| `/webui/requests/all` | `status`、`token` | 审核列表（需 `hf.webui.request.review`） |
 | `/webui/requests/review` | `id`、`decision=approve\|deny`、`reason`、`token` | 通过 / 拒绝 |
 | `/webui/requests/deliver` | `id`、`token` | 补发已批准未发放的申请 |
 | `/webui/auth/revoke` | `id` 或 `all=true`、`token` | `{revoked:n}` |
@@ -181,24 +181,24 @@ docker restart tshock
 
 ## 游戏内指令
 
-**统一入口**：`/web`（`/webui`），功能指令均为**二级子命令**；权限节点 `webui.use` / `webui.admin`：
+**统一入口**：`/web`（`/webui`），功能指令均为**二级子命令**；权限节点 `hf.webui.use` / `hf.webui.admin`：
 
 ```
-/web init                    # 一键初始化（需 webui.admin + tshock.rest.cfg）
-/web auth <验证码>          # 同意（需 webui.use）
-/web deny <验证码>          # 拒绝（需 webui.use）
-/web limit                   # 查看 TShock 建令牌限流（需 webui.admin + tshock.rest.cfg）
+/web init                    # 一键初始化（需 hf.webui.admin + tshock.rest.cfg）
+/web auth <验证码>          # 同意（需 hf.webui.use）
+/web deny <验证码>          # 拒绝（需 hf.webui.use）
+/web limit                   # 查看 TShock 建令牌限流（需 hf.webui.admin + tshock.rest.cfg）
 /web limit <上限>            # 设为 N（≥1）；unlimited=1000000；default=5
 ```
 
 - `init` 是给新开服的「一条指令搞定」：打开 `RestApiEnabled` / `LogRest`、把限流写成 50 / 每 10 分钟恢复 1，
-  并给默认注册组补上 `tshock.rest.useapi`、`tshock.rest.command`、`webui.use`、`webui.request.use`。
+  并给默认注册组补上 `tshock.rest.useapi`、`tshock.rest.command`、`hf.webui.use`、`hf.webui.request.use`。
   幂等、只往上调不往下调；`RestApiEnabled` 需重启 TShock 生效。
 - `auth` / `deny` 必须在游戏内由本人执行（控制台顶替不了玩家确认）。
 - `limit` 会修改并保存 TShock 的 `config.json` 中的 `RESTMaximumRequestsPerInterval`——
-  属用户明确要求的例外；同时要求 `webui.admin` 与 `tshock.rest.cfg`（控制台 / superadmin 满足）。
-- 权限节点需服主授予，例如：`/group addperm default webui.use`、`/group addperm <管理组> webui.admin`。
-  插件启动时若没任何组拥有 `webui.use` 会在控制台警告。
+  属用户明确要求的例外；同时要求 `hf.webui.admin` 与 `tshock.rest.cfg`（控制台 / superadmin 满足）。
+- 权限节点需服主授予，例如：`/group addperm default hf.webui.use`、`/group addperm <管理组> hf.webui.admin`。
+  插件启动时若没任何组拥有 `hf.webui.use` 会在控制台警告。
 - `/webui/commands` 指令目录按调用者用户组过滤（与 TShock `/help` 的可见性一致），
   带权限的指令不会下发给普通玩家。
 

@@ -4,6 +4,17 @@
 
 ## 未发布（v0.1.0-rc.11）
 
+- **权限节点统一加 `hf.` 前缀**
+  - 信使插件自定义的 4 个节点改名：`webui.use` → `hf.webui.use`、`webui.admin` → `hf.webui.admin`、
+    `webui.request.use` → `hf.webui.request.use`、`webui.request.review` → `hf.webui.request.review`
+    （TShock 自带的 `tshock.rest.*` 不变）。
+  - **升级后要重新授权**：老节点不再生效，没补的组会登录不了、交不了物资申请。
+    照旧执行一遍即可（把 `default` 换成你的玩家组）：`/group addperm default hf.webui.use`、
+    `/group addperm default hf.webui.request.use`；要管初始化 / 限流 / 审核再加
+    `/group addperm <管理组> hf.webui.admin`、`/group addperm <管理组> hf.webui.request.review`。
+    懒得记就对默认组跑一次 `/web init`，它会把 `hf.webui.use`、`hf.webui.request.use` 补上。
+  - 游戏内帮助 / 提示、网页报错文案（「缺少物资申请权限…」）与文档都已换成新名字。
+
 - **默认端口从 8080 改成 18080，并且新增 `config.json` —— 不用再记一堆环境变量**
   - 单文件二进制、Docker 镜像、`scripts/dev-native.sh`、vite 开发代理的默认端口统一为 `18080`：
     下载 exe 双击就是 `http://127.0.0.1:18080`；镜像 `docker run -p 18080:18080`。

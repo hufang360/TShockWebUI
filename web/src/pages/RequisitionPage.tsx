@@ -76,7 +76,7 @@ const MAX_STACK = 9999
  * 物资申请（自研信使插件 WebUI 的 /webui/requests*）。
  *
  * 玩家：搜索物品 → 加入清单 → 填用途 → 提交；查看自己的申请状态 / 撤回。
- * 服主（有 webui.request.review）：多一个「待审核」tab，可通过 / 拒绝 / 补发。
+ * 服主（有 hf.webui.request.review）：多一个「待审核」tab，可通过 / 拒绝 / 补发。
  */
 export function RequisitionPage({
   serverId,
