@@ -14,7 +14,9 @@ updates:
     directory: /web
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # 同时最多 3 条（minor/patch 组 1 条 + major 2 条）：多了看不过来，
+    # 真正坏了的那条反而被一堆红灯淹没。
+    open-pull-requests-limit: 3
     commit-message:
       prefix: chore(deps)
       prefix-development: chore(deps-dev)
@@ -28,22 +30,40 @@ updates:
         update-types:
           - minor
           - patch
+    # 这四个包的 major 在本仓库都是「一次迁移」而不是「一次升级」，静音掉，等有空手动做：
+    # - typescript 6→7：类型检查口径会变，全仓 tsc -b 得重跑一轮
+    # - jsdom 30→31：全部 DOM 用例的运行时，先读 breaking changes
+    # - @types/node 24→26：与 TypeScript / Node 目标版本绑定，要一起动
+    # - react-resizable-panels 2→4：跨大版本重写（指令页两栏分隔条），不是换个号的事
+    # 其它包（React / Vite / Tailwind / lucide 等）的 major 仍然会来 PR，按 docs/开发速查.md 的合并标准处理。
+    ignore:
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
+      - dependency-name: jsdom
+        update-types:
+          - version-update:semver-major
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
+      - dependency-name: react-resizable-panels
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    # action 的 major 仍单独来（要读 release notes），但 minor/patch 合一条，总共最多 2 条。
+    open-pull-requests-limit: 2
     commit-message:
       prefix: chore(ci)
     labels:
       - dependencies
-
-# 备查：后端一旦引入第三方 Go 依赖，把下面这段取消注释并把上面的「不开」注释删掉。
-#  - package-ecosystem: gomod
-#    directory: /server
-#    schedule:
-#      interval: weekly
-#    open-pull-requests-limit: 3
-#    commit-message:
-#      prefix: chore(server)
+    groups:
+      gha-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
