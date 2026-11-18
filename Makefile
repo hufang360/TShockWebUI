@@ -17,7 +17,7 @@
 #   make clean      # 清掉构建产物
 #
 # 约定：这里只做「一条命令 = 一个脚本/一段 make 逻辑」，不放业务实现；
-# 需要新参数时用 `make <目标> 变量=值`（如 `make dev-web API_TARGET=http://127.0.0.1:8080`），
+# 需要新参数时用 `make <目标> 变量=值`（如 `make dev-web API_TARGET=http://127.0.0.1:18080`），
 # 别把参数硬编码进目标里。每个目标上一行注释写清「什么时候用它、有什么副作用」。
 
 SHELL := /usr/bin/env bash
@@ -52,7 +52,7 @@ help:
 	@echo "  —— 开发（改代码）——"
 	@echo "  make dev-all       一条命令：容器后端 :$(API_PORT) + vite 页面 :$(WEB_PORT)（前台）"
 	@echo "  make dev-web       vite HMR 页面 :$(WEB_PORT)，/api → $(API_TARGET)"
-	@echo "  make dev           宿主直跑后端（scripts/dev-native.sh，默认 :8080）"
+	@echo "  make dev           宿主直跑后端（scripts/dev-native.sh，默认 :18080）"
 	@echo "  make dev-container 挂载式容器后端（默认 :$(API_PORT)；浏览器直接开就是完整应用）"
 	@echo "  make dev-container-frontend  只重建前端 dist（刷新即可）"
 	@echo "  make dev-container-backend   只重建后端并重启容器"
@@ -111,7 +111,7 @@ plugin:
 # 前提：后端已在跑（默认容器 :$(API_PORT)）——先另开一个终端 `make dev-container`。
 #   1) 后端没起：这里会先探 $(API_TARGET)/healthz 并提示，不会让你瞎看 proxy error；
 #   2) 端口被占会直接报错（strictPort），不会静默换端口；
-#   3) 换端口：make dev-web WEB_PORT=5174 API_PORT=8080 API_TARGET=http://127.0.0.1:8080
+#   3) 换端口：make dev-web WEB_PORT=5174 API_PORT=18081 API_TARGET=http://127.0.0.1:18081
 #   4) 纯静态页面（图鉴 / 存档解析）没有后端也能看：
 #      cd web && VITE_TRANSPORT=mock npm run dev
 dev-web:
@@ -119,13 +119,14 @@ dev-web:
 	  || { \
 	    echo "⚠️  $(API_TARGET) 无响应：页面能打开，但 /api/* 会报 http proxy error，无法登录/执行指令。"; \
 	    echo "    另开一个终端先启动后端：make dev-container   （容器 :$(API_PORT)）"; \
-	    echo "    或宿主直跑：make dev，然后 make dev-web API_TARGET=http://127.0.0.1:8080"; \
+	    echo "    或宿主直跑：make dev，然后 make dev-web API_TARGET=http://127.0.0.1:18080"; \
 	    echo; \
 	  }
 	cd web && VITE_PORT=$(WEB_PORT) VITE_API_TARGET=$(API_TARGET) npm run dev
 
 # ---- 开发：后端 ----------------------------------------------------------
-# 宿主直跑后端（不构建镜像）。默认 :8080；改端口 LISTEN=:18100 make dev。
+# 宿主直跑后端（不构建镜像）。默认 :18080（与容器同一个口，两者不能同时跑）；
+# 改端口 LISTEN=:18100 make dev。
 # 只在改了 Go 代码、或需要重启后端时才重跑；纯前端改动不需要碰它。
 dev:
 	scripts/dev-native.sh

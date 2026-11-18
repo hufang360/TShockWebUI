@@ -2,7 +2,7 @@
  * 复制文本到剪贴板，**永不抛错**：成功返回 `true`，失败返回 `false`。
  *
  * 为什么不能只用 `navigator.clipboard`：它只在**安全上下文**（`https:` / `localhost`）里存在，
- * 而本项目的常规部署是 `http://IP:8080`（`设计原则与约束.md` C12）。那种页面里
+ * 而本项目的常规部署是 `http://IP:18080`（`设计原则与约束.md` C12）。那种页面里
  * `navigator.clipboard` 是 `undefined`，`navigator.clipboard.writeText(...)` 会**同步抛 TypeError**
  * （不是 Promise 拒绝，`.catch` 接不住）。所以：
  *

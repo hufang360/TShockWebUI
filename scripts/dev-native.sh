@@ -7,7 +7,7 @@
 # 用本脚本即可绕过容器网络，直接用宿主机的出口访问远端。
 #
 # 用法：
-#   scripts/dev-native.sh                 # 构建后端并前台启动（默认 :8080）
+#   scripts/dev-native.sh                 # 构建后端并前台启动（默认 :18080）
 #   BUILD_WEB=1 scripts/dev-native.sh     # 先 npm run build 再启动
 #   LISTEN=:18100 scripts/dev-native.sh   # 换端口
 #   TSHOCK_URL=http://127.0.0.1:7878 scripts/dev-native.sh
@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT_DIR"
 
-LISTEN=${LISTEN:-:8080}
+LISTEN=${LISTEN:-:18080}
 TSHOCK_URL=${TSHOCK_URL:-http://127.0.0.1:7878}
 # 出站 HTTP 方法：GET 或 POST（默认 POST，规避机房对明文 GET 的 302 劫持）。
 TSHOCK_METHOD=${TSHOCK_METHOD:-POST}

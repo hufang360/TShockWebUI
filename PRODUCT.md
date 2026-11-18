@@ -42,7 +42,7 @@ web
 
 ## Operating Context
 
-- 交付：**单个 Docker 镜像**（distroless，约 20MB）或单文件二进制；一个端口 `8080`；
+- 交付：**单个 Docker 镜像**（distroless，约 20MB）或单文件二进制；一个端口 `18080`；
   TShock REST 默认 `http://127.0.0.1:7878`（同 compose 网络为 `http://tshock:7878`）。
 - 目标版本 **Terraria 1.4.5.8 / TShock 6.2.1**；启动时比对 `data/meta.json` 的 `gameVersion`，不一致要告警。
 - 部署环境**一般没有 HTTPS**；TLS 若存在则由外层（Caddy / Nginx / Cloudflare）终止。

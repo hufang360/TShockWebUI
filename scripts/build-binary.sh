@@ -15,7 +15,8 @@
 #
 # 版本号注入 -X main.version；用 `./dist/tswui -version` 与 `GET /healthz` 查看。
 #
-# 运行（默认 :8080，TShock 默认 http://127.0.0.1:7878）：
+# 运行（默认 :18080，TShock 默认 http://127.0.0.1:7878）：
+#   ./dist/tswui                          # 首次启动会在当前目录生成 config.json（改完重启生效）
 #   ./dist/tswui
 #   LISTEN=:9000 TSHOCK_URL=http://192.168.1.10:7878 ./dist/tswui
 #
@@ -173,4 +174,4 @@ if [ "$SMOKE" = "1" ]; then
   fi
 fi
 
-echo "==> 运行：$OUT  （默认监听 :8080，可用 LISTEN / TSHOCK_URL 等环境变量覆盖）"
+echo "==> 运行：$OUT  （默认监听 :18080；首次启动生成 config.json，也可用 LISTEN / TSHOCK_URL 等环境变量覆盖）"

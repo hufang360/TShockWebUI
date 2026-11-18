@@ -5,7 +5,7 @@ React + TypeScript + Vite + Tailwind，最终产物由 **Go 后端内嵌**在单
 
 ## 形态
 
-- 前端 `base = /`，API 一律使用相对路径 `/api`（`http://IP:8080` 与 `https://域名` 通用）。
+- 前端 `base = /`，API 一律使用相对路径 `/api`（`http://IP:18080` 与 `https://域名` 通用）。
 - 浏览器**不持有 TShock token**：登录/执行都走 `/api/*`，会话在后端 + `HttpOnly` Cookie。
 - 详见 `../docs/ARCHITECTURE.md` 与 `../docs/API_SPEC.md`。
 
@@ -23,7 +23,7 @@ React + TypeScript + Vite + Tailwind，最终产物由 **Go 后端内嵌**在单
 
 - 默认使用 `HttpTransport`（真实后端）。
 - 无后端时用 `VITE_TRANSPORT=mock npm run dev` 进入 Mock 演示（界面会显式标注「Mock」）。
-- 开发代理目标默认 `http://localhost:8080`，可用 `VITE_API_TARGET` 覆盖。
+- 开发代理目标默认 `http://localhost:18080`，可用 `VITE_API_TARGET` 覆盖。
 
 ## 命令
 
@@ -31,7 +31,7 @@ React + TypeScript + Vite + Tailwind，最终产物由 **Go 后端内嵌**在单
 cd web
 npm install
 
-npm run dev        # Vite 开发服务器 :5173（需把 /api 代理到后端 :8080）
+npm run dev        # Vite 开发服务器 :5173（需把 /api 代理到后端 :18080）
 npm run build      # 产物 web/dist/，base=/
 npm run typecheck  # TypeScript 类型检查
 npm run test:run   # vitest 单次运行

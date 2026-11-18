@@ -6,7 +6,7 @@
 #   scripts/run-container.sh                      # 构建镜像并（重）启动容器，映射到 :18080
 #   NO_BUILD=1 scripts/run-container.sh           # 跳过构建，直接用现有镜像
 #   SKIP_WEB_BUILD=1 scripts/run-container.sh     # 复用现有 web/dist，不重新构建前端
-#   PORT=8080 scripts/run-container.sh            # 指定宿主机端口
+#   PORT=18081 scripts/run-container.sh            # 指定宿主机端口
 #   TSHOCK_URL=http://host.docker.internal:7878 scripts/run-container.sh
 #   TSHOCK_METHOD=GET scripts/run-container.sh    # 出站改回 GET（默认 POST）
 #   NETWORK=ts_default TSHOCK_URL=http://tshock:7878 scripts/run-container.sh
@@ -14,7 +14,7 @@
 #   CONTAINER=tswui-test PORT=18081 ...           # 用别的名字/端口起临时实例
 #
 # 说明：
-# - WebUI 只暴露 8080；TShock REST(7878) 仍由 TShock 容器/宿主机自己管理。
+# - WebUI 只暴露 18080；TShock REST(7878) 仍由 TShock 容器/宿主机自己管理。
 # - 默认用 host.docker.internal 访问宿主机上的 TShock（与 s/ts/docker-compose.yml 的 7878 映射一致）。
 #   Docker Desktop（macOS/Windows）自带该域名；Linux 上脚本会自动加 host-gateway 映射。
 # - 走 HTTPS 反代时请设 COOKIE_SECURE=true。
@@ -93,8 +93,8 @@ esac
 
 RUN_ARGS=(
   --name "$CONTAINER"
-  -p "${PORT}:8080"
-  -e "LISTEN=:8080"
+  -p "${PORT}:18080"
+  -e "LISTEN=:18080"
   -e "TSHOCK_URL=${TSHOCK_URL}"
   -e "TSHOCK_METHOD=${TSHOCK_METHOD}"
   -e "COOKIE_SECURE=${COOKIE_SECURE}"

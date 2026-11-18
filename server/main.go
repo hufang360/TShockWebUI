@@ -40,10 +40,15 @@ var embeddedWebdist embed.FS
 
 func main() {
 	showVersion := flag.Bool("version", false, "打印版本信息并退出")
+	configPath := flag.String("config", "", "配置文件路径（默认 ./config.json；none 关闭）")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(versionLine())
 		return
+	}
+	// 命令行参数优先于环境变量：Windows 上双击 / 快捷方式传路径最省事。
+	if *configPath != "" {
+		_ = os.Setenv("TSWUI_CONFIG", *configPath)
 	}
 
 	if err := run(); err != nil {
@@ -66,6 +71,12 @@ func run() error {
 	logger := newLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
 	logger.Info("TShockWebUI 后端启动", "version", version, "config", cfg.LogValue())
+	switch {
+	case cfg.ConfigFileCreated:
+		logger.Info("首次运行：已生成配置文件，改完需重启才生效", "path", cfg.ConfigPath)
+	case cfg.ConfigFileWarn != "":
+		logger.Warn(cfg.ConfigFileWarn)
+	}
 
 	webFS, err := resolveWebFS(cfg.WebDistDir)
 	if err != nil {

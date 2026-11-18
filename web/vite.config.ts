@@ -106,10 +106,10 @@ export default defineConfig({
     port: Number(process.env.VITE_PORT) || 5173,
     // 端口被占时直接报错，而不是静默换到下一个（否则你会对着旧页面调半天）。
     strictPort: true,
-    // 开发期把 /api/* 代理到本机 Go 后端（server/，默认 :8080）。
+    // 开发期把 /api/* 代理到本机 Go 后端（server/，默认 :18080）。
     proxy: {
       '/api': {
-        target: process.env.VITE_API_TARGET ?? 'http://localhost:8080',
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:18080',
         changeOrigin: false,
       },
     },

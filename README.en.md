@@ -58,7 +58,9 @@ Download a desktop build, for example:
 - macOS: [tswui-0.1.0-rc.10-darwin-arm64](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.10/tswui-0.1.0-rc.10-darwin-arm64)
 Double-click to start; a console window opens — keep it open!
 (This executable bundles the frontend build, `data/*.json` and the atlases; no Node.js or other runtime is needed.)
-Then open [http://127.0.0.1:8080](http://127.0.0.1:8080) in your browser.
+On first start it writes `config.json` to the current directory (the exe's folder when double-clicked):
+port, TShock URL, log level and the rest live there — edit it and restart instead of remembering env vars.
+Then open [http://127.0.0.1:18080](http://127.0.0.1:18080) in your browser.
 **Web**
 
 - Add a TShock server: enter your server IP, and leave the `7878` REST API port next to it unchanged in most cases.
@@ -84,7 +86,8 @@ docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.10
 # On Linux, if host.docker.internal cannot be resolved, add
 #   --add-host host.docker.internal:host-gateway
 # or replace TSHOCK_URL with the host's IP.
-docker run -d --name tswui -p 18080:8080 \
+# To use config.json, mount it and add: -v $PWD/config:/config -e TSWUI_CONFIG=/config/config.json
+docker run -d --name tswui -p 18080:18080 \
   -e TSHOCK_URL=http://host.docker.internal:7878 \
   -e TSHOCK_ALLOW_CUSTOM_TARGETS=true \
   ghcr.io/hufang360/tshockwebui:0.1.0-rc.10
@@ -124,7 +127,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details.
 cd web && npm install && npm run build        # frontend build
 
 cd ../server
-WEB_DIST_DIR=../web/dist TSHOCK_URL=http://127.0.0.1:7878 go run .   # :8080
+WEB_DIST_DIR=../web/dist TSHOCK_URL=http://127.0.0.1:7878 go run .   # :18080
 
 go vet ./... && go test -race ./...
 ```
@@ -134,7 +137,7 @@ go vet ./... && go test -race ./...
 ```bash
 cd web
 npm install
-npm run dev          # http://localhost:5173; /api is proxied to VITE_API_TARGET (default :8080)
+npm run dev          # http://localhost:5173; /api is proxied to VITE_API_TARGET (default :18080)
 npm run build        # output in web/dist/
 npm run typecheck && npm run lint && npm run test:run
 ```

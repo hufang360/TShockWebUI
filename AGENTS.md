@@ -33,7 +33,7 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
                        └─ TShock 客户端 → env TSHOCK_URL (默认 http://127.0.0.1:7878)
 ```
 
-- 交付：**单个 Docker 镜像**（另可产出单文件二进制）；访问可为 `http://IP:8080` 或 `https://域名`。
+- 交付：**单个 Docker 镜像**（另可产出单文件二进制）；访问可为 `http://IP:18080` 或 `https://域名`。
 - 浏览器**不持有 TShock token**，密码只在 `POST /api/login` 的 body。
 - 可选能力（未装插件即禁用）与插件模块清单：见 `docs/API_SPEC.md` 与 `docs/设计原则与约束.md` §2。
 - **不暴露通用 `/tshock/` 代理**；只暴露固定 `/api/*`。

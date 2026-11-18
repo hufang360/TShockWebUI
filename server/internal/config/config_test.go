@@ -7,7 +7,8 @@ import (
 )
 
 func TestLoadDefaults(t *testing.T) {
-	// 清空所有相关 env，确保拿到默认值。
+	// 清空所有相关 env，且关掉配置文件，确保拿到纯默认值。
+	t.Setenv("TSWUI_CONFIG", "none")
 	for _, k := range []string{
 		"LISTEN", "TSHOCK_URL", "TSHOCK_METHOD", "TSHOCK_TIMEOUT", "COOKIE_SECURE", "SESSION_TTL",
 		"MAX_SESSIONS", "LOGIN_MAX_PER_MIN", "COMMAND_MAX_PER_MIN", "TRUST_PROXY", "LOG_LEVEL", "WEB_DIST_DIR",
@@ -18,7 +19,7 @@ func TestLoadDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Listen != ":8080" || cfg.TShockURL != "http://127.0.0.1:7878" {
+	if cfg.Listen != ":18080" || cfg.TShockURL != "http://127.0.0.1:7878" {
 		t.Fatalf("默认值错误：%+v", cfg)
 	}
 	if cfg.TShockTimeout != 10*time.Second || cfg.SessionTTL != 12*time.Hour {
@@ -36,6 +37,7 @@ func TestLoadDefaults(t *testing.T) {
 }
 
 func TestLoadOverrides(t *testing.T) {
+	t.Setenv("TSWUI_CONFIG", "none")
 	t.Setenv("LISTEN", ":9999")
 	t.Setenv("TSHOCK_URL", "https://tshock.example:7878")
 	t.Setenv("TSHOCK_TIMEOUT", "3s")
@@ -49,6 +51,8 @@ func TestLoadOverrides(t *testing.T) {
 	t.Setenv("TRUST_PROXY", "1")
 	t.Setenv("LOG_LEVEL", "DEBUG")
 	t.Setenv("WEB_DIST_DIR", "/tmp/dist")
+	// 名单归一：去空白 / 前导斜杠、转小写、去重、排序。
+	t.Setenv("TSWUI_INGAME_COMMANDS", " /SpawnBoss , spawnmob,spawnboss, ,")
 
 	cfg, err := Load()
 	if err != nil {
@@ -75,6 +79,9 @@ func TestLoadOverrides(t *testing.T) {
 	if cfg.WebDistDir != "/tmp/dist" {
 		t.Fatalf("WebDistDir = %q", cfg.WebDistDir)
 	}
+	if len(cfg.IngameCommands) != 2 || cfg.IngameCommands[0] != "spawnboss" || cfg.IngameCommands[1] != "spawnmob" {
+		t.Fatalf("TSWUI_INGAME_COMMANDS 解析错误：%+v", cfg.IngameCommands)
+	}
 }
 
 func TestLoadInvalid(t *testing.T) {
@@ -96,6 +103,7 @@ func TestLoadInvalid(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("TSWUI_CONFIG", "none")
 			t.Setenv(tc.key, tc.value)
 			if _, err := Load(); err == nil {
 				t.Fatalf("%s=%q 应报错", tc.key, tc.value)

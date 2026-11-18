@@ -10,7 +10,7 @@
 
 ## 0. 通用约定
 
-- 基址：同源，**相对路径 `/api`**（`http://IP:8080` 或 `https://域名` 都适用）。
+- 基址：同源，**相对路径 `/api`**（`http://IP:18080` 或 `https://域名` 都适用）。
 - 请求/响应体：`application/json; charset=utf-8`。
 - 缓存：所有 `/api/*` 的 JSON 响应都带 `Cache-Control: no-store`（响应可能随登录态变化，
   例如 `/api/status` 有无 token 拿到的字段不同），浏览器不得复用。

@@ -14,9 +14,10 @@
 #
 # 版本号注入 -X main.version；用 `.\dist\tswui.exe -version` 与 `GET /healthz` 查看。
 #
-# 运行（默认 :8080，TShock 默认 http://127.0.0.1:7878）：
-#   .\dist\tswui.exe
-#   $env:LISTEN=':9000'; $env:TSHOCK_URL='http://192.168.1.10:7878'; .\dist\tswui.exe
+# 运行（默认 :18080，TShock 默认 http://127.0.0.1:7878）：
+#   .\dist\tswui.exe                # 首次启动在 exe 当前目录生成 config.json，退出后改完再启动
+#   .\dist\tswui.exe -config D:\tswui\config.json   # 指定配置文件位置
+#   $env:LISTEN=':9000'; .\dist\tswui.exe          # 环境变量仍然优先于 config.json
 #
 # 说明：
 # - 内嵌资源由 server/main.go 的 //go:embed all:internal/webdist 提供，因此构建前
@@ -207,4 +208,4 @@ if ($Smoke) {
   }
 }
 
-Write-Host "==> 运行：$Out  （默认监听 :8080，可用 `$env:LISTEN / `$env:TSHOCK_URL 等环境变量覆盖）"
+Write-Host "==> 运行：$Out  （默认监听 :18080；首次启动生成 config.json，也可用 `$env:LISTEN / `$env:TSHOCK_URL 等环境变量覆盖）"

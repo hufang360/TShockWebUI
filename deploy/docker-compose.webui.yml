@@ -7,11 +7,11 @@
 #
 # 可选覆盖（写进同目录 .env，或命令行前置）：
 #   TSWUI_IMAGE=tshockwebui:test     镜像 tag
-#   TSWUI_PORT=8080                  宿主机端口
+#   TSWUI_PORT=18080                 宿主机端口
 #   TSHOCK_URL=http://host.docker.internal:7878
 #
 # 与下面这条 docker run 等价：
-#   docker run -d --name tswui --restart unless-stopped -p 8080:8080 \
+#   docker run -d --name tswui --restart unless-stopped -p 18080:18080 \
 #     --add-host host.docker.internal:host-gateway \
 #     -e TSHOCK_URL=http://host.docker.internal:7878 \
 #     -e TSHOCK_METHOD=POST \
@@ -27,6 +27,8 @@
 #   networks（同 deploy/docker-compose.example.yml 所在网络，通常是 tshock_default）。
 # - 前面有 HTTPS 反代时：COOKIE_SECURE 改 "true"、TRUST_PROXY 改 "true"。
 # - 公网部署建议 TSHOCK_ALLOW_CUSTOM_TARGETS 改 "false"，只允许 TSHOCK_URL。
+# - 容器默认不读写 config.json（镜像里 TSWUI_CONFIG=none）；想用它就取消下面 volumes
+#   那两行的注释，并在 environment 里加一行 TSWUI_CONFIG: "/config/config.json"。
 
 # 固定项目名，避免 compose 用目录名（deploy）当项目名而产生 deploy_default 之类的网络。
 name: tswui
@@ -37,11 +39,14 @@ services:
     container_name: tswui
     restart: unless-stopped
     ports:
-      - "${TSWUI_PORT:-8080}:8080"
+      - "${TSWUI_PORT:-18080}:18080"
+    # 可选：把 config.json 放到宿主机上（environment 里同时加 TSWUI_CONFIG: "/config/config.json"）
+    # volumes:
+    #   - ./config:/config
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      LISTEN: ":8080"
+      LISTEN: ":18080"
       TSHOCK_URL: "${TSHOCK_URL:-http://host.docker.internal:7878}"
       # 调用 TShock REST 的 HTTP 方法：POST（默认）或 GET。
       # TShock 不校验方法；默认 POST 用于规避机房对未备案域名明文 GET 的 302 劫持。

@@ -59,7 +59,10 @@ TShock 伴侣，面向服主，也面向玩家！
 
 （这个可执行文件里面，包含了 前端产物 + `data/*.json` + 图集，无需nodejs等环境）
 
-然后打开浏览器，访问 [http://127.0.0.1:8080](http://127.0.0.1:8080)
+第一次启动会生成 `config.json`（当前目录；双击启动时就是 exe 所在目录）：
+端口、TShock 地址、日志级别等都在里面，改完重启生效，比记一堆环境变量省事。
+
+然后打开浏览器，访问 [http://127.0.0.1:18080](http://127.0.0.1:18080)
 **网页端**
 
 - 添加tshock服务器，中间填写你的联机IP，旁边的 `7878` 是 REST API 端口，一般不用改。
@@ -85,7 +88,8 @@ docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.10
 # Linux 上如果解析不了 host.docker.internal，加
 #   --add-host host.docker.internal:host-gateway
 # 或把 TSHOCK_URL 换成宿主机 IP。
-docker run -d --name tswui -p 18080:8080 \
+# 想用 config.json 就挂卷并加：-v $PWD/config:/config -e TSWUI_CONFIG=/config/config.json
+docker run -d --name tswui -p 18080:18080 \
   -e TSHOCK_URL=http://host.docker.internal:7878 \
   -e TSHOCK_ALLOW_CUSTOM_TARGETS=true \
   ghcr.io/hufang360/tshockwebui:0.1.0-rc.10
@@ -125,7 +129,7 @@ TShock REST API（默认 http://127.0.0.1:7878，同网络 compose 用 http://ts
 cd web && npm install && npm run build        # 前端产物
 
 cd ../server
-WEB_DIST_DIR=../web/dist TSHOCK_URL=http://127.0.0.1:7878 go run .   # :8080
+WEB_DIST_DIR=../web/dist TSHOCK_URL=http://127.0.0.1:7878 go run .   # :18080
 
 go vet ./... && go test -race ./...
 ```
@@ -135,7 +139,7 @@ go vet ./... && go test -race ./...
 ```bash
 cd web
 npm install
-npm run dev          # http://localhost:5173，/api 代理到 VITE_API_TARGET（默认 :8080）
+npm run dev          # http://localhost:5173，/api 代理到 VITE_API_TARGET（默认 :18080）
 npm run build        # 产物 web/dist/
 npm run typecheck && npm run lint && npm run test:run
 ```

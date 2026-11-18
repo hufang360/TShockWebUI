@@ -33,9 +33,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # ---------- 2. 运行时（保持目标平台，不能固定 BUILDPLATFORM） ----------
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=srv /out/tswui /tswui
-EXPOSE 8080
-ENV LISTEN=:8080 \
+EXPOSE 18080
+ENV LISTEN=:18080 \
     TSHOCK_URL=http://tshock:7878 \
-    TSHOCK_METHOD=POST
+    TSHOCK_METHOD=POST \
+    TSWUI_CONFIG=none
 USER nonroot:nonroot
 ENTRYPOINT ["/tswui"]

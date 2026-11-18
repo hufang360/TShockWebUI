@@ -35,7 +35,7 @@ import { activeTargetHeader } from './servers'
 /**
  * 真实传输层：同源 `/api/*`（docs/API_SPEC.md）。
  *
- * - 相对路径（`/api`），故 `http://IP:8080` 与 `https://域名` 均可用。
+ * - 相对路径（`/api`），故 `http://IP:18080` 与 `https://域名` 均可用。
  * - `credentials: 'same-origin'` 携带 HttpOnly 会话 Cookie。
  * - 所有非 GET 请求带 `X-Requested-With: tswui`（CSRF 防线）。
  * - 绝不接触 TShock token / 密码持久化：密码只出现在 login 的 body。

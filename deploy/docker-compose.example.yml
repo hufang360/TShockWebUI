@@ -3,10 +3,11 @@
 #   docker compose -f deploy/docker-compose.example.yml up -d
 #
 # 说明：
-# - WebUI 只暴露 8080；TShock 的 7878 不对外，仅容器网络内可达。
-# - 生产环境请在 WebUI 前面加一层 TLS 反代（Caddy/Nginx/Cloudflare），
-#   并把 COOKIE_SECURE 设为 "true"。
+# - WebUI 只暴露 18080；TShock 的 7878 不对外，仅容器网络内可达。
+# - 生产环境请在 WebUI 前面加一层 TLS 反代，并把 COOKIE_SECURE 设为 "true"。
 # - 若 TShock 在别的机器：把 TSHOCK_URL 改成对应地址（必要时 https）。
+# - 容器默认不读写 config.json（镜像里 TSWUI_CONFIG=none）；想用配置文件就取消下面
+#   volumes 里那两行的注释，并在 environment 里设 TSWUI_CONFIG=/config/config.json。
 
 services:
   webui:
@@ -17,9 +18,12 @@ services:
     container_name: tshockwebui
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "18080:18080"
+    # 可选：把 config.json 放到宿主机上（environment 里同时设 TSWUI_CONFIG=/config/config.json）
+    # volumes:
+    #   - ./config:/config
     environment:
-      LISTEN: ":8080"
+      LISTEN: ":18080"
       TSHOCK_URL: "http://tshock:7878"
       # 调用 TShock REST 的 HTTP 方法：POST（默认）或 GET。
       # TShock 不校验方法；默认 POST 用于规避机房对未备案域名明文 GET 的 302 劫持。
@@ -41,6 +45,9 @@ services:
       # Tier B：允许 allowServer=false 的指令交给信使插件以真实在线玩家身份执行
       # （默认 false；需与服务端插件 WebUI/config.json 的 AllowInGameOnlyCommands 同时开启）
       TSWUI_ALLOW_INGAME_COMMANDS: "false"
+      # Tier B 放行名单（逗号分隔，指令名或别名）。留空 = 不限定。
+      # 例：spawnboss,spawnmob 只放行刷 Boss / 刷怪，其余（/item /tp /buff…）仍只能在游戏内敲。
+      TSWUI_INGAME_COMMANDS: ""
       LOG_LEVEL: "info"
     depends_on:
       - tshock

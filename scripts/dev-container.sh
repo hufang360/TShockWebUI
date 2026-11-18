@@ -91,9 +91,11 @@ esac
 
 RUN_ARGS=(
   --name "$CONTAINER"
-  -p "${PORT}:8080"
-  -e "LISTEN=:8080"
+  -p "${PORT}:18080"
+  -e "LISTEN=:18080"
   -e "WEB_DIST_DIR=/webdist"
+  # 开发容器不挂配置文件（容器内也没有可写目录），避免每次启动都报一次写不进去。
+  -e "TSWUI_CONFIG=none"
   -e "TSHOCK_URL=${TSHOCK_URL}"
   -e "TSHOCK_METHOD=${TSHOCK_METHOD}"
   -e "COOKIE_SECURE=${COOKIE_SECURE}"

@@ -25,5 +25,8 @@ tools/gamedump/obj/
 plugin/**/bin/
 plugin/**/obj/
 
+# 本机配置（首次启动自动生成，可能含 TSWUI_AUTH_SECRET）
+config.json
+
 # 系统杂物
 .DS_Store

@@ -27,8 +27,8 @@
 | ADR-3 | 运行时基础镜像用 **`gcr.io/distroless/static-debian12:nonroot`**（备选 `scratch`） | 加 ~2MB，自带 CA 证书（可反代 HTTPS 的 TShock）、非 root |
 | ADR-4 | **浏览器不再持有 TShock token**；后端内存会话 + `HttpOnly` Cookie | token 不进 JS，XSS 无法直接搬走；凭证改走 POST body |
 | ADR-5 | 浏览器**只调用固定 `/api/*`**，容器**不暴露通用 `/tshock/` 代理** | 收窄攻击面，避免「任意 URL 转发」；只暴露业务所需端点 |
-| ADR-6 | 生产前端 `base=/`，API 用相对路径 `/api`、数据用 `/data`；GitHub Pages 演示用 `VITE_BASE=/<repo>/` | 同一份构建适配 `http://IP:8080` 与 `https://域名`；Pages 仅静态演示 |
-| ADR-7 | TLS 由**外层**（Caddy/Nginx/Cloudflare）终止；容器内 HTTP `:8080` | 镜像保持小且简单；IP:端口 场景直接跑 HTTP |
+| ADR-6 | 生产前端 `base=/`，API 用相对路径 `/api`、数据用 `/data`；GitHub Pages 演示用 `VITE_BASE=/<repo>/` | 同一份构建适配 `http://IP:18080` 与 `https://域名`；Pages 仅静态演示 |
+| ADR-7 | TLS 由**外层**（Caddy/Nginx/Cloudflare）终止；容器内 HTTP `:18080` | 镜像保持小且简单；IP:端口 场景直接跑 HTTP |
 | ADR-8 | 保留 **Mock 传输**，作为离线开发/自动化测试用，界面必须显式标注 | 不把 Mock 冒充真实功能（AGENTS 铁律） |
 | ADR-9 | 已知 `allowServer=false` 由**前端和后端双重拒绝**；未知/插件指令**放行给 TShock 判定**（后端内嵌 `commands.json`） | 纵深防御；插件指令无法静态枚举，TShock 仍是最终权限边界 |
 | ADR-10 | 会话仅存内存，进程重启即失效 | 无数据库、镜像无状态，代价是重启后需重登（可接受） |
@@ -183,11 +183,14 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 
 ---
 
-## 5. 配置（环境变量）
+## 5. 配置
+
+三个来源，**同一个键名**：内置默认值、`config.json`（本机文件）、同名环境变量。
+优先级：**环境变量 > config.json > 内置默认值**。
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `LISTEN` | `:8080` | 监听地址 |
+| `LISTEN` | `:18080` | 监听地址 |
 | `TSHOCK_URL` | `http://127.0.0.1:7878` | TShock REST 基址（同机 compose 用 `http://tshock:7878`） |
 | `TSHOCK_METHOD` | `POST` | 调用 TShock REST 的 HTTP 方法：`GET` / `POST`。TShock 不校验方法；默认 POST 用于规避部分机房对未备案域名明文 GET 的 302 劫持 |
 | `TSHOCK_TIMEOUT` | `10s` | 出站超时 |
@@ -201,9 +204,50 @@ Go 侧**不引入任何第三方模块**（`go.mod` 无 require）。gzip、路�
 | `TSWUI_AUTH_SECRET` | 空 | 与 WebUI 信使插件共享的密钥（插件 `Secret`）。两者都为空时不校验；公网部署务必设置 |
 | `WEBAUTH_TIMEOUT` | `60s` | 「在线授权」等待玩家在游戏内确认的总时长 |
 | `TSWUI_ALLOW_INGAME_COMMANDS` | `false` | Tier B：允许 `allowServer=false` 的指令交给插件以真实在线玩家身份执行（需插件侧同步开启） |
+| `TSWUI_INGAME_COMMANDS` | 空 | Tier B 的放行名单（逗号分隔，指令名或别名，大小写不敏感）；空 = 不限定。例如 `spawnboss,spawnmob` 只放行刷 Boss / 刷怪 |
 | `LOG_LEVEL` | `info` | `debug|info|warn|error` |
+| `TSWUI_CONFIG` | `config.json` | 配置文件路径（相对启动目录）；`none` / `off` / `-` 关闭配置文件 |
 
 启动时打印一份**脱敏**配置（打印 `TSHOCK_URL` 但不打印任何凭证）。
+
+### 5.1 config.json（不方便设环境变量时用这个）
+
+Windows 用 `cmd` 传环境变量不便、变量名又多，可以**完全不用环境变量**：第一次运行会
+在**当前目录**生成一份 `config.json`（键名与上表同名的环境变量完全一致），
+退出后编辑它，再启动就生效。
+
+```bash
+./tswui.exe                      # 首次运行：生成 config.json，照常启动服务（不退出）
+# 编辑 config.json（把 LISTEN 改成 ":9000"、TSHOCK_URL 改成自己的服……）
+./tswui.exe                      # 重启即按文件里的值运行
+./tswui.exe -config D:\tswui\config.json   # 或用 -config / TSWUI_CONFIG 指定别的路径
+```
+
+生成的模板长这样（`_comment` 只是给人读的说明，删掉也行）：
+
+```json
+{
+  "_comment": ["TShockWebUI 配置文件：键名与同名环境变量一致 …"],
+  "LISTEN": ":18080",
+  "TSHOCK_URL": "http://127.0.0.1:7878",
+  "TSHOCK_TIMEOUT": "10s",
+  "SESSION_TTL": "12h",
+  "TSWUI_INGAME_COMMANDS": [],
+  "TSWUI_AUTH_SECRET": ""
+}
+```
+
+规则：
+
+- **只写想改的键**：没出现的键保持内置默认值；把 `LISTEN` / `TSHOCK_URL` / 时长这类键显式写成空串会直接报错（不静默回退）。
+- 时长写字符串（`"12h"`、`"90s"`），名单写数组（`["spawnboss","spawnmob"]`，与服务端一样做小写 / 去重归一）。
+- **笔误的键名直接报错拒绝启动**（`json: unknown field "LITSEN"`）——静默忽略会让你以为改了却还在跑默认值。
+- 环境变量仍然优先：容器 / compose / `make dev` 照旧用环境变量，同名键以 env 为准，不受文件影响。
+- 生成失败（目录只读）只打一条警告，不阻塞启动；文件存在但 JSON 写坏则拒绝启动并指出路径。
+- `config.json` 已加入 `.gitignore`：文件里可能含 `TSWUI_AUTH_SECRET`。
+- 它是**后端**的配置，与信使插件那份 `tshock/WebUI/config.json` 不是同一个文件（插件配置见 [`插件-信使.md`](插件-信使.md)）。
+- Docker 镜像里默认 `TSWUI_CONFIG=none`（容器内没有可写的当前位置），
+  要用就挂卷并显式设 `TSWUI_CONFIG=/config/config.json`（见 `deploy/docker-compose.*.yml` 的注释）。
 
 ---
 
@@ -245,8 +289,8 @@ docker compose -f deploy/docker-compose.example.yml up -d
 
 | 场景 | 访问 | 说明 |
 | --- | --- | --- |
-| 直接 IP:端口 | `http://<ip>:8080` | 明文 HTTP，建议仅内网/可信网络 |
-| 套域名 + 外层 TLS | `https://tr.example.com` → 反代到 `:8080` | 外层设 `COOKIE_SECURE=true`；容器内仍是 HTTP |
+| 直接 IP:端口 | `http://<ip>:18080` | 明文 HTTP，建议仅内网/可信网络 |
+| 套域名 + 外层 TLS | `https://tr.example.com` → 反代到 `:18080` | 外层设 `COOKIE_SECURE=true`；容器内仍是 HTTP |
 
 外层反代不需要再配 `/tshock/`——浏览器只走 `/api/*`。
 
@@ -284,7 +328,7 @@ VERSION=1.2.3 scripts/build-binary.sh          # 指定版本号（默认 git de
 2. `data/` 随仓库提交；构建脚本会先检查文件是否齐全，缺了就提示生成命令。
 3. 脚本一律以仓库根 `data/` 为唯一来源（前端不再有 `web/public/data` 符号链接）。
 4. 交叉编译只交叉 Go 部分；前端构建与平台无关，可在任一平台产出。
-5. Windows 首次运行会弹防火墙授权，需放行才能从局域网访问 `:8080`；`build-binary.ps1` 尚未在 Windows 实机验证。
+5. Windows 首次运行会弹防火墙授权，需放行才能从局域网访问 `:18080`；`build-binary.ps1` 尚未在 Windows 实机验证。
 
 各平台编译 / 体积 / 运行验证的实测表见 [`记录-实现与验收.md`](记录-实现与验收.md)。
 
@@ -297,7 +341,7 @@ VERSION=1.2.3 scripts/build-binary.sh          # 指定版本号（默认 git de
 node tools/gen-data.mjs && python3 tools/gen-atlas.py
 
 # 2) 后端（先跑）：二选一
-#    a. 宿主直跑 :8080（连宿主可访问的 TShock）
+#    a. 宿主直跑 :18080（连宿主可访问的 TShock）
 scripts/dev-native.sh                     # = make dev
 #    b. 挂载式容器 :18080（连宿主机 7878 上的 TShock，宿主构建、不 build 镜像）
 scripts/dev-container.sh                  # = make dev-container（默认 18080，浏览器直接开就是完整应用）

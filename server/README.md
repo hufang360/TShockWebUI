@@ -33,7 +33,7 @@ server/
 # 需要先构建前端（或用 WEB_DIST_DIR 指向 web/dist）
 cd web && npm run build
 
-# 启动后端（:8080），指向本机 TShock
+# 启动后端（:18080），指向本机 TShock
 cd server && WEB_DIST_DIR=../web/dist TSHOCK_URL=http://127.0.0.1:7878 go run .
 ```
 
@@ -90,7 +90,7 @@ TSWUI_TOKEN=$TSHOCK_TOKEN server/scripts/smoke.sh
 # 账号密码（会调 token/create，受 TShock 限流）
 TSWUI_USER=hf TSWUI_PASS=****** server/scripts/smoke.sh
 # 自定义地址
-TSWUI_BASE=http://127.0.0.1:8080 server/scripts/smoke.sh
+TSWUI_BASE=http://127.0.0.1:18080 server/scripts/smoke.sh
 ```
 
 ## 已知实现要点

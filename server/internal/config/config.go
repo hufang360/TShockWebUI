@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,14 +42,24 @@ type Config struct {
 	// AllowIngameCommands 允许把 allowServer=false 的指令交给信使插件、
 	// 以真实在线玩家身份执行（需要插件 AllowInGameOnlyCommands=true）。默认关。
 	AllowIngameCommands bool
+	// IngameCommands 限定上面这条通道只对哪些指令开放（指令名或别名，小写）。
+	// 空 = 不限定（旧行为）。仅在 AllowIngameCommands=true 时才有意义。
+	IngameCommands []string
 	// WebDistDir 仅用于本地开发：非空时从磁盘读取前端产物，替代内嵌资源。
 	WebDistDir string
+
+	// ConfigPath 是本次加载的配置文件绝对路径（空 = 未启用配置文件）。
+	ConfigPath string
+	// ConfigFileCreated 表示本次启动刚生成模板（首次运行），改完需重启才生效。
+	ConfigFileCreated bool
+	// ConfigFileWarn 是配置文件相关的非致命提示（如目录不可写导致生成失败），由 main 打印。
+	ConfigFileWarn string
 }
 
 // Default 返回全部默认值。TSHOCK_URL 默认指向本机 TShock。
 func Default() Config {
 	return Config{
-		Listen:         ":8080",
+		Listen:         ":18080",
 		TShockURL:      "http://127.0.0.1:7878",
 		TShockTimeout:  10 * time.Second,
 		TShockMethod:   "POST",
@@ -69,53 +80,82 @@ func Default() Config {
 	}
 }
 
-// Load 读取环境变量并校验，返回最终配置。
+// Load 返回最终配置：内置默认值 ← config.json ← 环境变量（后者覆盖前者），最后统一校验。
 func Load() (Config, error) {
 	c := Default()
 
-	c.Listen = env("LISTEN", c.Listen)
-	c.TShockURL = env("TSHOCK_URL", c.TShockURL)
-	c.TShockMethod = strings.ToUpper(strings.TrimSpace(env("TSHOCK_METHOD", c.TShockMethod)))
-	c.LogLevel = strings.ToLower(env("LOG_LEVEL", c.LogLevel))
-	c.WebAuthSecret = os.Getenv("TSWUI_AUTH_SECRET")
-	c.WebDistDir = os.Getenv("WEB_DIST_DIR")
-
-	var err error
-	if c.TShockTimeout, err = envDuration("TSHOCK_TIMEOUT", c.TShockTimeout); err != nil {
+	path, err := configFilePath()
+	if err != nil {
 		return c, err
 	}
-	if c.SessionTTL, err = envDuration("SESSION_TTL", c.SessionTTL); err != nil {
-		return c, err
-	}
-	if c.WebAuthTimeout, err = envDuration("WEBAUTH_TIMEOUT", c.WebAuthTimeout); err != nil {
-		return c, err
-	}
-	if c.CookieSecure, err = envBool("COOKIE_SECURE", c.CookieSecure); err != nil {
-		return c, err
-	}
-	if c.TrustProxy, err = envBool("TRUST_PROXY", c.TrustProxy); err != nil {
-		return c, err
-	}
-	if c.AllowIngameCommands, err = envBool("TSWUI_ALLOW_INGAME_COMMANDS", c.AllowIngameCommands); err != nil {
-		return c, err
-	}
-	if c.TShockAllowCustomTargets, err = envBool("TSHOCK_ALLOW_CUSTOM_TARGETS", c.TShockAllowCustomTargets); err != nil {
-		return c, err
-	}
-	if c.MaxSessions, err = envInt("MAX_SESSIONS", c.MaxSessions); err != nil {
-		return c, err
-	}
-	if c.LoginMaxPerMin, err = envInt("LOGIN_MAX_PER_MIN", c.LoginMaxPerMin); err != nil {
-		return c, err
-	}
-	if c.CommandMaxPerMin, err = envInt("COMMAND_MAX_PER_MIN", c.CommandMaxPerMin); err != nil {
-		return c, err
+	if path != "" {
+		c.ConfigPath = path
+		created, warn, err := loadConfigFile(path, &c)
+		if err != nil {
+			return c, err
+		}
+		c.ConfigFileCreated, c.ConfigFileWarn = created, warn
 	}
 
+	if err := applyEnv(&c); err != nil {
+		return c, err
+	}
 	if err := c.validate(); err != nil {
 		return c, err
 	}
 	return c, nil
+}
+
+// applyEnv 用环境变量覆盖 c（c 里已有配置文件 / 默认值）。
+func applyEnv(c *Config) error {
+	c.Listen = env("LISTEN", c.Listen)
+	c.TShockURL = env("TSHOCK_URL", c.TShockURL)
+	c.TShockMethod = strings.ToUpper(strings.TrimSpace(env("TSHOCK_METHOD", c.TShockMethod)))
+	c.LogLevel = strings.ToLower(env("LOG_LEVEL", c.LogLevel))
+	// 凭证与开发路径只在 env 非空时覆盖：空 env 不该抹掉配置文件里的值。
+	if v := os.Getenv("TSWUI_AUTH_SECRET"); v != "" {
+		c.WebAuthSecret = v
+	}
+	if v := os.Getenv("WEB_DIST_DIR"); v != "" {
+		c.WebDistDir = v
+	}
+
+	var err error
+	if c.TShockTimeout, err = envDuration("TSHOCK_TIMEOUT", c.TShockTimeout); err != nil {
+		return err
+	}
+	if c.SessionTTL, err = envDuration("SESSION_TTL", c.SessionTTL); err != nil {
+		return err
+	}
+	if c.WebAuthTimeout, err = envDuration("WEBAUTH_TIMEOUT", c.WebAuthTimeout); err != nil {
+		return err
+	}
+	if c.CookieSecure, err = envBool("COOKIE_SECURE", c.CookieSecure); err != nil {
+		return err
+	}
+	if c.TrustProxy, err = envBool("TRUST_PROXY", c.TrustProxy); err != nil {
+		return err
+	}
+	if c.AllowIngameCommands, err = envBool("TSWUI_ALLOW_INGAME_COMMANDS", c.AllowIngameCommands); err != nil {
+		return err
+	}
+	// 未设置时保留配置文件里的名单；设置了（含空串）就按 env 归一。
+	if raw, ok := os.LookupEnv("TSWUI_INGAME_COMMANDS"); ok {
+		c.IngameCommands = normalizeList(raw)
+	}
+	if c.TShockAllowCustomTargets, err = envBool("TSHOCK_ALLOW_CUSTOM_TARGETS", c.TShockAllowCustomTargets); err != nil {
+		return err
+	}
+	if c.MaxSessions, err = envInt("MAX_SESSIONS", c.MaxSessions); err != nil {
+		return err
+	}
+	if c.LoginMaxPerMin, err = envInt("LOGIN_MAX_PER_MIN", c.LoginMaxPerMin); err != nil {
+		return err
+	}
+	if c.CommandMaxPerMin, err = envInt("COMMAND_MAX_PER_MIN", c.CommandMaxPerMin); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c Config) validate() error {
@@ -164,11 +204,16 @@ func (c Config) validate() error {
 // LogValue 用于脱敏日志输出：只暴露非敏感字段。
 // TSHOCK_URL 如含 userinfo（http://user:pass@host）会被脱敏。
 func (c Config) LogValue() string {
+	configFile := c.ConfigPath
+	if configFile == "" {
+		configFile = "(未启用)"
+	}
 	return fmt.Sprintf(
-		"listen=%s tshock_url=%s tshock_timeout=%s tshock_method=%s cookie_secure=%t session_ttl=%s max_sessions=%d login_max_per_min=%d command_max_per_min=%d trust_proxy=%t allow_custom_targets=%t webauth_key_set=%t webauth_timeout=%s allow_ingame_commands=%t log_level=%s web_dist_dir=%q",
-		c.Listen, redactURL(c.TShockURL), c.TShockTimeout, c.TShockMethod, c.CookieSecure, c.SessionTTL,
+		"listen=%s config_file=%q tshock_url=%s tshock_timeout=%s tshock_method=%s cookie_secure=%t session_ttl=%s max_sessions=%d login_max_per_min=%d command_max_per_min=%d trust_proxy=%t allow_custom_targets=%t webauth_key_set=%t webauth_timeout=%s allow_ingame_commands=%t ingame_commands=%s log_level=%s web_dist_dir=%q",
+		c.Listen, configFile, redactURL(c.TShockURL), c.TShockTimeout, c.TShockMethod, c.CookieSecure, c.SessionTTL,
 		c.MaxSessions, c.LoginMaxPerMin, c.CommandMaxPerMin, c.TrustProxy, c.TShockAllowCustomTargets,
-		c.WebAuthSecret != "", c.WebAuthTimeout, c.AllowIngameCommands, c.LogLevel, c.WebDistDir,
+		c.WebAuthSecret != "", c.WebAuthTimeout, c.AllowIngameCommands, strings.Join(c.IngameCommands, "|"),
+		c.LogLevel, c.WebDistDir,
 	)
 }
 
@@ -187,6 +232,26 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// normalizeList 解析逗号分隔的名单（指令名 / 别名）：去空白与前导 /、转小写、去重、排序。
+// 空串返回 nil：调用方用 len==0 表示「不限定」。
+func normalizeList(raw string) []string {
+	seen := make(map[string]struct{}, 4)
+	out := make([]string, 0, 4)
+	for _, part := range strings.Split(raw, ",") {
+		name := strings.ToLower(strings.TrimLeft(strings.TrimSpace(part), "/"))
+		if name == "" {
+			continue
+		}
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func envDuration(key string, def time.Duration) (time.Duration, error) {
