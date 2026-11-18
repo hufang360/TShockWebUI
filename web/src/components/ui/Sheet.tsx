@@ -13,7 +13,8 @@ export function SheetOverlay({ className, ...props }: ComponentProps<typeof Shee
   return (
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
-      className={cn('fixed inset-0 z-50 bg-black/60 backdrop-blur-sm', className)}
+      // 与 `ContentScrim` / `DialogOverlay` 同一观感：半透明黑、不模糊。
+      className={cn('fixed inset-0 z-50 bg-black/50', className)}
       {...props}
     />
   )

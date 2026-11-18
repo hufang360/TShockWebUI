@@ -445,7 +445,7 @@ describe('FishShopPage', () => {
       expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeNull()
       expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeNull()
 
-      // 自绘遮罩：从内容区左边界（`--content-left`，即侧栏右边）开始，半透明黑 + 模糊。
+      // 自绘遮罩：从内容区左边界（`--content-left`，即侧栏右边）开始，半透明黑、不模糊。
       // 这里断言它的定位起点，等于断言「不会盖住左侧边栏」。
       const scrim = screen.getByTestId('fish-detail-scrim')
       expect(scrim.className).toContain('left-[var(--content-left,0px)]')
@@ -966,6 +966,10 @@ describe('FishShopPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     await screen.findByRole('dialog')
     expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeTruthy()
+    // 手机端抽屉自带的遮罩：半透明黑、不模糊（与桌面 `ContentScrim` 一个观感）。
+    const overlay = document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')
+    expect(overlay?.className).toContain('bg-black/50')
+    expect(overlay?.className).not.toContain('backdrop-blur')
 
     fireEvent.pointerDown(document.body)
     fireEvent.click(document.body)

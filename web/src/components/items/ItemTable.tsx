@@ -72,7 +72,7 @@ function ItemTable({
           <col />
           <col />
         </colgroup>
-        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground">
           <tr>
             <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>

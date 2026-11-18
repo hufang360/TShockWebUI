@@ -23,7 +23,7 @@ export function GoodsTable({
   const { t } = useI18n()
   return (
     <table className="w-full border-collapse text-left text-xs">
-      <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-2xs text-muted-foreground backdrop-blur">
+      <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-2xs text-muted-foreground">
         <tr className="border-b border-border/60">
           <th scope="col" className="px-2 py-2 font-medium">
             {t('fish.col.serial')}

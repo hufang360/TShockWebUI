@@ -58,8 +58,9 @@ export function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.
     <DrawerPrimitive.Backdrop
       data-slot="drawer-overlay"
       // 遮罩不透明度随拖拽进度变化（Base UI 提供 --drawer-swipe-progress）。
+      // 半透明黑、不模糊：与 `ContentScrim` / `DialogOverlay` 同一观感（模糊会把底下的文字糊成一片）。
       className={cn(
-        'fixed inset-0 z-50 min-h-dvh bg-black/60 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-backdrop-filter:backdrop-blur-sm',
+        'fixed inset-0 z-50 min-h-dvh bg-black/50 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0',
         className,
       )}
       {...props}

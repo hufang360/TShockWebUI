@@ -233,7 +233,7 @@ export function AppShell({
             )}
           >
             {/* 内容区顶栏：收起 / 展开侧栏 + 当前位置；滚动时吸附在页面顶部。 */}
-            <header className="relative sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/95 px-2 backdrop-blur md:px-3">
+            <header className="relative sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/95 px-2 md:px-3">
               {/* 移动端：打开抽屉；桌面端：只在侧栏收起时出现（展开态用侧栏页头的收起按钮）。 */}
               <SidebarTrigger
                 className="md:hidden"

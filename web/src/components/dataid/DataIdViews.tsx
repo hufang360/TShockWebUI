@@ -117,7 +117,7 @@ function NpcTable({ rows, onSelect }: { rows: Npc[]; onSelect: (npc: Npc) => voi
           <col />
           <col />
         </colgroup>
-        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground">
           <tr>
             <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
@@ -291,7 +291,7 @@ function BuffTable({ rows, onSelect }: { rows: Buff[]; onSelect: (buff: Buff) =>
           <col />
         </colgroup>
         {/* 表头不铺白底：用页面背景色（半透明 + 模糊），吸顶时也不会看到下面的行糊在一起 */}
-        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground">
           <tr>
             <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
@@ -420,7 +420,7 @@ function DataTable({
           <col />
         </colgroup>
         {/* 表头不铺白底：用页面背景色（半透明 + 模糊），吸顶时也不会看到下面的行糊在一起 */}
-        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground backdrop-blur">
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground">
           <tr>
             <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
             <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>

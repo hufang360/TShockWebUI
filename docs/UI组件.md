@@ -38,8 +38,8 @@
 | Switch | `ui/Switch.tsx` | radix switch | |
 | Dialog | `ui/Dialog.tsx` | radix dialog | 每个 Dialog 必须有 `DialogTitle`；`DialogFooter` = 底部操作区（`bg-background` + `border-t`）；`DialogContent` 支持 `overlay={false}`（不画暗色遮罩，配 `modal={false}` 用，行为接近 popover）与 `hideClose`（不画右上角 ×，调用方自己提供更合适的关闭入口）；`radius="container"` 换成 16px 圆角（默认 `modal` 24px，给命令面板这类紧凑弹框用——写成属性是因为 `rounded-modal` / `rounded-container`是两个独立工具类，同时写只会由 CSS 顺序决定谁生效） |
 | DropdownMenu | `ui/DropdownMenu.tsx` | radix dropdown-menu | 菜单项包在 `DropdownMenuGroup` 里；侧栏底部账号卡片（`SidebarAccountMenu`）用它 |
-| Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用 / 鱼店商品详情 / 数据ID 详情）；`SheetContent` 有 `overlay` 参数（`false` = 不画自带遮罩，配 `modal={false}` + `ContentScrim` 做「只盖内容区」的抽屉）；**不支持堆叠**，需要叠层就用 `Drawer` |
-| Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`；`DrawerContent` 也有 `overlay` 参数（`false` = 不画自带遮罩，物品详情的抽屉用它 + `ContentScrim`）。**每个 Drawer 必须有 `DrawerTitle`** |
+| Sheet | `ui/Sheet.tsx` | radix dialog | 侧边抽屉（Sidebar 移动端用 / 鱼店商品详情 / 数据ID 详情）；`SheetContent` 有 `overlay` 参数（`false` = 不画自带遮罩，配 `modal={false}` + `ContentScrim` 做「只盖内容区」的抽屉）；自带遮罩统一 `bg-black/50`、**不模糊**（与 `ContentScrim` / `Dialog` 同观感）；**不支持堆叠**，需要叠层就用 `Drawer` |
+| Drawer | `ui/Drawer.tsx` | **Base UI** `@base-ui/react/drawer` | **可堆叠**抽屉（物品详情用；物品分组也复用为固定右侧抽屉）：详情桌面从右侧滑入、移动端从底部滑入（带拖拽手柄、可滑走关闭）；在内容里再渲染 `<Drawer>` 就叠一层，父层缩小变暗留在后面。`DrawerContent` 的宽度用 `[--drawer-content-width:…]` / 竖向高度用 `h-*`、`max-h-*`；`DrawerContent` 也有 `overlay` 参数（`false` = 不画自带遮罩，物品详情的抽屉用它 + `ContentScrim`）；自带遮罩 `bg-black/50`、**不模糊**。**每个 Drawer 必须有 `DrawerTitle`** |
 | Tooltip | `ui/Tooltip.tsx` | radix tooltip | 需要 `TooltipProvider` 祖先（`SlotTooltip` 自带一个） |
 | Popover | `ui/Popover.tsx` | radix popover | 点击 / 受控展开的浮层（`PopoverContent` 默认 `side=bottom` / `sideOffset=6`）；登录框「登录帮助」、物品 ID / 数据 ID「页面设置」用它 |
 | Separator | `ui/Separator.tsx` | radix separator | 分隔线一律用它，不要 `border-t/b` div 或 `<hr>` |
@@ -483,6 +483,7 @@
   窄屏侧栏是抽屉本身、内容从 0 开始，故 `left-0`；
 - 层级 `z-[45]`：高于页面内容（`20`）与浮动终端 / 货架全屏（`40`），低于抽屉面板与其它模态（`50`）；
 - 点它 = 关闭；**不能用** `SheetContent` / `DrawerContent` 自带的 `inset-0` 遮罩（会把侧栏一起压暗并挡住导航）。
+- 全站遮罩（`ContentScrim` / `Dialog` / `Sheet` / `Drawer`）一律**半透明黑、不加模糊**：模糊会把底下正文糊成一片，只是变暗更干净；同一条规则适用于所有**半透明底色区块**——内容区顶栏（`bg-background/95`）、全屏浮动操作坞（`bg-card/95`）、各个吸顶表头（`bg-background/90`）都只留底色，**不再叠加 `backdrop-blur`**。
 
 配套的三件事，改其中一处必须一起改：
 
@@ -503,6 +504,7 @@
 | --- | --- | --- |
 | 鱼店商品详情 | `Sheet`（`components/fishshop/FishDetailSurface.tsx`） | 切页面回来仍开着（`tswui:moduleState` 的 `ui.detail`，按内容指纹存） |
 | 物品图鉴 详情 | Base UI `Drawer`（可堆叠，`components/items/ItemDetailDrawer.tsx`） | 遮罩由 `ItemsPage` 画，点它关掉整叠 |
+| 物品图鉴 分组 | Base UI `Drawer`（`components/items/DexGroupDrawer.tsx`） | 自己画 `ContentScrim`；点遮罩关、点左栏切页不关 |
 | 数据ID 详情 | `Sheet` | 切页面回来仍开着（`lib/dataIdState.ts` 的 `detail`） |
 | 指令小抄 分组 / 详情 | `Popover`（Radix） | 都不用遮罩：分组锚在工具条按钮上，详情锚在鼠标位置 |
 | 物品详情（图鉴以外的页面） | `Dialog`（`components/items/ItemDetailDialog.tsx`） | **就地弹框**，不再跳图鉴；见下 |
