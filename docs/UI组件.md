@@ -193,7 +193,7 @@
 | --- | --- | --- |
 | `components/ItemTooltipContent.tsx` | 大量硬编码色（`text-zinc-100` / `bg-black/85` / `text-amber-300` …） | 复刻 Terraria 游戏内物品提示的观感（名称按稀有度着色、半透明黑底、无模糊）；**不随站点明暗主题变化**，是游戏原样表现，换成语义令牌反而失真。详见 [`功能-合成表与物品提示.md`](功能-合成表与物品提示.md) |
 | `components/ItemTooltip.tsx` | `className="... z-[100]"` | 自研提示（非 shadcn `Tooltip`），会从 `Sheet` / `Dialog`（`z-50`）内部触发，portal 到 `body` 后必须盖在它们上面；没有可复用的组件堆叠机制 |
-| `components/ItemTooltipContent.tsx` | 里面那个 ⓘ「物品详情」的 shadcn `TooltipContent` 传 `className="z-[110]"` | 它挂在上面的 `z-[100]` 自研提示里，用默认 `z-50` 会被提示本体盖住 |
+| `components/ItemTooltipContent.tsx` | 里面那个 ⓘ「物品详情」的 shadcn `TooltipContent` 传 `className="z-[110]"` | 它挂在上面的 `z-[100]` 自研提示里，会被提示本体盖住 |
 | `components/ItemTooltipContent.tsx` | 右上角 ⭐ / ⓘ 是手写 `<button>`，不是 `IconAction` | 深色游戏风格提示上语义令牌不成立（`text-muted-foreground` 看不见），颜色按游戏原样写死；见上一条 |
 | `components/ui/*` 内建 `aria-label`（`Close` / `Loading` / `pagination` …） | 英文硬编码 | 这些是 shadcn 原样组件，不依赖 `lib/i18n`（避免 ui 层耦合业务 i18n）。**业务侧调用时用 `aria-label` / `title` 覆盖**（如 `AppShell` 给 `SidebarTrigger` / `SidebarRail` 传 `nav.toggleSidebar` / `nav.railToggle`） |
 | `components/ui/Card.tsx` | `Card` / `CardHeader` / `CardTitle` / `CardBody`，没有 `CardContent` / `CardFooter` | 项目自有命名（见组件清单）；布局语义一致，`CardFooter` 由 `DialogFooter` / `SheetFooter` 承担 |
@@ -435,7 +435,7 @@
   1. **左**：`SidebarTrigger` + `Separator` + `Breadcrumb`（只显示当前页面）+ **页面说明 ⓘ**（`TopBarActions info=…` 的 `TopBarInfoSlot`）。
      顶栏只在侧栏收起时出现「显示侧栏」（桌面）；移动端保留「打开菜单」。
   2. **右**：`上次刷新 → 刷新 → 管理卡片 / 页面设置`，即刷新类在最左、管理类在右。
-     图标固定：**管理卡片 = `PlayingCardsFan`**（首页 / 自定义模块 / 鱼店三处必须一致），**页面设置 = `Settings2`**——
+     图标固定：**管理卡片 = `GalleryVerticalEnd`**（首页 / 自定义模块 / 鱼店三处必须一致），**页面设置 = `Settings2`**——
      两者长得像，但一个是「挑卡片」，一个是「调这个页面的显示」，别混用。
      需要随手跑一条指令时用 `Ctrl/Cmd+K` 搜索面板，顶栏不再挂全局指令入口。
   3. **手机端**：右侧只保留 `…`（`DropdownMenu`），页面操作都在菜单里，**一行一个按钮（图标 + 名称）**，`…` 永远最右。
@@ -547,6 +547,10 @@
 
 > `SlotTooltip` 的触发元素保留原本的标签（Radix 的 `TooltipTrigger asChild` 只合并事件，不会变成 `<button>`），
 > 所以能安全地放在已经在 `Button` / 表格行里的图标上，不会产生嵌套按钮。
+
+- **层级**：`ui/Tooltip` 的 Content 默认 `z-[70]` —— 提示要盖在抽屉 / 普通弹框（`z-50`）和搜索面板（`z-[60]`）
+  上面，否则「弹框里按钮的提示」会被弹框自己的边角切掉半截（`返回上一级（Esc）` 曾经就是被切的那个）。
+  自研的 `ItemTooltip` 更高（`z-[100]`），它内部的 ⓘ 再高一档（`z-[110]`）。
 
 ## 业务组件（非 ui/）
 

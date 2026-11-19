@@ -20,6 +20,8 @@ export interface SearchIntent {
   kind?: 'npc' | 'tile' | 'wall' | 'buff'
   /** 物品图鉴要应用的集合 id。 */
   collectionId?: string
+  /** 鱼店：选中某件商品时带上编号，落到货架后直接打开它的详情。 */
+  goodsSerial?: number
 }
 
 interface PendingIntent extends SearchIntent {

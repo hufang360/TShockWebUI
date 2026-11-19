@@ -16,11 +16,17 @@ export function RichText({
   itemsById,
   prefixesById,
   atlas,
+  iconSize = 24,
 }: {
   text: string
   itemsById?: Map<number, Item>
   prefixesById?: Map<number, Prefix>
   atlas?: Atlas
+  /**
+   * `[i:..]` 图标的方框尺寸（CSS px），默认 24 = 游戏聊天里的占位尺寸。
+   * 行内密集的地方（搜索结果的次要信息）可以调小。
+   */
+  iconSize?: number
 }) {
   const tokens = parseRichText(text)
   if (tokens.length === 1 && tokens[0].kind === 'text') return <>{text}</>
@@ -52,9 +58,10 @@ export function RichText({
               <ItemIcon
                 item={item}
                 atlas={atlas}
-                size={24}
+                size={iconSize}
                 stack={token.stack}
-                maxStackSize={11}
+                // 数量字号上限随方框走（24px 时 11，16px 时 8），小方框里不会被数字糊满。
+                maxStackSize={Math.max(7, Math.round(iconSize * 0.46))}
                 prefix={prefix}
                 prefixId={token.prefixId}
               />

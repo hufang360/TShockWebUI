@@ -16,13 +16,12 @@ import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset, Item } from '@/types'
 import { cn } from '@/lib/cn'
 
-/** 合成表 / 掉落列表的只读显示选项；编辑入口在页面工具栏的「图鉴设置」Popover。 */
-export interface ItemDetailRecipeOptions {
-  /** 显示物品名称（默认不勾选 = 仅图标）。 */
-  showItemNames: boolean
-  /** 固定两列（默认不勾选 = 自适应多列）。 */
-  twoColumn: boolean
-}
+import type { ItemDetailRecipeOptions } from '@/hooks/useItemDetailRecipeOptions'
+
+export type { ItemDetailRecipeOptions } from '@/hooks/useItemDetailRecipeOptions'
+
+/** 物品详情的内容外壳：图鉴抽屉 / 其它页面的弹框 / 搜索面板里的一块。 */
+export type ItemDetailChrome = 'drawer' | 'dialog' | 'command'
 
 export interface ItemDetailPanelProps {
   item: Item
@@ -43,10 +42,14 @@ export interface ItemDetailPanelProps {
   /** 关掉整个详情（所有层）。 */
   onCloseAll: () => void
   /**
-   * 外壳：`drawer`（物品图鉴的可堆叠抽屉）/ `dialog`（其它页面就地弹框）。
-   * 只影响标题栏与关闭按钮的位置，内容完全一致。
+   * 外壳：`drawer`（物品图鉴的可堆叠抽屉）/ `dialog`（其它页面就地弹框）/
+   * `command`（全局搜索弹框里的一层：没有标题栏、没有底部操作按钮，
+   * 前往 Wiki / 复制名称 / 复制 ID 全走弹框底栏的快捷键）。
+   * 只影响标题栏、底部操作区与关闭按钮，内容完全一致。
    */
-  chrome: 'drawer' | 'dialog'
+  chrome: ItemDetailChrome
+  /** 「相关指令」点终端图标：默认填进搜索面板；搜索面板自己开着时用它写到面板输入框。 */
+  onFillCommand?: (command: string) => void
   /** 外壳组件带上的测试 id（`dex-detail`）。 */
   testId?: string
 }
@@ -72,11 +75,13 @@ export function ItemDetailPanel({
   onBack,
   onCloseAll,
   chrome,
+  onFillCommand,
   testId = 'dex-detail-actions',
 }: ItemDetailPanelProps) {
   const { t, lang } = useI18n()
   const [copied, setCopied] = useState<'id' | 'name' | null>(null)
   const isDialog = chrome === 'dialog'
+  const isCommand = chrome === 'command'
   const Title = isDialog ? DialogTitle : DrawerTitle
 
   const stat = dataset.itemStats.items[String(item.id)]
@@ -133,7 +138,7 @@ export function ItemDetailPanel({
       )}
       <Title className="min-w-0 flex-1 truncate">{t('dex.detail')}</Title>
       {/* 弹框的 × 由 `DialogContent` 提供（绝对定位在右上角），这里不再重复一个。 */}
-      {!isDialog && (
+      {!isDialog && !isCommand && (
         <IconAction
           label={t('action.close')}
           icon={X}
@@ -146,15 +151,20 @@ export function ItemDetailPanel({
 
   return (
     <>
-      {isDialog ? (
+      {isCommand ? (
+        /* 搜索面板里没有标题栏（层级由内容自己说明）：只有叠了子物品时给一行返回键。 */
+        depth > 0 && <div className={cn(headerClass, 'shrink-0 px-3 py-1.5')}>{header}</div>
+      ) : isDialog ? (
         // `pr-12` 让开 `DialogContent` 右上角那个 ×。
         <DialogHeader className={cn(headerClass, 'pr-12')}>{header}</DialogHeader>
       ) : (
         <DrawerHeader className={headerClass}>{header}</DrawerHeader>
       )}
 
-      {/* 中间滚动区：通栏 tips（无阴影）→ 词缀（可折叠分区）→ 相关指令 → 合成 / 掉落 */}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-4">
+      {/* 中间滚动区：通栏 tips（无阴影）→ 词缀（可折叠分区）→ 相关指令 → 合成 / 掉落。
+          `grow basis-auto`（而不是 `flex-1` 的 `basis-0`）：外壳高度自适应时
+          也按内容贡献高度（只有 `max-h` 的外壳不会把这块压成 0）。 */}
+      <div className="flex min-h-0 grow basis-auto flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-4">
         {/* 这里的这份 tips 就是当前物品自己：宽度占满一行、不要阴影，
             右上角不再显示 ⓘ「物品详情」入口（指向自己没意义） */}
         <ItemTooltipContent
@@ -190,6 +200,7 @@ export function ItemDetailPanel({
           <CommandLine
             label={t('commandLine.related')}
             commands={[giveCommand]}
+            onFill={onFillCommand}
             // 关掉整个详情（堆叠 / 弹框都一样）：搜索面板是模态的，不叠两层。
             onFilled={onCloseAll}
           />
@@ -214,41 +225,54 @@ export function ItemDetailPanel({
       </div>
 
       {/* 底部固定操作区（同「管理卡片」底部：按钮按内容宽度、带图标、不拉伸）：
-          前往 Wiki 在左，复制名称其次，复制 ID 在最右 */}
-      <div
-        data-testid={testId}
-        className="flex shrink-0 flex-row items-center justify-between gap-2 border-t px-5 py-3"
-      >
-        <Button variant="outline" asChild>
-          <a
-            href={wikiUrl(item.name, lang)}
-            target="_blank"
-            rel="noreferrer noopener"
-            aria-label={t('dex.wiki')}
-          >
-            <ExternalLink data-icon="inline-start" />
-            {t('dex.wiki')}
-          </a>
-        </Button>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button variant="outline" onClick={() => void copy('name')} aria-label={t('dex.copyName')}>
-            {copied === 'name' ? t('dex.copied') : t('dex.copyName')}
+          前往 Wiki 在左，复制名称其次，复制 ID 在最右。
+          搜索面板里的这一层**不渲染它**（三个动作全走底栏快捷键，见 `GlobalSearch`）。 */}
+      {!isCommand && (
+        <div
+          data-testid={testId}
+          className="flex shrink-0 flex-row items-center justify-between gap-2 border-t px-5 py-3"
+        >
+          <Button variant="outline" asChild>
+            <a
+              href={wikiUrl(item.name, lang)}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label={t('dex.wiki')}
+            >
+              <ExternalLink data-icon="inline-start" />
+              {t('dex.wiki')}
+            </a>
           </Button>
-          <Button
-            variant="primary"
-            onClick={() => void copy('id')}
-            aria-label={t('dex.copyId')}
-            data-testid="item-detail-copy-id"
-          >
-            {copied === 'id' ? t('dex.copied') : t('dex.copyId')}
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void copy('name')}
+              aria-label={t('dex.copyName')}
+            >
+              {copied === 'name' ? t('dex.copied') : t('dex.copyName')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void copy('id')}
+              aria-label={t('dex.copyId')}
+              data-testid="item-detail-copy-id"
+            >
+              {copied === 'id' ? t('dex.copied') : t('dex.copyId')}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 空态插画：只有 tips、没有合成信息时，右下角放一个半透明大号工匠图标。
-          绝对定位挂在面板上，不随中间区域滚动；`bottom-20` 让开底部操作区。 */}
+          绝对定位挂在面板上，不随中间区域滚动；没有底部操作区时贴底下一点。 */}
       {!hasRecipeInfo && (
-        <div aria-hidden className="pointer-events-none absolute right-6 bottom-20 opacity-[0.15]">
+        <div
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute right-6 opacity-[0.15]',
+            isCommand ? 'bottom-4' : 'bottom-20',
+          )}
+        >
           <ItemIcon
             item={dataset.itemsById.get(36)}
             atlas={dataset.atlas}

@@ -166,7 +166,11 @@ describe('searchEverything', () => {
       name: '传送回出生点',
       meta: '10 金币',
       icon: { kind: 'item', itemId: 50 },
-      action: { kind: 'prefill', tab: 'store', intent: { query: '传送回出生点' } },
+      action: {
+        kind: 'prefill',
+        tab: 'store',
+        intent: { query: '传送回出生点', goodsSerial: 7 },
+      },
     })
 
     // 说明 / 分类也参与匹配

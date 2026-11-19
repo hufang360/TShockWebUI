@@ -10,7 +10,10 @@ import {
 } from 'lucide-react'
 import { BuffIcon } from '@/components/BuffIcon'
 import { IconAction } from '@/components/IconAction'
+import { ItemDetailPanel } from '@/components/items/ItemDetailPanel'
+import type { ItemDetailRecipeOptions } from '@/hooks/useItemDetailRecipeOptions'
 import { ItemIcon } from '@/components/ItemIcon'
+import { RichText } from '@/components/RichText'
 import { NpcSprite } from '@/components/NpcSprite'
 import { CommandOutput } from '@/components/ResultPanel'
 import {
@@ -24,6 +27,10 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   InputGroup,
   InputGroupAddon,
   Kbd,
@@ -31,10 +38,12 @@ import {
 } from '@/components/ui'
 import { toast } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
+import { useItemDetailRecipeOptions } from '@/hooks/useItemDetailRecipeOptions'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { useIsMobile } from '@/hooks/use-mobile'
 import {
   commandInvocation,
+  groupPageExit,
   searchEverything,
   searchGroup,
   type GlobalSearchSources,
@@ -42,15 +51,20 @@ import {
   type SearchGroupId,
   type SearchHit,
 } from '@/lib/globalSearch'
+import { useItemFavorites } from '@/lib/itemFavoritesContext'
+import { ItemDetailProvider, type DetailEntry } from '@/lib/itemDetailContext'
+import { pushApi } from '@/lib/itemDetailStack'
 import { copyText } from '@/lib/clipboard'
 import { formatClock } from '@/lib/clock'
 import { cn } from '@/lib/cn'
 import { useI18n } from '@/lib/i18n'
+import { wikiUrl } from '@/lib/items'
 import { modKeyLabel, shortcutLabel } from '@/lib/keyboard'
 import type { SearchIntent } from '@/lib/searchIntent'
 import { forgetDrill, recallDrill, rememberDrill } from '@/lib/searchDrill'
 import { StorageKeys } from '@/lib/storage'
-import type { CommandResult, TabId } from '@/types'
+import type { BackendTransport } from '@/lib/tshock'
+import type { CommandResult, Dataset, TabId } from '@/types'
 
 /**
  * 全局搜索（`docs/计划-全局搜索.md`、`docs/功能-全局搜索.md`）。
@@ -91,16 +105,13 @@ const seeAllPageValue = (group: SearchGroupId) => `${group}:more-page`
 function runHit(
   hit: SearchHit,
   onNavigate: (tab: TabId, intent?: SearchIntent) => void,
-  onOpenItem: (itemId: number) => void,
 ): void {
-  if (hit.action.kind === 'item') {
-    onOpenItem(hit.action.itemId)
-    return
-  }
+  // 物品不在这里：它在弹框里就地开一层（见 `GlobalSearchDialog` 的 `openItemLevel`）。
   if (hit.action.kind === 'page') {
     onNavigate(hit.action.tab)
     return
   }
+  if (hit.action.kind !== 'prefill') return
   onNavigate(hit.action.tab, hit.action.intent)
 }
 
@@ -164,8 +175,16 @@ function HitRow({
       ) : (
         hit.meta && (
           // 真正贴右（名字 `flex-1` 吃掉剩余空间，不在右侧留预留位）。
-          <span className="max-w-[45%] shrink-0 truncate text-2xs text-muted-foreground">
-            {hit.meta}
+          // 次要信息也可能是物品标签（鱼店商品的价格就写成 `[i/s6:170]…`），按富文本渲染成图标；
+          // 没有标签时 `RichText` 原样返回文本，其它组不受影响。
+          <span className="flex max-w-[45%] shrink-0 items-center gap-1 overflow-hidden text-2xs text-muted-foreground">
+            <RichText
+              text={hit.meta}
+              itemsById={sources.dataset.itemsById}
+              prefixesById={sources.dataset.prefixesById}
+              atlas={sources.dataset.atlas}
+              iconSize={16}
+            />
           </span>
         )
       )}
@@ -257,25 +276,20 @@ interface GroupDetailProps {
   query: string
   sources: GlobalSearchSources
   onPick: (hit: SearchHit) => void
-  onBack: () => void
-  /** 二级里命中仍超过上限时的跳页出口。 */
+  /** 二级里的跳页出口（列表末尾的「更多」行）。 */
   onSeeAllPage: (tab: TabId, intent?: SearchIntent) => void
 }
 
-/** 二级：某一组的前 20 条（`Enter` 主操作和一级一致）。 */
-function GroupDetail({ detail, query, sources, onPick, onBack, onSeeAllPage }: GroupDetailProps) {
+/**
+ * 二级：某一组的前 20 条（`Enter` 主操作和一级一致）。
+ *
+ * 这层**没有标题行**：没有「返回」按钮、也不写「组名 · N 条」——回上一级只要 `Esc`，
+ * 条数在底栏左下角。省下的那一行给列表。
+ */
+function GroupDetail({ detail, query, sources, onPick, onSeeAllPage }: GroupDetailProps) {
   const { t } = useI18n()
   return (
     <div className="flex max-h-[inherit] flex-col" data-testid="global-search-group">
-      <div className="flex items-center gap-2 px-1 py-1">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ChevronLeft data-icon="inline-start" />
-          {t('action.back')}
-        </Button>
-        <span className="ml-auto truncate text-2xs text-muted-foreground tabular-nums">
-          {t(GROUP_LABEL[detail.group])} · {t('search.group.count', { n: detail.total })}
-        </span>
-      </div>
       <CommandList className="min-h-0 flex-1">
         {detail.hits.map((hit) => (
           <HitRow key={hit.id} hit={hit} sources={sources} onPick={onPick} />
@@ -459,18 +473,24 @@ function RecentGroup({ history, onRecent, onRemove }: RecentGroupProps) {
   )
 }
 
+/** 底栏里的一枚键帽（符号 / 图标，不写英文单词）。 */
+function Keycap({ children }: { children: React.ReactNode }) {
+  return (
+    <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">{children}</Kbd>
+  )
+}
+
 /**
  * 底栏的一个键位提示：键帽 + 文案。
  *
- * 键帽用符号 / 图标而不是英文单词（`⏎` 代替 `Enter`、delete 图标代替 `Delete`）：
- * 中文界面里不冒英文；组合键（`⌘` + `C`）拆成两个键帽，和系统提示的写法一致。
+ * 仅用于**无主操作可指**的说明（栏开时的「↑ ↓ 选择 / Esc 取消」）；有具体动作的一律用 `FooterAction`。
  */
 function Hint({
   keys,
   icon: Icon,
   label,
 }: {
-  /** 键帽文字（`⏎` / `Esc` / `↑` …）；用 `icon` 时省略。 */
+  /** 键帽文字（`↑ ↓` / `Esc` …）；用 `icon` 时省略。 */
   keys?: string
   /** 键帽里画图标（如 delete 键）；和 `keys` 二选一。 */
   icon?: LucideIcon
@@ -478,25 +498,51 @@ function Hint({
 }) {
   return (
     <span className="flex items-center gap-1">
-      <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">
-        {Icon ? <Icon aria-hidden className="size-3" /> : keys}
-      </Kbd>
+      <Keycap>{Icon ? <Icon aria-hidden className="size-3" /> : keys}</Keycap>
       {label}
     </span>
   )
 }
 
-/** 组合键（`⌘` + `C` / `Ctrl` + `C`）拆成两个键帽。 */
-function ModHint({ keyName, label }: { keyName: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1">
-      <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">
-        {modKeyLabel()}
-      </Kbd>
-      <Kbd className="h-5 min-w-5 border border-border/60 bg-background/70 px-1">{keyName}</Kbd>
-      {label}
-    </span>
-  )
+/**
+ * 底栏动作：**主操作直接写出来，其余收进「更多操作」**。
+ *
+ * 面板能做的事比一个普通搜索框多得多（打开 / 执行 / 复制 ID / 复制名称 / 去 Wiki / 去页面 / 返回），
+ * 全部平铺在底栏会变成一条读不完的说明。所以只留一个主操作 + 一个菜单入口（与 macOS 搜索的底部条同构）。
+ */
+type FooterActionId =
+  | 'open'
+  | 'copy'
+  | 'copyId'
+  | 'copyName'
+  | 'wiki'
+  | 'favorite'
+  | 'gotoPage'
+  | 'rerun'
+  | 'search'
+  | 'remove'
+
+interface FooterAction {
+  id: FooterActionId
+  /** 动作名（菜单里直接点也会执行）。 */
+  label: string
+  /** 组合键，**合并在一个键帽里**（`⌘C` / `Ctrl C`）；缺省 = 没有快捷键。 */
+  keys?: string
+  /** 键帽换成图标（delete 键这种没有字形的键）。 */
+  icon?: LucideIcon
+}
+
+/** 一个动作的键帽（没有快捷键时什么都不画）。 */
+function ActionKeycap({ action }: { action: FooterAction }) {
+  if (action.icon) {
+    const Icon = action.icon
+    return (
+      <Keycap>
+        <Icon aria-hidden className="size-3" />
+      </Keycap>
+    )
+  }
+  return action.keys ? <Keycap>{action.keys}</Keycap> : null
 }
 
 /**
@@ -586,7 +632,10 @@ interface GlobalSearchDialogProps {
   onOpenChange: (open: boolean) => void
   sources: GlobalSearchSources
   onNavigate: (tab: TabId, intent?: SearchIntent) => void
-  onOpenItem: (itemId: number) => void
+  /** 物品详情层要的：当前登录玩家名（`/give` 指令用）、网页发言、是否已登录。 */
+  username?: string | null
+  transport?: BackendTransport | null
+  authenticated?: boolean
   /**
    * 打开时预填的搜索词（「填入指令」用：等价于按 `Ctrl/Cmd+K` 再把指令敲进去）。
    * 面板按 `searchOpen` 重建，所以这里只在挂载时读一次。
@@ -610,18 +659,35 @@ export function GlobalSearchDialog({
   onOpenChange,
   sources,
   onNavigate,
-  onOpenItem,
+  username = null,
+  transport,
+  authenticated = false,
   initialQuery = '',
   canRunCommands,
   onRunCommand,
 }: GlobalSearchDialogProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
   const state = useSearchState(sources, initialQuery)
   const typed = state.query.trim().length > 0
   /** 当前展开的组（`null` = 一级）。**不跨弹框恢复**：重开就该是空面板。 */
   const [drill, setDrill] = useState<SearchGroupId | null>(null)
   const [run, setRun] = useState<RunState | null>(null)
+  /**
+   * 物品详情层（空 = 不在这一层）：栈里是「根物品 → 子物品…」，与物品详情弹框同一个思路。
+   * 它就是**弹框里的一层**——不再另开一个弹框，`Esc` 退层而不是关掉整个搜索面板。
+   */
+  const [itemStack, setItemStack] = useState<DetailEntry[]>([])
+  /** 从列表哪一行进的物品层：退回来时高亮停回那一行。 */
+  const itemOrigin = useRef<string | null>(null)
+  /** 「更多操作」菜单（`⌘K` 也能开）：只放非主操作。 */
+  const [moreOpen, setMoreOpen] = useState(false)
+  const itemEntry = itemStack[itemStack.length - 1]
+  const currentItem = itemEntry ? sources.dataset.itemsById.get(itemEntry.id) ?? null : null
+  const inItem = Boolean(itemEntry && currentItem)
+  const recipeOptions = useItemDetailRecipeOptions()
+  // 物品收藏（全局 Provider 提供）：物品层的「收藏 / 取消收藏」用它；没有 Provider 就不显示这一项。
+  const itemFavorites = useItemFavorites()
   const detail = useMemo(
     () => (drill ? searchGroup(sources, drill, state.applied) : null),
     [drill, sources, state.applied],
@@ -639,10 +705,11 @@ export function GlobalSearchDialog({
     })
   }
 
-  /** 离开弹框（跳页 / 打开详情）时把记忆清掉，免得下次打开突然回到旧位置。 */
+  /** 离开弹框（跳页 / 关面板）时把记忆清掉，免得下次打开突然回到旧位置。 */
   const leave = () => {
     forgetDrill()
     state.setQuery('')
+    setItemStack([])
     onOpenChange(false)
   }
 
@@ -722,7 +789,7 @@ export function GlobalSearchDialog({
       target?.dispatchEvent(new MouseEvent('pointermove', { bubbles: true }))
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [drill, run])
+  }, [drill, run, itemStack.length])
 
   /** 二级位置记忆：在二级里每移动一次高亮都刷新（离开后 60s 内能回到这儿）。 */
   useEffect(() => {
@@ -733,6 +800,8 @@ export function GlobalSearchDialog({
   /** 输入词清空（或只剩空白）就回一级：不留一个「某组 + 空词」的空列表。 */
   const changeQuery = (value: string) => {
     state.setQuery(value)
+    // 物品详情层不按词过滤：一改词就是「重新搜」，退回列表（`Esc` 只管退层）。
+    setItemStack((prev) => (prev.length > 0 ? [] : prev))
     // 结果页只在「还是一行能跑的指令」时留着：`/help` → `/help 1` 就是同一条指令补参数，
     // 结果照旧摆在上面；改成搜索词（`石头`）才回列表，否则 `Enter` 会跑错东西。
     if (run) {
@@ -782,8 +851,30 @@ export function GlobalSearchDialog({
     setDrill(null)
   }
 
+  /** 进物品详情层：内容就在弹框里（不另开弹框），高亮记下来，退回来停在同一行。 */
+  const openItemLevel = (hit: SearchHit) => {
+    if (hit.action.kind !== 'item') return
+    itemOrigin.current = hit.id
+    setItemStack([{ id: hit.action.itemId }])
+    // 焦点留在输入框：`Esc` 退层、`⌘C` 复制、`⌘⏎` 去 Wiki 都从这里来。
+    inputRef.current?.focus()
+  }
+
+  /** 物品层的 `Esc` / 返回键：先退一层子物品，退到底回列表并停回刚才那行。 */
+  const backFromItem = () => {
+    if (itemStack.length === 0) return
+    if (itemStack.length > 1) {
+      setItemStack((prev) => prev.slice(0, -1))
+      return
+    }
+    restoreTarget.current = itemOrigin.current
+    setItemStack([])
+  }
+
   /**
    * 快捷键（只在弹框内）：
+   * - 物品详情层：`⌘/Ctrl+C` 复制 ID、`⌘/Ctrl+⇧+C` 复制名称、`⌘/Ctrl+⏎` 前往 Wiki；
+   * - 二级：`⌘/Ctrl+⏎` 带着搜索词前往目标页（列表末尾那行「更多」是同一个出口）；
    * - `Delete` / `Backspace`：空查询时删掉高亮的那条最近搜索（有词时这两个键属于输入框）；
    * - `Ctrl/Cmd+C`：复制高亮行的 ID / 指令（输入框里没有选中文本时才接管）。
    *
@@ -791,7 +882,38 @@ export function GlobalSearchDialog({
    * 必须用 `DialogContent` 的 `onEscapeKeyDown` 才能拦下它（见下面的 `onEscapeKeyDown`）。
    */
   const handleRootKeyDown = (event: React.KeyboardEvent) => {
-    // 结果页：焦点就在输入框里，`Enter` 重跑（刷新结果卡片），其它键照常。
+    const mod = event.metaKey || event.ctrlKey
+    // `⌘K` = 展开 / 收起「更多操作」（弹框开着时全局的 `⌘K` 本来就不抢）。
+    if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault()
+      setMoreOpen((prev) => !prev)
+      return
+    }
+    // 物品详情层：三个快捷键都在面板底部写着（按钮本身也留着，鼠标照旧能用）。
+    if (inItem && currentItem) {
+      const target = event.target as HTMLElement | null
+      // 面板里的输入框优先（那里的 ⌘C 是复制自己选中的文本）。
+      const editingOther =
+        target !== inputRef.current &&
+        Boolean(target?.isContentEditable || /^(input|textarea)$/i.test(target?.tagName ?? ''))
+      if (editingOther) return
+      const key = event.key.toLowerCase()
+      if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+        if (key === 'c') {
+          const input = inputRef.current
+          if (target === input && input && input.selectionStart !== input.selectionEnd) return
+          event.preventDefault()
+          copyToClipboard(event.shiftKey ? currentItem.name : String(currentItem.id))
+          return
+        }
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault()
+          window.open(wikiUrl(currentItem.name, lang), '_blank', 'noopener,noreferrer')
+          return
+        }
+      }
+      return
+    }
     if (run) {
       // 只接管输入框里的 Enter：`查看用法` / `填入指令` 这些按钮的回车不能被吃掉。
       if (
@@ -804,7 +926,6 @@ export function GlobalSearchDialog({
       }
       return
     }
-    const mod = event.metaKey || event.ctrlKey
     if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
       const input = inputRef.current
       // 输入框里有选中文本：这是「复制搜到的字」，别抢。
@@ -816,7 +937,16 @@ export function GlobalSearchDialog({
       copyToClipboard(hit.copy)
       return
     }
-    if (detail || typed) return
+    // 二级：`⌘⏎` 带着这个词去目标页（目标页名写在下栏）。
+    if (detail) {
+      const exit = groupPageExit(detail.group, state.applied)
+      if (mod && !event.altKey && !event.shiftKey && event.key === 'Enter' && exit) {
+        event.preventDefault()
+        goPage(exit.tab, exit.intent)
+      }
+      return
+    }
+    if (typed) return
     if (event.key !== 'Delete' && event.key !== 'Backspace') return
     const recent = queryOfRecent(selectedValue(event.currentTarget))
     if (!recent) return
@@ -865,19 +995,147 @@ export function GlobalSearchDialog({
   const pick = (hit: SearchHit) => {
     const keyword = state.query.trim()
     if (keyword) state.remember(keyword)
+    // 物品就地开在弹框里（不再叠一个物品详情弹框）。
+    if (hit.action.kind === 'item') {
+      openItemLevel(hit)
+      return
+    }
     // 登录后一律执行（除仅游戏内）：缺参数就让 TShock 回一句用法错误，
     // 不靠数据里的 `required` 替用户判定「跑不了」。
     if (hit.command && !hit.inGameOnly && hit.runnable && canRunCommands) {
       void execute(hit.command, { origin: hit.id, needsArgs: hit.needsArgs })
       return
     }
-    runHit(hit, onNavigate, onOpenItem)
+    runHit(hit, onNavigate)
     leave()
   }
 
-  const showingRecent = !run && !detail && !typed && state.history.length > 0
+  const showingRecent = !run && !detail && !typed && !inItem && state.history.length > 0
   /** 刚打开、什么都没有：只有这时候才给「↑↓ 选择 / Esc 取消」这种通用提示。 */
-  const showIntro = !run && !detail && !typed && !showingRecent
+  const showIntro = !run && !detail && !typed && !inItem && !showingRecent
+  /** 二级的「前往 <页面>」出口（`⌘⏎`）：与列表末尾那行「更多」同一个目标。 */
+  const pageExit = detail ? groupPageExit(detail.group, state.applied) : undefined
+
+  /** 有上一层可回（二级 / 物品层 / 结果层）：输入框左侧的放大镜换成返回键。 */
+  const hasBack = inItem || Boolean(run) || Boolean(detail)
+  const backToInput = () => {
+    if (inItem) backFromItem()
+    else if (run) backFromRun()
+    else if (detail) backFromDrill()
+    inputRef.current?.focus()
+  }
+
+  /** 高亮的最近搜索词（删除 / 填入都按它来）。 */
+  const selectedRecent = queryOfRecent(selectedId) ?? state.history[0] ?? null
+
+  /**
+   * 底栏动作：第一个是**主操作**（直接写出来），其余收进「更多操作」。
+   * 顺序按「这一层最常做的事」排：拿 ID 去写指令 > 看 wiki / 合成 > 回上一层。
+   *
+   * 这里只放**数据**（id / 文案 / 键帽），执行统一走 `runFooterAction`：
+   * 渲染期不碰 ref，菜单项也可以直接用键盘触发同一个动作。
+   */
+  const footerActions: FooterAction[] = (() => {
+    /** 组合键文案：`⌘C` / `Ctrl C`；`shift` 时形如 `⌘⇧C`。 */
+    const combo = (key: string, shift = false) =>
+      shift ? `${modKeyLabel()}⇧${key}` : shortcutLabel(key)
+    // 菜单里不放「返回」：回上一层由输入框左侧的返回键 / `Esc` 负责。
+    if (inItem && currentItem) {
+      const list: FooterAction[] = [
+        { id: 'copyId', label: t('dex.copyId'), keys: combo('C') },
+        { id: 'copyName', label: t('dex.copyName'), keys: combo('C', true) },
+        { id: 'wiki', label: t('dex.wiki'), keys: combo('⏎') },
+      ]
+      // 收藏这一项要有全局收藏 Provider（App 提供）；没有就不显示，避免点了没反应。
+      if (itemFavorites) {
+        list.push({
+          id: 'favorite',
+          label: itemFavorites.isFavorited(currentItem.id)
+            ? t('editor.unfavorite')
+            : t('editor.favorite'),
+        })
+      }
+      return list
+    }
+    if (run) return [{ id: 'rerun', label: t('search.run.again'), keys: '⏎' }]
+    if (detail) {
+      const list: FooterAction[] = [
+        { id: 'open', label: t(enterHintOf(selectedHit, canRunCommands)), keys: '⏎' },
+      ]
+      if (copyHintKey) list.push({ id: 'copy', label: t(copyHintKey), keys: combo('C') })
+      if (pageExit) {
+        list.push({
+          id: 'gotoPage',
+          label: t('search.action.gotoPage', { page: pageLabelOf(sources, pageExit.tab) }),
+          keys: combo('⏎'),
+        })
+      }
+      return list
+    }
+    if (showingRecent) {
+      return [
+        { id: 'search', label: t('search.global.keys.search'), keys: '⏎' },
+        { id: 'remove', label: t('search.global.keys.remove'), icon: DeleteKey },
+      ]
+    }
+    if (typed) {
+      const list: FooterAction[] = []
+      if (selectedHit) {
+        list.push({
+          id: 'open',
+          label: t(enterHintOf(selectedHit, canRunCommands)),
+          keys: '⏎',
+        })
+      }
+      if (copyHintKey) list.push({ id: 'copy', label: t(copyHintKey), keys: combo('C') })
+      return list
+    }
+    return []
+  })()
+
+  /** 底栏动作的唯一执行入口（主操作按钮、菜单项都走这里）。 */
+  const runFooterAction = (id: FooterActionId) => {
+    switch (id) {
+      case 'open':
+        if (selectedHit) pick(selectedHit)
+        return
+      case 'copy':
+        if (selectedHit?.copy) copyToClipboard(selectedHit.copy)
+        return
+      case 'copyId':
+        if (currentItem) copyToClipboard(String(currentItem.id))
+        return
+      case 'copyName':
+        if (currentItem) copyToClipboard(currentItem.name)
+        return
+      case 'wiki':
+        if (currentItem) {
+          window.open(wikiUrl(currentItem.name, lang), '_blank', 'noopener,noreferrer')
+        }
+        return
+      case 'favorite':
+        if (currentItem && itemFavorites) itemFavorites.toggle(currentItem.id)
+        return
+      case 'gotoPage':
+        if (pageExit) goPage(pageExit.tab, pageExit.intent)
+        return
+      case 'rerun':
+        rerun()
+        return
+      case 'search':
+        if (selectedRecent) {
+          changeQuery(selectedRecent)
+          inputRef.current?.focus()
+        }
+        return
+      case 'remove':
+        if (selectedRecent) state.removeHistory(selectedRecent)
+        return
+    }
+  }
+
+  const primaryAction = footerActions[0]
+  const moreActions = footerActions.slice(1)
 
   // 圆角比通用弹框（`rounded-modal`，24px）小一档：命令面板要更紧凑。
   return (
@@ -889,9 +1147,14 @@ export function GlobalSearchDialog({
         // 用户会边看详情边搜，不该强迫先关掉抽屉。
         className="top-[12%] z-[60] max-w-xl translate-y-0 gap-2 p-0"
         data-testid="global-search-dialog"
-        /* `Esc` 逐级返回（执行结果 → 二级 → 一级），一级才关弹框。
+        /* `Esc` 逐级返回（物品详情 → 执行结果 → 二级 → 一级），一级才关弹框。
            必须写在这里：Radix 在 document 捕获阶段就处理了 Escape。 */
         onEscapeKeyDown={(event) => {
+          if (inItem) {
+            event.preventDefault()
+            backFromItem()
+            return
+          }
           if (run) {
             event.preventDefault()
             backFromRun()
@@ -914,9 +1177,29 @@ export function GlobalSearchDialog({
           className="min-w-0 gap-2 bg-transparent px-3 pt-3"
           onKeyDown={handleRootKeyDown}
         >
-          <InputGroup className="h-8 w-full">
-            <InputGroupAddon align="inline-start" className="pr-0">
-              <Search aria-hidden className="size-4 text-muted-foreground" />
+          <InputGroup
+            /* `focus-within:ring-0`：这个弹框里焦点一直在输入框，聚焦描边只会变成一圈死纹。 */
+            className="h-8 w-full focus-within:ring-0"
+            data-testid="global-search-input-group"
+          >
+            <InputGroupAddon
+              align="inline-start"
+              /* `[&_button]:size-4`：把返回键压成和放大镜同一个 16px 方框 ——
+                 `InputGroupAddon` 默认给 `size-7`，图标会被居中到右边一点，看着像错位。 */
+              className="pr-0 [&_button]:size-4"
+            >
+              {/* 有上一层时（二级 / 物品层 / 结果层）放大镜换成返回键：鼠标也能退一层。 */}
+              {hasBack ? (
+                <IconAction
+                  size="icon-xs"
+                  label={t('search.backWithKey', { key: 'Esc' })}
+                  icon={ChevronLeft}
+                  testId="global-search-back"
+                  onClick={backToInput}
+                />
+              ) : (
+                <Search aria-hidden className="size-4 text-muted-foreground" />
+              )}
             </InputGroupAddon>
             <CommandInput
               ref={inputRef}
@@ -927,22 +1210,33 @@ export function GlobalSearchDialog({
               className="px-3 text-xs"
               data-testid="global-search-input"
             />
-            {state.query.length > 0 && (
-              <InputGroupAddon align="inline-end">
-                <IconAction
-                  size="icon-xs"
-                  label={t('editor.clear')}
-                  icon={X}
-                  onClick={() => {
-                    changeQuery('')
-                    inputRef.current?.focus()
-                  }}
-                />
-              </InputGroupAddon>
-            )}
           </InputGroup>
-          <div ref={listHostRef} className="max-h-[60vh] overflow-hidden">
-            {run ? (
+          <div
+            ref={listHostRef}
+            /* 物品详情层内容密（tips / 词缀 / 合成 / 掉落）：高度比列表高一档，内部自己滚。
+               短物品按内容高，超过上限就在面板内部滚。 */
+            className={cn(
+              'overflow-hidden',
+              inItem && 'relative flex max-h-[min(38rem,62dvh)] min-h-0 flex-col',
+              !inItem && 'max-h-[60vh]',
+            )}
+          >
+            {inItem && currentItem && itemEntry ? (
+              <ItemLevel
+                key={itemStack.length}
+                dataset={sources.dataset}
+                entry={itemEntry}
+                depth={itemStack.length - 1}
+                username={username}
+                recipe={recipeOptions}
+                transport={transport}
+                authenticated={authenticated}
+                onPush={(next) => setItemStack((prev) => [...prev, next])}
+                onBack={backFromItem}
+                onCloseAll={backFromItem}
+                onFillCommand={fillCommand}
+              />
+            ) : run ? (
               <RunView
                 entries={run.entries}
                 sources={sources}
@@ -961,7 +1255,6 @@ export function GlobalSearchDialog({
                 query={state.query}
                 sources={sources}
                 onPick={pick}
-                onBack={backFromDrill}
                 onSeeAllPage={goPage}
               />
             ) : (
@@ -1016,27 +1309,133 @@ export function GlobalSearchDialog({
               <Hint keys="Esc" label={t('search.global.keys.close')} />
             </>
           )}
-          <span className="ml-auto flex items-center gap-3">
-            {run ? (
-              <>
-                <Hint keys="⏎" label={t('search.run.again')} />
-                <Hint keys="Esc" label={t('action.back')} />
-              </>
-            ) : showingRecent ? (
-              <>
-                <Hint keys="⏎" label={t('search.global.keys.search')} />
-                <Hint icon={DeleteKey} label={t('search.global.keys.remove')} />
-              </>
-            ) : (
-              <>
-                {selectedHit && <Hint keys="⏎" label={t(enterHintOf(selectedHit, canRunCommands))} />}
-                {copyHintKey && <ModHint keyName="C" label={t(copyHintKey)} />}
-                {detail && <Hint keys="Esc" label={t('action.back')} />}
-              </>
+          {/* 二级：条目数写在左下角（原来在标题行右侧，那行已经取消）。 */}
+          {detail && !inItem && (
+            <span className="tabular-nums" data-testid="global-search-count">
+              {t('search.group.count', { n: detail.total })}
+            </span>
+          )}
+          {/* 右下角：主操作是**带底色的胶囊按钮**（这一层最该点的那一个），
+              其余收进「操作」（同样的胶囊样式，只是安静：文字 + `⌘K` 键帽）。 */}
+          <span className="ml-auto flex min-w-0 items-center gap-2">
+            {primaryAction && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => runFooterAction(primaryAction.id)}
+                className="h-5 min-w-0 shrink gap-1.5 rounded-full px-2 text-2xs text-foreground"
+                data-testid="global-search-primary"
+              >
+                <span className="truncate">{primaryAction.label}</span>
+                <ActionKeycap action={primaryAction} />
+              </Button>
+            )}
+            {moreActions.length > 0 && (
+              <DropdownMenu open={moreOpen} onOpenChange={setMoreOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={t('search.moreActions')}
+                    data-testid="global-search-more"
+                    className="flex h-5 shrink-0 cursor-pointer items-center gap-1.5 rounded-chip px-1 text-2xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    {t('search.moreActions')}
+                    <Keycap>{shortcutLabel('K')}</Keycap>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="top"
+                  align="end"
+                  sideOffset={6}
+                  /* `z-[70]`：搜索弹框自己是 `z-[60]`（要盖住抽屉 / 弹框），
+                     菜单必须再高一档，否则弹在弹框后面=看不见。 */
+                  className="z-[70] min-w-44"
+                  // 选完让焦点留在输入框（菜单自己会把焦点还给触发器）。
+                  onCloseAutoFocus={(event) => {
+                    event.preventDefault()
+                    inputRef.current?.focus()
+                  }}
+                >
+                  {/* 主操作固定是第一条（列表与底栏那份一致），其余跟在后面。 */}
+                  {footerActions.map((action) => (
+                    <DropdownMenuItem
+                      key={action.id}
+                      onSelect={() => runFooterAction(action.id)}
+                      className="justify-between gap-3"
+                      data-testid={`global-search-action-${action.id}`}
+                    >
+                      <span className="min-w-0 truncate">{action.label}</span>
+                      <ActionKeycap action={action} />
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </span>
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+interface ItemLevelProps {
+  dataset: Dataset
+  entry: DetailEntry
+  /** 叠层深度（0 = 根）：> 0 时面板左上角出现返回键。 */
+  depth: number
+  username: string | null
+  recipe: ItemDetailRecipeOptions
+  transport?: BackendTransport | null
+  authenticated: boolean
+  /** 点配方材料 / ⓘ：叠一层（不重开面板）。 */
+  onPush: (entry: DetailEntry) => void
+  onBack: () => void
+  onCloseAll: () => void
+  onFillCommand: (command: string) => void
+}
+
+/**
+ * 物品详情层（弹框里的第三层）：内容与图鉴抽屉 / 物品详情弹框是同一个 `ItemDetailPanel`，
+ * 外壳换成搜索弹框里的一块——没有标题栏，只在叠了子物品时给一行返回。
+ *
+ * 词缀选择是本层的局部状态，所以每层单独一个实例（父级用 `key` = 栈深度）。
+ */
+function ItemLevel({
+  dataset,
+  entry,
+  depth,
+  username,
+  recipe,
+  transport,
+  authenticated,
+  onPush,
+  onBack,
+  onCloseAll,
+  onFillCommand,
+}: ItemLevelProps) {
+  const [prefixId, setPrefixId] = useState(entry.prefixId ?? 0)
+  const item = dataset.itemsById.get(entry.id)
+  if (!item) return null
+  return (
+    <ItemDetailProvider api={pushApi(entry, onPush)}>
+      <div className="flex min-h-0 w-full flex-col" data-testid="global-search-item">
+        <ItemDetailPanel
+          item={item}
+          dataset={dataset}
+          depth={depth}
+          username={username}
+          prefixId={prefixId}
+          onPrefixChange={setPrefixId}
+          stack={entry.stack}
+          recipe={recipe}
+          transport={transport}
+          authenticated={authenticated}
+          onBack={onBack}
+          onCloseAll={onCloseAll}
+          chrome="command"
+          onFillCommand={onFillCommand}
+        />
+      </div>
+    </ItemDetailProvider>
   )
 }

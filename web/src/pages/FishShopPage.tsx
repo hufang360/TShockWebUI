@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   AlertTriangle,
+  Check,
+  ChevronDown,
   Droplets,
   Fish,
   Footprints,
+  ListFilter,
   Maximize2,
   MessageSquare,
   Minimize2,
@@ -13,6 +16,7 @@ import {
   ShieldAlert,
   ShoppingCart,
   Star,
+  X,
 } from 'lucide-react'
 import { IconAction } from '@/components/IconAction'
 import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
@@ -48,6 +52,12 @@ import { useSettingsPopoverFocus } from '@/hooks/useSettingsPopoverFocus'
 import { cn } from '@/lib/cn'
 import { showsMetaToggle } from '@/lib/iconGridSize'
 import { splitFishArgs } from '@/lib/fishArgs'
+import {
+  FISH_CATEGORIES,
+  matchFishCategories,
+  resolveFishCategory,
+  type FishCategoryId,
+} from '@/lib/fishCategory'
 import { diagramUrl } from '@/lib/fishDiagram'
 import { isDegradedGood } from '@/lib/fishGood'
 import { formatItemTag } from '@/lib/items'
@@ -89,6 +99,10 @@ import {
   Skeleton,
   Spinner,
   DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   ToggleGroup,
   ToggleGroupItem,
 } from '@/components/ui'
@@ -140,6 +154,8 @@ interface FishUiState extends Record<string, unknown> {
   awning?: boolean
   /** 工具条页签：全部 / 买过 / 收藏。 */
   tab?: FishTab
+  /** 分组筛选（「收藏」右边那颗下拉，界面上叫「分组」）：单选，没选 = 不筛。 */
+  category?: FishCategoryId
   /** 买过的商品（**按内容指纹去重、最新在前**，不存 serial）。 */
   buys?: FishGoodStamp[]
   /** 收藏的商品（同上）。 */
@@ -176,11 +192,15 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const dataset = useDataset()
   const [ui, setUi] = useModuleState<FishUiState>(serverId, 'store', DEFAULT_STATE)
 
-  // 全局搜索选了「鱼店商品」/点了「更多」：把词填进这里的搜索框（不自动打开详情）。
+  /** 全局搜索选中某件商品时带上编号：等货架到了再打开详情（冷启动时 intent 先于数据到达）。 */
+  const [pendingSerial, setPendingSerial] = useState<number | null>(null)
+  // 全局搜索选了「鱼店商品」：把词填进搜索框；带了编号就在货架就绪后直接打开那一件的详情。
+  // （点「更多」进二级后走的是同一条路，只是没有编号 → 只筛词。）
   useSearchIntent(
     'store',
     useCallback((intent) => {
-      if (intent.query != null) setUi({ query: intent.query })
+      if (intent.query != null) setUi({ query: intent.query, category: undefined })
+      if (intent.goodsSerial != null) setPendingSerial(intent.goodsSerial)
     }, [setUi]),
   )
   const [capability, setCapability] = useState<FishCapabilities | null>(null)
@@ -335,6 +355,20 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     // 记住「现在看的是哪件」：切走再回来时详情还开着，不用重新翻货架。
     setUi({ detail: stampGood([], good, 1)[0] })
   }, [setUi])
+
+  // 货架到位后打开「全局搜索选中的那件」。找不到（已下架 / 编号变了）就只保留搜索词。
+  // 这里必须「数据到达 → setState」：搜索那次导航发生在货架请求之前，没有别的事件能触发。
+  useEffect(() => {
+    if (pendingSerial == null) return
+    const good = shop?.goods.find((item) => item.serial === pendingSerial)
+    if (good) {
+      // oxlint-disable-next-line react/set-state-in-effect -- 与货架数据到达同步
+      setPendingSerial(null)
+      openDetail(good)
+      return
+    }
+    if (shop) setPendingSerial(null)
+  }, [pendingSerial, shop, openDetail])
 
   const closeDetail = useCallback(() => {
     setSelected(null)
@@ -569,7 +603,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
     () => resolveStamps(favoriteStamps, shelfGoods),
     [favoriteStamps, shelfGoods],
   )
-  const goods = useMemo(() => {
+  // 分组筛选（「收藏」右边那颗下拉）：单选，`null` = 不筛。规则见 lib/fishCategory.ts。
+  const category = resolveFishCategory(ui.category)
+  /** 当前来源（页签 + 关键词）：分组的条数与筛选都在这上面算，三者是「且」的关系。 */
+  const sourceGoods = useMemo(() => {
     const list =
       tab === 'bought'
         ? boughtRows.map((row) => row.good)
@@ -585,6 +622,46 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
         g.map.some((m) => m.toLowerCase().includes(keyword)),
     )
   }, [tab, boughtRows, favoriteRows, shelfGoods, keyword])
+  /** 每件商品的分组只算一次：下拉里的条数与列表筛选共用。 */
+  const categoriesOf = useMemo(
+    () => new Map(sourceGoods.map((good) => [good, matchFishCategories(good)])),
+    [sourceGoods],
+  )
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<FishCategoryId, number>()
+    for (const categories of categoriesOf.values()) {
+      for (const id of categories) counts.set(id, (counts.get(id) ?? 0) + 1)
+    }
+    return counts
+  }, [categoriesOf])
+  /** 整张货架上有哪些分组（与当前页签无关）：只用来决定「下拉里列哪些」，不参与筛选。 */
+  const shelfCategories = useMemo(() => {
+    const present = new Set<FishCategoryId>()
+    for (const good of shelfGoods) {
+      for (const id of matchFishCategories(good)) present.add(id)
+    }
+    return present
+  }, [shelfGoods])
+  // 空分组不列出来（不留死入口）。判断看**整张货架**：否则切到「买过 / 收藏」时
+  // 只要手里的商品都没分组，下拉就凭空消失，还把页签行抽短一截。
+  // 已选中的更得留着，否则列表还空着，却没人知道刚才选了什么。
+  const visibleCategories = useMemo(
+    () =>
+      FISH_CATEGORIES.flatMap(({ id, iconId }) => {
+        const count = categoryCounts.get(id) ?? 0
+        return count > 0 || shelfCategories.has(id) || id === category
+          ? [{ id, iconId, count }]
+          : []
+      }),
+    [categoryCounts, shelfCategories, category],
+  )
+  const goods = useMemo(
+    () =>
+      category
+        ? sourceGoods.filter((good) => categoriesOf.get(good)?.includes(category))
+        : sourceGoods,
+    [sourceGoods, categoriesOf, category],
+  )
 
   /** 富文本渲染（价格 / 解锁 / 别名 / 限购 / 备注都可能含 [i:..] 物品图标）。 */
   const renderRichLines = (lines: string[]) => (
@@ -824,19 +901,25 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           className={cn(
             'flex min-w-0 flex-col gap-2 xl:min-h-0',
             // 全屏：连内容区顶栏一起盖住（与「物品 ID」「数据 ID」同一套做法），
-            // 设置 / 退出全屏改放右上角的 `FullscreenDock`（顶栏已被盖住，不能再挂 `TopBarActions`）。
-            shelfFullscreen && 'fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-4',
+            // 右上角只留「退出全屏」（`FullscreenDock persistent`）。
+            // 全屏不留内边距：工具条是第一个子元素、`sticky top-0`，容器留 padding 会让上沿露出一条滚过去的商品。
+            shelfFullscreen && 'fixed inset-0 z-50 overflow-y-auto bg-background',
           )}
         >
         {/* 全屏是 z-50 的层叠上下文：商品详情的遮罩得画在里面，否则（z-45）会被压在下面。 */}
         {shelfFullscreen && desktop && selected !== null && (
           <ContentScrim full testId="fish-detail-scrim" onClick={closeDetail} />
         )}
-        {/* 全屏盖住了顶栏，设置与退出改放右上角；4 秒无操作收成小竖条。 */}
+        {/* 全屏盖住了顶栏：右上角只留「退出全屏」，常驻不收起（与「物品 ID」「数据 ID」一致）——
+            页面设置在全屏里不给入口，要看设置先退出全屏。 */}
         {shelfFullscreen && (
-          <FullscreenDock label={t('dex.showActions')}>
-            {fishSettingsControl}
-            {fullscreenToggle}
+          <FullscreenDock persistent label={t('dex.showActions')}>
+            <IconAction
+              size="icon-xs"
+              label={t('dex.exitFullscreen')}
+              icon={Minimize2}
+              onClick={() => setShelfFullscreen(false)}
+            />
           </FullscreenDock>
         )}
 
@@ -880,22 +963,27 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               页面设置与刷新一样在顶栏右侧（`TopBarActions`）。 */}
           <div
             ref={toolbarRef}
+            data-testid="fish-toolbar"
             className={cn(
               'sticky z-20 flex flex-col gap-2 bg-background p-1 sm:flex-row sm:flex-wrap sm:items-center',
-              shelfFullscreen ? 'top-0 pr-12' : 'top-12',
+              shelfFullscreen ? 'top-0 px-3 pt-3 pr-10 sm:px-4 sm:pt-4' : 'top-12',
             )}
           >
-            {/* 左：页签（全部 / 买过 / 收藏）。 */}
+            {/* 左：页签（全部 / 买过 / 收藏）+ 分组。
+                分组照抄「物品 ID」那一颗：竖线 + 幽灵按钮（`ListFilter` 图标 + 文字） + 选中的 ×。
+                页签与分组二选一：选中分组时不再有任何页签处于选中态，点「全部」就回到整张货架。 */}
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground sm:w-auto">
-              <div className="flex min-w-0 items-center rounded-container bg-accent p-0.5">
+              <div className="flex min-w-0 flex-wrap items-center rounded-container bg-accent p-0.5">
                 <ToggleGroup
                   type="single"
                   size="sm"
                   variant="outline"
-                  value={tab}
+                  value={category ? '' : tab}
                   onValueChange={(value) => {
                     // 再点一下当前页签会传空串：保持原样。
-                    if (value) setUi({ tab: value as FishTab })
+                    if (!value) return
+                    // 换页签一律清掉分组：买过 / 收藏 不分分组，「全部」就是整张货架。
+                    setUi({ tab: value as FishTab, category: undefined })
                   }}
                   aria-label={t('fish.tabs')}
                   className="flex-wrap"
@@ -919,10 +1007,79 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   </ToggleGroupItem>
                 </ToggleGroup>
               </div>
+              {/* 分组只在「全部」下出现：买过 / 收藏 是本机记录，不做分组。 */}
+              {tab === 'all' && visibleCategories.length > 0 && (
+                <>
+                  <span
+                    aria-hidden
+                    data-testid="fish-category-separator"
+                    className="mx-1 h-4 w-px shrink-0 bg-border"
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        data-testid="fish-category"
+                        className={cn(
+                          'max-w-56 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground',
+                          category && 'font-medium text-foreground',
+                        )}
+                      >
+                        <ListFilter className="size-3.5 shrink-0" />
+                        <span className="min-w-0 truncate">
+                          {category
+                            ? t('fish.groupCurrent', { name: t(`fish.cat.${category}`) })
+                            : t('fish.category')}
+                        </span>
+                        <ChevronDown className="size-3.5 shrink-0" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-48">
+                      {visibleCategories.map(({ id, iconId, count }) => (
+                        <DropdownMenuItem
+                          key={id}
+                          data-testid={`fish-cat-${id}`}
+                          onSelect={() => setUi({ category: category === id ? undefined : id })}
+                          className="gap-2"
+                        >
+                          <ItemIcon
+                            item={dataset?.itemsById.get(iconId)}
+                            atlas={dataset?.atlas}
+                            size={16}
+                            tooltip={false}
+                            className="shrink-0"
+                          />
+                          <span className="truncate" data-testid={`fish-cat-name-${id}`}>
+                            {t(`fish.cat.${id}`)}
+                          </span>
+                          <span
+                            className="tabular-nums text-muted-foreground"
+                            data-testid={`fish-cat-count-${id}`}
+                          >
+                            {count}
+                          </span>
+                          {category === id && <Check className="ml-auto size-3.5 shrink-0" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  {category && (
+                    <IconAction
+                      size="icon-xs"
+                      label={t('fish.categoryClear')}
+                      icon={X}
+                      testId="fish-category-clear"
+                      onClick={() => setUi({ category: undefined })}
+                    />
+                  )}
+                </>
+              )}
             </div>
 
-            {/* 右：搜索框（与物品 ID / 数据 ID 一致，行尾 16rem；窄屏独占一行）。 */}
-            <div className="w-full min-w-0 sm:ml-auto sm:w-64">
+            {/* 右：搜索框（与物品 ID / 数据 ID 一致，行尾 16rem；窄屏独占一行）。
+                全屏也不改宽度：拉得越长越难扫，固定 16rem 在哪种视图下都一致。 */}
+            <div data-testid="fish-search-wrap" className="w-full min-w-0 sm:ml-auto sm:w-64">
               <SearchInput
                 value={ui.query}
                 onValueChange={(query) => setUi({ query })}
@@ -943,8 +1100,11 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             )}
           </div>
 
-          {/* 货架区留一圈内边距（`p-2`）：最后一行的板线 / 板下投影不会被容器下沿切掉。 */}
-          <div className="p-2">
+          {/* 货架区留一圈内边距（`p-2`）：最后一行的板线 / 板下投影不会被容器下沿切掉。
+              全屏时容器没有内边距了，这里补回来（与工具条左右对齐）。 */}
+          <div
+            className={cn('p-2', shelfFullscreen && 'px-3 pb-3 sm:px-4 sm:pb-4')}
+          >
             {awning && <ShopAwning />}
             {loading && !shop ? (
               <div
@@ -973,15 +1133,17 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                       <Fish />
                     </EmptyMedia>
                     <EmptyTitle>
-                      {keyword
-                        ? t('fish.empty')
-                        : tab === 'bought'
-                          ? t('fish.emptyBought')
-                          : tab === 'favorite'
-                            ? t('fish.emptyFavorite')
-                            : t('fish.empty')}
+                      {category
+                        ? t('fish.emptyCategory')
+                        : keyword
+                          ? t('fish.empty')
+                          : tab === 'bought'
+                            ? t('fish.emptyBought')
+                            : tab === 'favorite'
+                              ? t('fish.emptyFavorite')
+                              : t('fish.empty')}
                     </EmptyTitle>
-                    {tab === 'all' && !keyword && (
+                    {tab === 'all' && !keyword && !category && (
                       <EmptyDescription>{t('fish.clickHint')}</EmptyDescription>
                     )}
                   </EmptyHeader>
@@ -1034,7 +1196,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           />
           {/* 顶栏挂载顺序 = 显示顺序：卡片那组（上次刷新 / 刷新全部 / 管理卡片）之后，
               所以「页面设置 / 全屏」排在它们右边。 */}
-          {/* 全屏时这两个入口在 `FullscreenDock` 里（顶栏已被盖住），不要再挂一份。 */}
+          {/* 全屏时这两个入口都不挂：顶栏已被盖住，右上角只留「退出全屏」。 */}
           {!shelfFullscreen && (
             <TopBarActions>
               {fishSettingsControl}
@@ -1056,7 +1218,10 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
           <>
             <SheetHeader className="shrink-0 border-b px-5 py-3 pr-12">
               <DialogTitle>{t('fish.detail')}</DialogTitle>
-              <div className="mt-2 flex flex-col items-center gap-2">
+            </SheetHeader>
+
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+              <div className="flex flex-col items-center gap-2">
                 <GoodThumb good={selected} dataset={dataset} size={CELL_ICON_SIZE} tooltip={false} />
                 <p className="text-center text-base font-semibold text-foreground">
                   {/* 已下架的商品不再显示编号：编号是插件配置里的下标，早就不指向它了。 */}
@@ -1067,9 +1232,6 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   {selected.name}
                 </p>
               </div>
-            </SheetHeader>
-
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
               {/* 属性（价格 / 解锁 / 别名 / 限购 / 备注）：文字统一在值框上面一行的左上角 */}
               <dl className="flex flex-col gap-2">
                 <DetailField label={t('fish.cost')}>

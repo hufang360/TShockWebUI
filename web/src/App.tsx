@@ -939,7 +939,9 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             sources={searchSources}
             initialQuery={searchInitialQuery}
             onNavigate={navigate}
-            onOpenItem={(itemId) => itemDetailApi.open(itemId)}
+            username={username}
+            transport={transport}
+            authenticated={session.authenticated}
             canRunCommands={session.authenticated}
             onRunCommand={runSearchCommand}
           />

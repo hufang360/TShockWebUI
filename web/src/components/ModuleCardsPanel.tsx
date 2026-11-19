@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { AlertTriangle, PlayingCardsFan, RefreshCw } from 'lucide-react'
+import { AlertTriangle, GalleryVerticalEnd, RefreshCw } from 'lucide-react'
 import { CardLayoutGrid, type CardLayoutItem } from '@/components/CardLayoutGrid'
 import { CommandCard } from '@/components/CommandCard'
 import { IconAction } from '@/components/IconAction'
@@ -424,7 +424,7 @@ export function ModuleCardsPanel({
         {onAddCard && (
           <IconAction
             label={t('modules.cards.manage')}
-            icon={PlayingCardsFan}
+            icon={GalleryVerticalEnd}
             onClick={() => setManageOpen(true)}
           />
         )}

@@ -44,6 +44,27 @@ Terraria TShock 服务器的**玩家 Web 指令伴侣**：浏览器里编辑指�
 - **需求中途追加时先重述待办**：把新旧需求并成一条清单，不要一边继续旧岔路一边接新需求。
 - **长文档分段读**（`docs/` 里动辄上千行）：按需 `grep` / 局部 `read`，整篇读进来会把后续每一步都变贵。
 
+### 文档：迭代期不碰，`收尾`时才动
+
+- **迭代功能时不要改文档**：`changelog.md`、`docs/**` 一律先不动（包括已实现的 `插件-*.md` / `页面-*.md`）；
+  需求来回改时文档跟着反复改，既是无效功，也容易写出与实际不一致的描述。
+- 用户说 **「收尾」**（或明确要求更新文档 / 发版）时，才一次性补齐：`changelog.md`、对应的 `docs/` 页面文档。
+- 用户**明确要求先改文档**时照办（例如「先更新文档，再实施」）—— 这条规则默认行为，不覆盖明确指令。
+- 发版流程要求的 `docs/changelog/<版本>.md` 与 `docs/release/<版本>.md` 不受此限，仍按 [`docs/发布流程.md`](docs/发布流程.md) 在发版时生成。
+
+### 构建与产物
+
+- 前端产物是 `web/dist`，**无法只编译改动文件**：rollup 要按整张依赖图重新切 chunk，每次都是整包重发。
+- **迭代期要「增量」就开 watch**：`make web-watch`（= `cd web && npm run build:watch` = `vite build --watch`）。
+  改一个文件约 **0.15s** 重出一次 `web/dist`（首次 ~0.35s）；Vite 复用未改动模块的转换结果，
+  只是重新打包 + 复制 `data/`（7MB）。**它不做类型检查**。
+- 一次性的产物重建用 `npm run build:dist`（只 `vite build`，**0.7s**，同样不做类型检查）；
+  **收尾 / 发版**才用 `npm run build`（`tsc -b` + `vite build`，类型检查占大头；CI 与 `make verify` 走的也是它）。
+- 只改前端时**不用重建 Go 后端、不用重启容器**：dev 容器把 `web/dist` 以只读卷挂载，构建完刷新浏览器即可
+  （`make dev-container-frontend` 同义）。要把新前端带进**单文件二进制**（根 `dist/`，内嵌 dist + data）
+  才需要 `make binary` —— 那是一次全量构建。
+- 根 `dist/` 与 `web/dist/` 都在 `.gitignore`，产物不进版本库；首屏体积门禁是 `make bundle-check`（需先构建）。
+
 ### 验证强度（实测：全量 129 文件 / 1400 用例 ≈ 21s 墙钟、约 170s CPU；10 核会吃满）
 
 - **迭代期只跑相关文件**：`npx vitest run src/pages/XxxPage.test.tsx`（<3s，单核）；全量只在收尾跑一次。

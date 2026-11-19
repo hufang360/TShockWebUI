@@ -17,7 +17,9 @@ export function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          'z-50 overflow-hidden rounded-control bg-primary px-3 py-2 text-xs text-primary-foreground shadow-md',
+          // `z-[70]`：提示要盖在弹框（z-50）与搜索面板（z-[60]）上面，
+          // 否则「弹框里按钮的提示」会被弹框自己的圆角切掉一半。
+          'z-[70] overflow-hidden rounded-control bg-primary px-3 py-2 text-xs text-primary-foreground shadow-md',
           className,
         )}
         {...props}

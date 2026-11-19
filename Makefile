@@ -42,7 +42,8 @@ help:
 	@echo "  —— 数据 ——"
 	@echo "  make data          生成 data/（TR_SRC / SPRITE_DIR / dotnet 9）"
 	@echo "  —— 构建 ——"
-	@echo "  make web           安装依赖 + 构建前端（web/dist）"
+	@echo "  make web           安装依赖 + 构建前端（web/dist，含 tsc）"
+	@echo "  make web-watch     迭代：增量重建 web/dist（vite build --watch，~0.15s/次）"
 	@echo "  make server        编译 Go 后端"
 	@echo "  make plugin        构建信使插件 WebUI.dll"
 	@echo "  —— 校验 ——"
@@ -82,6 +83,12 @@ data:
 # 生产前端产物。用 npm ci（严格按 lockfile），本地临时试验请直接用 `make dev-web`。
 web:
 	cd web && npm ci && npm run build
+
+# 迭代期增量出产物：只跑 vite（不做 tsc），改一个文件约 0.15s 重新出一次 web/dist。
+# 前端产物是整包重发的，但 Vite 会复用未改动模块的转换结果，所以比 `npm run build`（含 tsc ~4s）快得多。
+# 类型检查仍然要单独跑：npm run typecheck（或收尾时 make verify）。
+web-watch:
+	cd web && npm run build:watch
 
 # 只编译，不产物落地：用来快速确认后端能过编译（完整构建见 make binary / make image）。
 server:

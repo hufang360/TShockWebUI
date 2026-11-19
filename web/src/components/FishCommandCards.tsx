@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   FishingHook,
+  GalleryVerticalEnd,
   ListRestart,
   NotebookPen,
   PiggyBank,
-  PlayingCardsFan,
   Podium,
   RefreshCw,
   Terminal,
@@ -42,20 +42,20 @@ interface FishCardDef {
 /**
  * 鱼店指令卡片。它们的输出都没有 REST 端点，只能靠 rawcmd 取回（不依赖鱼店 REST，老插件也能用）。
  *
- * 「钓鱼信息」常显；「鱼罐 / 消费榜 / 鱼篓榜 / 重载配置」默认**不显示、也不自动执行** —— 输出较长或不必常看，
- * 所以交给玩家自己在「管理卡片」里开「显示 / 自动执行」。
+ * 「钓鱼信息」「鱼罐」默认显示（鱼罐只显示、不自动执行：进页面不该顺手打一条 `/fish jar`）；
+ * 「消费榜 / 鱼篓榜 / 重载配置」默认不显示，交给玩家在「管理卡片」里开。
  */
 /** 重载配置卡片 id：执行成功后鱼店页要重新拉一次货架。 */
 const CONFIG_RELOAD_CARD = 'reload'
 
 const CARDS: FishCardDef[] = [
   { id: 'info', titleKey: 'fish.card.info', command: '/fish info', icon: <FishingHook /> },
+  // 鱼罐（`/fish jar`）默认显示：玩家最常看的是罐里还差多少；但要自动刷新就自己开「自动执行」。
   {
     id: 'jar',
     titleKey: 'fish.card.jar',
     command: '/fish jar',
     icon: <PiggyBank />,
-    defaultHidden: true,
     defaultManual: true,
   },
   {
@@ -420,7 +420,7 @@ export function FishCommandCards({
       />
       <IconAction
         label={t('modules.cards.manage')}
-        icon={PlayingCardsFan}
+        icon={GalleryVerticalEnd}
         onClick={() => setManageOpen(true)}
       />
     </TopBarActions>

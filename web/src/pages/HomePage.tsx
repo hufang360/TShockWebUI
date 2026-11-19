@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { PlayingCardsFan, RefreshCw, Terminal } from 'lucide-react'
+import { GalleryVerticalEnd, RefreshCw, Terminal } from 'lucide-react'
 import { COMMAND_CARD_BY_ID, homeCardIcon, type CommandCardId } from '@/components/home/commandCards'
 import { IconAction } from '@/components/IconAction'
 import {
@@ -651,7 +651,7 @@ export function HomePage({
         />
         <IconAction
           label={t('home.manage')}
-          icon={PlayingCardsFan}
+          icon={GalleryVerticalEnd}
           onClick={() => setManageOpen(true)}
         />
       </TopBarActions>

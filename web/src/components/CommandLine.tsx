@@ -40,12 +40,18 @@ export function CommandLine({
   label,
   commands,
   onFilled,
+  onFill,
 }: {
   label: string
   /** 指令条目：可以只给文本，也可以带 `note`（悬停说明）。 */
   commands: Array<string | RelatedCommand>
   /** 点了「填入指令」之后调用（用来关掉挡路的抽屉 / 弹框）。 */
   onFilled?: () => void
+  /**
+   * 覆盖「填去哪里」的默认实现（默认 `openCommandPalette`，即唤起搜索面板）。
+   * 搜索面板自己开着时用它直接把指令写回面板输入框。
+   */
+  onFill?: (command: string) => void
 }) {
   const { t } = useI18n()
   const dataset = useDataset()
@@ -73,6 +79,7 @@ export function CommandLine({
               item={item}
               favorites={favorites}
               onFilled={onFilled}
+              onFill={onFill}
             />
           ))}
         </div>
@@ -85,10 +92,12 @@ function CommandRow({
   item,
   favorites,
   onFilled,
+  onFill,
 }: {
   item: RelatedCommand
   favorites: CommandFavoritesApi
   onFilled?: () => void
+  onFill?: (command: string) => void
 }) {
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
@@ -118,7 +127,8 @@ function CommandRow({
           label={t('commandLine.fill')}
           icon={Terminal}
           onClick={() => {
-            openCommandPalette(command)
+            if (onFill) onFill(command)
+            else openCommandPalette(command)
             onFilled?.()
           }}
         />

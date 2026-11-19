@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { House } from 'lucide-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { DatasetProvider } from '@/lib/datasetContext'
+import { ItemFavoritesStoreProvider } from '@/lib/itemFavoritesContext'
 import type { GlobalSearchSources } from '@/lib/globalSearch'
 
 import { forgetDrill } from '@/lib/searchDrill'
@@ -28,28 +30,38 @@ function sources(overrides: Partial<GlobalSearchSources> = {}): GlobalSearchSour
   }
 }
 
-function renderDialog(props: { onNavigate?: () => void; onOpenItem?: () => void } = {}) {
+function renderDialog(
+  props: {
+    onNavigate?: () => void
+    username?: string | null
+    canRunCommands?: boolean
+  } = {},
+) {
   const onNavigate = vi.fn(props.onNavigate)
-  const onOpenItem = vi.fn(props.onOpenItem)
+  const s = sources()
   const utils = render(
     <I18nProvider lang="zh">
-      <GlobalSearchDialog
-        open
-        onOpenChange={() => {}}
-        sources={sources()}
-        onNavigate={onNavigate}
-        onOpenItem={onOpenItem}
-        canRunCommands={false}
-        onRunCommand={async () => ({ status: 'ok', output: [] })}
-      />
+      <DatasetProvider value={s.dataset}>
+        <ItemFavoritesStoreProvider>
+          <GlobalSearchDialog
+            open
+            onOpenChange={() => {}}
+            sources={s}
+            onNavigate={onNavigate}
+            username={props.username ?? null}
+            canRunCommands={props.canRunCommands ?? false}
+            onRunCommand={async () => ({ status: 'ok', output: [] })}
+          />
+        </ItemFavoritesStoreProvider>
+      </DatasetProvider>
     </I18nProvider>,
   )
-  return { ...utils, onNavigate, onOpenItem }
+  return { ...utils, onNavigate }
 }
 
 describe('GlobalSearchDialog', () => {
-  it('输入后按分组展示结果，物品点击即打开详情（不跳页）', async () => {
-    const { onNavigate, onOpenItem } = renderDialog()
+  it('输入后按分组展示结果，物品就地打开详情层（不跳页、不另开弹框）', async () => {
+    const { onNavigate } = renderDialog()
     const input = screen.getByRole('combobox')
     fireEvent.change(input, { target: { value: '天顶' } })
 
@@ -59,8 +71,79 @@ describe('GlobalSearchDialog', () => {
     expect(screen.getByRole('group', { name: '物品集合' })).toBeTruthy()
     fireEvent.click(option)
 
-    expect(onOpenItem).toHaveBeenCalledWith(4956)
+    // 详情内容就在弹框里（同一份 `ItemDetailPanel`），列表让位。
+    const level = await screen.findByTestId('global-search-item')
+    expect(within(level).getByTestId('item-tooltip').textContent).toContain('天顶剑')
+    // 面板底部那三个按钮不在这一层出现：动作全走底栏快捷键。
+    expect(within(level).queryByTestId('dex-detail-actions')).toBeNull()
+    expect(screen.queryByRole('group', { name: '物品集合' })).toBeNull()
+    // 只有一个弹框：没有另开物品详情弹框。
+    expect(screen.queryByTestId('dex-detail-dialog')).toBeNull()
     expect(onNavigate).not.toHaveBeenCalled()
+  })
+
+  it('物品详情层：Esc 回列表并停回原来那行；⌘C / ⌘⇧C / ⌘⏎ = 复制 ID / 复制名称 / 去 Wiki', async () => {
+    const written: string[] = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => void written.push(text) },
+    })
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const { onNavigate } = renderDialog()
+    const input = screen.getByRole('combobox')
+    fireEvent.change(input, { target: { value: '天顶' } })
+    const itemsGroup = await screen.findByRole('group', { name: '物品' })
+    const option = await within(itemsGroup).findByRole('option', { name: /天顶剑/ })
+    fireEvent.click(option)
+    await screen.findByTestId('global-search-item')
+
+    // 右下角：主操作直接写出来（快捷键在文字右边、合并在一个键帽里），其余在「操作」里。
+    const keys = () => screen.getByTestId('global-search-keys').textContent ?? ''
+    const primary = screen.getByTestId('global-search-primary')
+    expect(primary.textContent).toContain('复制ID')
+    expect(primary.querySelector('kbd')?.textContent).toMatch(/^(⌘C|Ctrl C)$/)
+    expect(keys()).toContain('操作')
+    expect(keys()).not.toContain('复制名称')
+    fireEvent.pointerDown(screen.getByTestId('global-search-more'), { button: 0, ctrlKey: false })
+    const menu = await screen.findByRole('menu')
+    // 第一条固定是主操作；「返回」不进菜单（回上一层走左侧返回键 / Esc）。
+    expect(within(menu).getAllByRole('menuitem')[0].textContent).toContain('复制ID')
+    expect(within(menu).getByText('复制名称')).toBeTruthy()
+    expect(within(menu).getByText('前往 Wiki')).toBeTruthy()
+    expect(within(menu).queryByText('返回')).toBeNull()
+    // 物品层的「操作」里还有收藏；点一下收藏这件物品。
+    const favorite = within(menu).getByText('收藏')
+    fireEvent.click(favorite)
+    await waitFor(() => expect(localStorage.getItem('tswui:itemFavorites') ?? '').toContain('4956'))
+    // 菜单项本身也能执行（鼠标路径）：点「复制名称」= 把名称写进剪贴板。
+    fireEvent.pointerDown(screen.getByTestId('global-search-more'), { button: 0, ctrlKey: false })
+    const menu2 = await screen.findByRole('menu')
+    expect(within(menu2).getByText('取消收藏')).toBeTruthy()
+    fireEvent.click(within(menu2).getByText('复制名称'))
+    await waitFor(() => expect(written).toEqual(['天顶剑']))
+
+    fireEvent.keyDown(input, { key: 'c', ctrlKey: true })
+    await waitFor(() => expect(written).toEqual(['天顶剑', '4956']))
+    fireEvent.keyDown(input, { key: 'c', ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(written).toEqual(['天顶剑', '4956', '天顶剑']))
+
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })
+    expect(openSpy).toHaveBeenCalledTimes(1)
+    expect(decodeURIComponent(String(openSpy.mock.calls[0]?.[0]))).toContain('天顶剑')
+
+    // Esc 退层：回到列表，高亮停回刚才那行；不跳页。
+    fireEvent.keyDown(input, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByTestId('global-search-item')).toBeNull())
+    expect((input as HTMLInputElement).value).toBe('天顶')
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('group', { name: '物品' }))
+          .getByRole('option', { name: /天顶剑/ })
+          .getAttribute('aria-selected'),
+      ).toBe('true'),
+    )
+    expect(onNavigate).not.toHaveBeenCalled()
+    openSpy.mockRestore()
   })
 
   it('底部列出键盘提示，且没有「取消」按钮（Esc / 点遮罩关）', () => {
@@ -77,6 +160,66 @@ describe('GlobalSearchDialog', () => {
     expect(screen.queryByRole('button', { name: '取消' })).toBeNull()
   })
 
+  it('输入框不再画聚焦描边（ring）：焦点常驻在它上面', () => {
+    renderDialog()
+    const group = screen.getByTestId('global-search-input-group')
+    // `InputGroup` 默认 `focus-within:ring-2`；这里用 ring-0 顶掉（twMerge 同组，后者生效）。
+    expect(group.className).toContain('focus-within:ring-0')
+  })
+
+  it('二级：输入框左侧的放大镜变成返回键，点它回一级', async () => {
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      id: 200 + i,
+      key: `Stone${i}`,
+      name: `石头${i}`,
+      icon: 29,
+      frames: 1,
+      sprite: [16, 16] as [number, number],
+      tags: [],
+    }))
+    render(
+      <I18nProvider lang="zh">
+        <DatasetProvider value={makeDataset({ items: many })}>
+          <GlobalSearchDialog
+            open
+            onOpenChange={() => {}}
+            sources={sources({ dataset: makeDataset({ items: many }) })}
+            onNavigate={() => {}}
+            canRunCommands={false}
+            onRunCommand={async () => ({ status: 'ok', output: [] })}
+          />
+        </DatasetProvider>
+      </I18nProvider>,
+    )
+    const input = screen.getByRole('combobox')
+    // 一级：没有返回键。
+    expect(screen.queryByTestId('global-search-back')).toBeNull()
+
+    fireEvent.change(input, { target: { value: '石头' } })
+    fireEvent.click(await screen.findByRole('option', { name: /更多/ }))
+    await screen.findByTestId('global-search-group')
+
+    // 二级：放大镜换成返回键（悬停提示写 Esc），点一下回一级（高亮停回「更多」那行）。
+    const back = screen.getByTestId('global-search-back')
+    expect(back.getAttribute('aria-label')).toContain('Esc')
+    fireEvent.click(back)
+    await waitFor(() => expect(screen.queryByTestId('global-search-group')).toBeNull())
+    expect(screen.queryByTestId('global-search-back')).toBeNull()
+    expect((input as HTMLInputElement).value).toBe('石头')
+  })
+
+  it('⌘K 展开 / 收起「更多操作」（不用鼠标）', async () => {
+    renderDialog()
+    const input = screen.getByRole('combobox')
+    fireEvent.change(input, { target: { value: 'give' } })
+    await screen.findByRole('group', { name: '指令' })
+
+    fireEvent.keyDown(input, { key: 'k', ctrlKey: true })
+    expect(await screen.findByRole('menu')).toBeTruthy()
+    fireEvent.keyDown(input, { key: 'k', ctrlKey: true })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  })
+
   it('底栏键帽：⏎ 代替 Enter、delete 图标代替 Delete、⌘C 拆成两个键帽', async () => {
     const onRemove = vi.fn()
     render(
@@ -86,24 +229,26 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={vi.fn()}
         />
       </I18nProvider>,
     )
-    // 有最近搜索：Enter 搜索 + delete 图标删除。
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '天顶' } })
-    const itemsGroup = await screen.findByRole('group', { name: '物品' })
-    fireEvent.click(await within(itemsGroup).findByRole('option', { name: /天顶剑/ }))
-    await screen.findByRole('option', { name: '天顶' })
+    // 有最近搜索：Enter 搜索 + delete 图标删除（跳页命中会顺手把词记进最近搜索）。
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '眼' } })
+    fireEvent.click(await screen.findByRole('option', { name: /克苏鲁之眼/ }))
+    await screen.findByRole('option', { name: '眼' })
 
+    // 主操作：⏎ 搜索（键帽是符号，不写英文单词）。
     const bar = screen.getByTestId('global-search-keys')
-    const kbds = [...bar.querySelectorAll('kbd')].map((el) => el.textContent)
-    expect(kbds).toContain('⏎')
-    // 删除键是图标，没有文字。
-    expect(kbds.some((text) => text === 'Delete')).toBe(false)
-    expect(bar.querySelectorAll('kbd svg').length).toBeGreaterThan(0)
+    expect([...bar.querySelectorAll('kbd')].map((el) => el.textContent)).toContain('⏎')
+    expect(bar.textContent).not.toContain('Enter')
+    // 删除在「更多操作」里：键帽是图标，没有文字。
+    fireEvent.pointerDown(screen.getByTestId('global-search-more'), { button: 0, ctrlKey: false })
+    const menu = await screen.findByRole('menu')
+    expect(menu.textContent).toContain('删除')
+    expect(menu.textContent).not.toContain('Delete')
+    expect(menu.querySelectorAll('kbd svg').length).toBeGreaterThan(0)
     expect(onRemove).not.toHaveBeenCalled()
   })
 
@@ -112,39 +257,50 @@ describe('GlobalSearchDialog', () => {
     const input = screen.getByRole('combobox')
     const keys = () => screen.getByTestId('global-search-keys').textContent ?? ''
 
+    /** 「更多操作」里的动作名（主操作直接写在底栏）。 */
+    const moreLabels = async () => {
+      fireEvent.pointerDown(screen.getByTestId('global-search-more'), { button: 0, ctrlKey: false })
+      const menu = await screen.findByRole('menu')
+      const text = menu.textContent ?? ''
+      fireEvent.keyDown(menu, { key: 'Escape' })
+      await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+      return text
+    }
+
     fireEvent.change(input, { target: { value: '天顶' } })
     await screen.findByRole('group', { name: '物品' })
-    await waitFor(() => expect(keys()).toContain('复制 ID'))
+    await waitFor(() => expect(keys()).toContain('打开'))
+    expect(await moreLabels()).toContain('复制 ID')
 
+    // 未登录：指令的主操作是「查看」，复制指令在「更多操作」里。
     fireEvent.change(input, { target: { value: 'give' } })
     await screen.findByRole('group', { name: '指令' })
-    await waitFor(() => expect(keys()).toContain('复制指令'))
-    expect(keys()).not.toContain('复制 ID')
+    await waitFor(() => expect(keys()).toContain('查看'))
+    expect(await moreLabels()).toContain('复制指令')
 
     fireEvent.change(input, { target: { value: 'zzzz' } })
     await screen.findByText(/没有找到「zzzz」/)
-    expect(keys()).not.toContain('复制')
+    expect(screen.queryByTestId('global-search-more')).toBeNull()
   })
 
   it('NPC 命中后跳到数据 ID 并带上数据源与搜索词', async () => {
-    const { onNavigate, onOpenItem } = renderDialog()
+    const { onNavigate } = renderDialog()
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '眼' } })
 
     fireEvent.click(await screen.findByRole('option', { name: /克苏鲁之眼/ }))
     expect(onNavigate).toHaveBeenCalledWith('dataid', { kind: 'npc', query: '克苏鲁之眼' })
-    expect(onOpenItem).not.toHaveBeenCalled()
   })
 
   it('回车执行高亮项，↓ 移动高亮', async () => {
-    const { onNavigate, onOpenItem } = renderDialog()
+    const { onNavigate } = renderDialog()
     const input = screen.getByRole('combobox')
     fireEvent.change(input, { target: { value: '物品' } })
     await screen.findByRole('option', { name: /物品 ID/ })
 
     fireEvent.keyDown(input, { key: 'ArrowDown' })
     fireEvent.keyDown(input, { key: 'Enter' })
-    // 「物品」只命中页面与集合：向下一条后回车会落到物品集合（跳页而不是弹物品详情）。
-    expect(onOpenItem).not.toHaveBeenCalled()
+    // 「物品」只命中页面与集合：向下一条后回车会落到物品集合（跳页而不是打开物品详情）。
+    expect(screen.queryByTestId('global-search-item')).toBeNull()
     expect(onNavigate).toHaveBeenCalledWith('items', expect.objectContaining({ collectionId: expect.any(String) }))
   })
 
@@ -156,7 +312,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands={canRunCommands}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -171,7 +326,11 @@ describe('GlobalSearchDialog', () => {
     const giveRow = await screen.findByRole('option', { name: /\/give/ })
     // 必填参数不再拦执行：底栏写「执行」，行里也没有图标按钮。
     await waitFor(() => expect(hints()).toContain('执行'))
-    expect(hints()).toContain('复制指令')
+    expect(hints()).not.toContain('复制指令')
+    fireEvent.pointerDown(screen.getByTestId('global-search-more'), { button: 0, ctrlKey: false })
+    expect((await screen.findByRole('menu')).textContent).toContain('复制指令')
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
     expect(rowIcons(giveRow)).toBe(0)
 
     // 未登录：不执行，Enter 变成「查看」（跳到指令小抄看用法）。
@@ -214,7 +373,6 @@ describe('GlobalSearchDialog', () => {
             ] as unknown as GlobalSearchSources['goods'],
           })}
           onNavigate={onNavigate}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -223,7 +381,53 @@ describe('GlobalSearchDialog', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '出生点' } })
     const group = await screen.findByRole('group', { name: '鱼店商品' })
     fireEvent.click(within(group).getByRole('option', { name: /传送回出生点/ }))
-    expect(onNavigate).toHaveBeenCalledWith('store', { query: '传送回出生点' })
+    // 带上编号：鱼店落到货架后直接打开这件商品的详情。
+    expect(onNavigate).toHaveBeenCalledWith('store', {
+      query: '传送回出生点',
+      goodsSerial: 7,
+    })
+  })
+
+  it('鱼店商品的次要信息是物品标签时渲染成图标，不显示原始 [i:..] 文本', async () => {
+    render(
+      <I18nProvider lang="zh">
+        <DatasetProvider value={makeDataset()}>
+          <GlobalSearchDialog
+            open
+            onOpenChange={() => {}}
+            sources={sources({
+              goods: [
+                {
+                  serial: 9,
+                  name: '物品瓶',
+                  iconId: 29,
+                  // 价格写成物品标签（鱼店配置里很常见）
+                  cost: '[i/s6:29][i:75]',
+                  map: ['工具'],
+                  desc: '',
+                  unlock: '',
+                  comment: '',
+                },
+              ] as unknown as GlobalSearchSources['goods'],
+            })}
+            onNavigate={vi.fn()}
+            canRunCommands={false}
+            onRunCommand={async () => ({ status: 'ok', output: [] })}
+          />
+        </DatasetProvider>
+      </I18nProvider>,
+    )
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '物品瓶' } })
+    const group = await screen.findByRole('group', { name: '鱼店商品' })
+    const row = within(group).getByRole('option', { name: /物品瓶/ })
+    expect(row.textContent).not.toContain('[i')
+    // 两个标签 → 两个 16px 小图标（行首那个 24px 是商品自己的图标）。
+    const metaIcons = within(row)
+      .getAllByRole('img')
+      .filter((el) => el.getAttribute('width') === '16')
+    expect(metaIcons.map((el) => el.getAttribute('aria-label'))).toEqual(['生命水晶', '坠落之星'])
+    // 数量标签（s6）在图标角落里显示。
+    expect(row.textContent).toContain('6')
   })
 
   it('可裸跑的指令：回车直接执行，并在二级页显示结果', async () => {
@@ -235,7 +439,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -272,7 +475,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -320,7 +522,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={async () => ({
             status: 'ok' as const,
@@ -352,7 +553,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={onNavigate}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={vi.fn()}
         />
@@ -373,22 +573,20 @@ describe('GlobalSearchDialog', () => {
   it('选中后清空输入，再次聚焦显示最近搜索', async () => {
     renderDialog()
     const input = screen.getByRole('combobox')
-    fireEvent.change(input, { target: { value: '天顶' } })
-    const itemsGroup = await screen.findByRole('group', { name: '物品' })
-    fireEvent.click(await within(itemsGroup).findByRole('option', { name: /天顶剑/ }))
+    fireEvent.change(input, { target: { value: '眼' } })
+    fireEvent.click(await screen.findByRole('option', { name: /克苏鲁之眼/ }))
 
     await waitFor(() => expect((input as HTMLInputElement).value).toBe(''))
     expect(await screen.findByText('最近搜索')).toBeTruthy()
     // 最近搜索是可键盘选中的 option。
-    expect(screen.getByRole('option', { name: '天顶' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: '眼' })).toBeTruthy()
   })
 
   it('最近搜索：行尾 ✕ 可单条删除，删完回到空态提示', async () => {
     renderDialog()
     const input = screen.getByRole('combobox')
-    fireEvent.change(input, { target: { value: '天顶' } })
-    const itemsGroup = await screen.findByRole('group', { name: '物品' })
-    fireEvent.click(await within(itemsGroup).findByRole('option', { name: /天顶剑/ }))
+    fireEvent.change(input, { target: { value: '眼' } })
+    fireEvent.click(await screen.findByRole('option', { name: /克苏鲁之眼/ }))
 
     const remove = await waitFor(() => {
       const el = document.querySelector('[data-recent-remove]')
@@ -397,23 +595,22 @@ describe('GlobalSearchDialog', () => {
     })
     fireEvent.click(remove)
 
-    await waitFor(() => expect(screen.queryByRole('option', { name: '天顶' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('option', { name: '眼' })).toBeNull())
     expect(screen.getByText(/可搜物品/)).toBeTruthy()
   })
 
   it('最近搜索：Delete / Backspace 删除高亮项（空查询时才接管）', async () => {
     renderDialog()
     const input = screen.getByRole('combobox')
-    fireEvent.change(input, { target: { value: '天顶' } })
-    const itemsGroup = await screen.findByRole('group', { name: '物品' })
-    fireEvent.click(await within(itemsGroup).findByRole('option', { name: /天顶剑/ }))
-    await waitFor(() => expect(screen.getByRole('option', { name: '天顶' })).toBeTruthy())
+    fireEvent.change(input, { target: { value: '眼' } })
+    fireEvent.click(await screen.findByRole('option', { name: /克苏鲁之眼/ }))
+    await waitFor(() => expect(screen.getByRole('option', { name: '眼' })).toBeTruthy())
 
     // 空查询 + 高亮第一条：Delete 直接删掉。
-    const option = screen.getByRole('option', { name: '天顶' })
+    const option = screen.getByRole('option', { name: '眼' })
     expect(option.getAttribute('aria-selected')).toBe('true')
     fireEvent.keyDown(input, { key: 'Delete' })
-    await waitFor(() => expect(screen.queryByRole('option', { name: '天顶' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('option', { name: '眼' })).toBeNull())
     expect(screen.getByText(/可搜物品/)).toBeTruthy()
   })
 
@@ -448,7 +645,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={onNavigate}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -464,12 +660,54 @@ describe('GlobalSearchDialog', () => {
     const detail = await screen.findByTestId('global-search-group')
     // 二级：20 条 + 1 条「更多」出口（25 条命中），出口右侧写目标页名。
     expect(within(detail).getAllByRole('option')).toHaveLength(21)
-    expect(detail.textContent).toContain('物品 · 25 条')
+    // 没有标题行：既没有「返回」按钮，也不写「物品 · 25 条」；条数在底栏左下。
+    expect(within(detail).queryByRole('button', { name: '返回' })).toBeNull()
+    expect(detail.textContent).not.toContain('物品 · 25 条')
+    expect(screen.getByTestId('global-search-count').textContent).toBe('25 条')
     expect(within(detail).getByRole('option', { name: /更多/ }).textContent).toContain('物品 ID')
     expect(onNavigate).not.toHaveBeenCalled()
 
-    // 20 条之后再多的才去页面，并带上搜索词。
-    fireEvent.click(within(detail).getByRole('option', { name: /更多/ }))
+    // 「更多操作」里有「前往 物品 ID」：不用滚到 20 条之后再点那一行。
+    fireEvent.pointerDown(screen.getByTestId('global-search-more'), { button: 0, ctrlKey: false })
+    const menu = await screen.findByRole('menu')
+    expect(menu.textContent).toContain('前往 物品 ID')
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter', ctrlKey: true })
+    expect(onNavigate).toHaveBeenCalledWith('items', { query: '石头' })
+  })
+
+  it('二级：⌘⏎ 去目标页（命中没超上限也给这个出口）', async () => {
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      id: 200 + i,
+      key: `Stone${i}`,
+      name: `石头${i}`,
+      icon: 29,
+      frames: 1,
+      sprite: [16, 16] as [number, number],
+      tags: [],
+    }))
+    const onNavigate = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <GlobalSearchDialog
+          open
+          onOpenChange={() => {}}
+          sources={sources({ dataset: makeDataset({ items: many }) })}
+          onNavigate={onNavigate}
+          canRunCommands={false}
+          onRunCommand={async () => ({ status: 'ok', output: [] })}
+        />
+      </I18nProvider>,
+    )
+    const input = screen.getByRole('combobox')
+    fireEvent.change(input, { target: { value: '石头' } })
+    fireEvent.click(await screen.findByRole('option', { name: /更多/ }))
+    const detail = await screen.findByTestId('global-search-group')
+    // 8 条命中：没有「更多」行（不需要分页），但仍然能一步去物品 ID。
+    expect(within(detail).queryByRole('option', { name: /更多/ })).toBeNull()
+    expect(screen.getByTestId('global-search-count').textContent).toBe('8 条')
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })
     expect(onNavigate).toHaveBeenCalledWith('items', { query: '石头' })
   })
 
@@ -490,7 +728,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -529,7 +766,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -564,7 +800,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -613,7 +848,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={() => {}}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -643,7 +877,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -671,7 +904,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -701,7 +933,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={onNavigate}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -730,7 +961,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={onNavigate2}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={onRun2}
         />
@@ -751,7 +981,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={vi.fn()}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={vi.fn()}
         />
@@ -771,7 +1000,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources()}
           onNavigate={onNavigate}
-          onOpenItem={() => {}}
           canRunCommands
           onRunCommand={async () => ({ status: 'command_error', output: [], message: '用法错误' })}
         />
@@ -803,7 +1031,6 @@ describe('GlobalSearchDialog', () => {
           onOpenChange={() => {}}
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
-          onOpenItem={() => {}}
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -813,8 +1040,14 @@ describe('GlobalSearchDialog', () => {
     fireEvent.change(input, { target: { value: '石头' } })
     fireEvent.click(await screen.findByRole('option', { name: /更多/ }))
     const detail = await screen.findByTestId('global-search-group')
-    // 二级第一行默认高亮：底栏也跟着说「复制 ID」。
-    await waitFor(() => expect(screen.getByTestId('global-search-keys').textContent).toContain('复制 ID'))
+    // 二级第一行默认高亮：主操作是「打开」，复制在「更多操作」里。
+    await waitFor(() =>
+      expect(screen.getByTestId('global-search-primary').textContent).toContain('打开'),
+    )
+    fireEvent.pointerDown(screen.getByTestId('global-search-more'), { button: 0, ctrlKey: false })
+    expect((await screen.findByRole('menu')).textContent).toContain('复制 ID')
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
     expect(within(detail).getAllByRole('option')[0].getAttribute('aria-selected')).toBe('true')
   })
 })

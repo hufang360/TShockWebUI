@@ -1,16 +1,11 @@
 import { useState } from 'react'
 import { ItemDetailPanel } from '@/components/items/ItemDetailPanel'
-import { useLocalState } from '@/hooks/useLocalState'
-import { StorageKeys } from '@/lib/storage'
 import { Dialog, DialogContent } from '@/components/ui'
-import {
-  ItemDetailProvider,
-  type DetailEntry,
-  type ItemDetailApi,
-  type ItemDetailOptions,
-} from '@/lib/itemDetailContext'
+import { useItemDetailRecipeOptions } from '@/hooks/useItemDetailRecipeOptions'
+import { ItemDetailProvider, type DetailEntry } from '@/lib/itemDetailContext'
+import { pushApi } from '@/lib/itemDetailStack'
 import type { BackendTransport } from '@/lib/tshock'
-import type { ItemDetailRecipeOptions } from '@/components/items/ItemDetailPanel'
+import type { ItemDetailRecipeOptions } from '@/hooks/useItemDetailRecipeOptions'
 import type { Dataset } from '@/types'
 
 export interface ItemDetailDialogProps {
@@ -48,7 +43,7 @@ export function ItemDetailDialog({
   onClose,
 }: ItemDetailDialogProps) {
   // 合成表显示选项与图鉴页共用同一份本机设置（图鉴设置 Popover 改这里也生效）。
-  const recipe = useRecipeOptions()
+  const recipe = useItemDetailRecipeOptions()
   const depth = stack.length - 1
   const entry = stack[depth]
   const item = entry ? dataset.itemsById.get(entry.id) ?? null : null
@@ -76,7 +71,7 @@ export function ItemDetailDialog({
       >
         {entry && item && (
           // 这里再提供一次 Provider：弹框内点配方材料 / ⓘ 就叠一层，而不是重开一个弹框。
-          <ItemDetailProvider api={toApi(entry, onPush)}>
+          <ItemDetailProvider api={pushApi(entry, onPush)}>
             <DialogLayer
               // 每层一个新的组件实例：词缀选择是本层局部状态（与抽屉里一致）。
               key={depth}
@@ -98,24 +93,6 @@ export function ItemDetailDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-/** 合成表 / 掉落列表的显示选项（与图鉴页共用本机设置）。 */
-function useRecipeOptions(): ItemDetailRecipeOptions {
-  const [showItemNames] = useLocalState<boolean>(StorageKeys.dexRecipeShowNames, false)
-  const [twoColumn] = useLocalState<boolean>(StorageKeys.dexRecipeTwoColumn, false)
-  return { showItemNames, twoColumn }
-}
-
-/** 把「打开某物品」转成往栈里 push（带着标签里的词缀 / 堆叠）。 */
-function toApi(entry: DetailEntry, onPush: (entry: DetailEntry) => void): ItemDetailApi {
-  return {
-    open: (itemId: number, opts?: ItemDetailOptions) =>
-      // 点自己不要叠（同一个物品在栈顶时忽略）。
-      entry.id === itemId && (opts?.prefixId ?? 0) === (entry.prefixId ?? 0)
-        ? undefined
-        : onPush({ id: itemId, prefixId: opts?.prefixId, stack: opts?.stack }),
-  }
 }
 
 /** 单层内容：词缀选择由本层自己维护，所以单独抽出来（`key` 换层时重建）。 */

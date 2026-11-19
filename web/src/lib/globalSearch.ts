@@ -431,7 +431,8 @@ function matchGoods(sources: GlobalSearchSources, q: string): SearchHit[] {
         'goods',
         String(good.serial),
         good.name,
-        { kind: 'prefill', tab: 'store', intent: { query: good.name } },
+        // 带上编号：鱼店落到货架后直接打开这件商品的详情（只填词不打开的话还得再找一遍）。
+        { kind: 'prefill', tab: 'store', intent: { query: good.name, goodsSerial: good.serial } },
         {
           meta: good.cost || undefined,
           icon: good.iconId ? { kind: 'item', itemId: good.iconId } : { kind: 'lucide', icon: CartIcon },
@@ -482,6 +483,15 @@ function seeAllOf(group: SearchGroupId, q: string): SearchGroup['seeAll'] {
   if (group === 'tiles' || group === 'walls') return { tab: 'dataid', intent: { query: q } }
   if (group === 'goods') return { tab: 'store', intent: { query: q } }
   return { tab: target.tab, intent: { query: q } }
+}
+
+/**
+ * 某组「前往 <页面>」的出口（目标页 + 搜索词）。
+ *
+ * 二级里不管命中是否超过上限都能用（底栏的 `⌘⏎` 快捷键）；「更多」行只在被截断时出现。
+ */
+export function groupPageExit(group: SearchGroupId, query: string): SearchGroup['seeAll'] {
+  return seeAllOf(group, query.trim().toLowerCase())
 }
 
 /** 一个组的匹配器（`q` 已小写化）。一级和二级共用，避免两套匹配逻辑跑偏。 */
