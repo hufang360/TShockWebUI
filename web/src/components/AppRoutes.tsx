@@ -163,6 +163,9 @@ export function AppRoutes({
           modules={modules}
           refreshInterval={settings.refreshInterval}
           eventsRefreshInterval={settings.eventsRefreshInterval}
+          ingame={ingame}
+          players={players}
+          runtimeValues={runtimeValues}
           onTokenInvalid={onTokenInvalid}
           onLogin={openLogin}
           onNavigate={onNavigate}
@@ -221,6 +224,9 @@ export function AppRoutes({
           transport={transport}
           authenticated={authenticated}
           refreshInterval={settings.refreshInterval}
+          ingame={ingame}
+          players={players}
+          runtimeValues={runtimeValues}
           onTokenInvalid={onTokenInvalid}
           onLogin={openLogin}
         />
@@ -246,6 +252,9 @@ export function AppRoutes({
           onLogin={openLogin}
           moduleId="world"
           keyPrefix="world:"
+          ingame={ingame}
+          players={players}
+          runtimeValues={runtimeValues}
           desc={
             <PluginHelp
               plugin={t('plugin.world.name')}
@@ -274,6 +283,9 @@ export function AppRoutes({
             onLogin={openLogin}
             moduleId={mod.id}
             keyPrefix={`${mod.id}:`}
+            ingame={ingame}
+            players={players}
+            runtimeValues={runtimeValues}
             // 没写说明就回退到「卡片怎么用」的帮助（写了就用作者自己的）。
             desc={mod.desc.trim() || t('modules.custom.help')}
           />

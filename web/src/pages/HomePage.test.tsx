@@ -7,6 +7,8 @@ import { DEFAULT_HOME_CARDS, createCustomCard } from '@/lib/homeCards'
 import { resetRefreshGate } from '@/lib/refreshGate'
 import { consumeEditorFocus } from '@/lib/editorFocus'
 import type { BackendTransport } from '@/lib/tshock'
+import { NO_INGAME } from '@/lib/ingame'
+import { addCardThroughDialog } from '@/test/managerSheet'
 import { makeDataset } from '@/test/fixtures'
 import { closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { playerStubs } from '@/test/playerStubs'
@@ -51,6 +53,7 @@ function renderPage(
             serverId="builtin"
             refreshInterval={120000}
             eventsRefreshInterval={180000}
+            ingame={NO_INGAME}
             onTokenInvalid={vi.fn().mockResolvedValue(true)}
             onLogin={onLogin}
             onNavigate={onNavigate as never}
@@ -150,10 +153,7 @@ describe('HomePage 卡片管理', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: '添加卡片' }))
-    fireEvent.change(within(dialog).getByLabelText('卡片名称'), { target: { value: '全服 公告' } })
-    fireEvent.change(within(dialog).getByLabelText('指令'), { target: { value: 'say hello' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: '添加' }))
+    await addCardThroughDialog('全服 公告', '/say hello')
 
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
     await waitFor(() => expect(screen.getByText('全服 公告')).toBeTruthy())
@@ -163,6 +163,46 @@ describe('HomePage 卡片管理', () => {
     const prefs = stored.byServer?.builtin
     expect(prefs.custom).toHaveLength(1)
     expect(prefs.custom[0]).toMatchObject({ name: '全服 公告', command: '/say hello' })
+  })
+
+  it('参数卡片：卡片上填参数，按模板拼指令执行，值写回本机', async () => {
+    const template = {
+      command: 'give',
+      syntax: 'give <item type/id> <player> [item amount] [prefix id/name]',
+      args: [
+        { mode: 'fixed' as const, value: '29' },
+        { mode: 'fill' as const, value: '' },
+        { mode: 'omit' as const, value: '' },
+        { mode: 'omit' as const, value: '' },
+      ],
+    }
+    const card = { ...createCustomCard('给物品', 'give', template), template }
+    seedHomeCards({
+      ...DEFAULT_HOME_CARDS,
+      order: [...DEFAULT_HOME_CARDS.order, card.id],
+      custom: [card],
+    })
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+
+    // 只渲染「执行时填」的参数（物品是固定值 29，卡片上不出现）。
+    expect(screen.queryByLabelText('item type/id')).toBeNull()
+    const player = await screen.findByLabelText('player')
+
+    // 缺必填项时按钮灰着：不发一条半截指令。
+    const run = screen.getByRole('button', { name: '执行' })
+    expect(run.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(player, { target: { value: '张三' } })
+    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/give 29 张三'))
+
+    // 输入的值写回本机（下次打开还是这个值）。
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem('tswui:homeCards') ?? '{}')
+      const saved = stored.byServer?.builtin?.custom?.[0]
+      expect(saved?.template?.args?.[1]).toEqual({ mode: 'fill', value: '张三' })
+    })
   })
 
   it('自定义卡片可删除', async () => {
@@ -289,6 +329,7 @@ describe('HomePage 卡片管理', () => {
                   serverId="builtin"
                   refreshInterval={120000}
                   eventsRefreshInterval={180000}
+                  ingame={NO_INGAME}
                   onTokenInvalid={vi.fn().mockResolvedValue(true)}
                   onLogin={vi.fn()}
                   onNavigate={vi.fn()}

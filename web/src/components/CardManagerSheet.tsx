@@ -33,9 +33,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Field,
-  FieldGroup,
-  FieldLabel,
   Input,
   Sheet,
   SheetContent,
@@ -65,6 +62,10 @@ export interface ManagerCard {
   icon?: ReactNode
   /** 用户添加的卡片：名称 / 指令可内联编辑，可删除。 */
   custom: boolean
+  /** 参数卡片：指令由参数拼出来，编辑走「参数设置」而不是内联改指令。 */
+  template?: boolean
+  /** 必须手动执行（参数卡片要现场填值）：开关置灰，悬停说明原因。 */
+  manualLocked?: boolean
   /** 置灰（如依赖的插件缺失）。 */
   disabled?: boolean
   /** 隐藏态（首页 / 鱼店用），置灰并显示闭眼图标。 */
@@ -124,15 +125,13 @@ export interface CardManagerSheetProps {
     /** 不可选的档位（鱼店只有右栏：`half` / `full` 置灰）。 */
     disabled?: CardWidth[]
   }
-  /** 底部「添加卡片」表单（不给则不显示）。 */
+  /** 底部「添加卡片」按钮（不给则不显示）；点开由页面弹出添加卡片弹框。 */
   add?: {
-    nameLabel: string
-    namePlaceholder: string
-    commandLabel: string
-    commandPlaceholder: string
-    createLabel: string
-    onAdd: (name: string, command: string) => void
+    label: string
+    onClick: () => void
   }
+  /** 参数卡片行尾的「参数设置」（不给则参数卡片不能编辑）。 */
+  onEditTemplate?: (id: string) => void
   /** 卡片名称 / 指令输入框的无障碍文案（自定义卡片内联编辑用）。 */
   nameLabel?: string
   commandLabel?: string
@@ -154,6 +153,7 @@ function RowButton({
   label,
   tip,
   onClick,
+  disabled,
   children,
 }: {
   /** 无障碍名称（当前状态）。 */
@@ -161,6 +161,7 @@ function RowButton({
   /** 悬停提示（描述这个操作）。 */
   tip: string
   onClick: () => void
+  disabled?: boolean
   children?: ReactNode
 }) {
   return (
@@ -170,10 +171,12 @@ function RowButton({
           <button
             type="button"
             aria-label={label}
+            aria-disabled={disabled || undefined}
             onClick={onClick}
             className={cn(
               'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-control text-muted-foreground transition-colors md:size-6',
               'hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ',
+              disabled && 'cursor-default opacity-50 hover:bg-transparent',
             )}
           >
             {children}
@@ -253,6 +256,7 @@ export function CardManagerSheet({
   visibility,
   width,
   add,
+  onEditTemplate,
   nameLabel,
   commandLabel,
   commandSuggestions,
@@ -261,14 +265,10 @@ export function CardManagerSheet({
   helpExtra,
 }: CardManagerSheetProps) {
   const { t } = useI18n()
-  const nameInputId = useId()
-  const commandInputId = useId()
   const suggestionBaseId = useId()
+  const [filter, setFilter] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [command, setCommand] = useState('')
-  const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [removeId, setRemoveId] = useState<string | null>(null)
   /** 刚复制过的卡片 id（菜单项短暂显示「已复制」）。 */
@@ -289,12 +289,10 @@ export function CardManagerSheet({
     if (open) return
     setDragId(null)
     setOverId(null)
-    setName('')
-    setCommand('')
-    setShowAddForm(false)
     setEditingId(null)
     setRemoveId(null)
     setCopiedId(null)
+    setFilter('')
   }, [open])
 
   /** 复制这张卡片的指令（悬停提示与「已复制」反馈都在菜单项上）。 */
@@ -305,31 +303,6 @@ export function CardManagerSheet({
     const ok = await copyText(cmd)
     setCopiedId(ok ? id : null)
     if (ok) window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1200)
-  }
-
-  const canAdd = Boolean(add && name.trim() && normalizeCustomCommand(command))
-
-  const submitAdd = () => {
-    if (!add || !canAdd) return
-    const cmd = normalizeCustomCommand(command)
-    add.onAdd(name.trim(), cmd)
-    setName('')
-    setCommand('')
-    setShowAddForm(false)
-  }
-
-  /** 添加表单在列表末尾：展开时滚到最底部，否则列表长的时候用户看不到它。 */
-  const toggleAddForm = () => {
-    const next = !showAddForm
-    setShowAddForm(next)
-    if (!next) return
-    const el = scrollRef.current
-    // jsdom 没有 scrollTo；真实浏览器里平滑滚到底。
-    if (el && typeof el.scrollTo === 'function') {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-    } else if (el) {
-      el.scrollTop = el.scrollHeight
-    }
   }
 
   /** 拖拽落到目标行：把源卡片移动到目标索引。 */
@@ -347,44 +320,13 @@ export function CardManagerSheet({
 
   const removeTarget = removeId ? cards.find((c) => c.id === removeId) : undefined
 
-  /** 添加表单：放在列表**下面**（新卡片也是加到末尾），使用说明之上。 */
-  const addForm = add && showAddForm && (
-    <div className="mx-5 mt-3 shrink-0 rounded-container border bg-accent/20 p-3">
-      <FieldGroup className="gap-2 sm:flex-row sm:items-end">
-        <Field className="min-w-0 flex-1">
-          <FieldLabel htmlFor={nameInputId}>{add.nameLabel}</FieldLabel>
-          <Input
-            id={nameInputId}
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') submitAdd()
-            }}
-            placeholder={add.namePlaceholder}
-            className="h-8 text-xs"
-          />
-        </Field>
-        <Field className="min-w-0 flex-1">
-          <FieldLabel htmlFor={commandInputId}>{add.commandLabel}</FieldLabel>
-          <Input
-            id={commandInputId}
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') submitAdd()
-            }}
-            placeholder={add.commandPlaceholder}
-            className="h-8 font-pixel text-xs"
-          />
-        </Field>
-        <Button size="sm" variant="primary" onClick={submitAdd} disabled={!canAdd}>
-          <Plus data-icon="inline-start" />
-          {add.createLabel}
-        </Button>
-      </FieldGroup>
-    </div>
-  )
+  // 卡片多时给一个过滤框（首页 / 模块的卡片清单会越来越长）。过滤期间不拖拽排序：
+  // 拖拽落点算的是「过滤后的第几行」，照着它移动会挪错位置。
+  const keyword = filter.trim().toLowerCase()
+  const visibleCards = keyword
+    ? cards.filter((card) => `${card.name} ${card.command}`.toLowerCase().includes(keyword))
+    : cards
+  const sortingDisabled = keyword.length > 0
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -411,11 +353,24 @@ export function CardManagerSheet({
           tabIndex={-1}
           className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none"
         >
+          {cards.length > 6 && (
+            <div className="px-5 pt-3">
+              <Input
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder={t('card.filterPlaceholder')}
+                aria-label={t('card.filterPlaceholder')}
+                className="h-8 text-xs"
+              />
+            </div>
+          )}
+
           <ul className="flex flex-col gap-1 px-5 py-3">
-            {cards.map((card, index) => {
+            {visibleCards.map((card) => {
+              const index = cards.indexOf(card)
               const label = card.name || card.command
               const suggestionListId = `${suggestionBaseId}-${index}`
-              const editing = card.custom && editingId === card.id
+              const editing = card.custom && card.template !== true && editingId === card.id
               const manual = autoExec ? autoExec.isManual(card.id) : false
               const hidden = card.hidden === true || (visibility ? visibility.isHidden(card.id) : false)
               const widthValue = width ? width.get(card.id) : null
@@ -428,9 +383,9 @@ export function CardManagerSheet({
                 <li
                   key={card.id}
                   // 整行都能拖（手柄只是视觉提示）；编辑态关掉，否则输入框里没法选词。
-                  draggable={Boolean(ordering) && !editing}
+                  draggable={Boolean(ordering) && !editing && !sortingDisabled}
                   onDragStart={
-                    ordering
+                    ordering && !sortingDisabled
                       ? (e) => {
                           setDragId(card.id)
                           e.dataTransfer.effectAllowed = 'move'
@@ -439,7 +394,7 @@ export function CardManagerSheet({
                       : undefined
                   }
                   onDragOver={
-                    ordering
+                    ordering && !sortingDisabled
                       ? (e) => {
                           if (!dragId) return
                           e.preventDefault()
@@ -449,7 +404,7 @@ export function CardManagerSheet({
                       : undefined
                   }
                   onDrop={
-                    ordering
+                    ordering && !sortingDisabled
                       ? (e) => {
                           e.preventDefault()
                           const source = dragId ?? e.dataTransfer.getData('text/plain')
@@ -458,10 +413,10 @@ export function CardManagerSheet({
                         }
                       : undefined
                   }
-                  onDragEnd={ordering ? resetDrag : undefined}
+                  onDragEnd={ordering && !sortingDisabled ? resetDrag : undefined}
                   className={cn(
                     'flex min-h-9 items-center gap-1.5 rounded-container bg-accent/40 pr-0.5 pl-1',
-                    ordering && 'cursor-grab active:cursor-grabbing',
+                    ordering && !sortingDisabled && 'cursor-grab active:cursor-grabbing',
                     dragId === card.id && 'opacity-50',
                     dragId && overId === card.id && dragId !== card.id && 'ring-2 ring-ring',
                     // 隐藏态只用闭眼徽标表达，不改透明度；缺插件仍置灰。
@@ -556,8 +511,18 @@ export function CardManagerSheet({
                     {canAutoExec && autoExec && (
                       <RowButton
                         label={manual ? t('home.manageManualChip') : t('home.manageAutoChip')}
-                        tip={manual ? t('home.manageAutoOffTip') : t('home.manageAutoOnTip')}
-                        onClick={() => autoExec.onToggle(card.id, !manual)}
+                        tip={
+                          card.manualLocked
+                            ? t('card.manualLocked')
+                            : manual
+                              ? t('home.manageAutoOffTip')
+                              : t('home.manageAutoOnTip')
+                        }
+                        disabled={card.manualLocked}
+                        onClick={() => {
+                          if (card.manualLocked) return
+                          autoExec.onToggle(card.id, !manual)
+                        }}
                       >
                         {manual ? <PlayOff className="size-3.5" /> : <Play className="size-3.5" />}
                       </RowButton>
@@ -583,7 +548,11 @@ export function CardManagerSheet({
                         icon={Pencil}
                         size="icon-xs"
                         variant={editing ? 'secondary' : 'ghost'}
-                        onClick={() => setEditingId((id) => (id === card.id ? null : card.id))}
+                        onClick={() =>
+                          card.template
+                            ? onEditTemplate?.(card.id)
+                            : setEditingId((id) => (id === card.id ? null : card.id))
+                        }
                       />
                     )}
                   </div>
@@ -603,7 +572,7 @@ export function CardManagerSheet({
                           {hasSort && ordering && (
                             <>
                               <DropdownMenuItem
-                                disabled={index === 0}
+                                disabled={index === 0 || sortingDisabled}
                                 onSelect={(e) => {
                                   e.preventDefault()
                                   ordering.onMove(card.id, -1)
@@ -613,7 +582,7 @@ export function CardManagerSheet({
                                 {ordering.moveUpLabel}
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                disabled={index === cards.length - 1}
+                                disabled={index === cards.length - 1 || sortingDisabled}
                                 onSelect={(e) => {
                                   e.preventDefault()
                                   ordering.onMove(card.id, 1)
@@ -661,8 +630,6 @@ export function CardManagerSheet({
             })}
           </ul>
 
-          {addForm}
-
           {/* 使用说明：贴在滚动区底部（内容少时到底，内容多时跟在最后一张卡后面）。
               收起后不再占位，改由页脚的 ⓘ 重新打开。 */}
           {!helpClosed && (
@@ -689,9 +656,9 @@ export function CardManagerSheet({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {add && (
-              <Button variant="outline" onClick={toggleAddForm} aria-expanded={showAddForm}>
+              <Button variant="outline" onClick={add.onClick}>
                 <Plus data-icon="inline-start" />
-                {t('home.manageAddCard')}
+                {add.label}
               </Button>
             )}
             {doneLabel && (

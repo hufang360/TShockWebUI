@@ -26,3 +26,18 @@ export async function openRowMenu(row: HTMLElement) {
   fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' })
   return screen.getByRole('menu')
 }
+
+/**
+ * 通过「添加卡片」弹框加一张**普通指令卡片**：搜索框里输入 `/指令` → 「使用「…」」→ 填名称 → 添加。
+ *
+ * 参数卡片走列表里的 `/指令` 选项（见 `CardTemplateDialog` 的用例），这里只覆盖「照旧写一条指令」的路径。
+ */
+export async function addCardThroughDialog(name: string, command: string) {
+  const raw = command.startsWith('/') ? command : `/${command}`
+  fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
+  // 弹框是按需加载的 chunk：等它挂上来。
+  fireEvent.change(await screen.findByLabelText('搜索指令'), { target: { value: raw } })
+  fireEvent.click(screen.getByRole('button', { name: `使用「${raw}」` }))
+  fireEvent.change(screen.getByLabelText('名称'), { target: { value: name } })
+  fireEvent.click(screen.getByRole('button', { name: '添加' }))
+}

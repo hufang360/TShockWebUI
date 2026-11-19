@@ -11,6 +11,7 @@ import {
   type ModuleCard,
 } from '@/lib/moduleCards'
 import { StorageKeys } from '@/lib/storage'
+import type { CardTemplate } from '@/lib/cardParams'
 
 /** 读写「模块内用户添加的指令卡片」（按服务器 + 模块）。 */
 export function useModuleCards(
@@ -18,8 +19,8 @@ export function useModuleCards(
   moduleId: string,
 ): {
   cards: ModuleCard[]
-  add: (name: string, command: string) => void
-  update: (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command'>>) => void
+  add: (name: string, command: string, template?: CardTemplate) => void
+  update: (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command' | 'template'>>) => void
   remove: (id: string) => void
   /** 恢复默认：清掉这个模块里用户添加的全部卡片。 */
   reset: () => void
@@ -29,16 +30,16 @@ export function useModuleCards(
   const cards = useMemo(() => moduleCardsFor(prefs, serverId, moduleId), [prefs, serverId, moduleId])
 
   const add = useCallback(
-    (name: string, command: string) => {
+    (name: string, command: string, template?: CardTemplate) => {
       // 卡片对象在 updater **外面**创建：StrictMode 会把 updater 跑两次，
       // 在里面生成 id 会一次点击加出两张卡。
-      const card = createModuleCard(name, command)
+      const card = createModuleCard(name, command, template)
       setRaw((prev) => addModuleCard(sanitizeModuleCards(prev), serverId, moduleId, card))
     },
     [setRaw, serverId, moduleId],
   )
   const update = useCallback(
-    (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command'>>) => {
+    (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command' | 'template'>>) => {
       setRaw((prev) => updateModuleCard(sanitizeModuleCards(prev), serverId, moduleId, id, patch))
     },
     [setRaw, serverId, moduleId],

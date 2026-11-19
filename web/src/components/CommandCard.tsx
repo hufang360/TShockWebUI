@@ -54,6 +54,13 @@ export interface CommandCardProps {
   /** 右上角按钮语义：`refresh`（默认）显示刷新图标；`run` 表示手动执行，显示播放图标。 */
   action?: 'refresh' | 'run'
   onRefresh?: () => void
+  /** 暂时不能执行（如参数卡片的必填项没填）：按钮置灰。 */
+  runDisabled?: boolean
+  /**
+   * 卡片正文顶部的参数输入区（参数卡片用）。**传了就不再压成单行空态**：
+   * 没有输入框这份卡片就没法用，省空间也不能省掉它。
+   */
+  paramForm?: ReactNode
   /** 折叠状态记忆 key（不传则不持久化）；如 `home:status` / `world:relive` / `fish:rank`。 */
   collapseKey?: string
   /**
@@ -88,6 +95,8 @@ export function CommandCard({
   footerNote,
   action = 'refresh',
   onRefresh,
+  runDisabled,
+  paramForm,
   collapseKey,
   showLastRunAt = false,
   itemsById,
@@ -124,7 +133,7 @@ export function CommandCard({
               size={compact ? 'icon-sm' : 'sm'}
               variant="ghost"
               aria-label={action === 'run' ? t('home.run') : t('home.refresh')}
-              disabled={unavailable || loading}
+              disabled={unavailable || loading || runDisabled}
               onClick={onRefresh}
               // 卡片页头的图标按钮统一用「次要灰」（与顶栏 IconAction 同一档）；
               // 带文字的形态保持正文色，免得标签也跟着变淡。
@@ -147,7 +156,7 @@ export function CommandCard({
       </TooltipProvider>
     ) : null
 
-  if (compactEmpty && !result && !loading && !unavailable && onRefresh) {
+  if (compactEmpty && !result && !loading && !unavailable && onRefresh && !paramForm) {
     return (
       <Card className={cn('overflow-hidden', className)} data-command={command ?? undefined}>
         {/* 紧凑行也要把图标压到 `size-4`：这里少了这条规则，图标会按 SVG 默认的 24px 渲染，
@@ -214,6 +223,11 @@ export function CommandCard({
             {/* 撑满剩余高度：卡片被同行更高的卡拉高时，多出来的空间留在灰底正文区里，
                 正文与卡片底部（或页脚备注 / 「上次刷新」）之间的间距保持和「Boss 进度」一样紧。 */}
             <div className="flex min-h-0 flex-1 flex-col">
+              {paramForm && (
+                <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {paramForm}
+                </div>
+              )}
               {unavailable ? (
                 <p className="text-xs text-muted-foreground">
                   {unavailableText ?? t('home.needLogin')}

@@ -8,6 +8,7 @@ import { useModuleCards } from '@/hooks/useModuleCards'
 import { useI18n } from '@/lib/i18n'
 import { readJson, writeJson } from '@/lib/storage'
 import type { BackendTransport } from '@/lib/tshock'
+import type { IngamePolicy } from '@/lib/ingame'
 import type { Dataset } from '@/types'
 
 export interface FixedCardDef {
@@ -64,6 +65,10 @@ interface CommandModulePageProps {
   fixedCards?: FixedCardDef[]
   /** 固定卡片依赖的第三方插件名（如 `WorldModify`）：指令不存在时提示未安装。 */
   pluginName?: string
+  /** 哪些 `allowServer=false` 的指令能在网页执行（添加卡片弹框用）。 */
+  ingame: IngamePolicy
+  players?: string[]
+  runtimeValues?: { regions?: string[]; warps?: string[] }
 }
 
 /** 通用「指令卡片模块」页：世界管理 / 自定义模块共用。 */
@@ -80,6 +85,9 @@ export function CommandModulePage({
   keyPrefix,
   fixedCards,
   pluginName,
+  ingame,
+  players,
+  runtimeValues,
 }: CommandModulePageProps) {
   const { t } = useI18n()
   const { cards, add, update, remove, reset: resetCards } = useModuleCards(serverId, moduleId)
@@ -101,6 +109,7 @@ export function CommandModulePage({
         id: c.id,
         name: c.name,
         command: c.command,
+        template: c.template,
         icon: <Terminal />,
         custom: true,
         manualKey: `${keyPrefix}${c.id}`,
@@ -147,6 +156,9 @@ export function CommandModulePage({
         onRemoveCard={remove}
         onResetCards={resetCards}
         pluginName={pluginName}
+        ingame={ingame}
+        players={players}
+        runtimeValues={runtimeValues}
       />
     </div>
   )

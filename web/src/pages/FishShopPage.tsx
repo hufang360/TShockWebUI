@@ -50,6 +50,7 @@ import { useChatSend } from '@/hooks/useChatSend'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { useSettingsPopoverFocus } from '@/hooks/useSettingsPopoverFocus'
 import { cn } from '@/lib/cn'
+import type { IngamePolicy } from '@/lib/ingame'
 import { showsMetaToggle } from '@/lib/iconGridSize'
 import { splitFishArgs } from '@/lib/fishArgs'
 import {
@@ -136,6 +137,10 @@ interface FishShopPageProps {
   authenticated: boolean
   /** 页面数据自动刷新间隔（毫秒，0 = 不自动刷新）。 */
   refreshInterval: number
+  /** 哪些 `allowServer=false` 的指令能在网页执行（右侧卡片添加弹框用）。 */
+  ingame: IngamePolicy
+  players?: string[]
+  runtimeValues?: { regions?: string[]; warps?: string[] }
   onTokenInvalid: () => Promise<boolean>
   onLogin: () => void
 }
@@ -187,7 +192,17 @@ function resolveTab(value: unknown): FishTab {
 }
 
 /** 网格图标尺寸：与「物品图鉴」一致（64px）。 */
-export function FishShopPage({ serverId, transport, authenticated, refreshInterval, onTokenInvalid, onLogin }: FishShopPageProps) {
+export function FishShopPage({
+  serverId,
+  transport,
+  authenticated,
+  refreshInterval,
+  ingame,
+  players,
+  runtimeValues,
+  onTokenInvalid,
+  onLogin,
+}: FishShopPageProps) {
   const { t } = useI18n()
   const dataset = useDataset()
   const [ui, setUi] = useModuleState<FishUiState>(serverId, 'store', DEFAULT_STATE)
@@ -1188,6 +1203,9 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             authenticated={authenticated}
             serverId={serverId}
             refreshInterval={refreshInterval}
+            ingame={ingame}
+            players={players}
+            runtimeValues={runtimeValues}
             onTokenInvalid={onTokenInvalid}
             // 顶栏那个「刷新全部」同时刷新货架（输入框里不再单独放刷新按钮）。
             onManualRefresh={() => void loadShop()}

@@ -5,6 +5,8 @@ import { CommandResultsProvider } from '@/lib/commandResults'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { resetRefreshGate } from '@/lib/refreshGate'
+import { NO_INGAME } from '@/lib/ingame'
+import { addCardThroughDialog } from '@/test/managerSheet'
 import { makeDataset } from '@/test/fixtures'
 import { closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { playerStubs } from '@/test/playerStubs'
@@ -48,6 +50,7 @@ function renderPage(
               authenticated={authenticated}
               serverId="default"
               refreshInterval={0}
+              ingame={NO_INGAME}
               onTokenInvalid={vi.fn().mockResolvedValue(true)}
               onLogin={onLogin}
               moduleId="world"
@@ -97,10 +100,7 @@ describe('CommandModulePage', () => {
 
     // 管理卡片弹框里添加一张卡片
     fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
-    fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
-    fireEvent.change(screen.getByLabelText('卡片名称'), { target: { value: '时间' } })
-    fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'time' } })
-    fireEvent.click(screen.getByRole('button', { name: '添加' }))
+    await addCardThroughDialog('时间', 'time')
 
     expect((await screen.findAllByText('时间')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('/time').length).toBeGreaterThan(0)
@@ -188,16 +188,50 @@ describe('CommandModulePage', () => {
     expect(await screen.findByText(help)).toBeTruthy()
   })
 
+  it('参数卡片：卡片上直接填参数，执行时按模板拼指令（不走自动刷新）', async () => {
+    const template = {
+      command: 'give',
+      syntax: 'give <item type/id> <player> [item amount] [prefix id/name]',
+      args: [
+        { mode: 'fixed', value: '29' },
+        { mode: 'fill', value: '' },
+        { mode: 'omit', value: '' },
+        { mode: 'omit', value: '' },
+      ],
+    }
+    localStorage.setItem(
+      'tswui:moduleCards',
+      JSON.stringify({
+        byServer: {
+          default: {
+            world: [{ id: 'c:give', name: '给物品', command: 'give', template }],
+          },
+        },
+      }),
+    )
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+
+    // 固定值不进表单；必填的 player 在卡片上。
+    expect(screen.queryByLabelText('item type/id')).toBeNull()
+    const player = await screen.findByLabelText('player')
+
+    // 参数卡片不参与自动刷新（进页面不会跑）。
+    expect(runCommand.mock.calls.some(([cmd]) => String(cmd).startsWith('/give'))).toBe(false)
+
+    fireEvent.change(player, { target: { value: '张三' } })
+    const card = player.closest('[data-slot="card"]') as HTMLElement
+    fireEvent.click(within(card).getByRole('button', { name: '执行' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/give 29 张三'))
+  })
+
   it('新添加的卡片默认「小」且不自动执行；改成「大」后占整行', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
     fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
     const sheet = await screen.findByRole('dialog')
-    fireEvent.click(within(sheet).getByRole('button', { name: '添加卡片' }))
-    fireEvent.change(within(sheet).getByLabelText('卡片名称'), { target: { value: '时间' } })
-    fireEvent.change(within(sheet).getByLabelText('指令'), { target: { value: 'time' } })
-    fireEvent.click(within(sheet).getByRole('button', { name: /^添加$/ }))
+    await addCardThroughDialog('时间', 'time')
 
     const row = within(sheet).getByRole('listitem', { name: '时间' })
     expect(within(row).getByLabelText('左·小')).toBeTruthy()
@@ -222,10 +256,7 @@ describe('CommandModulePage', () => {
     const sheet = await screen.findByRole('dialog')
 
     // 先改出一点非默认状态：加一张卡 + 把固定卡改成「小」。
-    fireEvent.click(within(sheet).getByRole('button', { name: '添加卡片' }))
-    fireEvent.change(within(sheet).getByLabelText('卡片名称'), { target: { value: '时间' } })
-    fireEvent.change(within(sheet).getByLabelText('指令'), { target: { value: 'time' } })
-    fireEvent.click(within(sheet).getByRole('button', { name: /^添加$/ }))
+    await addCardThroughDialog('时间', 'time')
     const infoRow = within(sheet).getByRole('listitem', { name: '世界信息' })
     // 固定卡默认「左·大」，点一下循环到「右栏」。
     fireEvent.click(within(infoRow).getByLabelText('左·大'))

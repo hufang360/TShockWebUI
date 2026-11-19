@@ -64,6 +64,40 @@ describe('sanitizeHomeCards', () => {
     expect(prefs.custom[0]).toEqual({ id: 'c:1', name: '全服 公告', command: '/say hello world' })
   })
 
+  it('保留参数卡片模板，非法模板则退回普通卡片', () => {
+    const template = {
+      command: 'give',
+      syntax: 'give <item type/id> <player> [item amount] [prefix id/name]',
+      args: [
+        { mode: 'fill', value: '29' },
+        { mode: 'fill', value: '' },
+        { mode: 'omit', value: '' },
+        { mode: 'omit', value: '' },
+      ],
+    }
+    const prefs = sanitizeHomeCards({
+      custom: [
+        { id: 'c:1', name: '给物品', command: 'give', template },
+        { id: 'c:2', name: '坏模板', command: '/who', template: { command: 'who' } },
+      ],
+    })
+    expect(prefs.custom[0]).toEqual({ id: 'c:1', name: '给物品', command: 'give', template })
+    expect(prefs.custom[1]).toEqual({ id: 'c:2', name: '坏模板', command: '/who' })
+  })
+
+  it('createCustomCard 带模板', () => {
+    const card = createCustomCard('给物品', 'give', {
+      command: 'give',
+      syntax: 'give <item type/id> <player>',
+      args: [
+        { mode: 'fill', value: '' },
+        { mode: 'fill', value: '' },
+      ],
+    })
+    expect(card.template?.command).toBe('give')
+    expect(createCustomCard('x', 'y').template).toBeUndefined()
+  })
+
   it('丢弃无 id / 重复 id 的自定义卡片', () => {
     const prefs = sanitizeHomeCards({
       custom: [

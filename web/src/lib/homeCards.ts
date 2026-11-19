@@ -67,6 +67,7 @@ export function isBuiltinCardId(id: string): id is BuiltinCardId {
 }
 
 import { isCardWidth, type CardWidth } from './cardLayout'
+import { sanitizeCardTemplate, type CardTemplate } from './cardParams'
 
 // 宽度档位（小 / 大 / 右）与模块页共用一份定义，见 `lib/cardLayout.ts`。
 export type { CardWidth } from './cardLayout'
@@ -96,8 +97,10 @@ export interface CustomHomeCard {
   id: string
   /** 显示名；为空时界面回退用指令。 */
   name: string
-  /** 用户填写的指令原文（可能缺前导 /，执行前再规范化）。 */
+  /** 用户填写的指令原文（可能缺前导 /，执行前再规范化）；参数卡片里是基础指令名。 */
   command: string
+  /** 参数化指令（见 `lib/cardParams.ts`）；没有则按普通指令卡片执行。 */
+  template?: CardTemplate
 }
 
 /**
@@ -210,8 +213,12 @@ function newCustomId(): string {
   return `${CUSTOM_PREFIX}${rand}`
 }
 
-export function createCustomCard(name = '', command = ''): CustomHomeCard {
-  return { id: newCustomId(), name, command }
+export function createCustomCard(
+  name = '',
+  command = '',
+  template?: CardTemplate,
+): CustomHomeCard {
+  return template ? { id: newCustomId(), name, command, template } : { id: newCustomId(), name, command }
 }
 
 /** 卡片可执行时使用的规范化指令（空则返回 null）。 */
@@ -240,8 +247,9 @@ export function sanitizeHomeCards(value: unknown): HomeCardsPrefs {
       // 执行与展示前再用 normalizeCustomCommand 规范化。
       const name = typeof rawName === 'string' ? rawName : ''
       const command = typeof rawCmd === 'string' ? rawCmd : ''
+      const template = sanitizeCardTemplate((item as { template?: unknown }).template)
       seenCustom.add(id)
-      custom.push({ id, name, command })
+      custom.push(template ? { id, name, command, template } : { id, name, command })
     }
   }
 

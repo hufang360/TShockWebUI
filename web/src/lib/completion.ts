@@ -427,6 +427,134 @@ export function computeCompletions({
     }))
 }
 
+
+/** 参数取值候选（来自本地数据源）：补全下拉框与卡片参数输入框共用同一套来源。 */
+export interface ParamValueCandidate {
+  /** 原样取值（不含引号；拼指令时由调用方决定是否加引号）。 */
+  value: string
+  /** 展示用（物品 / NPC / Buff / 词缀会带上 ID）。 */
+  label: string
+  /** 右侧的次要说明（内部名 / 取值来源）。 */
+  detail: string
+  /** 物品参数带上的物品（下拉框画图标用）。 */
+  item?: Item
+}
+
+/**
+ * 某个参数位在已输入词（`word`）下的候选。
+ *
+ * 只做前缀匹配，没有前缀命中才退回子串匹配（`ni` → night，而不是 night+midnight）。
+ * 没有本地数据源的参数（text / number / command）返回空：调用方保持自由输入。
+ */
+export function paramValueCandidates({
+  dataset,
+  command,
+  arg,
+  word = '',
+  players,
+  limit = 12,
+  lang = 'zh',
+  runtimeValues,
+}: {
+  dataset: Dataset
+  command: CommandDef
+  arg: CommandParam
+  word?: string
+  players: string[]
+  limit?: number
+  lang?: Lang
+  runtimeValues?: { regions?: string[]; warps?: string[] }
+}): ParamValueCandidate[] {
+  const lower = word.trim().toLowerCase()
+  const filter = <T,>(list: T[], key: (x: T) => string[]): T[] => {
+    if (!lower) return list
+    const keys = list.map((x) => key(x).map((k) => k.toLowerCase()))
+    const starts = list.filter((_, i) => keys[i].some((k) => k.startsWith(lower)))
+    return starts.length > 0 ? starts : list.filter((_, i) => keys[i].some((k) => k.includes(lower)))
+  }
+  const zh = lang !== 'en'
+  const out: ParamValueCandidate[] = []
+
+  switch (arg.kind) {
+    case 'player':
+      for (const p of filter(players, (p) => [p])) {
+        out.push({ value: p, label: p, detail: zh ? '在线玩家' : 'Online player' })
+      }
+      break
+    case 'item':
+      for (const it of searchItems(dataset.items, word, limit)) {
+        out.push({ value: String(it.id), label: `${it.name} (${it.id})`, detail: it.key, item: it })
+      }
+      break
+    case 'prefix':
+      for (const pf of filter(dataset.prefixes, (x) => [x.name, x.key]).slice(0, limit)) {
+        out.push({ value: String(pf.id), label: `${pf.name} (${pf.id})`, detail: pf.key })
+      }
+      break
+    case 'npc':
+      // 插数字 ID：TShock 的 GetNPCByIdOrName 接受 ID，且无空格/引号歧义。
+      for (const n of filter(dataset.npcs, (x) => [x.name, x.key]).slice(0, limit)) {
+        out.push({ value: String(n.id), label: `${n.name} (${n.id})`, detail: n.key })
+      }
+      break
+    case 'permission':
+      // 候选项来自 TShock 源码里的内置节点，自定义/插件节点只有运行期知道 —— 手输任意值仍然有效。
+      for (const p of filter(dataset.permissions.permissions, (x) => [x.node, x.desc]).slice(0, limit)) {
+        out.push({ value: p.node, label: p.node, detail: p.desc })
+      }
+      break
+    case 'group':
+      for (const g of filter(dataset.permissions.groups, (x) => [x]).slice(0, limit)) {
+        out.push({ value: g, label: g, detail: zh ? '内置用户组' : 'Built-in group' })
+      }
+      break
+    case 'buff':
+      for (const b of filter(dataset.buffs, (x) => [x.name, x.key]).slice(0, limit)) {
+        out.push({ value: String(b.id), label: `${b.name} (${b.id})`, detail: b.key })
+      }
+      break
+    case 'region':
+      for (const r of filter(runtimeValues?.regions ?? [], (x) => [x]).slice(0, limit)) {
+        out.push({ value: r, label: r, detail: zh ? '区域' : 'Region' })
+      }
+      break
+    case 'warp':
+      for (const w of filter(runtimeValues?.warps ?? [], (x) => [x]).slice(0, limit)) {
+        out.push({ value: w, label: w, detail: zh ? '传送点' : 'Warp' })
+      }
+      break
+    case 'enum': {
+      // enum 取值附上可读备注名（如 spawnboss 的 brain → 克苏鲁之脑），并允许按备注名搜索。
+      const labels = enumLabelsFor(command.name, lang, dataset.npcs)
+      for (const v of filter(arg.values ?? [], (v) => [v, labels[v] ?? ''])) {
+        out.push({ value: v, label: v, detail: labels[v] ?? (zh ? '可选值' : 'Allowed value') })
+      }
+      break
+    }
+    case 'command':
+      // 参数是「指令名」时（`/help`、`/aliases`）不给候选：一级指令前面已经敲过了，
+      // 空格后再弹一屏命令名只会白占屏幕；TShock 的 `/help` 也只收一个参数。
+      break
+    default:
+      break
+  }
+  return out
+}
+
+/** 参数类型 → 补全行图标 / 语义（没列出的按 enum 处理）。 */
+const COMPLETION_KIND_OF: Partial<Record<NonNullable<CommandParam['kind']>, CompletionKind>> = {
+  player: 'player',
+  item: 'item',
+  prefix: 'prefix',
+  npc: 'npc',
+  permission: 'permission',
+  group: 'group',
+  buff: 'buff',
+  region: 'region',
+  warp: 'warp',
+  enum: 'enum',
+}
+
 /** 参数值补全（按参数类型取本地数据源）。 */
 export function computeParamCompletions({
   dataset,
@@ -446,168 +574,28 @@ export function computeParamCompletions({
 
   const { arg, word, start, end } = slot
   const range = { start, end }
-  const lower = word.toLowerCase()
-  // 先按前缀匹配，没有前缀命中再退回子串匹配（'ni' → night，而不是 night+midnight）。
-  const filter = <T,>(list: T[], key: (x: T) => string[]): T[] => {
-    if (!lower) return list
-    const keys = list.map((x) => key(x).map((k) => k.toLowerCase()))
-    const starts = list.filter((_, i) => keys[i].some((k) => k.startsWith(lower)))
-    return starts.length > 0 ? starts : list.filter((_, i) => keys[i].some((k) => k.includes(lower)))
-  }
-  const zh = lang !== 'en'
-  const out: CompletionItem[] = []
-  // 含空格的值必须加双引号（Commands.cs:755 ParseParameters 支持引号）。
-  const quoteIfSpace = (v: string) => (/\s/.test(v) ? `"${v}"` : v)
+  const kind = arg.kind ? (COMPLETION_KIND_OF[arg.kind] ?? 'enum') : 'enum'
+  const out: CompletionItem[] = paramValueCandidates({
+    dataset,
+    command: slot.command,
+    arg,
+    word,
+    players,
+    limit,
+    lang,
+    runtimeValues,
+  }).map((c) => ({
+    id: `param:${arg.kind ?? 'value'}:${c.value}`,
+    kind,
+    label: c.label,
+    detail: c.detail,
+    // 含空格的值必须加双引号（Commands.cs:755 ParseParameters 支持引号）。
+    insert: /\s/.test(c.value) ? `"${c.value}"` : c.value,
+    item: c.item,
+    range,
+    suffix: ' ',
+  }))
 
-  switch (arg.kind) {
-    case 'player':
-      for (const p of filter(players, (p) => [p])) {
-        out.push({
-          id: `param:player:${p}`,
-          kind: 'player',
-          label: p,
-          detail: zh ? '在线玩家' : 'Online player',
-          insert: p,
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'item':
-      for (const it of searchItems(dataset.items, word, limit)) {
-        out.push({
-          id: `param:item:${it.id}`,
-          kind: 'item',
-          label: `${it.name} (${it.id})`,
-          detail: it.key,
-          // 插 ID：TShock 的 GetItemByIdOrName 接受 ID，且不含空格/引号问题
-          insert: String(it.id),
-          item: it,
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'prefix':
-      for (const pf of filter(dataset.prefixes, (x) => [x.name, x.key]).slice(0, limit)) {
-        out.push({
-          id: `param:prefix:${pf.id}`,
-          kind: 'prefix',
-          label: `${pf.name} (${pf.id})`,
-          detail: pf.key,
-          insert: String(pf.id),
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'npc':
-      // 插数字 ID：TShock 的 GetNPCByIdOrName 接受 ID，且无空格/引号歧义。
-      for (const n of filter(dataset.npcs, (x) => [x.name, x.key]).slice(0, limit)) {
-        out.push({
-          id: `param:npc:${n.id}`,
-          kind: 'npc',
-          label: `${n.name} (${n.id})`,
-          detail: n.key,
-          insert: String(n.id),
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'permission':
-      // 插节点原文（`tshock.world.time`）；候选项来自 TShock 源码里的内置节点，
-      // 自定义/插件节点只有运行期知道 —— 这里只是候选，手输任意值仍然有效。
-      for (const p of filter(dataset.permissions.permissions, (x) => [x.node, x.desc]).slice(0, limit)) {
-        out.push({
-          id: `param:permission:${p.node}`,
-          kind: 'permission',
-          label: p.node,
-          detail: p.desc,
-          insert: p.node,
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'group':
-      for (const g of filter(dataset.permissions.groups, (x) => [x]).slice(0, limit)) {
-        out.push({
-          id: `param:group:${g}`,
-          kind: 'group',
-          label: g,
-          detail: zh ? '内置用户组' : 'Built-in group',
-          insert: g,
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'buff':
-      for (const b of filter(dataset.buffs, (x) => [x.name, x.key]).slice(0, limit)) {
-        out.push({
-          id: `param:buff:${b.id}`,
-          kind: 'buff',
-          label: `${b.name} (${b.id})`,
-          detail: b.key,
-          insert: String(b.id),
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'region':
-      for (const r of filter(runtimeValues?.regions ?? [], (x) => [x]).slice(0, limit)) {
-        out.push({
-          id: `param:region:${r}`,
-          kind: 'region',
-          label: r,
-          detail: zh ? '区域' : 'Region',
-          insert: quoteIfSpace(r),
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'warp':
-      for (const w of filter(runtimeValues?.warps ?? [], (x) => [x]).slice(0, limit)) {
-        out.push({
-          id: `param:warp:${w}`,
-          kind: 'warp',
-          label: w,
-          detail: zh ? '传送点' : 'Warp',
-          insert: quoteIfSpace(w),
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    case 'enum': {
-      // enum 取值在补全里附上可读备注名（如 spawnboss 的 brain → 克苏鲁之脑）；
-      // 同时允许按备注名搜索（输入「克苏鲁」也能命中 brain）。
-      const labels = enumLabelsFor(slot.command.name, lang, dataset.npcs)
-      for (const v of filter(arg.values ?? [], (v) => [v, labels[v] ?? ''])) {
-        out.push({
-          id: `param:enum:${v}`,
-          kind: 'enum',
-          label: v,
-          detail: labels[v] ?? (zh ? '可选值' : 'Allowed value'),
-          // 含空格的值必须加双引号（Commands.cs:755 ParseParameters 支持引号）
-          insert: /\s/.test(v) ? `"${v}"` : v,
-          range,
-          suffix: ' ',
-        })
-      }
-      break
-    }
-    case 'command':
-      // 参数是「指令名」时（`/help`、`/aliases`）**不给候选**：一级指令玩家前面已经敲过了，
-      // 空格后再弹一屏命令名只会白占屏幕；而且 TShock 的 `/help` 只收**一个**参数
-      // （Commands.cs:5351，`/help user add` 直接报语法错），后面没有下一级可补。
-      break
-    default:
-      break
-  }
   // 字面量子命令排在前，再拼按类型候选；同 kind+insert 去重。
   const merged = [...literalItems]
   const seen = new Set(literalItems.map((c) => `${c.kind}:${c.insert}`))

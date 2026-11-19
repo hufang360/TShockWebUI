@@ -8,14 +8,17 @@
  * - 自定义模块的卡片全部来自这里。
  */
 
+import { sanitizeCardTemplate, type CardTemplate } from './cardParams'
 import { isCustomModuleId, MODULE_BY_ID } from './modules'
 
 export interface ModuleCard {
   id: string
   /** 显示名；为空时回退用指令。 */
   name: string
-  /** 指令原文（执行前再规范化）。 */
+  /** 指令原文（执行前再规范化）；参数卡片里是基础指令名。 */
   command: string
+  /** 参数化指令（见 `lib/cardParams.ts`）；没有则按普通指令卡片执行。 */
+  template?: CardTemplate
 }
 
 export interface ModuleCardsPrefs {
@@ -32,8 +35,8 @@ function newId(): string {
   return `c:${rand}`
 }
 
-export function createModuleCard(name = '', command = ''): ModuleCard {
-  return { id: newId(), name, command }
+export function createModuleCard(name = '', command = '', template?: CardTemplate): ModuleCard {
+  return template ? { id: newId(), name, command, template } : { id: newId(), name, command }
 }
 
 export function moduleCardsFor(
@@ -65,7 +68,7 @@ export function updateModuleCard(
   serverId: string,
   moduleId: string,
   cardId: string,
-  patch: Partial<Pick<ModuleCard, 'name' | 'command'>>,
+  patch: Partial<Pick<ModuleCard, 'name' | 'command' | 'template'>>,
 ): ModuleCardsPrefs {
   const forServer = prefs.byServer[serverId]
   const list = forServer?.[moduleId]
@@ -122,11 +125,13 @@ export function sanitizeModuleCards(value: unknown): ModuleCardsPrefs {
         if (!id || seen.has(id)) continue
         const name = (item as { name?: unknown }).name
         const command = (item as { command?: unknown }).command
+        const template = sanitizeCardTemplate((item as { template?: unknown }).template)
         seen.add(id)
         cards.push({
           id,
           name: typeof name === 'string' ? name : '',
           command: typeof command === 'string' ? command : '',
+          ...(template ? { template } : {}),
         })
       }
       if (cards.length > 0) modules[moduleId] = cards

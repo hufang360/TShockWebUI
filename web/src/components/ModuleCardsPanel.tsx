@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { AlertTriangle, GalleryVerticalEnd, RefreshCw } from 'lucide-react'
 import { CardLayoutGrid, type CardLayoutItem } from '@/components/CardLayoutGrid'
 import { CommandCard } from '@/components/CommandCard'
+import { CustomCommandCard } from '@/components/card/CustomCommandCard'
 import { IconAction } from '@/components/IconAction'
 import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
 import { Notice } from '@/components/Notice'
@@ -16,9 +17,11 @@ import { useExecutionQueue } from '@/lib/executionQueue'
 import { useI18n } from '@/lib/i18n'
 import { formatClock, formatClockWithDate } from '@/lib/clock'
 
+import { cardRunState, needsUserInput, type CardTemplate } from '@/lib/cardParams'
 import { isRefreshDue, lastRefreshedAt, markRefreshed, refreshScope } from '@/lib/refreshGate'
 import { StorageKeys } from '@/lib/storage'
 import { resultFromError, TshockRequestError, type BackendTransport } from '@/lib/tshock'
+import type { IngamePolicy } from '@/lib/ingame'
 import type { CommandResult, Dataset } from '@/types'
 
 export interface PanelCard {
@@ -31,6 +34,8 @@ export interface PanelCard {
   custom?: boolean
   /** 固定卡片（来自依赖插件，不可删除）。 */
   fixed?: boolean
+  /** 参数卡片模板（有则卡片自带输入框，执行时按参数拼指令）。 */
+  template?: CardTemplate
   /** 自动执行偏好 key（tswui:autoExec）。 */
   manualKey: string
   /** 未设置偏好时的默认值（true = 默认手动）。 */
@@ -66,8 +71,8 @@ interface ModuleCardsPanelProps {
   /** 参与同一套排序 / 宽度的非指令卡片（模块页的记事本）。 */
   extra?: PanelExtraItem
   /** 允许「管理卡片」时提供。 */
-  onAddCard?: (name: string, command: string) => void
-  onUpdateCard?: (id: string, patch: { name?: string; command?: string }) => void
+  onAddCard?: (name: string, command: string, template?: CardTemplate) => void
+  onUpdateCard?: (id: string, patch: { name?: string; command?: string; template?: CardTemplate }) => void
   onRemoveCard?: (id: string) => void
   /** 「恢复默认」时清空用户添加的卡片（页面持有卡片存储，所以回调从这里传进来）。 */
   onResetCards?: () => void
@@ -76,6 +81,10 @@ interface ModuleCardsPanelProps {
    * 任一固定卡片执行返回「指令不存在」即判定插件未安装（`no_permission` 不算）。
    */
   pluginName?: string
+  /** 哪些 `allowServer=false` 的指令能在网页执行（添加卡片弹框用）。 */
+  ingame: IngamePolicy
+  players?: string[]
+  runtimeValues?: { regions?: string[]; warps?: string[] }
 }
 
 /**
@@ -98,6 +107,9 @@ export function ModuleCardsPanel({
   onRemoveCard,
   onResetCards,
   pluginName,
+  ingame,
+  players,
+  runtimeValues,
 }: ModuleCardsPanelProps) {
   const { t, lang } = useI18n()
   const { enqueue, busy, busyPrefix } = useExecutionQueue()
@@ -146,11 +158,21 @@ export function ModuleCardsPanel({
 
   const resultKey = (id: string) => `${keyPrefix}${id}`
 
+  /** 卡片实际要执行的指令：参数卡片按模板 + 已保存的值拼（拼不出来返回 ''）。 */
+  const cardCommand = useCallback(
+    (card: PanelCard): string => {
+      if (!card.template) return card.command.trim()
+      if (!dataset) return ''
+      return cardRunState(dataset, card).command ?? ''
+    },
+    [dataset],
+  )
+
   const runOne = useCallback(
-    async (card: PanelCard): Promise<CommandResult> => {
+    async (card: PanelCard, command = cardCommand(card)): Promise<CommandResult> => {
       const run = async (): Promise<CommandResult> => {
         try {
-          return await transport.runCommand(card.command)
+          return await transport.runCommand(command)
         } catch (err) {
           return resultFromError(err)
         }
@@ -164,18 +186,18 @@ export function ModuleCardsPanel({
       return res
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [transport, onTokenInvalid, setResult, keyPrefix],
+    [transport, onTokenInvalid, setResult, keyPrefix, cardCommand],
   )
 
   const runBatch = useCallback(
     async (list: PanelCard[]) => {
       const run = async (): Promise<CommandResult[]> => {
         try {
-          return await transport.runBatch(list.map((c) => c.command))
+          return await transport.runBatch(list.map((c) => cardCommand(c)))
         } catch (err) {
           if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
             const reauthed = await onTokenInvalid()
-            if (reauthed) return await transport.runBatch(list.map((c) => c.command))
+            if (reauthed) return await transport.runBatch(list.map((c) => cardCommand(c)))
           }
           throw err
         }
@@ -191,13 +213,14 @@ export function ModuleCardsPanel({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [transport, onTokenInvalid, setResult, keyPrefix],
+    [transport, onTokenInvalid, setResult, keyPrefix, cardCommand],
   )
 
-  // 只有「自动执行」的卡片参与自动刷新 / 刷新全部（手动卡片只能点自己的按钮）。
+  // 只有「自动执行」的卡片参与自动刷新 / 刷新全部（手动卡片只能点自己的按钮）；
+  // 参数卡片要现场填值，一律不自动跑（见 `needsUserInput`）。
   const runnable = useMemo(
-    () => cards.filter((c) => c.command.trim().length > 0 && !cardManual(c)),
-    [cards, cardManual],
+    () => cards.filter((c) => cardCommand(c).length > 0 && !needsUserInput(c) && !cardManual(c)),
+    [cards, cardManual, cardCommand],
   )
 
   /**
@@ -254,7 +277,7 @@ export function ModuleCardsPanel({
           key: `${keyPrefix}__batch__`,
           labelKey: 'home.batch',
           label: 'home.batch',
-          command: targets.map((c) => c.command).join('  '),
+          command: targets.map((c) => cardCommand(c)).join('  '),
           run: () => runBatch(targets),
         })
         return
@@ -262,8 +285,8 @@ export function ModuleCardsPanel({
       for (const card of targets) {
         enqueue({
           key: resultKey(card.id),
-          label: card.name || card.command,
-          command: card.command,
+          label: card.name || cardCommand(card),
+          command: cardCommand(card),
           run: async () => {
             await runOne(card)
           },
@@ -331,23 +354,48 @@ export function ModuleCardsPanel({
         {
           id,
           width: widthOf(id),
-          node: (
-            <CommandCard
-              title={card.name || card.command}
-              command={card.command}
-              result={results[resultKey(card.id)]}
-              loading={busy(resultKey(card.id))}
-              unavailable={!authenticated || missingFixedIds.has(card.id)}
-              unavailableText={missingFixedIds.has(card.id) ? t('panel.pluginMissingCard') : undefined}
-              action={cardManual(card) ? 'run' : 'refresh'}
-              emptyText={cardManual(card) ? t('home.customClickRefresh') : undefined}
-              collapseKey={resultKey(card.id)}
-              onRefresh={authenticated ? () => void runOne(card) : undefined}
-              itemsById={dataset?.itemsById}
-              prefixesById={dataset?.prefixesById}
-              atlas={dataset?.atlas}
-            />
-          ),
+          node:
+            card.template && dataset ? (
+              <CustomCommandCard
+                card={card}
+                dataset={dataset}
+                title={card.name || card.command}
+                result={results[resultKey(card.id)]}
+                loading={busy(resultKey(card.id))}
+                unavailable={!authenticated || missingFixedIds.has(card.id)}
+                unavailableText={
+                  missingFixedIds.has(card.id) ? t('panel.pluginMissingCard') : undefined
+                }
+                action={cardManual(card) ? 'run' : 'refresh'}
+                emptyText={t('home.customClickRefresh')}
+                collapseKey={resultKey(card.id)}
+                onRun={(cmd) => void runOne(card, cmd)}
+                onTemplateChange={(template) => onUpdateCard?.(card.id, { template })}
+                players={players}
+                runtimeValues={runtimeValues}
+                itemsById={dataset.itemsById}
+                prefixesById={dataset.prefixesById}
+                atlas={dataset.atlas}
+              />
+            ) : (
+              <CommandCard
+                title={card.name || card.command}
+                command={card.command}
+                result={results[resultKey(card.id)]}
+                loading={busy(resultKey(card.id))}
+                unavailable={!authenticated || missingFixedIds.has(card.id)}
+                unavailableText={
+                  missingFixedIds.has(card.id) ? t('panel.pluginMissingCard') : undefined
+                }
+                action={cardManual(card) ? 'run' : 'refresh'}
+                emptyText={cardManual(card) ? t('home.customClickRefresh') : undefined}
+                collapseKey={resultKey(card.id)}
+                onRefresh={authenticated ? () => void runOne(card) : undefined}
+                itemsById={dataset?.itemsById}
+                prefixesById={dataset?.prefixesById}
+                atlas={dataset?.atlas}
+              />
+            ),
         },
       ]
     })
@@ -365,6 +413,9 @@ export function ModuleCardsPanel({
     missingFixedIds,
     dataset,
     t,
+    players,
+    runtimeValues,
+    onUpdateCard,
   ])
 
   // 「管理卡片」列表按布局顺序列，记事本也在里面（可排序 / 改宽度）。
@@ -389,8 +440,12 @@ export function ModuleCardsPanel({
         id: card.id,
         icon: card.icon,
         name: card.name,
-        command: card.command,
+        // 参数卡片显示拼好的指令（与首页一致），不是半截的 `give`。
+        command:
+          card.template && dataset ? cardRunState(dataset, card).preview || card.command : card.command,
         custom: card.custom === true,
+        template: card.template,
+        manualLocked: card.custom === true && needsUserInput(card),
         manualKey: card.manualKey,
         defaultManual: card.defaultManual,
         hidden: layout.hidden[id] === true,
@@ -475,6 +530,10 @@ export function ModuleCardsPanel({
           onAdd={onAddCard}
           onUpdate={onUpdateCard ?? (() => {})}
           onRemove={onRemoveCard ?? (() => {})}
+          dataset={dataset as Dataset}
+          ingame={ingame}
+          players={players}
+          runtimeValues={runtimeValues}
           ordering={layout.order.length > 1 ? { onMove: move } : undefined}
           visibility={{ isHidden, onToggle: toggleHidden }}
           width={{ get: widthOf, set: setWidth }}

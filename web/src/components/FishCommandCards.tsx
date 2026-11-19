@@ -10,6 +10,7 @@ import {
   Terminal,
 } from 'lucide-react'
 import { CommandCard } from '@/components/CommandCard'
+import { CustomCommandCard } from '@/components/card/CustomCommandCard'
 import { IconAction } from '@/components/IconAction'
 import { FishNotepad } from '@/components/fishshop/FishNotepad'
 import { ModuleCardManagerDialog, type ManageableCard } from '@/components/ModuleCardManagerDialog'
@@ -25,7 +26,9 @@ import { formatClock, formatClockWithDate } from '@/lib/clock'
 
 import { isRefreshDue, lastRefreshedAt, markRefreshed, refreshScope } from '@/lib/refreshGate'
 import { StorageKeys } from '@/lib/storage'
+import { cardRunState, needsUserInput, type CardTemplate } from '@/lib/cardParams'
 import { resultFromError, TshockRequestError, type BackendTransport } from '@/lib/tshock'
+import type { IngamePolicy } from '@/lib/ingame'
 import type { CommandResult, Dataset } from '@/types'
 
 interface FishCardDef {
@@ -112,6 +115,24 @@ interface FishCommandCardsProps {
    * 鱼店页据此把右侧一栏收掉，让左边货架铺满整行。
    */
   onContentChange?: (hasContent: boolean) => void
+  /** 哪些 `allowServer=false` 的指令能在网页执行（添加卡片弹框用）。 */
+  ingame: IngamePolicy
+  players?: string[]
+  runtimeValues?: { regions?: string[]; warps?: string[] }
+}
+
+/** 右列的一张卡（内置 / 自定义 / 记事本）。 */
+interface FishEntry {
+  key: string
+  label: string
+  icon: ReactNode
+  command: string
+  /** 参数卡片模板（自定义卡片可能有）。 */
+  template?: CardTemplate
+  custom: boolean
+  defaultManual: boolean
+  hidden: boolean
+  notepad: boolean
 }
 
 /**
@@ -129,6 +150,9 @@ export function FishCommandCards({
   onManualRefresh,
   onConfigReloaded,
   onContentChange,
+  ingame,
+  players,
+  runtimeValues,
 }: FishCommandCardsProps) {
   const { t, lang } = useI18n()
   const { enqueue, busy, busyPrefix } = useExecutionQueue()
@@ -264,7 +288,7 @@ export function FishCommandCards({
     [setRawHidden],
   )
 
-  const entries = useMemo(
+  const entries = useMemo<FishEntry[]>(
     () => [
       ...CARDS.map((c) => ({
         key: c.id,
@@ -278,9 +302,14 @@ export function FishCommandCards({
       })),
       ...customCards.map((c) => ({
         key: c.id,
-        label: c.name || c.command,
+        label:
+          c.name ||
+          (c.template && dataset ? cardRunState(dataset, c).preview || c.command : c.command),
         icon: <Terminal /> as ReactNode,
-        command: c.command,
+        // 参数卡片显示拼好的指令；执行仍按模板现拼（见下面的渲染分支）。
+        command:
+          c.template && dataset ? cardRunState(dataset, c).preview || c.command : c.command,
+        template: c.template,
         custom: true,
         // 用户添加的卡片默认**不自动执行**。
         defaultManual: true,
@@ -299,7 +328,7 @@ export function FishCommandCards({
         notepad: true,
       },
     ],
-    [customCards, t, isHidden],
+    [customCards, t, isHidden, dataset],
   )
 
   // 卡片顺序（含记事本）：鱼店只有右列，所以只排顺序，不排宽度。
@@ -320,6 +349,8 @@ export function FishCommandCards({
         (e) =>
           e.command.trim().length > 0 &&
           !e.hidden &&
+          // 参数卡片要现场填值，不能用上次的值替你跑。
+          !needsUserInput(e) &&
           !isManual(autoExec, `fish:${e.key}`, e.defaultManual),
       )
       if (batchMode && batchPlugin === true) {
@@ -394,6 +425,8 @@ export function FishCommandCards({
         name: entry.label,
         command: entry.command,
         custom: entry.custom,
+        template: entry.template,
+        manualLocked: entry.custom && needsUserInput(entry),
         manualKey: `fish:${entry.key}`,
         defaultManual: entry.defaultManual,
         hidden: entry.hidden,
@@ -438,6 +471,32 @@ export function FishCommandCards({
           const manual = isManual(autoExec, `fish:${card.key}`, card.defaultManual)
           return card.notepad ? (
             <FishNotepad key={card.key} serverId={serverId} />
+          ) : card.template && dataset ? (
+            <CustomCommandCard
+              key={card.key}
+              card={{
+                id: card.key,
+                name: card.label,
+                command: card.command,
+                template: card.template,
+              }}
+              dataset={dataset}
+              title={card.label}
+              icon={card.icon}
+              result={results[`fish:${card.key}`]}
+              loading={busy(`fish:${card.key}`)}
+              unavailable={!authenticated}
+              action={manual ? 'run' : 'refresh'}
+              emptyText={t('home.customClickRefresh')}
+              collapseKey={`fish:${card.key}`}
+              onRun={(cmd) => void runOne(card.key, cmd)}
+              onTemplateChange={(template) => updateCard(card.key, { template })}
+              players={players}
+              runtimeValues={runtimeValues}
+              itemsById={dataset.itemsById}
+              prefixesById={dataset.prefixesById}
+              atlas={dataset.atlas}
+            />
           ) : (
             <CommandCard
               key={card.key}
@@ -467,7 +526,11 @@ export function FishCommandCards({
         onToggleManual={(card, manual) =>
           setAutoExec((prev) => setManual(sanitizeAutoExec(prev), card.manualKey, manual))
         }
-        onAdd={(name, cmd) => addCard(name, cmd)}
+        dataset={dataset as Dataset}
+        ingame={ingame}
+        players={players}
+        runtimeValues={runtimeValues}
+        onAdd={(name, cmd, template) => addCard(name, cmd, template)}
         onUpdate={(id, patch) => updateCard(id, patch)}
         onRemove={(id) => removeCard(id)}
         // 鱼罐 / 消费榜 / 鱼篓榜 / 记事本都可以隐藏，玩家在这里打开「是否显示」才出现。

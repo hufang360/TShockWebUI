@@ -12,15 +12,10 @@ import {
 import { HomeCardManager } from '@/components/HomeCardManager'
 import { CardLayoutGrid, type CardLayoutItem } from '@/components/CardLayoutGrid'
 import { CommandCard } from '@/components/CommandCard'
+import { CustomCommandCard } from '@/components/card/CustomCommandCard'
 import { LoginGate } from '@/components/LoginGate'
 import { TopBarActions } from '@/components/TopBar'
 import { DEFAULT_MODULES, type ModulesPrefs } from '@/lib/modules'
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui'
 import { requestEditorFocus } from '@/lib/editorFocus'
 import { useLocalState } from '@/hooks/useLocalState'
 import {
@@ -37,7 +32,6 @@ import {
   BUILTIN_CARD_META,
   DEFAULT_HOME_CARDS,
   cardWidth,
-  customCardCommand,
   isBuiltinCardId,
   isCustomCardId,
   readHomeCardsStore,
@@ -52,7 +46,9 @@ import { useI18n } from '@/lib/i18n'
 import { formatClock, formatClockWithDate } from '@/lib/clock'
 
 import { readJson, StorageKeys, writeJson } from '@/lib/storage'
+import { cardRunState, needsUserInput, type CardTemplate } from '@/lib/cardParams'
 import { resultFromError, TshockRequestError, type BackendTransport, type ServerStatus } from '@/lib/tshock'
+import type { IngamePolicy } from '@/lib/ingame'
 import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
 
 /** 「最近执行」最多展示几条（去重后）。 */
@@ -70,6 +66,12 @@ interface HomePageProps {
   modules?: ModulesPrefs
   /** 页面数据自动刷新间隔（毫秒，0 = 不自动刷新）。 */
   refreshInterval: number
+  /** 哪些 `allowServer=false` 的指令能在网页执行（添加卡片时判断「仅游戏内」）。 */
+  ingame: IngamePolicy
+  /** 在线玩家（参数卡片的玩家候选）。 */
+  players?: string[]
+  /** 登录后拉到的运行期取值（区域 / 传送点，参数卡片用）。 */
+  runtimeValues?: { regions?: string[]; warps?: string[] }
   /** 服务器动态刷新间隔（毫秒）。 */
   eventsRefreshInterval: number
   /** token 失效 → 弹出登录框；返回是否重登成功。 */
@@ -87,6 +89,9 @@ export function HomePage({
   serverId,
   modules = DEFAULT_MODULES,
   refreshInterval,
+  ingame,
+  players,
+  runtimeValues,
   eventsRefreshInterval,
   onTokenInvalid,
   onLogin,
@@ -164,6 +169,8 @@ export function HomePage({
   const [batchMode] = useLocalState(StorageKeys.homeBatch, false)
   // 供 refreshAll 读取而不触发 effect 重建（避免隐藏卡片时整页重跑指令）。
   const prefsRef = useRef(prefs)
+  /** 同上：`cardIsManual` 在下面才定义，这里先放个 ref 让收集指令的回调读到最新的那一份。 */
+  const cardIsManualRef = useRef<(id: string) => boolean>(() => false)
   useEffect(() => {
     prefsRef.current = prefs
   }, [prefs])
@@ -291,7 +298,7 @@ export function HomePage({
     for (const id of order) {
       if (hidden[id]) continue
       if (skipMissing && pluginMissingRef.current(id)) continue
-      if (cardIsManual(id)) continue
+      if (cardIsManualRef.current(id)) continue
       if (isBuiltinCardId(id)) {
         const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
         if (!def) continue
@@ -301,12 +308,14 @@ export function HomePage({
       } else if (isCustomCardId(id)) {
         const card = customById.get(id)
         if (!card) continue
-        const cmd = customCardCommand(card)
-        if (!cmd) continue
-        queueCustomCommand(card.id, card.name.trim() || cmd, cmd)
+        // 参数卡片要玩家现场填值：自动刷新 / 批量执行不能用上次的值替你决定。
+        if (needsUserInput(card)) continue
+        const run = cardRunState(dataset, card)
+        if (!run.command) continue
+        queueCustomCommand(card.id, card.name.trim() || run.preview, run.command)
       }
     }
-  }, [username, queueCommand, queueCustomCommand, autoExec])
+  }, [username, queueCommand, queueCustomCommand, dataset])
 
   /** 按首页顺序收集所有会执行的指令（key 为结果存储键，与卡片 id 一致）。 */
   const collectBatchEntries = useCallback((skipMissing = true): { key: string; cmd: string }[] => {
@@ -316,7 +325,7 @@ export function HomePage({
     for (const id of order) {
       if (hidden[id]) continue
       if (skipMissing && pluginMissingRef.current(id)) continue
-      if (cardIsManual(id)) continue
+      if (cardIsManualRef.current(id)) continue
       if (isBuiltinCardId(id)) {
         const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
         if (!def) continue
@@ -325,12 +334,13 @@ export function HomePage({
       } else if (isCustomCardId(id)) {
         const card = customById.get(id)
         if (!card) continue
-        const cmd = customCardCommand(card)
-        if (cmd) entries.push({ key: card.id, cmd })
+        if (needsUserInput(card)) continue
+        const run = cardRunState(dataset, card)
+        if (run.command) entries.push({ key: card.id, cmd: run.command })
       }
     }
     return entries
-  }, [username, autoExec])
+  }, [username, dataset])
 
   /** 一次请求执行全部卡片指令，并把结果分发回各卡片。 */
   const runBatchEntries = useCallback(
@@ -478,9 +488,16 @@ export function HomePage({
   const customById = useMemo(() => new Map(prefs.custom.map((c) => [c.id, c])), [prefs.custom])
   // 卡片是否「不自动执行」：内置卡默认自动，用户添加的卡片默认手动（只能点卡片自己的按钮跑）。
   const cardIsManual = useCallback(
-    (id: string) => isManual(autoExec, `home:${id}`, isCustomCardId(id)),
-    [autoExec],
+    (id: string) => {
+      const card = customById.get(id)
+      if (card && needsUserInput(card)) return true
+      return isManual(autoExec, `home:${id}`, isCustomCardId(id))
+    },
+    [autoExec, customById],
   )
+  useEffect(() => {
+    cardIsManualRef.current = cardIsManual
+  }, [cardIsManual])
   // 首页有指令在排队 / 执行中（或状态正在刷新）时禁用「刷新」。
   const refreshingAll = loadingStatus || busyPrefix('home:')
 
@@ -550,33 +567,39 @@ export function HomePage({
 
   const renderCustomCard = (id: string) => {
     const card = customById.get(id)!
-    const cmd = customCardCommand(card)
-    const title = card.name.trim() || cmd || t('home.manageUntitled')
-    if (!cmd) {
-      return (
-        <Card key={id} className="flex flex-col">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Terminal />
-              {title}
-            </CardTitle>
-          </CardHeader>
-          <CardBody className="flex-1">
-            <p className="text-xs text-warning">{t('home.customUnset')}</p>
-          </CardBody>
-        </Card>
-      )
-    }
-    return commandOutputCard({
-      id,
-      title,
-      icon: <Terminal />,
-      command: cmd,
-      result: commandResults[id],
-      loading: busy(`home:${id}`),
-      unavailable: !authenticated,
-      emptyText: t('home.customClickRefresh'),
-      onRefresh: () => queueCustomCommand(id, title, cmd),
+    const run = cardRunState(dataset, card)
+    const title = card.name.trim() || run.preview || t('home.manageUntitled')
+    return (
+      <CustomCommandCard
+        key={id}
+        card={card}
+        dataset={dataset}
+        title={title}
+        icon={<Terminal />}
+        result={commandResults[id]}
+        loading={busy(`home:${id}`)}
+        unavailable={!authenticated}
+        emptyText={t('home.customClickRefresh')}
+        action={cardIsManual(id) ? 'run' : 'refresh'}
+        onRun={(cmd) => queueCustomCommand(id, title, cmd)}
+        onTemplateChange={(template) => updateCustomTemplate(id, template)}
+        collapseKey={`home:${id}`}
+        players={players}
+        runtimeValues={runtimeValues}
+        itemsById={dataset.itemsById}
+        prefixesById={dataset.prefixesById}
+        atlas={dataset.atlas}
+        className="max-h-[48rem]"
+      />
+    )
+  }
+
+  /** 参数卡片的输入值写回本机（防抖在卡片内做）。 */
+  const updateCustomTemplate = (id: string, template: CardTemplate) => {
+    const current = prefsRef.current
+    setPrefs({
+      ...current,
+      custom: current.custom.map((c) => (c.id === id ? { ...c, template } : c)),
     })
   }
 
@@ -665,6 +688,10 @@ export function HomePage({
       <HomeCardManager
         open={manageOpen}
         onOpenChange={setManageOpen}
+        dataset={dataset}
+        ingame={ingame}
+        players={players}
+        runtimeValues={runtimeValues}
         prefs={prefs}
         onChange={(next) => setPrefs(next)}
         pluginMissing={pluginMissing}

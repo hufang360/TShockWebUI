@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { DEFAULT_HOME_CARDS, type HomeCardsPrefs } from '@/lib/homeCards'
-import { closeRowMenu, openRowMenu } from '@/test/managerSheet'
+import { NO_INGAME } from '@/lib/ingame'
+import { makeDataset } from '@/test/fixtures'
+import { addCardThroughDialog, closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { HomeCardManager } from './HomeCardManager'
 
 function Harness({ initial = DEFAULT_HOME_CARDS }: { initial?: HomeCardsPrefs }) {
@@ -19,6 +21,8 @@ function Harness({ initial = DEFAULT_HOME_CARDS }: { initial?: HomeCardsPrefs })
         // 与首页一致：用户添加的卡片默认「不自动执行」。
         isManual={(id) => manual[id] ?? id.startsWith('c:')}
         onToggleManual={(id, value) => setManual((prev) => ({ ...prev, [id]: value }))}
+        dataset={makeDataset()}
+        ingame={NO_INGAME}
       />
     </I18nProvider>
   )
@@ -33,25 +37,17 @@ function openEditor(row: HTMLElement) {
   fireEvent.click(within(row).getByRole('button', { name: '编辑' }))
 }
 
-/** 点「添加卡片」后，用按需展开的表单添加一张自定义卡片。 */
-function addCard(name: string, command: string) {
-  fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
-  fireEvent.change(screen.getByLabelText('卡片名称'), { target: { value: name } })
-  fireEvent.change(screen.getByLabelText('指令'), { target: { value: command } })
-  fireEvent.click(screen.getByRole('button', { name: '添加' }))
-}
+const addCard = addCardThroughDialog
 
 afterEach(() => {
   localStorage.clear()
 })
 
 describe('HomeCardManager', () => {
-  it('添加表单默认收起；行内徽标直接显示「自动执行」状态（不必进菜单）', async () => {
+  it('添加走弹框（抽屉里不再展开表单）；行内徽标直接显示「自动执行」状态（不必进菜单）', async () => {
     render(<Harness />)
+    // 抽屉里没有内联表单。
     expect(screen.queryByLabelText('卡片名称')).toBeNull()
-
-    fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
-    expect(screen.getByLabelText('卡片名称')).toBeTruthy()
 
     // 内置卡片默认自动执行 → 行内是「自动执行」徽标。
     const row = screen.getByRole('listitem', { name: '游戏时间' })
@@ -66,6 +62,11 @@ describe('HomeCardManager', () => {
       '下移',
       '复制指令',
     ])
+    await closeRowMenu()
+
+    // 点「添加卡片」开的是按需加载的弹框。
+    fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
+    expect(await screen.findByLabelText('搜索指令')).toBeTruthy()
   })
 
   it('点行内「自动执行」徽标即可切换成「不自动执行」', () => {
@@ -117,20 +118,20 @@ describe('HomeCardManager', () => {
     expect(last.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('添加按钮在名称和指令都有效前保持禁用', () => {
+  it('添加按钮在选到指令前保持禁用', async () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
+    await screen.findByLabelText('搜索指令')
     const add = screen.getByRole('button', { name: '添加' })
     expect(add.hasAttribute('disabled')).toBe(true)
-    fireEvent.change(screen.getByLabelText('卡片名称'), { target: { value: '我的卡片' } })
-    expect(add.hasAttribute('disabled')).toBe(true)
-    fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'time' } })
+    fireEvent.change(screen.getByLabelText('搜索指令'), { target: { value: '/time' } })
+    fireEvent.click(screen.getByRole('button', { name: '使用「/time」' }))
     expect(add.hasAttribute('disabled')).toBe(false)
   })
 
-  it('按需展开的表单可添加自定义卡片（默认小尺寸、不自动执行）', () => {
+  it('弹框里可添加自定义卡片（默认小尺寸、不自动执行）', async () => {
     render(<Harness />)
-    addCard('我的卡片', 'time')
+    await addCard('我的卡片', 'time')
     const row = screen.getByRole('listitem', { name: '我的卡片' })
     expect(within(row).getByText('我的卡片')).toBeTruthy()
     expect(within(row).getByText('/time')).toBeTruthy()
@@ -162,7 +163,7 @@ describe('HomeCardManager', () => {
     expect(within(builtinRow).queryByText('内置')).toBeNull()
     expect(within(builtinRow).queryByRole('button', { name: '编辑' })).toBeNull()
 
-    addCard('我的卡片', 'time')
+    await addCard('我的卡片', 'time')
     const customRow = screen.getByRole('listitem', { name: '我的卡片' })
     // 编辑是行内按钮（在「是否显示」右边）；内置卡没有。
     expect(within(customRow).getByRole('button', { name: '编辑' })).toBeTruthy()
@@ -233,7 +234,7 @@ describe('HomeCardManager', () => {
 
   it('删除在「更多设置」菜单里，点开后再二次确认', async () => {
     render(<Harness />)
-    addCard('我的卡片', 'time')
+    await addCard('我的卡片', 'time')
     const row = screen.getByRole('listitem', { name: '我的卡片' })
 
     const menu = await openRowMenu(row)
@@ -251,7 +252,7 @@ describe('HomeCardManager', () => {
   it('自定义卡片指令输入框关联收藏指令的下拉候选', async () => {
     seedFavorites(['/time 12:00', '/who'])
     render(<Harness />)
-    addCard('卡片', 'time')
+    await addCard('卡片', 'time')
     const row = screen.getByRole('listitem', { name: '卡片' })
     openEditor(row)
 
@@ -268,7 +269,7 @@ describe('HomeCardManager', () => {
 
   it('无收藏时指令输入框不关联下拉候选（不报错）', async () => {
     render(<Harness />)
-    addCard('卡片', 'time')
+    await addCard('卡片', 'time')
     const row = screen.getByRole('listitem', { name: '卡片' })
     openEditor(row)
     const cmdInput = screen.getAllByPlaceholderText('/指令').find((el) => el.getAttribute('list'))
