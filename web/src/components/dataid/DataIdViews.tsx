@@ -119,7 +119,9 @@ const CELL_CLASS =
   'group/cell flex cursor-pointer flex-col items-center gap-1 rounded-container text-center transition'
 /** 横条格子：横向排布（图标左、文字右）。 */
 const ROW_CELL_CLASS =
-  'group/cell flex h-14 cursor-pointer items-center gap-2 p-2 text-left transition md:h-14'
+  'group/cell flex h-14 cursor-pointer items-center gap-2 text-left transition-colors duration-150 md:h-14'
+/** 横条不做上浮（与合成表条目一致，只过渡颜色）。 */
+const ROW_HOVER = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
 const CELL_HOVER =
   'hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
 /** 图标区（格子底板）：只有小档垫底板，其余只留 hover 淡色（见 `lib/iconGridSize` 的 `iconPlateClass`）。 */
@@ -170,7 +172,7 @@ export function NpcCell({
       type="button"
       title={`${npc.name} #${npc.id}`}
       onClick={() => onSelect(npc)}
-      className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, CELL_HOVER)}
+      className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, row ? ROW_HOVER : CELL_HOVER)}
       // 横条平分整行宽度：格子填满 1fr 轨道，别再写死格宽
       style={{ width: row ? '100%' : spec.cell * scale }}
     >
@@ -400,7 +402,7 @@ export function BuffGrid({
           type="button"
           title={`${buff.name} #${buff.id}`}
           onClick={() => onSelect(buff)}
-          className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, CELL_HOVER)}
+          className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, row ? ROW_HOVER : CELL_HOVER)}
           style={{ width: row ? '100%' : spec.cell }}
         >
           {row ? (
@@ -535,7 +537,7 @@ export function TileIconGrid({
             type="button"
             title={`${name} #${displayId}`}
             onClick={() => onSelect(entry)}
-            className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, CELL_HOVER)}
+            className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, row ? ROW_HOVER : CELL_HOVER)}
             style={{ width: row ? '100%' : spec.cell }}
           >
             <span

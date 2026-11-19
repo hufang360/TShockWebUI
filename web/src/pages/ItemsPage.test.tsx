@@ -254,7 +254,15 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.queryByLabelText('物品 ID')).toBeNull()
     // 全屏不再显示「页面设置」（要看设置先退出全屏）
     expect(screen.queryByRole('button', { name: '页面设置' })).toBeNull()
-    const exit = screen.getByRole('button', { name: '退出全屏' })
+    // 全屏保留「分类页签」这一行（左上角），但不提供「分组」入口（抽屉遮罩在全屏容器下面画不出来），
+    // 搜索也仍然隐藏
+    expect(screen.getByRole('radiogroup', { name: '制作界面' })).toBeTruthy()
+    expect(screen.queryByLabelText('分组')).toBeNull()
+    // 全屏里仍有「分类页签」这一行（左上角），但不再提供「分组」入口（抽屉遮罩在全屏容器下面画不出来），
+    // 搜索也仍然隐藏
+    expect(screen.getByRole('radiogroup', { name: '制作界面' })).toBeTruthy()
+    expect(screen.queryByLabelText('分组')).toBeNull()
+    const exit = screen.getByRole('button', { name: /退出全屏/ })
     expect(exit).toBeTruthy()
     // 常驻：不进收起态（收起态只剩一条可点的竖条按钮），也不会自己消失
     expect(screen.queryByRole('button', { name: '显示操作' })).toBeNull()
@@ -265,6 +273,8 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(page.dataset.fullscreen).toBeUndefined()
     expect(page.className).not.toContain('overflow-y-auto')
+    // 退出全屏后「分组」入口回到分类行末尾
+    expect(screen.getByLabelText('分组')).toBeTruthy()
   })
 
   it('全屏里打开物品详情：遮罩铺满整屏，不再从侧栏右边开始', async () => {

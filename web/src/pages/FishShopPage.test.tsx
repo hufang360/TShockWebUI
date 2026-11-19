@@ -1501,7 +1501,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
 
     // 全屏：连顶栏一起盖住（`inset-0`），右列收起，退出按钮挪到右上角操作坞；Esc 退出
     fireEvent.click(screen.getByRole('button', { name: '全屏查看货架' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /退出全屏/ })).toBeTruthy())
     const shelf = screen.getByTestId('fish-shelf-panel')
     expect(shelf.className).toContain('fixed')
     expect(shelf.className).toContain('inset-0')

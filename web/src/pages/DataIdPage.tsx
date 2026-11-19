@@ -595,6 +595,35 @@ export function DataIdPage({
     </Popover>
   )
 
+  /** NPC 有「全部 / Boss / 各分类」这一行；其它数据源没有分类 tab，搜索框就排最左。 */
+  const hasCategoryTabs = kind === 'npc'
+
+  /** 搜索框本体：NPC 贴行尾，图格 / 墙 / Buff 排最左。 */
+  const searchField = (
+    <SearchInput
+      ref={searchRef}
+      value={query}
+      onValueChange={changeQuery}
+      placeholder={
+        kind === 'npc'
+          ? t('dataId.search.npc')
+          : kind === 'tile'
+            ? t('dataId.search.tile')
+            : kind === 'wall'
+              ? t('dataId.search.wall')
+              : t('dataId.search.buff')
+      }
+      aria-label={t('nav.dataId')}
+      history={searchHistory}
+      onHistoryRemove={removeSearchHistory}
+      leadingIcon={<Search className="size-4 text-muted-foreground" />}
+      // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
+      resultLabel={t('dataId.resultCount', { n: total })}
+      shortcut
+      inputClassName="text-xs"
+    />
+  )
+
   const fullscreenControl = (
     <IconAction
       label={resultsFullscreen ? t('dataId.exitFullscreen') : t('dataId.enterFullscreen')}
@@ -663,11 +692,14 @@ export function DataIdPage({
           {/* 搜索 + 筛选行：吸在顶栏下面；表头再吸在它下面（偏移由它实测）。 */}
           <div
             ref={toolbarRef}
-            className="sticky top-12 z-20 flex flex-col gap-2 bg-background py-1.5"
+            // 上下不留内边距：与「数据源 Tab 行」「图标区」的距离都只由根容器的 `gap-2` 决定（各 8px）。
+            className="sticky top-12 z-20 flex flex-col gap-2 bg-background"
           >
             {/* 工具行：不再套卡片，直接铺在页面上 */}
-            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 p-1">
-              {/* 左：NPC 分类 / 视图开关（原来在右侧）。 */}
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-1">
+              {/* 图格 / 墙 / Buff 没有分类 tab：搜索框排最左，别让右边空着。 */}
+              {!hasCategoryTabs && <div className="w-full min-w-0 sm:w-64">{searchField}</div>}
+              {/* 左：NPC 分类（只有 NPC 有）。 */}
               <div className="flex min-w-0 flex-wrap items-center gap-1">
                 {kind === 'npc' && (
                   <Tabs
@@ -696,38 +728,17 @@ export function DataIdPage({
                 )}
               </div>
 
-              {/* 右：搜索框（与物品 ID 一致，放在行尾；窄屏独占一行）。 */}
-              <div className="ml-auto w-full min-w-0 sm:w-64">
-                <SearchInput
-                  ref={searchRef}
-                  value={query}
-                  onValueChange={changeQuery}
-                  placeholder={
-                    kind === 'npc'
-                      ? t('dataId.search.npc')
-                      : kind === 'tile'
-                        ? t('dataId.search.tile')
-                        : kind === 'wall'
-                          ? t('dataId.search.wall')
-                          : t('dataId.search.buff')
-                  }
-                  aria-label={t('nav.dataId')}
-                  history={searchHistory}
-                  onHistoryRemove={removeSearchHistory}
-                  leadingIcon={<Search className="size-4 text-muted-foreground" />}
-                  // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
-                  resultLabel={t('dataId.resultCount', { n: total })}
-                  shortcut
-                  inputClassName="text-xs"
-                />
-              </div>
+              {/* NPC 有分类 tab：搜索贴行尾（与物品 ID 一致）；其它数据源见行首。 */}
+              {hasCategoryTabs && (
+                <div className="ml-auto w-full min-w-0 sm:w-64">{searchField}</div>
+              )}
             </div>
           </div>
         </>
       )}
 
       {/* 网格 / 表格：不是卡片（直接铺在页面上），整页滚动 */}
-      <div ref={listRef} data-testid="dataid-list" className="px-1 py-1">
+      <div ref={listRef} data-testid="dataid-list" className="px-1 pb-1">
         {total === 0 ? (
           <Empty className="min-h-40 border border-dashed">
             <EmptyHeader>

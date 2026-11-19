@@ -86,7 +86,7 @@ export const ITEM_SIZES: Record<ItemIconSize, ItemSizeSpec> = {
  */
 /** 横条格子的 hover 底色由 `ROW_PLATE_CLASS` 给（不能写 `hover:bg-transparent`，那会把底板盖成透明）。 */
 const ROW_CELL_CLASS =
-  'group/cell flex cursor-pointer items-center gap-2 p-2 text-left transition duration-150 hover:-translate-y-0.5 hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
+  'group/cell flex cursor-pointer items-center gap-2 text-left transition-colors duration-150 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
 
 /** 兼容旧导入路径：大档图标框（= 游戏 `sizeLimit` 32 的 2 倍）。 */
 export const ICON_SIZE = ITEM_SIZES.lg.icon

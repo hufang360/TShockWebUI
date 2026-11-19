@@ -67,7 +67,7 @@ const CELL_CLASS =
 
 /** 横条格子：横向排布（图标左、文字右），四边内边距 8px = 图标↔文字间距 = 行高与底板之差（56 vs 40）。 */
 const ROW_CELL_CLASS =
-  'group/cell flex h-14 cursor-pointer items-center gap-2 p-2 font-normal text-left transition duration-150 hover:-translate-y-0.5 hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:h-14'
+  'group/cell flex h-14 cursor-pointer items-center gap-2 font-normal text-left transition-colors duration-150 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:h-14'
 
 /** 图标区（格子底板）：底色 / 描边与 hover 提亮都来自 `lib/iconGridSize` 的试用配色。 */
 const ICON_SURFACE_CLASS = 'relative flex items-center justify-center transition'

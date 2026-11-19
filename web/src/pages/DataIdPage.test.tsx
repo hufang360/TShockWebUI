@@ -210,6 +210,25 @@ describe('DataIdPage', () => {
     expect(width()).toBe('72px')
   })
 
+  it('搜索框位置：NPC 贴在分类 tab 行尾，图格 / 墙 / Buff 没有分类 tab 就排最左', () => {
+    renderPage()
+    const tab = (name: string) => fireEvent.mouseDown(screen.getByRole('tab', { name }))
+    const input = () => screen.getByLabelText('数据 ID')
+
+    // NPC：左侧有分类 tab，搜索贴行尾
+    expect(screen.getByTestId('npc-category-tabs')).toBeTruthy()
+    expect(input().closest('.ml-auto')).toBeTruthy()
+
+    // 图格 / 墙 / Buff：没有分类 tab，搜索排最左（工具行的第一个子元素）
+    for (const name of ['图格', '墙', 'Buff']) {
+      tab(name)
+      expect(screen.queryByTestId('npc-category-tabs')).toBeNull()
+      expect(input().closest('.ml-auto')).toBeNull()
+      const toolbarRow = input().closest('.sm\\:w-64')?.parentElement as HTMLElement
+      expect(toolbarRow.firstElementChild?.contains(input())).toBe(true)
+    }
+  })
+
   it('图标大小「横条」：图标在左、ID 与名称在右竖排；Boss 分类不再放大', () => {
     renderPage()
     const pick = (testId: string) => {
@@ -282,7 +301,7 @@ describe('DataIdPage', () => {
     expect(screen.queryByRole('tablist', { name: 'NPC / 图格 / 墙 / Buff' })).toBeNull()
     // 全屏不再显示「页面设置」（要看设置先退出全屏）
     expect(screen.queryByRole('button', { name: '页面设置' })).toBeNull()
-    const exit = screen.getByRole('button', { name: '退出全屏' })
+    const exit = screen.getByRole('button', { name: /退出全屏/ })
     expect(exit).toBeTruthy()
     // 常驻：不收成竖条；尺寸小一档（icon-xs → 手机 36 / 桌面 24）
     expect(screen.queryByRole('button', { name: '显示操作' })).toBeNull()

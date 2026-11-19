@@ -57,12 +57,14 @@ export const ICON_PLATE_DARK_CLASS = 'dark:bg-secondary'
  * hover / 键盘聚焦用 `hover:` / `focus-visible:`（不是 `group-hover/cell:`）：
  * 底板就长在格子自己身上，而 `group-*` 变体要求作用在**后代**元素上。
  */
-export const ROW_PLATE_CLASS = `${PLATE_BG} hover:bg-secondary focus-visible:bg-secondary hover:brightness-90 focus-visible:brightness-90 dark:hover:brightness-110 dark:focus-visible:brightness-110`
+export const ROW_PLATE_CLASS =
+  // 与合成表条目（`RecipePanel` 的 `RECIPE_ROW_CLASS`）同色：常驻 `bg-accent/40`、悬停 `bg-accent`，
+  // 只做颜色过渡、不做位移 —— 横条是一行一条，位移会跟上下行互相挤。
+  'rounded-control bg-accent/40 px-2 transition-colors duration-150 hover:bg-accent focus-visible:bg-accent'
 
 /**
- * 底板 hover / 聚焦的强度：**亮色压深 10%、暗色提亮 10%**。
- * 小档（`ICON_PLATE_HOVER_CLASS`）和横条（`ROW_PLATE_CLASS`）用同一组数值，只是挂在不同的元素上
- * （小档挂在图标方块 → 用 `group-hover/cell:`；横条挂在格子自己身上 → 用 `hover:`），这样两处手感一致。
+ * 小档底板的 hover / 聚焦：**亮色压深 10%、暗色提亮 10%**（挂在图标方块上，所以用 `group-hover/cell:`）。
+ * 横条的底色与合成表条目一致，见 `ROW_PLATE_CLASS`。
  */
 
 /**

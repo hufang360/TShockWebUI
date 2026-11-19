@@ -1098,44 +1098,49 @@ export function ItemsPage({
                     </ToggleGroup>
                     {/* 「分组」跟 11 个分类同一行（排在「其他」右边）、同一尺寸：
                         幽灵按钮、`size="sm"`、同样的内边距，不加灰色药丸底。 */}
-                    <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={t('dex.collectionGroup')}
-                      onClick={() => setGroupDrawerOpen(true)}
-                      className={cn(
-                        'max-w-56 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground',
-                        (collection || gameMode) && 'font-medium text-foreground',
-                      )}
-                    >
-                      <ListFilter className="size-3.5 shrink-0" />
-                      <span className="min-w-0 truncate">
-                        {collection
-                          ? t('dex.groupCurrent', {
-                              group: t(`dex.group.${collection.group}`),
-                              name:
-                                collection.group === 'range'
-                                  ? rangeTabLabel(collection)
-                                  : collection.name,
-                            })
-                          : gameMode
+                    {/* 分组入口：全屏里不渲染（抽屉遮罩 `z-[45]` 在全屏容器 `z-50` 下面，画不出来）。 */}
+                  {!resultsFullscreen && (
+                    <>
+                      <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={t('dex.collectionGroup')}
+                        onClick={() => setGroupDrawerOpen(true)}
+                        className={cn(
+                          'max-w-56 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground',
+                          (collection || gameMode) && 'font-medium text-foreground',
+                        )}
+                      >
+                        <ListFilter className="size-3.5 shrink-0" />
+                        <span className="min-w-0 truncate">
+                          {collection
                             ? t('dex.groupCurrent', {
-                                group: t('dex.tabs'),
-                                name: t(`dex.tab.${effectiveGroupTab}`),
+                                group: t(`dex.group.${collection.group}`),
+                                name:
+                                  collection.group === 'range'
+                                    ? rangeTabLabel(collection)
+                                    : collection.name,
                               })
-                            : t('dex.collectionGroup')}
-                      </span>
-                      <ChevronDown className="size-3.5 shrink-0" />
-                    </Button>
-                    {(collection || gameMode) && (
-                      <IconAction
-                        size="icon-xs"
-                        label={t('dex.clearGroup')}
-                        icon={X}
-                        onClick={clearGroup}
-                      />
-                    )}
+                            : gameMode
+                              ? t('dex.groupCurrent', {
+                                  group: t('dex.tabs'),
+                                  name: t(`dex.tab.${effectiveGroupTab}`),
+                                })
+                              : t('dex.collectionGroup')}
+                        </span>
+                        <ChevronDown className="size-3.5 shrink-0" />
+                      </Button>
+                      {(collection || gameMode) && (
+                        <IconAction
+                          size="icon-xs"
+                          label={t('dex.clearGroup')}
+                          icon={X}
+                          onClick={clearGroup}
+                        />
+                      )}
+                    </>
+                  )}
                   </div>
                   {/* 边界渐隐：贴到色块与页面底色一致，滑到头那一侧自动不画。 */}
                   {tabRowEdges.start && (
@@ -1156,10 +1161,13 @@ export function ItemsPage({
               </TooltipProvider>
             )}
 
-            {/* 右侧搜索：两种模式一致（常驻输入框，`ml-auto` 贴行尾），不随 tab 带滚动，窄屏换到下一行。 */}
-            <div className="flex w-full shrink-0 items-center gap-1 sm:ml-auto sm:w-64">
-              {searchField}
-            </div>
+            {/* 右侧搜索：两种模式一致（常驻输入框，`ml-auto` 贴行尾），不随 tab 带滚动，窄屏换到下一行。
+                全屏里不渲染（全屏只保留分类那一行）。 */}
+            {!resultsFullscreen && (
+              <div className="flex w-full shrink-0 items-center gap-1 sm:ml-auto sm:w-64">
+                {searchField}
+              </div>
+            )}
 </>
   )
 
@@ -1257,6 +1265,13 @@ export function ItemsPage({
             visible={page.scrollTop > SCROLL_TOP_THRESHOLD}
             onClick={scrollToTop}
           />
+
+          {resultsFullscreen && (
+            // 全屏里保留「分类页签」这一行（左上角、吸在容器顶部）：搜索与分组都不出现。
+            <div className="sticky top-0 z-20 bg-background pb-2">
+              <div className="flex min-w-0 items-center gap-2">{toolsRow}</div>
+            </div>
+          )}
 
           {resultsFullscreen && (
             // 全屏只留「退出全屏」：常驻（不自动收起），尺寸比顶栏那颗小一档。
