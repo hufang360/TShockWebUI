@@ -26,7 +26,7 @@
 | Field | `ui/Field.tsx` | — | `FieldGroup/Field/FieldLabel/FieldDescription/FieldTitle/FieldSet/FieldLegend`；表单一律用它 |
 | Checkbox | `ui/Checkbox.tsx` | radix checkbox | 布尔勾选（表单/开关项） |
 | Slider | `ui/Slider.tsx` | radix slider | 数值范围（如设置页字号） |
-| ToggleGroup | `ui/ToggleGroup.tsx` | radix toggle-group | 2–5 选的选项集（主题 / 语言 / scheme） |
+| ToggleGroup | `ui/ToggleGroup.tsx` | radix toggle-group | 2–5 选的选项集（主题 / 语言 / scheme）。`variant` 只写在 `ToggleGroup` 上（`default` 灰底胶囊 / `outline` 无底但保留胶囊布局 / `ghost` 幽灵：不垫灰底、高度跟按钮），条目通过 context 自动继承，不用给每个 `ToggleGroupItem` 再传一次；`ghost` 的选中态用 `bg-foreground/10` 而不是 `bg-card`（后者在页面底色上读不出来）。尺寸 `sm` / `md` 用于带文字的选项；只有图标的方形选项用 `icon-xs`（手机 36 / 桌面 24）与 `icon-sm`（40 / 28），阶梯与 `Button` 一致，且必须给 `aria-label` |
 | Spinner | `ui/Spinner.tsx` | lucide | 加载指示；Button 内配 `data-icon`，独立展示配 `aria-label` |
 | Empty | `ui/Empty.tsx` | — | 空状态（`EmptyHeader/Media/Title/Description/Content`），不要手写空态 |
 | Toaster / toast | `ui/Sonner.tsx`（`sonner`） | sonner | 全局提示条：`App` 里挂一次 `<Toaster>`，业务里 `toast.success(...)`；多条自动堆叠、每条带关闭按钮、`duration` 秒级自动消失。配色走语义令牌（`--popover` / `--popover-foreground` / `--border`），`theme` 由 `settings.theme` 算好的 light/dark 传入（不引入 `next-themes`）。**不用于**验证真伪的结果（执行结果仍留在结果区） |
@@ -62,7 +62,9 @@
   独立展示时给 `aria-label`；不要再手写 `Loader2 animate-spin` / `animate-pulse` 圆点。
 - **表单一律 `FieldGroup` + `Field`**（`FieldLabel` / `FieldDescription`），不要裸 `div` + `label` + `gap-*`；
   禁用态 `Field data-disabled` + 控件 `disabled`。
-- **选项集（2–7）用 `ToggleGroup`**；真正的面板切换才用 `Tabs`。
+- **选项集（2–7）用 `ToggleGroup`**；真正的面板切换才用 `Tabs`。选项集里要放图标时，
+  用 `variant="ghost"`：没有灰色槽位垫底，图标直接贴在页面上；纯图标的方形选项配 `size="icon-xs"`
+  并给 `aria-label`（见物品图鉴左上角的 11 个分类）。
 - **页面级 `Tabs`（数据 ID 的 NPC / 图格 / 墙 / Buff）独占一整行**：
   数据 ID 的主 Tabs 不包在 Card 内；玩家管理不重复渲染页面标题，
   页面级动作（简约视图 / 导出图片）进**顶栏右侧**，正文不放大按钮。
@@ -644,24 +646,47 @@
   （`formatClock`，与「指令 → 历史」面板同一格式）而不是箭头；指令被截断时 hover 整行用 `Tooltip` 出全文（不用原生 `title`）。
   整行仍是按钮：点了跳到指令页、填进输入框，并直接把焦点交给输入框。
 
-## 图标网格（物品 ID / 数据 ID）
+## 图标网格（物品 ID / 数据 ID / 鱼店）
 
-- 大档格宽 **72**、图标 **64**（大档列间距：手机 8px / 桌面 16px，行距 16px）；格子默认**无底色**，hover 时只有图标区铺 `bg-primary/10`，文字无背景，整格一起上浮。
-- 物品 ID：虚拟滚动；**三档尺寸**（页面设置「图标大小」，`components/items/DexCell.tsx` 的 `ITEM_SIZES`）——
-  大 图标 64 / 格 72 / 带文字格高 106、中 48 / 56 / 90（**默认**）、小 32 / 40（**只显示图标**，强制隐藏 ID 与名称）。
-  列间距大 16（窄屏 8）/ 中 12 / 小 8，行距与列间距同值；间距用内联 style，和 `computeVirtualGrid` 用同一组数。
-  尺寸只影响格子：表格视图、详情抽屉、提示里的图标不变。
-- **鱼店商品格子用同一套档位**（`components/fishshop/GoodCells.tsx` 的 `GOOD_SIZES` / `GOOD_GRID_CLASS`，
-  图标 / 格宽与物品 ID 完全相同，间距各自定：货架有货架板，行距要更宽）：
-  页面设置「图标大小」三档 —— 大 图标 64 / 格子 72、中 48 / 56（**默认**）、
-  小 32 / 40（**不显示编号和名称**）。列宽固定为格子宽（`grid-cols-[repeat(auto-fill,…)]`，不拉伸），列距 8px；
-  间距按尺寸分档：**大 = `gap-x-4` / `gap-y-6`（列 16 / 行 24px）**、**中 = `gap-x-2` / `gap-y-4`（列 8 / 行 16px）**、
-  小 = `gap-2`（行 / 列都 8px）且不画货架板；中 / 大的行距放宽，给压在序号行上的货架板（`.fish-shelf`，纯 CSS 画）留呼吸空间。
-  格子里从上到下是 **图标区（比图标大 8px）→ `#编号` → 名称**，hover 底色只在图标区。
-- 数据 ID：同一套三档档位（`components/dataid/DataIdViews.tsx` 的 `DATA_ID_SIZES`，大 64/72、中 48/56、小 32/40，
-  小档只图标），页面设置「视图」第一行的 `Select` 切换、存本机；**默认按数据源给**（NPC 大、图格 / 墙 / Buff 中，
-  见 `DATA_ID_DEFAULT_SIZES`）；**Boss 分类按档位各放大一倍**（大档即 128 贴图 / 144 格子）。
-  NPC 格子下方是原来的两行（ID 一行、名称一行，ID 不带 `#`）；**NPC 详情**里图标下方是一行 `#ID 名称`。
+- **四档图标大小**（页面设置「图标大小」，档位名与容错在 `lib/iconGridSize`）：**小 / 中 / 大 / 横条**；
+  像素三页各写一份（物品 ID `ITEM_SIZES`、数据 ID `DATA_ID_SIZES`、鱼店 `GOOD_SIZES`），**横条三页都是
+  图标 32 / 图标区 40 / 最小格宽 160 / 格高 56**。
+  - 方块档：大 图标 64 / 格 72、中 48 / 56、小 32 / 40（只放图标，强制隐藏 ID 与名称）。
+  - **横条档**（`size === 'row'`）：一格一条横条 —— **图标在左、`#编号` 与名称在右竖排**（编号 `font-pixel`、名称 `text-xs`
+    单行 `truncate`）；格高 56 = 图标区 40 + 上下各 8（与左右内边距、图标↔文字间距同一个 `gap-2`）。
+    **默认档位三页都是横条**（`DEFAULT_ITEM_ICON_SIZE` / `DATA_ID_DEFAULT_SIZES` / `DEFAULT_GOOD_ICON_SIZE`）。
+  - **横条平分整行宽度**：列数按最小格宽算（`auto-fill` 思路），再把剩余宽度平均分给各列 ——
+    数据 ID / 鱼店用 `repeat(auto-fill, minmax(160px, 1fr))`，物品 ID（虚拟滚动，列数要在 JS 里算）按
+    `viewportWidth` 求列数后把宽均分，并把 `maxCols` 一起传给 `computeVirtualGrid`（否则会多推一列）。
+  - 横条档下**不显示「隐藏编号和名称」开关**（`showsMetaToggle`）；鱼店横条**不画货架板、不画遮阳伞**；
+    数据 ID 的 **Boss ×2 放大**对横条不生效（否则一行 320px 撑爆容器）。
+- **图标区底板**（`lib/iconGridSize` 的 `iconPlateClass`）：底色**一律用主题的 `secondary`**（= secondary 按钮同色），
+  亮暗由 `--secondary` 自己给，**不写死颜色、不加描边**。
+  - 小档与横条：底板**亮暗都有**（横条的底板铺在**整条格子**上，`ROW_PLATE_CLASS`）。
+  - 中 / 大档：**只有暗色垫**（亮色下大图标本来就清楚，只保留 `bg-primary/10` 的 hover）。
+  - hover / 键盘聚焦：有底板处**亮色压深 10% / 暗色提亮 10%**（小档与横条同一组数值；横条挂在格子上用 `hover:`，
+    小档挂在图标方块上用 `group-hover/cell:`）。
+- **横条档的悬停提示覆盖整条**（`components/RowTip.tsx`）：图标只占左边一小块，提示只挂图标等于没有。
+  有真实物品（物品 ID、鱼店原生商品、图格代表物品）→ 物品提示；没有物品（NPC / Buff / 鱼店借来的识别图）→
+  一句「`#编号` + 名称」。
+- **搜索框位置（三页统一）**：各自页签行（Tab 带）的**右侧** —— 固定 `sm:w-64`、`inputClassName="text-xs"`（比正文小一档），
+  窄屏整行换到下一行；页签带自己横向滚动、两侧渐隐，**搜索不跟着滚**。
+  - 物品 ID：页签行 = 「全部物品 / ⭐ 收藏」（line 变体 `Tabs`）+ 11 个分类（幽灵按钮，图标 + 文字）+「分组」。
+    收藏模式下不显示「分组」入口，搜索框与「全部物品」完全一致（常驻，不收进放大镜）。
+  - 数据 ID：NPC 分类 / 视图开关在左，搜索在右。
+  - 鱼店：「全部 / 买过 / 收藏」页签在左，搜索在右。
+- **列表够长时右下角有「回到顶部」**（`components/ScrollToTop.tsx`，阈值 `SCROLL_TOP_THRESHOLD = 480px`）：
+  物品 ID / 数据 ID 都用页面滚动宿主的 `scrollTop` 判断，点了调 `scrollToTop()`；全屏里同样可用。
+- **全屏（物品 ID / 数据 ID）**：右上角只剩「退出全屏」——常驻、**不自动收起**（`FullscreenDock persistent`），
+  尺寸比顶栏那颗小一档（`IconAction size="icon-xs"`）；「页面设置」不在全屏里出现。
+- 物品 ID：虚拟滚动；三档方块 + 横条（见上），列间距 大 16 / 中 12 / 小 8（窄屏一律 8），行距与列间距同值；
+  间距用内联 style，和 `computeVirtualGrid` 用同一组数。尺寸只影响格子：表格视图、详情抽屉、提示里的图标不变。
+- **鱼店商品格子用同一套档位**：间距按尺寸分档 —— **大 = `gap-x-4` / `gap-y-6`**、**中 = `gap-x-2` / `gap-y-4`**、
+  小 / 横条 = `gap-2`；中 / 大的行距放宽，给压在序号行上的货架板（`.fish-shelf`，纯 CSS 画）留呼吸空间。
+  方块档格子里从上到下是 **图标区（比图标大 8px）→ `#编号` → 名称**，hover 底色只在图标区。
+- 数据 ID：同一套档位（大 64/72、中 48/56、小 32/40、横条 见上），页面设置「视图」第一行的 `Select` 切换、存本机；
+  **Boss 分类按档位各放大一倍**（大档即 128 贴图 / 144 格子），横条除外。
+  NPC 方块档格子下方是两行（ID 一行、名称一行，ID 不带 `#`）；**NPC 详情**里图标下方是一行 `#ID 名称`。
 - **NPC 详情的「相关指令」**：一块里按顺序列 `/spawnboss`（+ `/sb` 简写 + `/sb all`，仅 Boss 且限制在 `sbAll`）、
   召唤物 `/give <物品> <玩家>`（登录时才有）、`/sm <ID>`、`/tpnpc <英文名>`（城镇 NPC + 379/438）、
   `/renameNPC <ID> <newname>`（城镇 NPC）、`/setdungeon` + `/wm dungeon`（`NPC_DUNGEON_IDS`）、`/npc <ID>`；

@@ -46,6 +46,7 @@ import { useChatSend } from '@/hooks/useChatSend'
 import { usePageScrollReset, useStickyHeaderOffset } from '@/hooks/usePageScroll'
 import { useSettingsPopoverFocus } from '@/hooks/useSettingsPopoverFocus'
 import { cn } from '@/lib/cn'
+import { showsMetaToggle } from '@/lib/iconGridSize'
 import { splitFishArgs } from '@/lib/fishArgs'
 import { diagramUrl } from '@/lib/fishDiagram'
 import { isDegradedGood } from '@/lib/fishGood'
@@ -155,9 +156,10 @@ type FishTab = (typeof FISH_TABS)[number]
 
 const DEFAULT_STATE: FishUiState = { query: '' }
 
-/** 本机存的「图标大小」可能是旧版本写坏的值：认不出来就回到默认的「大」。 */
+/** 本机存的「图标大小」可能是旧版本写坏的值：认不出来就回到默认的「中」（鱼店比物品 ID 小一档）。 */
 function resolveIconSize(value: unknown): GoodIconSize {
-  return value === 'sm' || value === 'md' || value === 'lg' ? value : DEFAULT_GOOD_ICON_SIZE
+  if (value === 'sm' || value === 'md' || value === 'lg' || value === 'row') return value
+  return DEFAULT_GOOD_ICON_SIZE
 }
 
 /** 「买过 / 收藏」各存多少条（本机 localStorage；一个服通常也就几十到几百件商品）。 */
@@ -606,14 +608,16 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const tableView = ui.tableView === true
   const iconSize = resolveIconSize(ui.iconSize)
   const sizeSpec = GOOD_SIZES[iconSize]
-  // 小尺寸本来就只有图标：中 / 大的「隐藏编号和名称」在它上面没有意义，不显示这个开关。
-  const metaToggleVisible = sizeSpec.showMeta
+  // 小档只放图标、横条的意义就是带文字：这两种档位下「隐藏编号和名称」没意义，不显示开关。
+  const metaToggleVisible = showsMetaToggle(iconSize)
   const showMeta = sizeSpec.showMeta && !hideMeta
-  // 货架板：表格视图没有格子、小尺寸格子又密，这两种情况本来就不画，所以开关也不显示。
-  const shelfToggleVisible = !tableView && iconSize !== 'sm'
+  // 货架板：表格视图没有格子、小档格子又密、横条是横排（板压不住位置），这几种都不画，开关也不显示。
+  const shelfToggleVisible = !tableView && iconSize !== 'sm' && iconSize !== 'row'
   const shelfLines = shelfToggleVisible && ui.shelf !== false
-  // 遮阳伞是「摊位」的一部分（不是格子的装饰），网格 / 空态 / 加载中都顶着同一块篷；表格视图里不画。
-  const awning = ui.awning !== false && !tableView
+  // 遮阳伞是「摊位」的一部分（不是格子的装饰），网格 / 空态 / 加载中都顶着同一块篷；
+  // 表格视图没有格子不画；横条是紧凑的一列条目，顶着篷会挤（同货架板，开关也不显示）。
+  const awningToggleVisible = !tableView && iconSize !== 'row'
+  const awning = awningToggleVisible && ui.awning !== false
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsFocus = useSettingsPopoverFocus()
   // 「货架全屏」：顶栏以外的区域全部让给货架（与「物品 ID」同一套做法，Esc 退出）。
@@ -687,6 +691,9 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                 <SelectItem value="sm" data-testid="fish-icon-size-sm">
                   {t('iconSize.sm')}
                 </SelectItem>
+                <SelectItem value="row" data-testid="fish-icon-size-row">
+                  {t('iconSize.row')}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -727,7 +734,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               </FieldLabel>
             </Field>
           )}
-          {!tableView && (
+          {awningToggleVisible && (
             <Field orientation="horizontal" className="items-start rounded-control px-2 py-2 hover:bg-accent/50">
               <Checkbox
                 id="fish-awning"
@@ -868,7 +875,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
 
       {canUse && (
         <>
-          {/* 吸顶工具条：搜索（结果数在框内）+ 右侧「全部 / 买过 / 收藏」页签。
+          {/* 吸顶工具条：左侧「全部 / 买过 / 收藏」页签 + 行尾搜索框（结果数在框内）。
               货架（页面）往上滚时它留在顶栏下面，不用滚回顶部找搜索框。
               页面设置与刷新一样在顶栏右侧（`TopBarActions`）。 */}
           <div
@@ -878,22 +885,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
               shelfFullscreen ? 'top-0 pr-12' : 'top-12',
             )}
           >
-            <div className="flex w-full min-w-0 items-center gap-2 sm:flex-1">
-              <div className="w-full max-w-sm">
-                <SearchInput
-                  value={ui.query}
-                  onValueChange={(query) => setUi({ query })}
-                  placeholder={t('fish.search')}
-                  aria-label={t('fish.search')}
-                  leadingIcon={<Search className="size-4 text-muted-foreground" />}
-                  // 货架条数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
-                  resultLabel={t('fish.total', { n: goods.length })}
-                  shortcut
-                />
-              </div>
-            </div>
-            {/* 手机上搜索独占第一行；页签从下一行开始、靠右（与「物品 ID」一致）。 */}
-            <div className="ml-0 flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground sm:ml-auto sm:w-auto">
+            {/* 左：页签（全部 / 买过 / 收藏）。 */}
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground sm:w-auto">
               <div className="flex min-w-0 items-center rounded-container bg-accent p-0.5">
                 <ToggleGroup
                   type="single"
@@ -926,6 +919,22 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
                   </ToggleGroupItem>
                 </ToggleGroup>
               </div>
+            </div>
+
+            {/* 右：搜索框（与物品 ID / 数据 ID 一致，行尾 16rem；窄屏独占一行）。 */}
+            <div className="w-full min-w-0 sm:ml-auto sm:w-64">
+              <SearchInput
+                value={ui.query}
+                onValueChange={(query) => setUi({ query })}
+                placeholder={t('fish.search')}
+                aria-label={t('fish.search')}
+                leadingIcon={<Search className="size-4 text-muted-foreground" />}
+                // 货架条数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
+                resultLabel={t('fish.total', { n: goods.length })}
+                shortcut
+                // 字号与物品 ID 的搜索框一致（比正文小一档）
+                inputClassName="text-xs"
+              />
             </div>
             {error && !selected && (
               <Alert variant="destructive">

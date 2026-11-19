@@ -3,10 +3,13 @@ import { CommandLine } from '@/components/CommandLine'
 import { ItemIcon } from '@/components/ItemIcon'
 import { NpcSprite } from '@/components/NpcSprite'
 import { Badge } from '@/components/ui'
+import { RowTip } from '@/components/RowTip'
 import { cn } from '@/lib/cn'
 import type { DataIdKind } from '@/lib/dataIdState'
 import {
   DEFAULT_ICON_GRID_SIZE,
+  iconPlateClass,
+  ROW_PLATE_CLASS,
   type IconGridSize,
 } from '@/lib/iconGridSize'
 import { useI18n } from '@/lib/i18n'
@@ -68,18 +71,27 @@ export const DATA_ID_SIZES: Record<IconGridSize, DataIdSizeSpec> = {
     gapMobile: 8,
     gapY: 8,
   },
+  // 横条：图标在左、ID 与名称在右竖排（名称单行截断）。图标 / 底板与小档一致，最小格宽 120 ≈ 5 个中文字。
+  row: {
+    icon: 32,
+    surface: 40,
+    cell: 160,
+    showMeta: true,
+    gapDesktop: 8,
+    gapMobile: 8,
+    gapY: 8,
+  },
 }
 
 /**
- * 各数据源的默认档位：**NPC 用「大」**（贴图细节多、数量最少），
- * **图格 / 墙 / Buff 用「中」**（一屏能多铺几行，图标仍是 48px 看得清）。
- * 用户一旦在页面设置里选过，就按他选的来（见 `DataIdPage` 的 `rawIconSize`）。
+ * 各数据源的默认档位：**一律「横条」**（图标在左、ID 与名称在右，三种数据源一致，
+ * 一屏能铺更多条也读得全）。用户一旦在页面设置里选过，就按他选的来（见 `DataIdPage` 的 `rawIconSize`）。
  */
 export const DATA_ID_DEFAULT_SIZES: Record<DataIdKind, IconGridSize> = {
-  npc: 'lg',
-  tile: 'md',
-  wall: 'md',
-  buff: 'md',
+  npc: 'row',
+  tile: 'row',
+  wall: 'row',
+  buff: 'row',
 }
 
 /** 图标网格的容器样式：列宽 = 格子宽（`large` 时翻倍），间距按档位给。 */
@@ -88,9 +100,12 @@ export function iconGridStyle(
   { large = false, mobile = false }: { large?: boolean; mobile?: boolean } = {},
 ): CSSProperties {
   const spec = DATA_ID_SIZES[size]
-  const scale = large ? 2 : 1
+  // 横条档：列数按最小宽度自动填，再把剩余宽度平分成等宽列（与鱼店同一套做法）；Boss 的 ×2 对横条不生效。
+  const row = size === 'row'
+  const scale = large && !row ? 2 : 1
+  const track = row ? `minmax(${spec.cell}px, 1fr)` : `${spec.cell * scale}px`
   return {
-    gridTemplateColumns: `repeat(auto-fill, ${spec.cell * scale}px)`,
+    gridTemplateColumns: `repeat(auto-fill, ${track})`,
     columnGap: mobile ? spec.gapMobile : spec.gapDesktop,
     rowGap: spec.gapY * scale,
   }
@@ -102,11 +117,25 @@ export function iconGridStyle(
  */
 const CELL_CLASS =
   'group/cell flex cursor-pointer flex-col items-center gap-1 rounded-container text-center transition'
+/** 横条格子：横向排布（图标左、文字右）。 */
+const ROW_CELL_CLASS =
+  'group/cell flex h-14 cursor-pointer items-center gap-2 p-2 text-left transition md:h-14'
 const CELL_HOVER =
   'hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
-/** 图标区：默认**无底色**、无描边；hover 时才铺 `bg-primary/10`。 */
-const ICON_CELL_BG =
-  'flex items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10'
+/** 图标区（格子底板）：只有小档垫底板，其余只留 hover 淡色（见 `lib/iconGridSize` 的 `iconPlateClass`）。 */
+const ICON_CELL_BG = 'flex items-center justify-center transition'
+
+const iconSurfaceClass = (size: IconGridSize) => cn(ICON_CELL_BG, iconPlateClass(size))
+
+/** 横条档右侧的文字块：ID 在上、名称在下（名称单行截断）。横条的意义就是带文字，所以忽略「隐藏 ID 和名称」。 */
+function RowMeta({ id, name }: { id: string | number; name: string }) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+      <span className="font-pixel text-2xs leading-none text-muted-foreground">{id}</span>
+      <span className="w-full truncate text-xs leading-4 text-foreground">{name}</span>
+    </span>
+  )
+}
 
 /**
  * 数据表格的一行：斑马纹 + hover / 键盘聚焦高亮 + **整行可点**（指针变手型）。
@@ -132,28 +161,49 @@ export function NpcCell({
   onSelect: (npc: Npc) => void
 }) {
   const spec = DATA_ID_SIZES[size]
-  const scale = large ? 2 : 1
-  const showMeta = spec.showMeta && !hideMeta
+  const row = size === 'row'
+  // 横条档不按 Boss 分类放大：一行 360px 宽没有意义，格子会撑得比屏幕还宽。
+  const scale = large && !row ? 2 : 1
+  const showMeta = row || (spec.showMeta && !hideMeta)
   return (
     <button
       type="button"
       title={`${npc.name} #${npc.id}`}
       onClick={() => onSelect(npc)}
-      className={cn(CELL_CLASS, CELL_HOVER)}
-      style={{ width: spec.cell * scale }}
+      className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, CELL_HOVER)}
+      // 横条平分整行宽度：格子填满 1fr 轨道，别再写死格宽
+      style={{ width: row ? '100%' : spec.cell * scale }}
     >
-      <span
-        className={ICON_CELL_BG}
-        style={{ width: spec.surface * scale, height: spec.surface * scale }}
-      >
-        <NpcSprite id={npc.id} size={spec.icon * scale} name={npc.name} />
-      </span>
-      {showMeta && (
-        <>
-          <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
-            {npc.id}
+      {row ? (
+        // 横条：提示锚点放在整条格子上（NPC 没有物品，用「#ID + 名称」）
+        <RowTip id={npc.id} name={npc.name}>
+          <span
+            data-testid="dataid-icon-surface"
+            className={iconSurfaceClass(size)}
+            style={{ width: spec.surface * scale, height: spec.surface * scale }}
+          >
+            <NpcSprite id={npc.id} size={spec.icon * scale} name={npc.name} />
           </span>
-          <span className="w-full truncate text-xs leading-4 text-foreground">{npc.name}</span>
+          <RowMeta id={npc.id} name={npc.name} />
+        </RowTip>
+      ) : (
+        <>
+          <span
+            data-testid="dataid-icon-surface"
+            className={iconSurfaceClass(size)}
+            style={{ width: spec.surface * scale, height: spec.surface * scale }}
+          >
+            <NpcSprite id={npc.id} size={spec.icon * scale} name={npc.name} />
+          </span>
+          {
+        showMeta && (
+          <>
+            <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+              {npc.id}
+            </span>
+            <span className="w-full truncate text-xs leading-4 text-foreground">{npc.name}</span>
+          </>
+          )}
         </>
       )}
     </button>
@@ -340,7 +390,8 @@ export function BuffGrid({
   onSelect: (buff: Buff) => void
 }) {
   const spec = DATA_ID_SIZES[size]
-  const showMeta = spec.showMeta && !hideMeta
+  const row = size === 'row'
+  const showMeta = row || (spec.showMeta && !hideMeta)
   return (
     <div className="grid" style={iconGridStyle(size, { mobile })}>
       {rows.map((buff) => (
@@ -349,21 +400,40 @@ export function BuffGrid({
           type="button"
           title={`${buff.name} #${buff.id}`}
           onClick={() => onSelect(buff)}
-          className={cn(CELL_CLASS, CELL_HOVER)}
-          style={{ width: spec.cell }}
+          className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, CELL_HOVER)}
+          style={{ width: row ? '100%' : spec.cell }}
         >
-          <span
-            className={ICON_CELL_BG}
-            style={{ width: spec.surface, height: spec.surface }}
-          >
-            <BuffIcon id={buff.id} size={spec.icon} name={buff.name} />
-          </span>
-          {showMeta && (
-            <>
-              <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
-                {buff.id}
+          {row ? (
+            // 横条：提示锚点放在整条格子上（Buff 没有物品，用「#ID + 名称」）
+            <RowTip id={buff.id} name={buff.name}>
+              <span
+                data-testid="dataid-icon-surface"
+                className={iconSurfaceClass(size)}
+                style={{ width: spec.surface, height: spec.surface }}
+              >
+                <BuffIcon id={buff.id} size={spec.icon} name={buff.name} />
               </span>
-              <span className="w-full truncate text-xs leading-4 text-foreground">{buff.name}</span>
+              <RowMeta id={buff.id} name={buff.name} />
+            </RowTip>
+          ) : (
+            <>
+              <span
+                data-testid="dataid-icon-surface"
+                className={iconSurfaceClass(size)}
+                style={{ width: spec.surface, height: spec.surface }}
+              >
+                <BuffIcon id={buff.id} size={spec.icon} name={buff.name} />
+              </span>
+              {showMeta && (
+                <>
+                  <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+                    {buff.id}
+                  </span>
+                  <span className="w-full truncate text-xs leading-4 text-foreground">
+                    {buff.name}
+                  </span>
+                </>
+              )}
             </>
           )}
         </button>
@@ -451,7 +521,8 @@ export function TileIconGrid({
 }) {
   const { t } = useI18n()
   const spec = DATA_ID_SIZES[size]
-  const showMeta = spec.showMeta && !hideMeta
+  const row = size === 'row'
+  const showMeta = row || (spec.showMeta && !hideMeta)
   return (
     <div className="grid" style={iconGridStyle(size, { mobile })}>
       {rows.map((entry) => {
@@ -464,11 +535,12 @@ export function TileIconGrid({
             type="button"
             title={`${name} #${displayId}`}
             onClick={() => onSelect(entry)}
-            className={cn(CELL_CLASS, CELL_HOVER)}
-            style={{ width: spec.cell }}
+            className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, CELL_HOVER)}
+            style={{ width: row ? '100%' : spec.cell }}
           >
             <span
-              className={ICON_CELL_BG}
+              data-testid="dataid-icon-surface"
+              className={iconSurfaceClass(size)}
               style={{ width: spec.surface, height: spec.surface }}
             >
               {item ? (
@@ -487,18 +559,22 @@ export function TileIconGrid({
                 />
               )}
             </span>
-            {showMeta && (
-              <>
-                <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
-                  {displayId}
-                </span>
-                <span className="w-full truncate text-xs leading-4 text-foreground">{name}</span>
-                {entry.subId == null && (entry.styles?.length ?? 0) > 0 && (
-                  <span className="max-w-full truncate rounded bg-accent/60 px-2 py-0.5 text-2xs text-muted-foreground">
-                    {t('dataId.styles.count', { n: entry.styles!.length })}
+            {row ? (
+              <RowMeta id={displayId} name={name} />
+            ) : (
+              showMeta && (
+                <>
+                  <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+                    {displayId}
                   </span>
-                )}
-              </>
+                  <span className="w-full truncate text-xs leading-4 text-foreground">{name}</span>
+                  {entry.subId == null && (entry.styles?.length ?? 0) > 0 && (
+                    <span className="max-w-full truncate rounded bg-accent/60 px-2 py-0.5 text-2xs text-muted-foreground">
+                      {t('dataId.styles.count', { n: entry.styles!.length })}
+                    </span>
+                  )}
+                </>
+              )
             )}
           </button>
         )

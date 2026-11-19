@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { resetDataIdState } from '@/lib/dataIdState'
+import {
+  ICON_PLATE_CLASS,
+  ICON_PLATE_DARK_CLASS,
+  ICON_PLATE_HOVER_CLASS,
+  ROW_PLATE_CLASS,
+} from '@/lib/iconGridSize'
 import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
 import type { Dataset } from '@/types'
@@ -31,6 +37,11 @@ function withBunny(): Dataset {
     npcs: [...base.npcs, bunny],
     npcsById: new Map([...base.npcsById, [46, bunny]]),
   }
+}
+
+/** 预置「图标大小」档位：默认已改成横条，验小 / 中 / 大档要先塞进去。 */
+function seedIconSize(size: 'lg' | 'md' | 'sm' | 'row') {
+  localStorage.setItem('tswui:dataId:iconSize', JSON.stringify(size))
 }
 
 describe('DataIdPage', () => {
@@ -107,6 +118,7 @@ describe('DataIdPage', () => {
   })
 
   it('页面设置可隐藏图标格里的 ID 与名称', () => {
+    seedIconSize('lg')
     renderPage()
     const cell = screen.getByTitle('蓝史莱姆 #1')
     expect(within(cell).getByText('蓝史莱姆')).toBeTruthy()
@@ -124,7 +136,7 @@ describe('DataIdPage', () => {
     expect(hidden.style.width).toBe('72px')
   })
 
-  it('图标大小三档：中 56 / 小 40 只显示图标；刷新后记住；恢复默认回到「大」', async () => {
+  it('图标大小：默认「横条」，中 56 / 小 40 只显示图标；刷新后记住；恢复默认回到「横条」', async () => {
     const first = renderPage()
     const pick = (testId: string) => {
       fireEvent.click(within(openSettings()).getByRole('combobox', { name: '图标大小' }))
@@ -146,6 +158,9 @@ describe('DataIdPage', () => {
     pick('dataid-icon-size-sm')
     expect(cell().style.width).toBe('40px')
     expect(sprite()).toBe('32px')
+    // 小档也是一样的格子底板（只改尺寸，配色不跟着变）。
+    const surface = () => within(cell()).getByTestId('dataid-icon-surface')
+    expect(surface().className).toContain(ICON_PLATE_CLASS)
     expect(within(cell()).queryByText('蓝史莱姆')).toBeNull()
     expect(within(cell()).queryByText('1')).toBeNull()
     expect(within(openSettings()).queryByLabelText('隐藏 ID 和名称')).toBeNull()
@@ -156,13 +171,14 @@ describe('DataIdPage', () => {
     renderPage()
     expect(cell().style.width).toBe('40px')
 
-    // 恢复默认 → 清掉选择，回到该数据源的默认（NPC = 大 72）
+    // 恢复默认 → 清掉选择，回到默认档位「横条」（格子填满 1fr 轨道）
     fireEvent.click(within(openSettings()).getByRole('button', { name: '恢复默认' }))
-    expect(cell().style.width).toBe('72px')
+    expect(cell().style.width).toBe('100%')
+    expect(cell().dataset.size ?? '').toBe('')
     expect(stored()).toBe('')
   })
 
-  it('没选过图标大小时按数据源取默认：NPC 大 72，图格 / 墙 / Buff 中 56', async () => {
+  it('没选过图标大小时按数据源取默认：四种数据源一律「横条」', async () => {
     renderPage()
     const width = () => (screen.getByTitle('蓝史莱姆 #1') as HTMLElement).style.width
     const tab = (name: string) => fireEvent.mouseDown(screen.getByRole('tab', { name }))
@@ -171,14 +187,15 @@ describe('DataIdPage', () => {
         .getByTestId('dataid-list')
         .querySelector<HTMLElement>('button[title]')!.style.width
 
-    expect(width()).toBe('72px')
+    // 横条平分整行宽度：格子填满 1fr 轨道，不再有「NPC 大 / 其余中」的分档
+    expect(width()).toBe('100%')
 
     tab('图格')
-    expect(firstCellWidth()).toBe('56px')
+    expect(firstCellWidth()).toBe('100%')
     tab('墙')
-    expect(firstCellWidth()).toBe('56px')
+    expect(firstCellWidth()).toBe('100%')
     tab('Buff')
-    expect(firstCellWidth()).toBe('56px')
+    expect(firstCellWidth()).toBe('100%')
 
     // 用户选过之后，切数据源也按选的来（不再回到各自的默认）
     const pick = (testId: string) => {
@@ -191,7 +208,69 @@ describe('DataIdPage', () => {
     expect(width()).toBe('72px')
   })
 
-  it('全屏时隐藏搜索和 Tabs，只保留页面设置 / 退出按钮，图标铺满水平宽度', () => {
+  it('图标大小「横条」：图标在左、ID 与名称在右竖排；Boss 分类不再放大', () => {
+    renderPage()
+    const pick = (testId: string) => {
+      fireEvent.click(within(openSettings()).getByRole('combobox', { name: '图标大小' }))
+      fireEvent.click(screen.getByTestId(testId))
+    }
+    const cell = () => screen.getByTitle('蓝史莱姆 #1')
+
+    pick('dataid-icon-size-row')
+    // 平分整行宽度：格子填满 1fr 轨道（列数由容器宽度决定）
+    expect(cell().style.width).toBe('100%')
+    // 列数按最小 160px 自动填，再把剩余宽度平分成等宽列（与鱼店同一套）
+    expect((cell().parentElement as HTMLElement).style.gridTemplateColumns).toContain(
+      'minmax(160px, 1fr)',
+    )
+    // 底板铺在整条格子上（图标 + ID + 名称一块底），图标方块自己不上色
+    expect(cell().className).toContain(ROW_PLATE_CLASS)
+    // 横排：图标区在左、文字块在右（ID 在上、名称在下，名称单行截断）
+    const surface = within(cell()).getByTestId('dataid-icon-surface')
+    expect(surface.style.width).toBe('40px')
+    expect(surface.className).not.toContain(ICON_PLATE_CLASS)
+    const name = within(cell()).getByText('蓝史莱姆')
+    expect(name.className).toContain('truncate')
+    const text = name.parentElement as HTMLElement
+    expect(text.className).toContain('flex-col')
+    expect(text.children).toHaveLength(2)
+    expect(text.children[0].textContent).toBe('1')
+    // 横条带文字 → 「隐藏 ID 和名称」开关不出现
+    expect(within(openSettings()).queryByLabelText('隐藏 ID 和名称')).toBeNull()
+
+    // Boss 分类照旧放大一倍，但横条档保持 1×（否则一行 320px 撑爆容器）。
+    fireEvent.mouseDown(within(screen.getByTestId('npc-category-tabs')).getByRole('tab', { name: 'Boss' }))
+    const boss = screen.getByTitle('克苏鲁之眼 #4')
+    expect(boss.style.width).toBe('100%')
+  })
+
+  it('图标区底板：只有小档垫底板，四种网格一致（三页共用 `iconPlateClass`）', () => {
+    seedIconSize('md')
+    renderPage()
+    const firstSurface = () =>
+      screen.getByTestId('dataid-list').querySelector<HTMLElement>('[data-testid="dataid-icon-surface"]')!
+    const pickSmall = () => {
+      fireEvent.click(within(openSettings()).getByRole('combobox', { name: '图标大小' }))
+      fireEvent.click(screen.getByTestId('dataid-icon-size-sm'))
+    }
+
+    // 默认中大档：亮色不垫底板（只留 hover / 聚焦淡色），暗色下仍垫底板。
+    expect(firstSurface().className).not.toContain(ICON_PLATE_CLASS)
+    expect(firstSurface().className).toContain(ICON_PLATE_DARK_CLASS)
+    expect(firstSurface().className).toContain('group-hover/cell:bg-primary/10')
+
+    // 小档：底板 + hover 提亮，四种网格都一样（NPC 是当前页签，其余三个切过去看）。
+    pickSmall()
+    expect(firstSurface().className).toContain(ICON_PLATE_CLASS)
+    expect(firstSurface().className).toContain(ICON_PLATE_HOVER_CLASS)
+    for (const name of ['图格', '墙', 'Buff']) {
+      fireEvent.mouseDown(screen.getByRole('tab', { name }))
+      expect(firstSurface().className).toContain(ICON_PLATE_CLASS)
+      expect(firstSurface().className).toContain(ICON_PLATE_HOVER_CLASS)
+    }
+  })
+
+  it('全屏时隐藏搜索和 Tabs，右上角只留「退出全屏」，图标铺满水平宽度', () => {
     renderPage()
     const page = screen.getByTestId('dataid-page')
     fireEvent.click(screen.getByRole('button', { name: '全屏查看结果' }))
@@ -199,8 +278,13 @@ describe('DataIdPage', () => {
     expect(page.className).toContain('inset-0')
     expect(screen.queryByLabelText('数据 ID')).toBeNull()
     expect(screen.queryByRole('tablist', { name: 'NPC / 图格 / 墙 / Buff' })).toBeNull()
-    expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy()
+    // 全屏不再显示「页面设置」（要看设置先退出全屏）
+    expect(screen.queryByRole('button', { name: '页面设置' })).toBeNull()
+    const exit = screen.getByRole('button', { name: '退出全屏' })
+    expect(exit).toBeTruthy()
+    // 常驻：不收成竖条；尺寸小一档（icon-xs → 手机 36 / 桌面 24）
+    expect(screen.queryByRole('button', { name: '显示操作' })).toBeNull()
+    expect(exit.className).toContain('md:size-6')
     const grid = screen.getByTestId('dataid-list').querySelector<HTMLElement>('.grid')
     expect(grid?.style.gridTemplateColumns).toContain('repeat(auto-fill')
 
@@ -283,6 +367,7 @@ describe('DataIdPage', () => {
   })
 
   it('网格里的贴图绘制区：默认 64×64，切到 Boss 翻倍到 128×128', () => {
+    seedIconSize('lg')
     renderPage()
     const cell = screen.getByTitle('蓝史莱姆 #1')
     const canvas = cell.querySelector('canvas') as HTMLCanvasElement
@@ -330,6 +415,7 @@ describe('DataIdPage', () => {
   })
 
   it('切到 Buff：默认图标网格；勾选「表格视图」后可用表格', async () => {
+    seedIconSize('md')
     renderPage()
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
     expect(screen.getByTitle('黑曜石皮 #1')).toBeTruthy()
@@ -688,6 +774,7 @@ describe('DataIdPage', () => {
   })
 
   it('图格：多样式显示计数；详情列出子 ID，可展开为行并搜索 21-1', async () => {
+    seedIconSize('md')
     const chest = { id: 48, key: 'Chest', name: '木箱', icon: 48, frames: 1, sprite: [16, 16] as [number, number], tags: [] }
     const goldChest = { id: 306, key: 'GoldChest', name: '金箱', icon: 306, frames: 1, sprite: [16, 16] as [number, number], tags: [] }
     const container = {
@@ -793,6 +880,7 @@ describe('DataIdPage', () => {
   })
 
   it('页面设置「恢复默认」：视图开关回到默认值，打开时焦点不落在它身上', async () => {
+    seedIconSize('md')
     renderPage()
     const popover = openSettings()
     // 打开时焦点给第一个设置项，不是标题栏的「恢复默认」。
@@ -808,7 +896,8 @@ describe('DataIdPage', () => {
     expect(within(popover).getByTestId('dataid-two-cols').getAttribute('data-state')).toBe('unchecked')
 
     fireEvent.click(within(popover).getByRole('button', { name: '恢复默认' }))
-    expect(within(popover).getByTestId('dataid-hide-meta').getAttribute('data-state')).toBe('unchecked')
+    // 恢复默认把图标大小改回「横条」→ 那个档位下没有「隐藏 ID 和名称」开关
+    expect(within(popover).queryByTestId('dataid-hide-meta')).toBeNull()
     expect(
       within(popover).getByRole('checkbox', { name: '表格视图' }).getAttribute('data-state'),
     ).toBe('unchecked')

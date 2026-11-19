@@ -1,4 +1,4 @@
-import { Check, X } from 'lucide-react'
+import { Check } from 'lucide-react'
 import {
   Accordion,
   AccordionContent,
@@ -19,7 +19,6 @@ import {
   rangeTabLabel,
   type ItemCollection,
 } from '@/lib/collections'
-import { IconAction } from '@/components/IconAction'
 import { ContentScrim } from '@/components/ContentScrim'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/lib/i18n'
@@ -104,8 +103,8 @@ export function DexGroupDrawer({
           className="gap-0 p-0"
         >
           <DrawerHeader className="flex-row items-center border-b px-4 py-3">
+            {/* 不画关闭按钮：点遮罩 / 按 Esc 关，选完分组也自动关（标题栏只留标题）。 */}
             <DrawerTitle className="min-w-0 flex-1">{t('dex.collectionGroup')}</DrawerTitle>
-            <IconAction label={t('action.close')} icon={X} onClick={() => handleOpenChange(false)} />
           </DrawerHeader>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-3">

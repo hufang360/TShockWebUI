@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 interface FullscreenDockProps {
   /** 收起后那条小竖条的无障碍名称 / 提示。 */
   label: string
+  /** 常驻：不自动收起、也不收成竖条（只有一两个按钮时用它，省得还要悬停才看得到）。 */
+  persistent?: boolean
   children: ReactNode
 }
 
@@ -14,16 +16,17 @@ const IDLE_COLLAPSE_MS = 4000
  * （左侧上下圆角、右侧直角）；悬停 / 聚焦 / 点击会重新展开，展开后 4 秒无操作再收起。
  *
  * 全屏时页面没有顶栏，设置与退出全屏只能放在内容之上，固定在右上角最不容易挡住列表。
+ * `persistent` 时不收起（物品 ID / 数据 ID 只剩一个「退出全屏」，没必要让它消失）。
  */
-export function FullscreenDock({ label, children }: FullscreenDockProps) {
+export function FullscreenDock({ label, persistent = false, children }: FullscreenDockProps) {
   const [expanded, setExpanded] = useState(true)
   const [hover, setHover] = useState(false)
   const [focused, setFocused] = useState(false)
   const timer = useRef<number | null>(null)
 
-  // 展开但没有交互（悬停 / 聚焦）时，延迟收起；任何一次交互都会重置计时。
+  // 展开但没有交互（悬停 / 聚焦）时，延迟收起；任何一次交互都会重置计时。常驻时永不收起。
   useEffect(() => {
-    if (!expanded || hover || focused) {
+    if (persistent || !expanded || hover || focused) {
       if (timer.current != null) window.clearTimeout(timer.current)
       timer.current = null
       return
@@ -36,7 +39,7 @@ export function FullscreenDock({ label, children }: FullscreenDockProps) {
       if (timer.current != null) window.clearTimeout(timer.current)
       timer.current = null
     }
-  }, [expanded, hover, focused])
+  }, [persistent, expanded, hover, focused])
 
   return (
     <div

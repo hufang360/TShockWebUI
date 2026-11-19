@@ -34,6 +34,9 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   ToggleGroup,
   ToggleGroupItem,
   Tooltip,
@@ -43,6 +46,7 @@ import {
 } from '@/components/ui'
 import { useDebouncedValue } from '@/hooks/useDebounced'
 import { FullscreenDock } from '@/components/FullscreenDock'
+import { ScrollToTop, SCROLL_TOP_THRESHOLD } from '@/components/ScrollToTop'
 import { TopBarActions } from '@/components/TopBar'
 import { useItemFavoritesState } from '@/hooks/useItemFavoritesState'
 import { useRecipeFavoritesState } from '@/hooks/useRecipeFavoritesState'
@@ -66,6 +70,7 @@ import { useSearchIntent } from '@/lib/searchIntent'
 import { readDexState, rememberDexState, DEFAULT_GAME_TAB, type DexMode, type DexState } from '@/lib/dexState'
 import { ItemFavoritesProvider } from '@/lib/itemFavoritesContext'
 import { ItemDetailProvider, type ItemDetailApi, type DetailEntry, type ItemDetailOptions } from '@/lib/itemDetailContext'
+import { dexTabIconUrl } from '@/lib/dexTabIcons'
 import { searchItems } from '@/lib/items'
 import {
   COMMON_RECIPE_EXCLUDED_RESULT_IDS,
@@ -73,7 +78,7 @@ import {
   COMMON_RECIPE_MAKE_LIMIT,
 } from '@/lib/commonRecipes'
 import { StorageKeys } from '@/lib/storage'
-import { resolveIconGridSize } from '@/lib/iconGridSize'
+import { resolveIconGridSize, showsMetaToggle } from '@/lib/iconGridSize'
 import { computeVirtualGrid } from '@/lib/virtualGrid'
 import type { Dataset, Item } from '@/types'
 
@@ -451,10 +456,13 @@ export function ItemsPage({
 
   const keyword = debounced.trim()
 
-  // 一级模式只剩「全部物品 / ⭐ 收藏」；制作界面与集合都收进「分组」Popover。
+  /**
+   * 按下某个一级 tab 之前是否**已经**停在它上面：Radix Tabs 用 `mousedown` 切档，
+   * `click` 到达时状态已经变了，读不到「原来」的状态 —— 所以按下时先记一笔。
+   */
+  const pressedTabRef = useRef<'all' | 'favorites' | null>(null)
+  // 一级模式只有「全部物品 / ⭐ 收藏」两个 tab；制作界面与集合都收进「分组」Popover（收藏下不显示这个入口）。
   const isCollectionGroup = state.mode !== 'all' && state.mode !== 'game'
-  /** 一级 ToggleGroup 的当前值（制作界面 / 集合分组激活时为空，不选中任何一级模式）。 */
-  const activeTopMode = state.favoritesOnly ? 'favorites' : state.mode === 'all' ? 'all' : ''
   const collection =
     isCollectionGroup && state.collectionId ? COLLECTIONS_BY_ID.get(state.collectionId) ?? null : null
 
@@ -711,7 +719,15 @@ export function ItemsPage({
 
   // 格子尺寸由档位给：小尺寸强制只图标（`showMeta=false`），「隐藏 ID 和名称」只在有文字的档位生效。
   const showMeta = sizeSpec.showMeta && !hideItemMeta
-  const cellWidth = sizeSpec.cell
+  // 横条档：列数按最小宽度算出来（与鱼店 / 数据 ID 同一套），再把这一行的宽度平分成等宽格子。
+  const rowCols =
+    viewportWidth > 0
+      ? Math.max(1, Math.floor((viewportWidth + gapX) / (sizeSpec.cell + gapX)))
+      : null
+  const cellWidth =
+    rowCols && viewportWidth > 0
+      ? Math.floor((viewportWidth - (rowCols - 1) * gapX) / rowCols)
+      : sizeSpec.cell
   const cellHeight = showMeta ? sizeSpec.metaHeight : sizeSpec.cell
 
   const layout = computeVirtualGrid({
@@ -725,6 +741,8 @@ export function ItemsPage({
     viewportHeight: page.viewportHeight,
     scrollTop: page.scrollTop,
     overscanRows: 1,
+    // 横条已经自己算好列数（平分宽度），别让虚拟网格按格宽再推一遍、推出多一列
+    maxCols: rowCols ?? undefined,
   })
   const visible = ordered.slice(layout.startIndex, layout.endIndex)
 
@@ -927,11 +945,14 @@ export function ItemsPage({
                               <SelectItem value="sm" data-testid="dex-icon-size-sm">
                                 {t('iconSize.sm')}
                               </SelectItem>
+                              <SelectItem value="row" data-testid="dex-icon-size-row">
+                                {t('iconSize.row')}
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        {/* 小尺寸本来就只有图标：这个开关对它没意义，跟鱼店一样藏起来。 */}
-                        {sizeSpec.showMeta && (
+                        {/* 小档 / 横条没有「隐藏文字」这回事（一个只有图标、一个意义就是带文字），开关藏起来。 */}
+                        {showsMetaToggle(iconSize) && (
                           <DexSettingField
                             id="dex-hide-item-meta"
                             label={t('dex.hideItemMeta')}
@@ -1003,6 +1024,145 @@ export function ItemsPage({
                 </TooltipProvider>
   )
 
+  /** 搜索框本体（普通模式在左边独占，收藏模式在放大镜后面展开）。 */
+  const searchField = (
+    <SearchInput
+      ref={searchRef}
+      value={state.query}
+      onValueChange={(v) => {
+        patch({ query: v })
+        resetScroll()
+      }}
+      placeholder={t('dex.placeholder')}
+      aria-label={t('nav.items')}
+      history={searchHistory}
+      onHistorySelect={selectKeyword}
+      onHistoryRemove={removeSearchHistory}
+      historyOnInput={false}
+      leadingIcon={<Search className="size-4 text-muted-foreground" />}
+      // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
+      resultLabel={t('dex.resultCount', { n: ordered.length })}
+      shortcut
+      // 比正文小一档：搜索框是工具，别跟结果区的字抢大小
+      inputClassName="text-xs"
+    />
+  )
+
+  /** 工具行本体：正常在吸顶工具条里，宽屏时整块搬进顶栏中段。 */
+  const toolsRow = (
+    <>            {state.favoritesOnly ? (
+              <FavoritesKindToggle
+                kind={favoritesKind}
+                onChange={setFavoritesKind}
+                itemsCount={favoriteItems.length}
+                recipesCount={recipeFavs.length}
+              />
+            ) : (
+              // 制作界面的 11 个页签直接可选（分组抽屉里是同一份状态）；
+              // 这一格可以伸缩、自己横向滚（滚动条隐掉），右侧的搜索不跟着滚。
+              <TooltipProvider delayDuration={150}>
+                <div className="relative min-w-0 flex-1">
+                  <div
+                    ref={tabRowRef}
+                    className="flex items-center overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    <ToggleGroup
+                      variant="ghost"
+                      size="sm"
+                      value={gameMode ? effectiveGroupTab : ''}
+                      onValueChange={(next) => (next ? selectGameTab(next) : clearGroup())}
+                      aria-label={t('dex.tabs')}
+                      className="flex-nowrap"
+                    >
+                      {groupTabs.map((tab) => (
+                        // 图标 + 文字：分类名直接写出来，不用再悬停猜（按钮里已经有文字，也就不挂提示了）。
+                        <ToggleGroupItem
+                          key={tab.id}
+                          value={tab.id}
+                          size="sm"
+                          className="gap-1.5"
+                          aria-label={t(`dex.tab.${tab.id}`)}
+                          data-testid={`dex-game-tab-${tab.id}`}
+                        >
+                          {/* 30px 像素图缩到 16–20px：不开 pixelated 会糊成一团灰。 */}
+                          <img
+                            src={dexTabIconUrl(tab.id)}
+                            alt=""
+                            aria-hidden
+                            draggable={false}
+                            className="size-5 shrink-0 [image-rendering:pixelated] md:size-4"
+                          />
+                          <span>{t(`dex.tab.${tab.id}`)}</span>
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                    {/* 「分组」跟 11 个分类同一行（排在「其他」右边）、同一尺寸：
+                        幽灵按钮、`size="sm"`、同样的内边距，不加灰色药丸底。 */}
+                    <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t('dex.collectionGroup')}
+                      onClick={() => setGroupDrawerOpen(true)}
+                      className={cn(
+                        'max-w-56 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground',
+                        (collection || gameMode) && 'font-medium text-foreground',
+                      )}
+                    >
+                      <ListFilter className="size-3.5 shrink-0" />
+                      <span className="min-w-0 truncate">
+                        {collection
+                          ? t('dex.groupCurrent', {
+                              group: t(`dex.group.${collection.group}`),
+                              name:
+                                collection.group === 'range'
+                                  ? rangeTabLabel(collection)
+                                  : collection.name,
+                            })
+                          : gameMode
+                            ? t('dex.groupCurrent', {
+                                group: t('dex.tabs'),
+                                name: t(`dex.tab.${effectiveGroupTab}`),
+                              })
+                            : t('dex.collectionGroup')}
+                      </span>
+                      <ChevronDown className="size-3.5 shrink-0" />
+                    </Button>
+                    {(collection || gameMode) && (
+                      <IconAction
+                        size="icon-xs"
+                        label={t('dex.clearGroup')}
+                        icon={X}
+                        onClick={clearGroup}
+                      />
+                    )}
+                  </div>
+                  {/* 边界渐隐：贴到色块与页面底色一致，滑到头那一侧自动不画。 */}
+                  {tabRowEdges.start && (
+                    <div
+                      aria-hidden
+                      data-testid="dex-tab-fade-start"
+                      className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"
+                    />
+                  )}
+                  {tabRowEdges.end && (
+                    <div
+                      aria-hidden
+                      data-testid="dex-tab-fade-end"
+                      className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+                    />
+                  )}
+                </div>
+              </TooltipProvider>
+            )}
+
+            {/* 右侧搜索：两种模式一致（常驻输入框，`ml-auto` 贴行尾），不随 tab 带滚动，窄屏换到下一行。 */}
+            <div className="flex w-full shrink-0 items-center gap-1 sm:ml-auto sm:w-64">
+              {searchField}
+            </div>
+</>
+  )
+
   const fullscreenToggle = (
     <IconAction
       label={resultsFullscreen ? t('dex.exitFullscreen') : t('dex.enterFullscreen')}
@@ -1035,104 +1195,78 @@ export function ItemsPage({
               {fullscreenToggle}
             </TopBarActions>
           )}
-          {/* 工具条：不再套卡片，直接铺在页面上（与数据 ID 一致） */}
+          {/* 一级模式：全部物品 / ⭐ 收藏。做法与数据 ID 页左上角的数据源 tab 一致（line 变体、整行左侧起排）。 */}
           {!resultsFullscreen && (
-          <div
-            ref={toolbarRef}
-            className="sticky top-12 z-20 flex flex-col gap-2 bg-background p-1 sm:flex-row sm:flex-wrap sm:items-center"
-          >
-            <div className="flex w-full min-w-0 items-center gap-2 sm:flex-1">
-              <div className="w-full max-w-sm">
-                <SearchInput
-                  ref={searchRef}
-                  value={state.query}
-                  onValueChange={(v) => {
-                    patch({ query: v })
-                    resetScroll()
+            <Tabs
+              value={state.favoritesOnly ? 'favorites' : 'all'}
+              onValueChange={selectTopMode}
+              className="w-full shrink-0 gap-0 pt-1.5"
+            >
+              <TabsList aria-label={t('dex.filter')} variant="line" className="w-full justify-start">
+                {/* 再点一次已选中的「全部物品」= 重置（清空搜索词与分组、回到顶部）。
+                    Radix Tabs 在 **mousedown** 就切档，等 `click` 时状态已经变了 —— 所以「按下前是否
+                    已经在这个 tab 上」要在 `onPointerDown` 里记下来（见 `pressedTabRef`）。 */}
+                <TabsTrigger
+                  value="all"
+                  className="flex-none"
+                  data-testid="dex-mode-all"
+                  onPointerDown={() => {
+                    pressedTabRef.current = !state.favoritesOnly && state.mode === 'all' ? 'all' : null
                   }}
-                  placeholder={t('dex.placeholder')}
-                  aria-label={t('nav.items')}
-                  history={searchHistory}
-                  onHistorySelect={selectKeyword}
-                  onHistoryRemove={removeSearchHistory}
-                  historyOnInput={false}
-                  leadingIcon={<Search className="size-4 text-muted-foreground" />}
-                  // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
-                  resultLabel={t('dex.resultCount', { n: ordered.length })}
-                  shortcut
-                  inputClassName="text-sm"
-                />
-              </div>
-            </div>
-
-            {/* 手机上搜索独占第一行；筛选项从下一行开始。 */}
-            <div className="ml-0 flex w-full flex-wrap items-center gap-2 text-xs text-muted-foreground sm:ml-auto sm:w-auto">
-              <div className="flex min-w-0 items-center rounded-container bg-accent p-0.5">
-                <ToggleGroup
-                  type="single"
-                  value={activeTopMode}
-                  onValueChange={selectTopMode}
-                  aria-label={t('dex.filter')}
-                  variant="outline"
-                  size="sm"
-                  className="flex-wrap"
+                  onClick={() => {
+                    if (pressedTabRef.current === 'all') selectTopMode('')
+                  }}
                 >
-                  <ToggleGroupItem value="all" data-testid="dex-mode-all">
-                    {t('dex.collectionAll')}
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="favorites" data-testid="dex-favorites-toggle">
-                    <Star
-                      className={cn(activeTopMode === 'favorites' && 'fill-current')}
-                      data-icon="inline-start"
-                    />
-                    {t('dex.favorites')}
-                    <span className="tabular-nums opacity-70">{favoriteItems.length}</span>
-                  </ToggleGroupItem>
-                </ToggleGroup>
-                <Separator orientation="vertical" className="mx-1 h-4" />
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={t('dex.collectionGroup')}
-                  onClick={() => setGroupDrawerOpen(true)}
-                  className={cn(
-                    'max-w-64 gap-2 px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground',
-                    (collection || gameMode) && 'bg-card font-semibold text-foreground shadow-sm',
-                  )}
+                  {t('dex.collectionAll')}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="favorites"
+                  className="flex-none"
+                  data-testid="dex-favorites-toggle"
+                  // 再点一次已选中的「收藏」= 回到全部物品（与「全部物品再点一次 = 重置」对称）。
+                  onPointerDown={() => {
+                    pressedTabRef.current = state.favoritesOnly ? 'favorites' : null
+                  }}
+                  onClick={() => {
+                    if (pressedTabRef.current === 'favorites') selectTopMode('')
+                  }}
                 >
-                  <ListFilter className="size-3.5 text-muted-foreground" />
-                  <span className="min-w-0 truncate">
-                    {collection
-                      ? t('dex.groupCurrent', {
-                          group: t(`dex.group.${collection.group}`),
-                          name:
-                            collection.group === 'range'
-                              ? rangeTabLabel(collection)
-                              : collection.name,
-                        })
-                      : gameMode
-                        ? t('dex.groupCurrent', {
-                            group: t('dex.tabs'),
-                            name: t(`dex.tab.${effectiveGroupTab}`),
-                          })
-                        : t('dex.collectionGroup')}
-                  </span>
-                  <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-                </Button>
-                {(collection || gameMode) && (
-                  <IconAction label={t('dex.clearGroup')} icon={X} onClick={clearGroup} />
-                )}
-              </div>
-
+                  <Star
+                    className={cn(state.favoritesOnly && 'fill-current')}
+                    data-icon="inline-start"
+                  />
+                  {t('dex.favorites')}
+                  <span className="tabular-nums opacity-70">{favoriteItems.length}</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+          {/* 工具条：一行放「分类 tab 带 + 分组」和右侧的搜索（与数据 ID 的 tab 行同一套思路）。 */}
+          {/* 工具条：分类页签 + 分组 + 行尾搜索，整行吸在顶栏下面。 */}
+          {!resultsFullscreen && (
+            <div
+              ref={toolbarRef}
+              className="sticky top-12 z-20 flex flex-col gap-2 bg-background p-1 sm:flex-row sm:items-center"
+            >
+              {toolsRow}
             </div>
-          </div>
           )}
 
+          {/* 滚动时出现的「回到顶部」：全屏也是同一个滚动宿主（全屏容器自己）。 */}
+          <ScrollToTop
+            visible={page.scrollTop > SCROLL_TOP_THRESHOLD}
+            onClick={scrollToTop}
+          />
+
           {resultsFullscreen && (
-            <FullscreenDock label={t('dex.showActions')}>
-              {itemsSettingsControl}
-              {fullscreenToggle}
+            // 全屏只留「退出全屏」：常驻（不自动收起），尺寸比顶栏那颗小一档。
+            <FullscreenDock persistent label={t('dex.showActions')}>
+              <IconAction
+                size="icon-xs"
+                label={t('dex.exitFullscreen')}
+                icon={Minimize2}
+                onClick={() => setResultsFullscreen(false)}
+              />
             </FullscreenDock>
           )}
 
@@ -1164,72 +1298,6 @@ export function ItemsPage({
             onKeyDown={showFavoriteRecipes ? undefined : handleGridKeyDown}
             className="px-1 py-1"
           >
-            {/* 非收藏模式的左上角：制作界面的 11 个页签直接可选（与收藏的分类切换同一位置）。
-                分组抽屉里的「制作界面」分区照旧保留，两处是同一份状态。
-                窄屏不换行：整行横向滚动（滚动条隐掉，免得白占一行高度）。 */}
-            {!state.favoritesOnly && (
-              <div className="relative mb-2 px-1">
-                <div
-                  ref={tabRowRef}
-                  className="flex items-center overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                >
-                  <ToggleGroup
-                    size="sm"
-                    value={gameMode ? effectiveGroupTab : ''}
-                    onValueChange={(next) => (next ? selectGameTab(next) : clearGroup())}
-                    aria-label={t('dex.tabs')}
-                    className="flex-nowrap"
-                  >
-                    {groupTabs.map((tab) => (
-                      <ToggleGroupItem
-                        key={tab.id}
-                        value={tab.id}
-                        className="flex-none"
-                        data-testid={`dex-game-tab-${tab.id}`}
-                      >
-                        {t(`dex.tab.${tab.id}`)}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </div>
-                {/* 边界渐隐：贴到色块与页面底色一致，滑到头那一侧自动不画。 */}
-                {tabRowEdges.start && (
-                  <div
-                    aria-hidden
-                    data-testid="dex-tab-fade-start"
-                    className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"
-                  />
-                )}
-                {tabRowEdges.end && (
-                  <div
-                    aria-hidden
-                    data-testid="dex-tab-fade-end"
-                    className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
-                  />
-                )}
-              </div>
-            )}
-            {/* ⭐ 收藏模式的左上角：物品 / 合成表 两份收藏切换（数量直接写在按钮上）。 */}
-            {state.favoritesOnly && (
-              <div className="mb-2 flex items-center px-1">
-                <ToggleGroup
-                  size="sm"
-                  value={favoritesKind}
-                  onValueChange={(next) => next && setFavoritesKind(next as FavoriteKind)}
-                  aria-label={t('favorites.kind')}
-                >
-                  <ToggleGroupItem value="items" data-testid="dex-favorites-kind-items">
-                    {t('favorites.items', { n: favoriteItems.length })}
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="recipes" data-testid="dex-favorites-kind-recipes">
-                    {t('favorites.recipes', { n: recipeFavs.length })}
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="common" data-testid="dex-favorites-kind-common">
-                    {t('dex.common')}
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-            )}
             {showFavoriteRecipes ? (
               <FavoriteRecipesPanel
                 dataset={dataset}
@@ -1323,5 +1391,39 @@ export function ItemsPage({
         </div>
       </ItemDetailProvider>
     </ItemFavoritesProvider>
+  )
+}
+
+/** 收藏模式的三份收藏切换（物品 / 合成表 / 常用合成表）：与右侧的放大镜同一行。 */
+function FavoritesKindToggle({
+  kind,
+  onChange,
+  itemsCount,
+  recipesCount,
+}: {
+  kind: FavoriteKind
+  onChange: (kind: FavoriteKind) => void
+  itemsCount: number
+  recipesCount: number
+}) {
+  const { t } = useI18n()
+  return (
+    <ToggleGroup
+      size="sm"
+      value={kind}
+      onValueChange={(next) => next && onChange(next as FavoriteKind)}
+      aria-label={t('favorites.kind')}
+      className="min-w-0 flex-nowrap"
+    >
+      <ToggleGroupItem value="items" data-testid="dex-favorites-kind-items">
+        {t('favorites.items', { n: itemsCount })}
+      </ToggleGroupItem>
+      <ToggleGroupItem value="recipes" data-testid="dex-favorites-kind-recipes">
+        {t('favorites.recipes', { n: recipesCount })}
+      </ToggleGroupItem>
+      <ToggleGroupItem value="common" data-testid="dex-favorites-kind-common">
+        {t('favorites.commonRecipes')}
+      </ToggleGroupItem>
+    </ToggleGroup>
   )
 }

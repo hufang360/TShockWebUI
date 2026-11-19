@@ -1,16 +1,17 @@
 import { memo } from 'react'
 import { ItemIcon } from '@/components/ItemIcon'
 import { closeItemTooltip } from '@/lib/itemTooltipBus'
+import { RowTip } from '@/components/RowTip'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import type { IconGridSize } from '@/lib/iconGridSize'
+import { iconPlateClass, ROW_PLATE_CLASS, type IconGridSize } from '@/lib/iconGridSize'
 import type { Atlas, Item } from '@/types'
 
 /** 图标尺寸档位（页面设置 →「图标大小」）；档位名与容错来自 `lib/iconGridSize`，与数据 ID / 鱼店共用。 */
 export type ItemIconSize = IconGridSize
 
-/** 物品 ID 默认「中」：一屏能看更多件，图标也还看得清（页面设置可改成大 / 小）。 */
-export const DEFAULT_ITEM_ICON_SIZE: IconGridSize = 'md'
+/** 物品 ID 默认「横条」：图标在左、ID 与名称在右，一屏能看更多件也读得全（页面设置可改成小 / 中 / 大）。 */
+export const DEFAULT_ITEM_ICON_SIZE: IconGridSize = 'row'
 
 interface ItemSizeSpec {
   /**
@@ -65,7 +66,27 @@ export const ITEM_SIZES: Record<ItemIconSize, ItemSizeSpec> = {
     gapMobile: 8,
     gapY: 8,
   },
+  // 横条：图标在左、`#ID` 与名称在右竖排（名称单行截断）。最小格宽 160（与鱼店一致），实际按容器平分后更宽。
+  // 图标 / 底板与小档相同（32 / 40），格高 56 = 底板 40 + 上下各 8（与左右内边距、图标↔文字间距同一个 gap-2）。
+  row: {
+    icon: 32,
+    surface: 40,
+    cell: 160,
+    metaHeight: 56,
+    showMeta: true,
+    gapDesktop: 8,
+    gapMobile: 8,
+    gapY: 8,
+  },
 }
+
+/**
+ * 横条格子：横向排布（图标左、文字右），所以不能复用 `CELL_CLASS` 的 `grid place-items-center`。
+ * 其余反馈与竖排格子一致：整格微上浮、不铺整格底色。
+ */
+/** 横条格子的 hover 底色由 `ROW_PLATE_CLASS` 给（不能写 `hover:bg-transparent`，那会把底板盖成透明）。 */
+const ROW_CELL_CLASS =
+  'group/cell flex cursor-pointer items-center gap-2 p-2 text-left transition duration-150 hover:-translate-y-0.5 hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
 
 /** 兼容旧导入路径：大档图标框（= 游戏 `sizeLimit` 32 的 2 倍）。 */
 export const ICON_SIZE = ITEM_SIZES.lg.icon
@@ -77,8 +98,9 @@ export const ICON_SIZE = ITEM_SIZES.lg.icon
 export const CELL_CLASS =
   'group/cell grid cursor-pointer place-items-center gap-1 rounded-container transition duration-150 hover:-translate-y-0.5 hover:bg-transparent focus-visible:-translate-y-0.5 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring '
 export const CELL_SELECTED = 'bg-primary/20'
+/** 图标区（格子底板）：小档 / 横条垫底板，配色 / hover 都来自 `lib/iconGridSize` 的 `iconPlateClass`。 */
 export const ICON_SURFACE_CLASS =
-  'relative flex items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10 group-focus-visible/cell:bg-primary/10'
+  'relative flex items-center justify-center transition'
 
 /**
  * 单个格子：**点击整张卡片打开详情抽屉**；**图标区域悬停显示物品提示**。
@@ -113,7 +135,25 @@ export const DexCell = memo(function DexCell({
   onSelect: (item: Item) => void
 }) {
   const spec = ITEM_SIZES[size]
-  const showMeta = spec.showMeta && !hideMeta
+  const row = size === 'row'
+  // 横条的意义就是带文字（开关在横条档下也隐藏了），所以忽略 `hideMeta`。
+  const showMeta = row || (spec.showMeta && !hideMeta)
+  const surface = (
+    <span
+      data-testid="dex-icon-surface"
+      className={cn(ICON_SURFACE_CLASS, iconPlateClass(size))}
+      style={{ width: spec.surface, height: spec.surface }}
+    >
+      {/* 横条档的提示挂在整条格子上（`RowTip`），图标自己就别再挂一个 */}
+      <ItemIcon
+        item={item}
+        atlas={atlas}
+        size={spec.icon}
+        hideDetailLink
+        tooltip={!row}
+      />
+    </span>
+  )
   return (
     <Button
       variant="ghost"
@@ -124,23 +164,37 @@ export const DexCell = memo(function DexCell({
         onSelect(item)
       }}
       data-dex-index={index}
-      className={cn(CELL_CLASS, selected && CELL_SELECTED)}
+      data-size={size}
+      className={cn(
+        row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS,
+        selected && CELL_SELECTED,
+      )}
       style={{ width, height }}
     >
-      <span
-        data-testid="dex-icon-surface"
-        className={ICON_SURFACE_CLASS}
-        style={{ width: spec.surface, height: spec.surface }}
-      >
-        <ItemIcon item={item} atlas={atlas} size={spec.icon} hideDetailLink />
-      </span>
-      {showMeta && (
-        <span className="font-pixel text-2xs leading-none text-muted-foreground">{item.id}</span>
-      )}
-      {showMeta && (
-        <span className="w-full truncate text-center text-xs leading-4 text-foreground">
-          {item.name}
-        </span>
+      {showMeta && row ? (
+        <RowTip item={item} atlas={atlas} itemName={item.name} id={item.id} name={item.name}>
+          {surface}
+          <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+            <span className="font-pixel text-2xs leading-none text-muted-foreground">
+              {item.id}
+            </span>
+            <span className="w-full truncate text-xs leading-4 text-foreground">{item.name}</span>
+          </span>
+        </RowTip>
+      ) : (
+        <>
+          {surface}
+          {showMeta && (
+            <span className="font-pixel text-2xs leading-none text-muted-foreground">
+              {item.id}
+            </span>
+          )}
+          {showMeta && (
+            <span className="w-full truncate text-center text-xs leading-4 text-foreground">
+              {item.name}
+            </span>
+          )}
+        </>
       )}
     </Button>
   )

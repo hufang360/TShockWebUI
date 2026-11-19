@@ -4,8 +4,19 @@ import { I18nProvider } from '@/lib/i18n'
 import { makeDataset } from '@/test/fixtures'
 import type { Item } from '@/types'
 import { resetDexState } from '@/lib/dexState'
+import {
+  ICON_PLATE_CLASS,
+  ICON_PLATE_DARK_CLASS,
+  ICON_PLATE_HOVER_CLASS,
+  ROW_PLATE_CLASS,
+} from '@/lib/iconGridSize'
 import { recipeFavoriteKey } from '@/lib/recipeFavorites'
 import { ItemsPage } from './ItemsPage'
+
+/** 预置「图标大小」档位：默认已改成横条，验小 / 中 / 大档要先塞进去。 */
+function seedIconSize(size: 'lg' | 'md' | 'sm' | 'row') {
+  localStorage.setItem('tswui:dex:iconSize', JSON.stringify(size))
+}
 
 function makeItem(id: number): Item {
   return {
@@ -92,23 +103,23 @@ describe('ItemsPage 图鉴', () => {
     expect(document.activeElement).not.toBe(screen.getByLabelText('物品 ID'))
   })
 
-  it('默认中档：手机与桌面一致（56 宽 / 图标 48），隐藏 ID 和名称后只显示图标', () => {
+  it('默认横条：手机与桌面一致（图标 32 / 格高 56），横条不带「隐藏 ID 和名称」开关', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
     renderPage(makeItems(5))
     const first = cell('物品1')
-    expect(first.style.width).toBe('56px')
-    expect(first.style.height).toBe('90px')
+    expect(first.dataset.size).toBe('row')
+    // jsdom 量不到容器宽度 → 格宽退回最小值 160（真实浏览器里按列数平分整行）
+    expect(first.style.width).toBe('160px')
+    expect(first.style.height).toBe('56px')
     expect((within(first).getByRole('img', { name: '物品1' }) as HTMLCanvasElement).style.width).toBe(
-      '48px',
+      '32px',
     )
     expect(within(first).getByText('1')).toBeTruthy()
     expect(within(first).getByText('物品1')).toBeTruthy()
 
+    // 横条的意义就是带文字：这个档位下没有「隐藏 ID 和名称」开关
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
-    fireEvent.click(screen.getByLabelText('隐藏 ID 和名称'))
-    expect(cell('物品1').style.width).toBe('56px')
-    expect(cell('物品1').style.height).toBe('56px')
-    expect(within(cell('物品1')).queryByText('1')).toBeNull()
+    expect(screen.queryByLabelText('隐藏 ID 和名称')).toBeNull()
   })
 
   it('详情里的提示 ⭐ 可收藏物品（写入 tswui:itemFavorites）', () => {
@@ -139,7 +150,8 @@ describe('ItemsPage 图鉴', () => {
     const group = input.closest('[data-slot="input-group"]')
     expect(group).toBeTruthy()
     expect(group?.querySelector('.lucide-search')).toBeTruthy()
-    expect(group?.parentElement?.parentElement?.className).toContain('max-w-sm')
+    // 搜索固定在工具条右侧（桌面 w-64，窄屏整行）
+    expect(group?.parentElement?.parentElement?.className).toContain('sm:w-64')
     // 放大镜在左、结果数在输入框右侧（不再单独摆在框外面）。
     const addons = group?.querySelectorAll('[data-slot="input-group-addon"]')
     expect(addons?.[0]?.getAttribute('data-align')).toBe('inline-start')
@@ -149,7 +161,7 @@ describe('ItemsPage 图鉴', () => {
     const count = screen.getByText('3 个结果')
     expect(group?.contains(count)).toBe(true)
 
-    // 工具条不再套卡片，吸在顶栏下面；手机分两行：搜索行在上，筛选 / 分组 / 设置行在下。
+    // 工具条不再套卡片，吸在顶栏下面；手机分两行（分类带在上、搜索在下），桌面同一行。
     expect(document.querySelector('[data-slot="card-body"]')).toBeNull()
     const toolbar = group?.closest('.sticky')
     expect(toolbar?.className).toContain('top-12')
@@ -178,6 +190,7 @@ describe('ItemsPage 图鉴', () => {
   })
 
   it('鼠标滑过格子图标显示物品提示', async () => {
+    seedIconSize('md')
     renderPage(makeItems(3))
     const canvas = within(cell('物品1')).getByRole('img', { name: '物品1' })
     fireEvent.mouseOver(canvas)
@@ -237,8 +250,15 @@ describe('ItemsPage 图鉴', () => {
     // 全屏时页面自己就是滚动区（不再借 `<main>`）。
     expect(page.className).toContain('overflow-y-auto')
     expect(screen.queryByLabelText('物品 ID')).toBeNull()
-    expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '退出全屏' })).toBeTruthy()
+    // 全屏不再显示「页面设置」（要看设置先退出全屏）
+    expect(screen.queryByRole('button', { name: '页面设置' })).toBeNull()
+    const exit = screen.getByRole('button', { name: '退出全屏' })
+    expect(exit).toBeTruthy()
+    // 常驻：不进收起态（收起态只剩一条可点的竖条按钮），也不会自己消失
+    expect(screen.queryByRole('button', { name: '显示操作' })).toBeNull()
+    // 比顶栏那颗小一档：icon-xs（手机 36 / 桌面 24）
+    expect(exit.className).toContain('size-9')
+    expect(exit.className).toContain('md:size-6')
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(page.dataset.fullscreen).toBeUndefined()
@@ -265,6 +285,7 @@ describe('ItemsPage 图鉴', () => {
   })
 
   it('网格虚拟化：只挂可视行，滚动后切片随之下移', async () => {
+    seedIconSize('md')
     renderPage(makeItems(1000))
     const list = screen.getByTestId('dex-list')
     const names = () => gridIcons().map((el) => el.getAttribute('aria-label'))
@@ -289,6 +310,7 @@ describe('ItemsPage 图鉴', () => {
   })
 
   it('格子默认显示 ID 和名称；开启隐藏后仅显示图标，hover 整格上浮', () => {
+    seedIconSize('md')
     renderPage(makeItems(10))
     let first = cell('物品1')
     const canvas = within(first).getByRole('img', { name: '物品1' }) as HTMLCanvasElement
@@ -310,16 +332,63 @@ describe('ItemsPage 图鉴', () => {
     const surface = within(first).getByTestId('dex-icon-surface')
     expect(first.className).toContain('cursor-pointer')
     expect(first.className).toContain('hover:-translate-y-0.5')
-    // 底色只在图标区（hover 时），格子本身不再铺色；图标区尺寸随档位（默认中 = 56）。
+    // 底色只在图标区（格子本身不铺色）；中档**不垫底板**，hover / 聚焦只给一层主色淡底，
+    // 图标区尺寸随档位（默认中 = 56）。
     expect(first.className).not.toContain('hover:bg-primary/10')
     expect(surface.style.width).toBe('56px')
     expect(surface.style.height).toBe('56px')
+    expect(surface.className).not.toContain(ICON_PLATE_CLASS)
+    // 中档亮色不垫底板，但暗色下仍垫（同样靠提亮给 hover 反馈）。
+    expect(surface.className).toContain(ICON_PLATE_DARK_CLASS)
     expect(surface.className).toContain('group-hover/cell:bg-primary/10')
     expect(surface.className).not.toContain('bg-muted/50')
     expect(surface.className).not.toContain('ring-border/50')
   })
 
-  it('图标大小三档：默认中，大 72 / 小 40 只显示图标；刷新后记住；恢复默认回到「中」', async () => {
+  it('图标大小「横条」：图标在左、ID 与名称在右竖排，名称单行截断，最小格宽 160 / 格高 56', async () => {
+    renderPage(makeItems(6))
+    const settings = () => {
+      if (!screen.queryByTestId('dex-settings-popover')) {
+        fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+      }
+      return screen.getByTestId('dex-settings-popover')
+    }
+    fireEvent.click(within(settings()).getByRole('combobox', { name: '图标大小' }))
+    fireEvent.click(screen.getByTestId('dex-icon-size-row'))
+
+    const item = cell('物品1')
+    expect(item.dataset.size).toBe('row')
+    // jsdom 量不到容器宽度 → 格宽退回最小值 160（真实浏览器里按列数平分整行）；
+    // 格高 56 = 底板 40 + 上下各 8（与左右内边距同一个 gap-2）
+    expect(item.style.width).toBe('160px')
+    expect(item.style.height).toBe('56px')
+    // 横排：图标区在左、文字块在右
+    expect(item.className).toContain('flex')
+    // 底板铺在**整条格子**上（图标 + 编号 + 名称一块底），图标方块自己不上色
+    expect(item.className).toContain(ROW_PLATE_CLASS)
+    const surface = within(item).getByTestId('dex-icon-surface')
+    expect(surface.style.width).toBe('40px')
+    expect(surface.className).not.toContain(ICON_PLATE_CLASS)
+    // 文字块是竖排两行：ID 在上、名称在下（名称单行截断）
+    const name = within(item).getByText('物品1')
+    expect(name.className).toContain('truncate')
+    const text = name.parentElement as HTMLElement
+    expect(text.className).toContain('flex-col')
+    expect(text.children).toHaveLength(2)
+    expect(text.children[0].textContent).toBe('1')
+    // 横条的意义就是带文字：这个档位下「隐藏 ID 和名称」开关不出现。
+    expect(within(settings()).queryByLabelText('隐藏 ID 和名称')).toBeNull()
+    // 之前在其他档位勾过「隐藏」也不影响横条（切档不该让文字消失）。
+    fireEvent.click(within(settings()).getByRole('combobox', { name: '图标大小' }))
+    fireEvent.click(screen.getByTestId('dex-icon-size-md'))
+    fireEvent.click(within(settings()).getByLabelText('隐藏 ID 和名称'))
+    await waitFor(() => expect(within(cell('物品1')).queryByText('物品1')).toBeNull())
+    fireEvent.click(within(settings()).getByRole('combobox', { name: '图标大小' }))
+    fireEvent.click(screen.getByTestId('dex-icon-size-row'))
+    expect(within(cell('物品1')).getByText('物品1')).toBeTruthy()
+  })
+
+  it('图标大小：默认「横条」，大 72 / 小 40 只显示图标；刷新后记住；恢复默认回到「横条」', async () => {
     const first = renderPage(makeItems(6))
     const settings = () => {
       if (!screen.queryByTestId('dex-settings-popover')) {
@@ -334,13 +403,14 @@ describe('ItemsPage 图鉴', () => {
     const gridGap = () =>
       screen.getByTestId('dex-list').querySelector<HTMLElement>('.grid')?.style
 
-    // 默认「中」：格子 56 / 90，图标 48
-    expect(cell('物品1').style.width).toBe('56px')
-    expect(cell('物品1').style.height).toBe('90px')
+    // 默认「横条」：图标 32、格高 56、最小格宽 160，列间距 8
+    expect(cell('物品1').dataset.size).toBe('row')
+    expect(cell('物品1').style.width).toBe('160px')
+    expect(cell('物品1').style.height).toBe('56px')
     expect(
       (within(cell('物品1')).getByRole('img', { name: '物品1' }) as HTMLCanvasElement).style.width,
-    ).toBe('48px')
-    expect(gridGap()?.columnGap).toBe('12px')
+    ).toBe('32px')
+    expect(gridGap()?.columnGap).toBe('8px')
 
     // 大：格子 72 / 106，图标 64，列间距 16
     pick('dex-icon-size-lg')
@@ -357,6 +427,10 @@ describe('ItemsPage 图鉴', () => {
     expect(small.style.height).toBe('40px')
     expect(within(small).queryByText('物品1')).toBeNull()
     expect(within(small).queryByText('1')).toBeNull()
+    // 小档只有图标，也是唯一垫底板的档位（密集排列时分格子用）。
+    const smallSurface = within(small).getByTestId('dex-icon-surface')
+    expect(smallSurface.className).toContain(ICON_PLATE_CLASS)
+    expect(smallSurface.className).toContain(ICON_PLATE_HOVER_CLASS)
     expect(gridGap()?.columnGap).toBe('8px')
     expect(within(settings()).queryByLabelText('隐藏 ID 和名称')).toBeNull()
     const stored = () => JSON.parse(localStorage.getItem('tswui:dex:iconSize') ?? 'null')
@@ -367,10 +441,11 @@ describe('ItemsPage 图鉴', () => {
     renderPage(makeItems(6))
     expect(cell('物品1').style.width).toBe('40px')
 
-    // 恢复默认 → 回到「中」
+    // 恢复默认 → 回到「横条」
     fireEvent.click(within(settings()).getByRole('button', { name: '恢复默认' }))
-    expect(cell('物品1').style.width).toBe('56px')
-    expect(stored()).toBe('md')
+    expect(cell('物品1').dataset.size).toBe('row')
+    expect(cell('物品1').style.width).toBe('160px')
+    expect(stored()).toBe('row')
   })
 
   it('详情：默认不显示，点格子后弹出 dialog（tips + 复制 + wiki）', () => {
@@ -788,6 +863,8 @@ describe('ItemsPage 图鉴', () => {
     const input = screen.getByLabelText('物品 ID') as HTMLInputElement
     fireEvent.change(input, { target: { value: '物品1' } })
     expect(input.value).toBe('物品1')
+    // Tabs 用 mousedown 切档、「再点一次 = 重置」靠 pointerdown + click 的组合，所以两个都要发
+    fireEvent.pointerDown(screen.getByTestId('dex-mode-all'))
     fireEvent.click(screen.getByTestId('dex-mode-all'))
     expect(input.value).toBe('')
   })
@@ -832,10 +909,15 @@ describe('ItemsPage 图鉴', () => {
     // 29 = 消耗品+材料，75 = 材料，4956 = 武器（见 test/fixtures.ts 的 itemGroups）
     renderPage([makeItem(29), makeItem(75), makeItem(4956)])
     const names = () => gridIcons().map((el) => el.getAttribute('aria-label'))
-    const tabs = within(screen.getByTestId('dex-list')).getByRole('radiogroup', {
-      name: '制作界面',
-    })
+    const tabs = screen.getByRole('radiogroup', { name: '制作界面' })
     expect(within(tabs).getAllByRole('radio')).toHaveLength(11)
+    // 幽灵按钮 + 图标 + 文字：分类名直接写出来，图标来自 data/dex-tab-icons
+    expect(tabs.getAttribute('data-variant')).toBe('ghost')
+    const weaponsTab = within(tabs).getByRole('radio', { name: '武器' })
+    expect(weaponsTab.textContent).toBe('武器')
+    expect(weaponsTab.querySelector('img')?.getAttribute('src')).toBe(
+      '/data/dex-tab-icons/weapons.png',
+    )
     // 窄屏不折行：整行横向滚动（不挤成多行，也不给 11 个按钮留占位）
     expect(tabs.className).toContain('flex-nowrap')
     expect(tabs.className).not.toContain('flex-wrap')
@@ -854,18 +936,31 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.getByLabelText('分组').textContent).toBe('分组')
 
     // 收藏模式换回收藏的分类切换，页签行让位
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
     expect(
-      within(screen.getByTestId('dex-list')).queryByRole('radiogroup', { name: '制作界面' }),
+      screen.queryByRole('radiogroup', { name: '制作界面' }),
     ).toBeNull()
     expect(screen.getByTestId('dex-favorites-kind-items')).toBeTruthy()
   })
 
+  it('分类按钮显示图标 + 文字（不再挂悬停提示，也没有 Tooltip 抢 data-state）', async () => {
+    renderPage([makeItem(29)])
+    const tabs = screen.getByRole('radiogroup', { name: '制作界面' })
+    const weapons = within(tabs).getByRole('radio', { name: '武器' })
+    // 图标按原图显示（亮色不反色），文字就是分类名
+    expect(weapons.querySelector('img')?.className).not.toContain('invert')
+    expect(weapons.textContent).toBe('武器')
+
+    fireEvent.pointerMove(weapons, { pointerType: 'mouse' })
+    fireEvent.pointerEnter(weapons, { pointerType: 'mouse' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    // 没有 Tooltip 包一层：选中态不会再被 `data-state` 冲掉
+    expect(weapons.getAttribute('data-state')).toBe('off')
+  })
+
   it('页签行滑出边界时两侧渐隐，滑到头就收起', () => {
     renderPage([makeItem(29), makeItem(75), makeItem(4956)])
-    const row = within(screen.getByTestId('dex-list')).getByRole('radiogroup', {
-      name: '制作界面',
-    }).parentElement!
+    const row = screen.getByRole('radiogroup', { name: '制作界面' }).parentElement!
     // jsdom 不做布局：手动给出可视宽 / 内容宽 / 滚动位置
     Object.defineProperty(row, 'clientWidth', { configurable: true, value: 200 })
     Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 600 })
@@ -920,17 +1015,49 @@ describe('ItemsPage 图鉴', () => {
 
     expect(names().sort()).toEqual(['物品1', '物品29', '物品4956', '物品75'])
 
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
     expect(names().sort()).toEqual(['物品29', '物品75'])
-    // 收藏内也支持搜索，但搜索只在收藏范围内
+    // 收藏内也支持搜索，但搜索只在收藏范围内（与「全部物品」同一处理：搜索框常驻）
     fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: 'Item75' } })
     await waitFor(() => expect(names()).toEqual(['物品75']))
 
     // 清空搜索 + 关掉收藏 → 回到全部物品
     fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: '' } })
     await waitFor(() => expect(names().sort()).toEqual(['物品29', '物品75']))
+    // 再点一次已选中的「收藏」= 回到全部物品（pointerdown 记录「按下前已选中」）
+    fireEvent.pointerDown(screen.getByTestId('dex-favorites-toggle'))
     fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
     expect(names().sort()).toEqual(['物品1', '物品29', '物品4956', '物品75'])
+  })
+
+  it('收藏：搜索与「全部物品」同一处理（常驻在 tab 行右侧），第三个分类叫「常用合成表」', () => {
+    renderPage(makeItems(3))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
+
+    expect(screen.getByTestId('dex-favorites-kind-common').textContent).toBe('常用合成表')
+    // 搜索框常驻（不再藏在放大镜后面），并且与分类 tab 在同一行
+    const input = screen.getByLabelText('物品 ID')
+    expect(input).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '搜索收藏' })).toBeNull()
+    const kindRow = screen.getByTestId('dex-favorites-kind-items').closest('div')?.parentElement
+    expect(kindRow?.contains(input)).toBe(true)
+    // 搜索贴在行尾（`ml-auto`），不是紧跟在 tab 后面
+    expect(input.closest('.sm\\:ml-auto')).toBeTruthy()
+
+    // 退出收藏模式后仍是同一个搜索框
+    fireEvent.mouseDown(screen.getByTestId('dex-mode-all'))
+    expect(screen.getByLabelText('物品 ID')).toBeTruthy()
+  })
+
+  it('收藏下不显示「分组」入口（收藏与分组 / 集合无关）', () => {
+    renderPage(makeItems(3))
+    expect(screen.getByLabelText('分组')).toBeTruthy()
+
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
+    expect(screen.queryByLabelText('分组')).toBeNull()
+
+    fireEvent.mouseDown(screen.getByTestId('dex-mode-all'))
+    expect(screen.getByLabelText('分组')).toBeTruthy()
   })
 
   it('「收藏 → 常用」：把常用清单的合成记录平铺出来（不分物品分组）', async () => {
@@ -954,7 +1081,7 @@ describe('ItemsPage 图鉴', () => {
       },
     })
     renderPage(dataset)
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
     fireEvent.click(screen.getByTestId('dex-favorites-kind-common'))
 
     // 平铺：没有分组标题 / 小标题，只有合成记录行。
@@ -995,7 +1122,7 @@ describe('ItemsPage 图鉴', () => {
       JSON.stringify([{ key: recipeFavoriteKey(recipe), ts: 1 }]),
     )
     renderPage(dataset)
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
 
     // 默认看物品（这里没收藏物品 → 空态），切换按钮带数量。
     expect(screen.getByTestId('dex-favorites-kind-items').textContent).toBe('物品（0）')
@@ -1013,21 +1140,21 @@ describe('ItemsPage 图鉴', () => {
     expect(row.textContent).toContain('图格 17')
 
     // 退出收藏模式再回来：回到「物品」，不会停在合成表。
-    fireEvent.click(screen.getByTestId('dex-mode-all'))
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-mode-all'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
     expect(screen.getByTestId('dex-favorites-kind-items').getAttribute('data-state')).toBe('on')
   })
 
   it('收藏模式没有合成记录时，合成表里是空态提示', () => {
     renderPage(makeItems(3))
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
     fireEvent.click(screen.getByTestId('dex-favorites-kind-recipes'))
     expect(screen.getByText('还没有收藏合成记录')).toBeTruthy()
   })
 
   it('收藏夹为空时提示「收藏夹是空的」（不是「没有匹配的物品」）', () => {
     renderPage(makeItems(5))
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
     expect(screen.getByText('收藏夹是空的')).toBeTruthy()
     expect(screen.queryByText('没有匹配的物品')).toBeNull()
   })
@@ -1035,7 +1162,7 @@ describe('ItemsPage 图鉴', () => {
   it('收藏有记录但搜索没匹配：提示「没有匹配的物品」', async () => {
     localStorage.setItem('tswui:itemFavorites', JSON.stringify([{ id: 1, ts: 1 }]))
     renderPage(makeItems(5))
-    fireEvent.click(screen.getByTestId('dex-favorites-toggle'))
+    fireEvent.mouseDown(screen.getByTestId('dex-favorites-toggle'))
     fireEvent.change(screen.getByLabelText('物品 ID'), { target: { value: 'Item999' } })
     await waitFor(() => expect(screen.getByText('没有匹配的物品')).toBeTruthy())
   })
@@ -1048,8 +1175,10 @@ describe('ItemsPage 图鉴', () => {
         />
       </I18nProvider>,
     )
-    expect(screen.getByTestId('dex-mode-all').getAttribute('data-state')).toBe('on')
-    // 工具条里只有「全部物品 / 收藏」；制作界面页签在结果区左上角，不是工具条按钮
+    // 一级模式是 Tabs（数据 ID 页同一套）：选中的 tab 是 `active`
+    expect(screen.getByTestId('dex-mode-all').getAttribute('data-state')).toBe('active')
+    expect(screen.getByRole('tablist', { name: '筛选' })).toBeTruthy()
+    // 制作界面页签在结果区左上角（第二个 ToggleGroup 行），不是工具条按钮
     expect(screen.queryByRole('button', { name: /^制作界面/ })).toBeNull()
   })
 
@@ -1186,6 +1315,7 @@ describe('ItemsPage 图鉴', () => {
   })
 
   it('页面设置 Popover 集中显示三项设置与 info 提示，详情抽屉不再重复', async () => {
+    seedIconSize('md')
     renderPage(makeItems(3))
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
     const popover = screen.getByTestId('dex-settings-popover')
@@ -1207,6 +1337,7 @@ describe('ItemsPage 图鉴', () => {
   })
 
   it('页面设置「恢复默认」：视图开关回到默认值，打开时焦点不落在它身上', async () => {
+    seedIconSize('md')
     renderPage(makeItems(3))
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
     const popover = screen.getByTestId('dex-settings-popover')
@@ -1225,7 +1356,8 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(within(popover).getByRole('button', { name: '恢复默认' }))
     const state = (label: string) =>
       within(popover).getByLabelText(label).getAttribute('data-state')
-    expect(state('隐藏 ID 和名称')).toBe('unchecked')
+    // 恢复默认把图标大小也改回「横条」→ 那个档位下没有「隐藏 ID 和名称」开关
+    expect(within(popover).queryByLabelText('隐藏 ID 和名称')).toBeNull()
     expect(state('表格视图')).toBe('unchecked')
     expect(state('显示物品名称')).toBe('unchecked')
     expect(state('两列视图-详情页')).toBe('unchecked')

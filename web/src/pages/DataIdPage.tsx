@@ -5,7 +5,6 @@ import {
   BuffGrid,
   BuffTableLayout,
   DATA_ID_DEFAULT_SIZES,
-  DATA_ID_SIZES,
   DataDetail,
   DataTableLayout,
   iconGridStyle,
@@ -18,6 +17,7 @@ import { IconAction } from '@/components/IconAction'
 import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
 import { ContentScrim } from '@/components/ContentScrim'
 import { FullscreenDock } from '@/components/FullscreenDock'
+import { ScrollToTop, SCROLL_TOP_THRESHOLD } from '@/components/ScrollToTop'
 import { SearchInput } from '@/components/SearchInput'
 import {
   Button,
@@ -70,7 +70,7 @@ import {
   isBossNpc,
   npcCollectionName,
 } from '@/lib/npcCollections'
-import { resolveIconGridSize } from '@/lib/iconGridSize'
+import { resolveIconGridSize, showsMetaToggle } from '@/lib/iconGridSize'
 import { StorageKeys } from '@/lib/storage'
 import type { TileWallData, TileWallEntry } from '@/types'
 
@@ -121,7 +121,6 @@ export function DataIdPage({
   // 像素定义在 `DataIdViews` 的 `DATA_ID_SIZES`。
   const [rawIconSize, setIconSize] = useLocalState<string>(StorageKeys.dataIdIconSize, '')
   const iconSize = rawIconSize ? resolveIconGridSize(rawIconSize) : DATA_ID_DEFAULT_SIZES[kind]
-  const sizeSpec = DATA_ID_SIZES[iconSize]
   const mobileGrid = useMediaQuery('(max-width: 767px)')
   const [twoCols, setTwoCols] = useState(initial.twoCols)
   // 「两列表格」只在 xl（≥1280px）真能排成两列；小屏只有一列 → 隐藏开关，也按单列渲染。
@@ -479,11 +478,14 @@ export function DataIdPage({
                   <SelectItem value="sm" data-testid="dataid-icon-size-sm">
                     {t('iconSize.sm')}
                   </SelectItem>
+                  <SelectItem value="row" data-testid="dataid-icon-size-row">
+                    {t('iconSize.row')}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {/* 小尺寸本来就只有图标：这个开关对它没意义。 */}
-            {sizeSpec.showMeta && (
+            {/* 小档只放图标、横条的意义就是带文字：这两种档位下开关没意义。 */}
+            {showsMetaToggle(iconSize) && (
               <Field orientation="horizontal" className="w-auto">
                 <Checkbox
                   id="dataid-hide-meta"
@@ -620,10 +622,17 @@ export function DataIdPage({
           {fullscreenControl}
         </TopBarActions>
       )}
+      <ScrollToTop visible={scroller.scrollTop > SCROLL_TOP_THRESHOLD} onClick={scrollToTop} />
+
       {resultsFullscreen ? (
-        <FullscreenDock label={t('dataId.showActions')}>
-          {settingsControl}
-          {fullscreenControl}
+        // 全屏只留「退出全屏」：常驻（不自动收起），尺寸比顶栏那颗小一档。
+        <FullscreenDock persistent label={t('dataId.showActions')}>
+          <IconAction
+            size="icon-xs"
+            label={t('dataId.exitFullscreen')}
+            icon={Minimize2}
+            onClick={() => setResultsFullscreen(false)}
+          />
         </FullscreenDock>
       ) : (
         <>
@@ -658,34 +667,8 @@ export function DataIdPage({
           >
             {/* 工具行：不再套卡片，直接铺在页面上 */}
             <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 p-1">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <div className="w-full max-w-sm min-w-0">
-                  <SearchInput
-                    ref={searchRef}
-                    value={query}
-                    onValueChange={changeQuery}
-                    placeholder={
-                      kind === 'npc'
-                        ? t('dataId.search.npc')
-                        : kind === 'tile'
-                          ? t('dataId.search.tile')
-                          : kind === 'wall'
-                            ? t('dataId.search.wall')
-                            : t('dataId.search.buff')
-                    }
-                    aria-label={t('nav.dataId')}
-                    history={searchHistory}
-                    onHistoryRemove={removeSearchHistory}
-                    leadingIcon={<Search className="size-4 text-muted-foreground" />}
-                    // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
-                    resultLabel={t('dataId.resultCount', { n: total })}
-                    shortcut
-                    inputClassName="text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-1 sm:w-auto">
+              {/* 左：NPC 分类 / 视图开关（原来在右侧）。 */}
+              <div className="flex min-w-0 flex-wrap items-center gap-1">
                 {kind === 'npc' && (
                   <Tabs
                     value={npcFilter || 'all'}
@@ -711,6 +694,32 @@ export function DataIdPage({
                     </TabsList>
                   </Tabs>
                 )}
+              </div>
+
+              {/* 右：搜索框（与物品 ID 一致，放在行尾；窄屏独占一行）。 */}
+              <div className="ml-auto w-full min-w-0 sm:w-64">
+                <SearchInput
+                  ref={searchRef}
+                  value={query}
+                  onValueChange={changeQuery}
+                  placeholder={
+                    kind === 'npc'
+                      ? t('dataId.search.npc')
+                      : kind === 'tile'
+                        ? t('dataId.search.tile')
+                        : kind === 'wall'
+                          ? t('dataId.search.wall')
+                          : t('dataId.search.buff')
+                  }
+                  aria-label={t('nav.dataId')}
+                  history={searchHistory}
+                  onHistoryRemove={removeSearchHistory}
+                  leadingIcon={<Search className="size-4 text-muted-foreground" />}
+                  // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
+                  resultLabel={t('dataId.resultCount', { n: total })}
+                  shortcut
+                  inputClassName="text-xs"
+                />
               </div>
             </div>
           </div>

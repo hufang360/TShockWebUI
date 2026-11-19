@@ -70,6 +70,28 @@ type SearchInputProps = Omit<ComponentProps<'input'>, 'onChange' | 'value'> & {
  * 带 `history` 时：**打字**（或点右侧历史按钮）会在下方下拉框里显示「最近搜索」，
  * 可像代码补全那样边输边筛；**聚焦本身不弹**（页面进入会自动聚焦，见 `historyOnFocus`）。
  */
+/**
+ * 这一下 `/` 该不该由搜索框接管：不在输入类元素里、没被别处 preventDefault、也没有浮层开着。
+ * 抽出来是因为**收起的搜索框不存在时**（收藏模式的放大镜）也要用同一套判断。
+ */
+export function isSlashShortcut(event: globalThis.KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.isComposing) return false
+  if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return false
+  const target = event.target as HTMLElement | null
+  if (target && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))) {
+    return false
+  }
+  // 浮层（指令工具弹框、抽屉、弹框）开着时让 `/` 留在浮层里。
+  if (
+    document.querySelector(
+      '[data-slot="popover-content"], [data-slot="dialog-content"], [data-slot="sheet-content"], [data-slot="drawer-content"]',
+    )
+  ) {
+    return false
+  }
+  return true
+}
+
 export function SearchInput({
   value,
   onValueChange,
@@ -137,23 +159,7 @@ export function SearchInput({
   useEffect(() => {
     if (!shortcut) return
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return
-      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
-      const target = event.target as HTMLElement | null
-      if (
-        target &&
-        (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))
-      ) {
-        return
-      }
-      // 浮层（指令工具弹框、抽屉、弹框）开着时让 `/` 留在浮层里。
-      if (
-        document.querySelector(
-          '[data-slot="popover-content"], [data-slot="dialog-content"], [data-slot="sheet-content"], [data-slot="drawer-content"]',
-        )
-      ) {
-        return
-      }
+      if (!isSlashShortcut(event)) return
       const input = rootRef.current?.querySelector('input')
       if (!input) return
       event.preventDefault()

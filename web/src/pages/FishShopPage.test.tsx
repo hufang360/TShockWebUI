@@ -6,6 +6,12 @@ import { CommandResultsProvider } from '@/lib/commandResults'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { resetRefreshGate } from '@/lib/refreshGate'
+import {
+  ICON_PLATE_CLASS,
+  ICON_PLATE_DARK_CLASS,
+  ICON_PLATE_HOVER_CLASS,
+  ROW_PLATE_CLASS,
+} from '@/lib/iconGridSize'
 import { makeDataset } from '@/test/fixtures'
 import { playerStubs } from '@/test/playerStubs'
 import type { BackendTransport, FishGood, FishShop } from '@/lib/tshock'
@@ -123,6 +129,7 @@ afterEach(() => {
 
 describe('FishShopPage', () => {
   it('货架网格：列出商品，格子尺寸 / 排版 / 提示都对', async () => {
+    seedIconSize('md')
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
     expect((await screen.findAllByText('生命水晶')).length).toBeGreaterThan(0)
@@ -144,10 +151,12 @@ describe('FishShopPage', () => {
     expect(parts[0]).toBe('')
     expect(parts[1]).toBe('#1')
     expect(parts[2]).toBe('生命水晶')
-    // 底色只挂在图标区上（中档 = 56）。
+    // 底色只挂在图标区上（中档 = 56）；中档亮色不垫底板，暗色才垫，hover 淡色照旧。
     const surface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
     expect(surface.style.width).toBe('56px')
     expect(surface.style.height).toBe('56px')
+    expect(surface.className).not.toContain(ICON_PLATE_CLASS)
+    expect(surface.className).toContain(ICON_PLATE_DARK_CLASS)
     expect(surface.className).toContain('group-hover/cell:bg-primary/10')
     // 网格：列宽固定 = 格子宽（默认中档 56）；中档列距 8px、行距 16px（行距放宽给货架板和名称留空间）。
     const grid = cell.parentElement as HTMLElement
@@ -335,6 +344,7 @@ describe('FishShopPage', () => {
   })
 
   it('非原生物品（指令类，desc 无 [i:..]）悬停只给「编号 + 名称」，不报物品属性', async () => {
+    seedIconSize('md')
     renderPage(fakeTransport({ fishList: async () => shopOf([ARG_GOOD]) }))
 
     const cell = await screen.findByRole('button', { name: '地图上找' })
@@ -363,8 +373,9 @@ describe('FishShopPage', () => {
     fireEvent.focus(input)
     const count = await screen.findByText('1 件商品')
     expect(group.contains(count)).toBe(true)
-    // 输入框宽度有上限（包在 `max-w-sm` 的容器里，避免长占位符撑满整行）。
-    expect(group.closest('.max-w-sm')).toBeTruthy()
+    // 搜索框固定在工具条行尾（桌面 16rem，与物品 ID / 数据 ID 一致），不是占满左侧。
+    expect(group.closest('.sm\\:w-64')).toBeTruthy()
+    expect(input.className).toContain('text-xs')
     // 头部白卡已移除：输入框直接铺在页面背景上。
     expect(group.closest('[data-slot="card"]')).toBeNull()
 
@@ -1018,6 +1029,14 @@ describe('FishShopPage 右侧指令卡片', () => {
   })
 })
 
+/** 预置本机的「图标大小」档位：鱼店默认已是「横条」，验中 / 大 / 小档要先塞进去。 */
+function seedIconSize(size: 'lg' | 'md' | 'sm' | 'row') {
+  const raw = localStorage.getItem('tswui:moduleState')
+  const state = raw ? JSON.parse(raw) : { default: { store: {} } }
+  state.default = { ...(state.default ?? {}), store: { ...(state.default?.store ?? {}), iconSize: size } }
+  localStorage.setItem('tswui:moduleState', JSON.stringify(state))
+}
+
 /** 页面设置里的「图标大小」是 Select：点开下拉再点选项。 */
 async function pickIconSize(label: string) {
   fireEvent.click(screen.getByRole('combobox', { name: '图标大小' }))
@@ -1074,6 +1093,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
   })
 
   it('页面设置：图标大小 / 隐藏编号和名称 / 表格视图', async () => {
+    seedIconSize('md')
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     expect(await screen.findByText('#1')).toBeTruthy()
 
@@ -1122,13 +1142,14 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     )
 
     fireEvent.click(within(popover).getByRole('button', { name: '恢复默认' }))
-    // 默认「中」：56（不是「大」）。
-    await waitFor(() => expect(cell.style.width).toBe('56px'))
+    // 默认「横条」：格子填满 1fr 轨道（`100%`），文字照常。
+    await waitFor(() => expect(cell.style.width).toBe('100%'))
+    expect(cell.dataset.size).toBe('row')
     expect(screen.getByText('#1')).toBeTruthy()
-    expect(screen.getByTestId('shop-awning')).toBeTruthy()
-    // 货架层板（jsdom 没排版，画不出来；看开关本身）回到勾选。
-    expect(within(popover).getByLabelText('货架层板').getAttribute('data-state')).toBe('checked')
-    expect(within(popover).getByLabelText('遮阳伞').getAttribute('data-state')).toBe('checked')
+    // 横条档本来就不画篷、不画板 → 这两个开关也不出现（不是「回到勾选」）。
+    expect(within(popover).queryByLabelText('货架层板')).toBeNull()
+    expect(within(popover).queryByLabelText('遮阳伞')).toBeNull()
+    expect(screen.queryByTestId('shop-awning')).toBeNull()
 
     // 设置键从本机存储里清掉（回落到默认值，而不是写一串 false）。
     const store = JSON.parse(localStorage.getItem('tswui:moduleState') ?? '{}').default?.store ?? {}
@@ -1137,13 +1158,17 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     }
   })
 
-  it('图标大小：小 32 / 中 48 / 大 64，默认「中」；小尺寸不显示编号与名称', async () => {
+  it('图标大小：默认「横条」，小 32 / 中 48 / 大 64；小尺寸不显示编号与名称', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     const cell = await screen.findByRole('button', { name: '生命水晶' })
-    // 默认「中」：图标 48、格子 56，编号与名称照常。
-    expect(cell.style.width).toBe('56px')
-    const defSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
-    expect(defSurface.style.width).toBe('56px')
+    // 默认「横条」：图标 32（底板 40）在左，编号与名称在右。
+    expect(cell.dataset.size).toBe('row')
+    expect(cell.style.width).toBe('100%')
+    const rowSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
+    expect(rowSurface.style.width).toBe('40px')
+    // 横条的底板铺在整条格子上，图标方块自己不上色
+    expect(cell.className).toContain(ROW_PLATE_CLASS)
+    expect(rowSurface.className).not.toContain(ICON_PLATE_CLASS)
     expect(screen.getByText('#1')).toBeTruthy()
     expect(screen.getByText('生命水晶')).toBeTruthy()
 
@@ -1159,6 +1184,9 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     await waitFor(() => expect(cell.style.width).toBe('40px'))
     const smSurface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
     expect(smSurface.style.width).toBe('40px')
+    // 小档是唯一垫底板的档位。
+    expect(smSurface.className).toContain(ICON_PLATE_CLASS)
+    expect(smSurface.className).toContain(ICON_PLATE_HOVER_CLASS)
     expect(screen.queryByText('#1')).toBeNull()
     expect(screen.queryByLabelText('隐藏编号和名称')).toBeNull()
 
@@ -1168,7 +1196,48 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect(screen.getByText('#1')).toBeTruthy()
   })
 
+  it('图标大小「横条」：图标在左、编号与名称在右竖排；不画货架板、不显示两个开关', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
+    const cell = await screen.findByRole('button', { name: '生命水晶' })
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }))
+    await pickIconSize('横条')
+
+    // 平分整行宽度：格子填满 1fr 轨道（最窄 10rem，鱼店比物品 ID / 数据 ID 的 120 更宽）
+    await waitFor(() => expect(cell.style.width).toBe('100%'))
+    expect(cell.parentElement?.className).toContain('minmax(10rem,1fr)')
+    expect(cell.dataset.size).toBe('row')
+    expect(cell.className).toContain('h-14')
+    // 底板铺在整条格子上（图标 + 编号 + 名称一块底），图标方块自己不上色
+    expect(cell.className).toContain(ROW_PLATE_CLASS)
+    // 横向排布：图标区在左、文字块在右（`#编号` 在上、名称在下）
+    const surface = cell.querySelector('[data-testid="good-icon-surface"]') as HTMLElement
+    expect(surface.style.width).toBe('40px')
+    expect(surface.className).not.toContain(ICON_PLATE_CLASS)
+    const name = within(cell).getByText('生命水晶')
+    expect(name.className).toContain('truncate')
+    const text = name.parentElement as HTMLElement
+    expect(text.className).toContain('flex-col')
+    expect(text.children[0].textContent).toBe('#1')
+
+    // 横条是横排：货架板压不住位置、遮阳伞也会挤 → 两样都不画，开关也不出现；
+    // 「隐藏编号和名称」同理（横条的意义就是带文字）。
+    const popover = screen.getByTestId('fish-settings-popover')
+    expect(within(popover).queryByLabelText('货架层板')).toBeNull()
+    expect(within(popover).queryByLabelText('遮阳伞')).toBeNull()
+    expect(within(popover).queryByLabelText('隐藏编号和名称')).toBeNull()
+    expect(screen.queryByTestId('fish-shelf')).toBeNull()
+    expect(screen.queryByTestId('shop-awning')).toBeNull()
+
+    // 切回「中」：板、篷和开关都回来。
+    await pickIconSize('中')
+    await waitFor(() => expect(cell.style.width).toBe('56px'))
+    expect(within(popover).getByLabelText('货架层板')).toBeTruthy()
+    expect(within(popover).getByLabelText('遮阳伞')).toBeTruthy()
+    expect(screen.getByTestId('shop-awning')).toBeTruthy()
+  })
+
   it('货架板：中 / 大尺寸才画，上沿贴图标区底部、板身盖住序号行、左右各留 4px', async () => {
+    seedIconSize('md')
     // jsdom 没有排版：按「格子 / 图标区 / 图标 / 序号行」分别给假矩形，验证几何计算。
     // 格子高 107、图标区底 72、图标底 68、序号行底 87 → 板上沿 72 + 1px（整块板下移）＝ 73、
     // 板厚 87 - 73 = 14、周期 = 107 + 行距；板宽收到最后一列（jsdom 当作 1 列，即 72），左右各留 4px。
@@ -1219,6 +1288,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
   })
 
   it('页面设置：「货架层板」可以手动关掉 / 打开，开关记在本机', async () => {
+    seedIconSize('md')
     // 同上：jsdom 不排版，货架板要假矩形才画得出来。
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
       this: HTMLElement,
@@ -1255,6 +1325,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
   })
 
   it('遮阳伞：默认挂在货架区顶部，表格视图下不画，「页面设置」可以关掉', async () => {
+    seedIconSize('md')
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
     expect(await screen.findByTestId('shop-awning')).toBeTruthy()
 

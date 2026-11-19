@@ -2,6 +2,9 @@ import { ItemIcon } from '@/components/ItemIcon'
 import { SlotTooltip } from '@/components/SlotTooltip'
 import { Button } from '@/components/ui'
 import { parseRichText } from '@/lib/richtext'
+import { RowTip } from '@/components/RowTip'
+import { cn } from '@/lib/cn'
+import { iconPlateClass, ROW_PLATE_CLASS, type IconGridSize } from '@/lib/iconGridSize'
 import type { FishGood } from '@/lib/tshock'
 import type { Dataset, Item } from '@/types'
 
@@ -13,12 +16,11 @@ import type { Dataset, Item } from '@/types'
 /** 大号图标尺寸：**64×64**（= 游戏 `sizeLimit` 32 的 2 倍，`mode='game'` 下整数倍最近邻放大）。 */
 export const CELL_ICON_SIZE = 64
 
-/** 图标尺寸档位（页面设置「图标大小」：小 / 中 / 大）。 */
-export type GoodIconSize = 'sm' | 'md' | 'lg'
+/** 图标尺寸档位（页面设置「图标大小」：小 / 中 / 大）；档位名与「小档底色」等共用规则在 `lib/iconGridSize`。 */
+export type GoodIconSize = IconGridSize
 
-/** 默认「大」：与「物品 ID」的格子同尺寸（图标 64、格子 72）。 */
-/** 鱼店默认「中」：一屏能看更多件，图标也还看得清（页面设置可改成大 / 小）。 */
-export const DEFAULT_GOOD_ICON_SIZE: GoodIconSize = 'md'
+/** 鱼店默认「横条」：商品名都比较长，横排（图标 + 编号 + 名称）一眼能认全，也一屏能看更多件。 */
+export const DEFAULT_GOOD_ICON_SIZE: GoodIconSize = 'row'
 
 interface GoodSizeSpec {
   /** 图标边长：32 / 48 / 64，都是游戏 `sizeLimit` 32 的整数倍，放大不糊。 */
@@ -36,12 +38,15 @@ export const GOOD_SIZES: Record<GoodIconSize, GoodSizeSpec> = {
   lg: { icon: CELL_ICON_SIZE, surface: 72, cell: 72, showMeta: true },
   md: { icon: 48, surface: 56, cell: 56, showMeta: true },
   sm: { icon: 32, surface: 40, cell: 40, showMeta: false },
+  // 横条：图标在左、`#编号` 与名称在右竖排（名称单行截断）。图标 / 底板与小档一致，
+  // 最小格宽 160 ≈ 8 个中文字（鱼店商品名普遍比物品 ID 长一截，比物品 ID / 数据 ID 的 120 更宽）。
+  row: { icon: 32, surface: 40, cell: 160, showMeta: true },
 }
 
 /**
  * 货架网格：列宽固定 = 格子宽度（`auto-fill`，不拉伸撑满）；
  * `relative` 是给货架线那一层（`GoodGrid` 里绝对定位的子元素）当定位基准。
- * 间距（用户定）：大 = 列 16px / 行 24px，中 = 列 8px / 行 16px，小 = 双向 8px。
+ * 间距（用户定）：大 = 列 16px / 行 24px，中 = 列 8px / 行 16px，小 / 横条 = 双向 8px。
  * 中 / 大的行距放宽是为了让「货架板」（`GoodGrid` + `.fish-shelf`）压在序号行上之后，
  * 名称下面还有呼吸空间，不会跟下一行的图标挤在一起。
  */
@@ -49,6 +54,7 @@ export const GOOD_GRID_CLASS: Record<GoodIconSize, string> = {
   lg: 'relative grid grid-cols-[repeat(auto-fill,4.5rem)] gap-x-4 gap-y-6',
   md: 'relative grid grid-cols-[repeat(auto-fill,3.5rem)] gap-x-2 gap-y-4',
   sm: 'relative grid grid-cols-[repeat(auto-fill,2.5rem)] gap-2',
+  row: 'relative grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2',
 }
 
 /**
@@ -59,9 +65,12 @@ export const GOOD_GRID_CLASS: Record<GoodIconSize, string> = {
 const CELL_CLASS =
   'group/cell grid h-auto cursor-pointer place-items-center gap-1 rounded-container px-0 py-0 font-normal transition duration-150 hover:-translate-y-0.5 hover:bg-transparent hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:h-auto'
 
-/** 图标区：默认无底色（尺寸随档位走）；hover / 键盘聚焦时才铺 `bg-primary/10`（与物品 / NPC 格子一致）。 */
-const ICON_SURFACE_CLASS =
-  'relative flex items-center justify-center rounded-control transition-colors group-hover/cell:bg-primary/10 group-focus-visible/cell:bg-primary/10'
+/** 横条格子：横向排布（图标左、文字右），四边内边距 8px = 图标↔文字间距 = 行高与底板之差（56 vs 40）。 */
+const ROW_CELL_CLASS =
+  'group/cell flex h-14 cursor-pointer items-center gap-2 p-2 font-normal text-left transition duration-150 hover:-translate-y-0.5 hover:text-foreground focus-visible:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:h-14'
+
+/** 图标区（格子底板）：底色 / 描边与 hover 提亮都来自 `lib/iconGridSize` 的试用配色。 */
+const ICON_SURFACE_CLASS = 'relative flex items-center justify-center transition'
 
 export interface GoodItemTag {
   itemId: number
@@ -120,34 +129,71 @@ export function GoodCell({
   hideMeta?: boolean
 }) {
   const prefixName = goodPrefixName(good, dataset)
+  const iconTag = goodIcon(good)
+  const item = iconTag ? dataset?.itemsById.get(iconTag.itemId) : undefined
   const spec = GOOD_SIZES[size]
-  // 小尺寸本来就只放图标；hideMeta 只对中 / 大尺寸起作用。
-  const showMeta = spec.showMeta && !hideMeta
+  const row = size === 'row'
+  // 小尺寸本来就只放图标；横条的意义就是带文字（开关也隐藏了），所以忽略 hideMeta。
+  const showMeta = row || (spec.showMeta && !hideMeta)
   return (
     <Button
       variant="ghost"
       onClick={() => onSelect(good)}
       aria-label={good.name}
       data-size={size}
-      className={CELL_CLASS}
-      style={{ width: spec.cell }}
+      className={row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS}
+      // 横条平分整行宽度：格子填满 1fr 轨道，别再写死格宽
+      style={{ width: row ? '100%' : spec.cell }}
     >
-      <span
-        data-testid="good-icon-surface"
-        className={ICON_SURFACE_CLASS}
-        style={{ width: spec.surface, height: spec.surface }}
-      >
-        <GoodThumb good={good} dataset={dataset} size={spec.icon} />
-      </span>
-      {showMeta && (
+      {row ? (
+        // 横条：提示锚点放在整条格子上（图标只占左边一小块，挂在图标上等于没有提示）
+        <RowTip
+          item={item}
+          atlas={dataset?.atlas}
+          itemName={good.name}
+          prefix={prefixName}
+          prefixId={iconTag?.prefix}
+          stack={iconTag?.stack}
+          id={good.serial}
+          name={good.name}
+        >
+          <span
+            data-testid="good-icon-surface"
+            className={cn(ICON_SURFACE_CLASS, iconPlateClass(size))}
+            style={{ width: spec.surface, height: spec.surface }}
+          >
+            <GoodThumb good={good} dataset={dataset} size={spec.icon} silent />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+            <span className="font-pixel text-2xs leading-none text-muted-foreground">
+              #{good.serial}
+            </span>
+            <span className="w-full truncate text-xs leading-4 text-foreground">
+              {prefixName ? <span className="text-warning">{prefixName} </span> : null}
+              {good.name}
+            </span>
+          </span>
+        </RowTip>
+      ) : (
         <>
-          <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
-            #{good.serial}
+          <span
+            data-testid="good-icon-surface"
+            className={cn(ICON_SURFACE_CLASS, iconPlateClass(size))}
+            style={{ width: spec.surface, height: spec.surface }}
+          >
+            <GoodThumb good={good} dataset={dataset} size={spec.icon} />
           </span>
-          <span className="w-full truncate text-center text-xs leading-4 text-foreground">
-            {prefixName ? <span className="text-warning">{prefixName} </span> : null}
-            {good.name}
-          </span>
+          {showMeta && (
+            <>
+              <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+                #{good.serial}
+              </span>
+              <span className="w-full truncate text-center text-xs leading-4 text-foreground">
+                {prefixName ? <span className="text-warning">{prefixName} </span> : null}
+                {good.name}
+              </span>
+            </>
+          )}
         </>
       )}
     </Button>
@@ -167,12 +213,15 @@ export function GoodThumb({
   dataset,
   size,
   tooltip = true,
+  silent = false,
 }: {
   good: FishGood
   dataset: Dataset | null
   size: number
   /** 关掉「编号 + 商品名」提示（详情页图标下方已经写着编号和名称时用）。 */
   tooltip?: boolean
+  /** 提示由外层负责（横条档把锚点放在整条格子上，见 `components/RowTip`）。 */
+  silent?: boolean
 }) {
   const icon = goodIcon(good)
   const item: Item | undefined = icon ? dataset?.itemsById.get(icon.itemId) : undefined
@@ -185,7 +234,7 @@ export function GoodThumb({
       stack={icon?.stack}
       prefix={goodPrefixName(good, dataset)}
       prefixId={icon?.prefix}
-      tooltip={native}
+      tooltip={native && !silent}
     />
   ) : (
     <span
@@ -195,7 +244,7 @@ export function GoodThumb({
       {good.name.slice(0, 1) || '?'}
     </span>
   )
-  if (native || !tooltip) return thumb
+  if (silent || native || !tooltip) return thumb
   return (
     <SlotTooltip
       label={
