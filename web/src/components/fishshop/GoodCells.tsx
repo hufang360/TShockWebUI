@@ -131,6 +131,9 @@ export function GoodCell({
   const prefixName = goodPrefixName(good, dataset)
   const iconTag = goodIcon(good)
   const item = iconTag ? dataset?.itemsById.get(iconTag.itemId) : undefined
+  // 横条档与方块档同源：只有**原生商品**（`desc` 带 `[i:..]`）才弹物品提示，
+  // 借来的识别图（鱼池借水桶、钓篷借图鉴）仍是「`#编号` + 商品名」，两边不一致会让人以为买的就是那件物品。
+  const tipItem = goodIsNativeItem(good) ? item : undefined
   const spec = GOOD_SIZES[size]
   const row = size === 'row'
   // 小尺寸本来就只放图标；横条的意义就是带文字（开关也隐藏了），所以忽略 hideMeta。
@@ -148,7 +151,7 @@ export function GoodCell({
       {row ? (
         // 横条：提示锚点放在整条格子上（图标只占左边一小块，挂在图标上等于没有提示）
         <RowTip
-          item={item}
+          item={tipItem}
           atlas={dataset?.atlas}
           itemName={good.name}
           prefix={prefixName}
@@ -232,6 +235,7 @@ export function GoodThumb({
       atlas={dataset?.atlas}
       size={size}
       stack={icon?.stack}
+      name={good.name}
       prefix={goodPrefixName(good, dataset)}
       prefixId={icon?.prefix}
       tooltip={native && !silent}

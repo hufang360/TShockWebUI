@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { DatasetProvider } from '@/lib/datasetContext'
 import { installCommandPaletteSpy, lastFilled } from '@/test/commandPaletteSpy'
 import { makeDataset } from '@/test/fixtures'
 import type { Item } from '@/types'
@@ -38,10 +39,13 @@ function renderPage(items: Item[] | ReturnType<typeof makeDataset>, opts: { keep
   const dataset = Array.isArray(items) ? makeDataset({ items }) : items
   const utils = render(
     <I18nProvider lang="zh">
-      {/* 整页滚动：滚动宿主就是 AppShell 的 `<main>`（网格自己不再溢出滚动）。 */}
-      <main data-testid="page-scroll-host">
-        <ItemsPage dataset={dataset} username="Alice" />
-      </main>
+      {/* 与 App 一致：提示里的属性行来自上下文（未提供时降级为「名称行」）。 */}
+      <DatasetProvider value={dataset}>
+        {/* 整页滚动：滚动宿主就是 AppShell 的 `<main>`（网格自己不再溢出滚动）。 */}
+        <main data-testid="page-scroll-host">
+          <ItemsPage dataset={dataset} username="Alice" />
+        </main>
+      </DatasetProvider>
     </I18nProvider>,
   )
   // 默认就是「全部物品」；显式点一次，顺便清掉上一次测试可能留下的筛选。
@@ -209,6 +213,32 @@ describe('ItemsPage 图鉴', () => {
     fireEvent.click(canvas)
     expect(screen.queryByRole('tooltip')).toBeNull()
     expect(screen.getByTestId('dex-detail')).toBeTruthy()
+  })
+
+  it('横条的提示与方块档逐字相同：带属性行，且都不带「物品详情」入口', async () => {
+    const base = makeDataset({ items: makeItems(3) })
+    const dataset: typeof base = {
+      ...base,
+      itemStats: {
+        ...base.itemStats,
+        items: { '1': { tip: ['12 近战伤害'], stats: { damage: 12 } } },
+      },
+    }
+    // 横条（默认档）：整条都是触发区
+    const rowView = renderPage(dataset)
+    fireEvent.mouseOver(within(cell('物品1')).getByText('物品1'))
+    const rowTip = await screen.findByRole('tooltip', {}, { timeout: 1200 })
+    expect(rowTip.textContent).toContain('12 近战伤害')
+    expect(within(rowTip).queryByRole('button', { name: '物品详情' })).toBeNull()
+    const rowText = rowTip.textContent
+    rowView.unmount()
+
+    // 中档图标：同一份数据、同一套参数，提示必须逐字相同
+    seedIconSize('md')
+    renderPage(dataset)
+    fireEvent.mouseOver(within(cell('物品1')).getByRole('img', { name: '物品1' }))
+    const mdTip = await screen.findByRole('tooltip', {}, { timeout: 1200 })
+    expect(mdTip.textContent).toBe(rowText)
   })
 
   it('详情遮罩只盖内容区：点遮罩关掉整叠抽屉，点页面别处不关', async () => {

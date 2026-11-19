@@ -416,6 +416,47 @@ describe('FishShopPage', () => {
     expect(within(tip).getByText('生命水晶')).toBeTruthy()
   })
 
+  it('横条的提示与方块档逐字相同（原生商品）', async () => {
+    // 原生商品 + 词缀 + 堆叠，且**商品名与物品名不同**：两边都该用顾客看到的商品名
+    const NATIVE: FishGood = {
+      ...GOOD,
+      serial: 2,
+      name: '水晶特惠包',
+      icon: '[i/p81/s5:29]',
+      desc: '[i/p81/s5:29] 生命水晶',
+    }
+
+    // 中档（方块）：图标上弹物品提示
+    seedIconSize('md')
+    const mdView = renderPage(fakeTransport({ fishList: async () => shopOf([NATIVE]) }))
+    const mdCell = await screen.findByRole('button', { name: '水晶特惠包' })
+    fireEvent.mouseOver(within(mdCell).getByRole('img'))
+    const mdTip = await screen.findByRole('tooltip')
+    const mdText = mdTip.textContent
+    expect(mdText).toContain('传奇')
+    expect(mdText).toContain('水晶特惠包')
+    mdView.unmount()
+
+    // 横条（默认档）：提示锚点是**整条**，内容与上面一模一样
+    seedIconSize('row')
+    renderPage(fakeTransport({ fishList: async () => shopOf([NATIVE]) }))
+    const rowCell = await screen.findByRole('button', { name: '水晶特惠包' })
+    fireEvent.mouseOver(within(rowCell).getByTestId('row-tip'))
+    const rowTip = await screen.findByRole('tooltip')
+    expect(rowTip.textContent).toBe(mdText)
+  })
+
+  it('横条档的非原生商品（desc 无 [i:..]）也只给「编号 + 名称」', async () => {
+    // 默认档就是横条：借来的识别图（生命水晶）不能弹出物品属性，否则会让人以为买的就是那件东西
+    renderPage(fakeTransport({ fishList: async () => shopOf([ARG_GOOD]) }))
+    const cell = await screen.findByRole('button', { name: '地图上找' })
+    fireEvent.pointerMove(within(cell).getByTestId('row-tip'), { pointerType: 'mouse' })
+    const tip = await screen.findByRole('tooltip')
+    expect(tip.textContent).toContain('#160')
+    expect(tip.textContent).toContain('地图上找')
+    expect(tip.textContent).not.toContain('生命水晶')
+  })
+
   it('详情内容与布局：标题 / 价格图标 / 数量框 / 不显示空行 / 遮罩只盖内容区', async () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 

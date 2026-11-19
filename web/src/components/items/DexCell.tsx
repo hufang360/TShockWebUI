@@ -172,7 +172,15 @@ export const DexCell = memo(function DexCell({
       style={{ width, height }}
     >
       {showMeta && row ? (
-        <RowTip item={item} atlas={atlas} itemName={item.name} id={item.id} name={item.name}>
+        // 提示与方块档（`ItemIcon`）同一份：属性行由 RowTip 自己取，ⓘ「物品详情」两边都隐藏（点格子就能开）
+        <RowTip
+          item={item}
+          atlas={atlas}
+          itemName={item.name}
+          hideDetailLink
+          id={item.id}
+          name={item.name}
+        >
           {surface}
           <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
             <span className="font-pixel text-2xs leading-none text-muted-foreground">
