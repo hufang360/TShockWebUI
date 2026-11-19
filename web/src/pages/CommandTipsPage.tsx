@@ -45,7 +45,7 @@ import {
   spawnMobCommand,
   tpNpcCommand,
 } from '@/lib/spawnTips'
-import { useTerminal } from '@/lib/terminalContext'
+import { openCommandPalette } from '@/lib/commandPalette'
 import { BAN_COMMANDS, PERM_SETUP_COMMANDS, USER_ACCOUNT_COMMANDS } from '@/lib/userCommandTips'
 import {
   GODMODE_COMMANDS,
@@ -98,7 +98,7 @@ interface CommandTipsPageProps {
   ingame: IngamePolicy
   /** 「数据 ID → NPC」入口（详情里的「在数据 ID 里查更多」）。 */
   onNavigate?: (tab: TabId) => void
-  /** 详情里「填入」的去向；默认填进浮动终端，指令页里改为填进页面输入框。 */
+  /** 详情里「执行」的去向；默认填进搜索面板（等价于 `Ctrl/Cmd+K` 后敲进去，不自动执行）。 */
   onPick?: (command: string) => void
   /** 从全局搜索带进来的搜索词（容器页消费意图后传下来）。 */
   searchQuery?: string
@@ -116,7 +116,7 @@ interface TableRow {
   note?: string
   /**
    * 参考行：语法带占位符（`/give <物品> <玩家>`），点了也跑不通，
-   * 所以详情里**只给复制**；`false` / 省略 = 详情里可「执行」（填进浮窗）。
+   * 所以详情里**只给复制**；`false` / 省略 = 详情里可「执行」（填进搜索面板）。
    */
   syntax?: boolean
   /** 详情里这一行的「指令语法」：已按分区 / 指令解析好，`''` = 这条指令没有语法。 */
@@ -538,7 +538,7 @@ function CommandRow({
  * - 同一前缀的行（`/worldevent invasion …`、`/worldmode …`）默认折成一行，点一下展开；
  *   分组标题不单独占一行，而是折叠行的「说明」（`/worldevent` → 世界事件）；
  * - 每个分区内的行按**指令列 a~z** 排序（折叠行用它的前缀参与排序）；
- * - 参考行（`syntax` 为真）：语法带占位符，填进浮窗也跑不通，详情里只给复制；
+ * - 参考行（`syntax` 为真）：语法带占位符，填进搜索框也跑不通，详情里只给复制；
  * - 表格**不在卡片里**，本身也不滚动：整页交给 AppShell 的 `<main>` 滚（浏览器右侧那条滚动条），
  *   表头吸在**工具条下面**（`--page-sticky-top`，实测工具条高度）；
  * - **指令列有最大宽度**：手机较窄（长指令换行，不横向溢出），`sm` 起单行截断 + 悬停 Tooltip 看全。
@@ -555,7 +555,7 @@ function CommandTable({
   ingame: IngamePolicy
   /** 搜索时强制展开：否则命中的行藏在折叠组里。 */
   expandAll: boolean
-  /** 行内「执行」：只是把指令填进浮窗，不自动发出。 */
+  /** 行内「执行」：只是把指令填进搜索面板，不自动发出。 */
   onPick: (command: string) => void
   /** 「数据 ID → NPC」入口（只有参数是 NPC 的指令才有）。 */
   onNavigate?: (tab: TabId) => void
@@ -778,7 +778,7 @@ function GroupList({
  * 物品与增益 / 传送 / 建筑与保护 / 玩家账号 / 权限配置 / 服务器 / 聊天与统计。
  *
  * 布局：**左边搜索框 + 表格，右边分组列表**（手机端分组收进抽屉）。
- * **单击一行打开右侧详情**，在详情里复制或把完整指令填进右下角「指令」浮窗（不自动执行）；
+ * **单击一行打开详情**，在详情里复制，或者「执行」把完整指令填进**搜索面板**（不自动执行）；
  * 参考行（语法带占位符）只提供复制。
  * 权限与执行结果都由 TShock 判定。
  */
@@ -790,8 +790,7 @@ export function CommandTipsPage({
   searchQuery,
 }: CommandTipsPageProps) {
   const { t, lang } = useI18n()
-  const { open } = useTerminal()
-  const pick = onPick ?? open
+  const pick = onPick ?? openCommandPalette
   const [query, setQuery] = useState(searchQuery ?? '')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [groupOpen, setGroupOpen] = useState(false)

@@ -50,7 +50,6 @@ import { modKeyLabel, shortcutLabel } from '@/lib/keyboard'
 import type { SearchIntent } from '@/lib/searchIntent'
 import { forgetDrill, recallDrill, rememberDrill } from '@/lib/searchDrill'
 import { StorageKeys } from '@/lib/storage'
-import { useTerminal } from '@/lib/terminalContext'
 import type { CommandResult, TabId } from '@/types'
 
 /**
@@ -66,7 +65,7 @@ import type { CommandResult, TabId } from '@/types'
  * 2. 二级：该组的前 `MAX_PER_GROUP_DETAIL` 条，更多的才「更多」（右侧写目标页，跳页 + 预填词）；
  * 3. 指令的执行结果（只有指令有）：留在弹框里显示输出，`Esc` 回上一层。
  *
- * 行的操作**只有键盘**：`Enter` 走主操作（打开 / 查看 / 执行 / 填入终端）、`⌘/Ctrl+C` 复制。
+ * 行的操作**只有键盘**：`Enter` 走主操作（打开 / 查看 / 执行 / 填入指令）、`⌘/Ctrl+C` 复制。
  * 行上不放图标按钮——每个动作都在底栏写明，不用猜哪个图标是复制。底栏文案跟着**高亮行**变。
  *
  * 结果列表用 shadcn `Command`（cmdk）：分组、键盘导航、`aria-activedescendant` 由它管；
@@ -302,7 +301,7 @@ interface RunEntry {
   command: string
   /** 触发它的行（`SearchHit.id`）：`Esc` 返回时把高亮放回去。 */
   origin: string
-  /** 这条指令在数据里标了必填参数：失败时多给一个「填入终端」。 */
+  /** 这条指令在数据里标了必填参数：失败时多给一个「填入指令」。 */
   needsArgs?: boolean
   /** 结果落地的时间；多条记录靠它区分。 */
   ts: number
@@ -314,12 +313,10 @@ interface RunViewProps {
   entries: RunEntry[]
   /** 富文本要的图集 / 词缀（和结果面板同一份数据）。 */
   sources: GlobalSearchSources
-  /** 浮动终端可用时才给「填入终端」。 */
-  canFillTerminal: boolean
   /** 最新一条执行失败时给一条「查看用法」（跳到指令小抄）。 */
   onUsage: () => void
-  /** 填入浮动终端（补参数后重跑）；是否给看最新一条有没有标必填参数。 */
-  onFillTerminal: () => void
+  /** 把这条指令填回输入框补参数（留在面板里，回车再跑）。 */
+  onFillCommand: () => void
 }
 
 /**
@@ -330,13 +327,7 @@ interface RunViewProps {
  *
  * 这里**没有返回按钮**：焦点始终留在输入框，`Esc` 回列表（底栏有提示）。
  */
-function RunView({
-  entries,
-  sources,
-  canFillTerminal,
-  onUsage,
-  onFillTerminal,
-}: RunViewProps) {
+function RunView({ entries, sources, onUsage, onFillCommand }: RunViewProps) {
   const { t, lang } = useI18n()
   const listRef = useRef<HTMLDivElement>(null)
   const latest = entries[entries.length - 1]
@@ -397,14 +388,14 @@ function RunView({
           >
             {t('search.run.usage')}
           </Button>
-          {failed && latest?.needsArgs && canFillTerminal && (
+          {failed && latest?.needsArgs && (
             <Button
               variant="ghost"
               size="sm"
               className="px-1 text-2xs text-muted-foreground"
-              onClick={onFillTerminal}
+              onClick={onFillCommand}
             >
-              {t('search.action.fillTerminal')}
+              {t('search.action.fillCommand')}
             </Button>
           )}
         </div>
@@ -509,7 +500,7 @@ function ModHint({ keyName, label }: { keyName: string; label: string }) {
 }
 
 /**
- * 高亮行的 `Enter` 文案。四种动作各自写明：执行 / 填入终端 / 打开 / 查看。
+ * 高亮行的 `Enter` 文案。四种动作各自写明：执行 / 打开 / 查看。
  *
  * 不写字图标（行里没有按钮），所以这里必须准确——它就是这个行唯一的行为说明。
  */
@@ -527,9 +518,9 @@ function enterHintOf(hit: SearchHit | undefined, canRunCommands: boolean): strin
  * 输入词 / 结果 / 最近搜索（高亮由 cmdk 管，这里只管数据和写历史）。
  * 每次打开弹框都是空词：二级位置记忆只在**同一次会话内**用（见 `lib/searchDrill.ts`）。
  */
-function useSearchState(sources: GlobalSearchSources) {
+function useSearchState(sources: GlobalSearchSources, initialQuery = '') {
   const { history, remember, remove } = useSearchHistory(StorageKeys.globalSearchHistory)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   /** 真正用于匹配的词（防抖后，二级也用同一个词，避免两层显示不一致）。 */
   const applied = useDebouncedValue(query, 120)
   const groups = useMemo(() => searchEverything(sources, applied), [sources, applied])
@@ -596,8 +587,11 @@ interface GlobalSearchDialogProps {
   sources: GlobalSearchSources
   onNavigate: (tab: TabId, intent?: SearchIntent) => void
   onOpenItem: (itemId: number) => void
-  /** 浮动终端是否可用（未登录 / 该页不显示浮动终端时为 false）。 */
-  canFillTerminal: boolean
+  /**
+   * 打开时预填的搜索词（「填入指令」用：等价于按 `Ctrl/Cmd+K` 再把指令敲进去）。
+   * 面板按 `searchOpen` 重建，所以这里只在挂载时读一次。
+   */
+  initialQuery?: string
   /** 当前能不能直接执行指令（要登录）——不能时回车仍然只是跳到「指令小抄」查用法。 */
   canRunCommands: boolean
   /** 执行一条指令并返回结果（由 `App` 提供，内部走 rawcmd / 权限判定）。 */
@@ -617,14 +611,13 @@ export function GlobalSearchDialog({
   sources,
   onNavigate,
   onOpenItem,
-  canFillTerminal,
+  initialQuery = '',
   canRunCommands,
   onRunCommand,
 }: GlobalSearchDialogProps) {
   const { t } = useI18n()
-  const terminal = useTerminal()
   const inputRef = useRef<HTMLInputElement>(null)
-  const state = useSearchState(sources)
+  const state = useSearchState(sources, initialQuery)
   const typed = state.query.trim().length > 0
   /** 当前展开的组（`null` = 一级）。**不跨弹框恢复**：重开就该是空面板。 */
   const [drill, setDrill] = useState<SearchGroupId | null>(null)
@@ -646,16 +639,17 @@ export function GlobalSearchDialog({
     })
   }
 
-  /** 离开弹框（跳页 / 填终端）时把记忆清掉，免得下次打开突然回到旧位置。 */
+  /** 离开弹框（跳页 / 打开详情）时把记忆清掉，免得下次打开突然回到旧位置。 */
   const leave = () => {
     forgetDrill()
     state.setQuery('')
     onOpenChange(false)
   }
 
-  const fillTerminal = (command: string) => {
-    terminal.open(command)
-    leave()
+  /** 「填入指令」：把这条指令放回输入框（等价于用户自己敲进去），留在面板里改参数。 */
+  const fillCommand = (command: string) => {
+    changeQuery(command)
+    inputRef.current?.focus()
   }
   const goPage = (tab: TabId, intent?: SearchIntent) => {
     onNavigate(tab, intent)
@@ -799,7 +793,7 @@ export function GlobalSearchDialog({
   const handleRootKeyDown = (event: React.KeyboardEvent) => {
     // 结果页：焦点就在输入框里，`Enter` 重跑（刷新结果卡片），其它键照常。
     if (run) {
-      // 只接管输入框里的 Enter：`查看用法` / `填入终端` 这些按钮的回车不能被吃掉。
+      // 只接管输入框里的 Enter：`查看用法` / `填入指令` 这些按钮的回车不能被吃掉。
       if (
         event.key === 'Enter' &&
         event.target === inputRef.current &&
@@ -952,13 +946,14 @@ export function GlobalSearchDialog({
               <RunView
                 entries={run.entries}
                 sources={sources}
-                canFillTerminal={canFillTerminal}
                 onUsage={() =>
                   goPage('tables', {
                     query: (run.entries[run.entries.length - 1]?.command ?? '').replace(/^\//, ''),
                   })
                 }
-                onFillTerminal={() => fillTerminal(run.entries[run.entries.length - 1]?.command ?? '')}
+                onFillCommand={() =>
+                  fillCommand(run.entries[run.entries.length - 1]?.command ?? '')
+                }
               />
             ) : detail ? (
               <GroupDetail

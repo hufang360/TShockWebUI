@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, BookText, ClipboardList, Fish, Globe2, House, LayoutGrid, Map as MapIcon, Plug, Search, Settings as SettingsIcon, Terminal, UserRound, Users } from 'lucide-react'
-import { CommandTerminal } from '@/components/CommandTerminal'
-import { TerminalTopBarButton } from '@/components/TerminalTopBarButton'
 import { AppShell, type NavItem } from '@/components/AppShell'
 import { AppRoutes, preloadRoute } from '@/components/AppRoutes'
 import { ExecutionQueuePanel } from '@/components/ExecutionQueuePanel'
@@ -37,10 +35,10 @@ import { loadDataset, reconcileDataVersion, withRuntimeCommands } from '@/lib/da
 import { ingamePolicyFrom, type IngamePolicy } from '@/lib/ingame'
 import { useLanguagePacks } from '@/lib/languagePack/useLanguagePacks'
 import { CommandResultsProvider } from '@/lib/commandResults'
+import { registerCommandPalette } from '@/lib/commandPalette'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { I18nProvider, translate } from '@/lib/i18n'
-import { TerminalProvider } from '@/lib/terminalContext'
 import { ItemDetailProvider, type DetailEntry, type ItemDetailApi } from '@/lib/itemDetailContext'
 import { ItemDetailDialog } from '@/components/items/ItemDetailDialog'
 import { ItemFavoritesStoreProvider } from '@/lib/itemFavoritesContext'
@@ -56,7 +54,7 @@ import {
   type ModulesPrefs,
 } from '@/lib/modules'
 import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
-import { StorageKeys, removeKey } from '@/lib/storage'
+import { StorageKeys, removeKey, removeLegacyKey } from '@/lib/storage'
 import { readTabFromHash, tabHash } from '@/lib/routes'
 import {
   BUILTIN_ID,
@@ -216,6 +214,19 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     },
     [setUi],
   )
+  /**
+   * 搜索面板的**预填词**：「填入指令」把这条指令塞进 `Ctrl/Cmd+K` 的输入框
+   * （面板顶部就是「执行指令 /xxx」那一行，改完参数回车即可），不跳页、不另开窗口。
+   */
+  const [searchInitialQuery, setSearchInitialQuery] = useState('')
+  const openCommandPalette = useCallback((query: string) => {
+    setSearchInitialQuery(query)
+    setSearchOpen(true)
+  }, [])
+  useEffect(() => {
+    registerCommandPalette(openCommandPalette)
+    return () => registerCommandPalette(null)
+  }, [openCommandPalette])
   useEffect(() => {
     const onHashChange = () => setHashTab(readTabFromHash())
     window.addEventListener('hashchange', onHashChange)
@@ -467,9 +478,12 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     }
   }, [transport])
 
-  // 启动时清理已废弃的 tswui:auth（旧版曾存 token），再探测真实会话（设计原则与约束 C15）。
+  // 启动时清理已废弃的键：`tswui:auth`（旧版曾存 token）、`tswui:terminal*`（浮动终端已删除），
+  // 再探测真实会话（设计原则与约束 C15）。
   useEffect(() => {
     removeKey(StorageKeys.auth)
+    removeLegacyKey('terminal')
+    removeLegacyKey('terminal:draft')
     let cancelled = false
     void (async () => {
       const s = await transport.session()
@@ -801,9 +815,6 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     </div>
   )
 
-  // 浮动终端只在「指令」「设置」两页不出现（那两页不需要边看边执行）。
-  const terminalAllowed = activeTab !== 'editor' && activeTab !== 'settings'
-
   // 侧栏账号卡片上的服务器地址（遮挡展示；内置项不再显示「服务器默认」）。
   const accountServerLabel =
     activeServerId === BUILTIN_ID
@@ -821,7 +832,6 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         <ItemDetailProvider api={itemDetailApi}>
         <ItemFavoritesStoreProvider>
         <RecipeFavoritesStoreProvider>
-        <TerminalProvider>
         <AppShell
           activeTab={activeTab}
           onTabChange={navigate}
@@ -846,12 +856,6 @@ export default function App({ transport: transportProp }: AppProps = {}) {
                 testId="global-search-open"
                 onClick={() => setSearchOpen(true)}
               />
-            ) : undefined
-          }
-          headerActions={
-            // 首页与各模块都放（右侧顶栏：上次刷新 / 刷新 / 管理卡片 / 终端）。
-            terminalAllowed && session.authenticated ? (
-              <TerminalTopBarButton visible />
             ) : undefined
           }
           sidebarCollapsed={ui.sidebarCollapsed}
@@ -923,34 +927,19 @@ export default function App({ transport: transportProp }: AppProps = {}) {
             languagePacks={langPacks}
           />
         </AppShell>
-        <CommandTerminal
-          visible={terminalAllowed}
-          dataset={view}
-          transport={transport}
-          authenticated={session.authenticated}
-          serverId={activeServerId}
-          players={players}
-          ingame={ingame}
-          runtimeValues={runtimeParams}
-          settings={settings}
-          onTokenInvalid={handleTokenInvalid}
-          onLogin={() => {
-            setLoginReason(null)
-            setLoginOpen(true)
-          }}
-          onNavigate={navigate}
-        />
-        </TerminalProvider>
         {/* 搜索弹框：桌面与移动共用同一套界面。 */}
         {searchSources && (
           <GlobalSearchDialog
             key={searchOpen ? 'open' : 'closed'}
             open={searchOpen}
-            onOpenChange={setSearchOpen}
+            onOpenChange={(open) => {
+              setSearchOpen(open)
+              if (!open) setSearchInitialQuery('')
+            }}
             sources={searchSources}
+            initialQuery={searchInitialQuery}
             onNavigate={navigate}
             onOpenItem={(itemId) => itemDetailApi.open(itemId)}
-            canFillTerminal={terminalAllowed && session.authenticated}
             canRunCommands={session.authenticated}
             onRunCommand={runSearchCommand}
           />

@@ -52,8 +52,6 @@ interface AppShellProps {
   sidebarSearch?: ReactNode
   /** 内容区顶栏的移动端入口（`md` 以下显示）：移动端侧栏是抽屉，搜索改从这里进。 */
   mobileSearch?: ReactNode
-  /** 顶栏右侧的全局操作（在页面操作之后，如浮动指令入口）。 */
-  headerActions?: ReactNode
   /** 侧栏底部的玩家状态 / 设置等 */
   headerRight: ReactNode
   /** 侧栏底部额外区域（账号卡片上方，如执行队列） */
@@ -135,7 +133,6 @@ export function AppShell({
   headerExtra,
   sidebarSearch,
   mobileSearch,
-  headerActions,
   headerRight,
   sidebarExtra,
   banner,
@@ -261,10 +258,9 @@ export function AppShell({
                 </BreadcrumbList>
               </Breadcrumb>
               <TopBarInfoSlot />
-              {/* 右侧：页面操作在前（上次刷新 / 刷新最左），全局入口（浮动指令）最后；
-                  手机端全部收进 `…` 菜单。 */}
+              {/* 右侧：页面操作（上次刷新 / 刷新最左），手机端全部收进 `…` 菜单。 */}
               <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">
-                <TopBarSlot extra={headerActions} />
+                <TopBarSlot />
               </div>
             </header>
             {banner}

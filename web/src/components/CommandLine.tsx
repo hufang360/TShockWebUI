@@ -19,8 +19,8 @@ import { useDataset } from '@/lib/datasetContext'
 import type { CommandFavoritesApi } from '@/lib/favorites'
 import { useI18n } from '@/lib/i18n'
 import type { RelatedCommand } from '@/lib/npcRelatedCommands'
+import { openCommandPalette } from '@/lib/commandPalette'
 import { RECIPE_SECTION_TONE } from '@/lib/sectionTones'
-import { useTerminal } from '@/lib/terminalContext'
 
 /** 「相关指令」标题前的图标：149 号物品（书）。与物品详情的「合成」分组同一套图标语言。 */
 const RELATED_ICON_ID = 149
@@ -30,8 +30,8 @@ const RELATED_ICON_ID = 149
  * **标题后面带条目数量**；下面每条指令一行 —— **外观同合成记录**（无描边、浅底 `bg-accent/40`、悬停加深）。
  *
  * 交互（与合成记录一致，但**整行本身什么也不做**）：
- * - 终端：把指令填进右下角的**浮动终端**并让它弹出来（`terminal.open(command)`）；
- *   抽屉会挡在浮窗上面，所以给了 `onOpenTerminal` 时顺手让调用方关掉抽屉；
+ * - 指令：把这条指令填进**搜索面板**（等价于 `Ctrl/Cmd+K` 后敲进去，`openCommandPalette(command)`）；
+ *   给了 `onFilled` 时顺手让调用方关掉抽屉 / 弹框（搜索面板是模态的，盖在它们上面）；
  * - ⭐ 收藏这条指令（写进「指令」页的收藏，与结果卡片同一份数据）；
  * - 复制：只复制，不执行。
  * 带 `note` 的条目（如 `/sb all` → 召唤所有Boss）悬停整行时用 Tooltip 出说明。
@@ -39,13 +39,13 @@ const RELATED_ICON_ID = 149
 export function CommandLine({
   label,
   commands,
-  onOpenTerminal,
+  onFilled,
 }: {
   label: string
   /** 指令条目：可以只给文本，也可以带 `note`（悬停说明）。 */
   commands: Array<string | RelatedCommand>
-  /** 点了「填充指令」之后调用（用来关掉挡住浮动终端的抽屉）。 */
-  onOpenTerminal?: () => void
+  /** 点了「填入指令」之后调用（用来关掉挡路的抽屉 / 弹框）。 */
+  onFilled?: () => void
 }) {
   const { t } = useI18n()
   const dataset = useDataset()
@@ -72,7 +72,7 @@ export function CommandLine({
               key={item.command}
               item={item}
               favorites={favorites}
-              onOpenTerminal={onOpenTerminal}
+              onFilled={onFilled}
             />
           ))}
         </div>
@@ -84,14 +84,13 @@ export function CommandLine({
 function CommandRow({
   item,
   favorites,
-  onOpenTerminal,
+  onFilled,
 }: {
   item: RelatedCommand
   favorites: CommandFavoritesApi
-  onOpenTerminal?: () => void
+  onFilled?: () => void
 }) {
   const { t } = useI18n()
-  const { open: openTerminal } = useTerminal()
   const [copied, setCopied] = useState(false)
   const { command } = item
   const note = item.note ? t(item.note.key, item.note.vars) : null
@@ -116,11 +115,11 @@ function CommandRow({
       <span className="touch-visible flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/cmd:opacity-100 group-focus-within/cmd:opacity-100">
         <IconAction
           size="icon-xs"
-          label={t('commandLine.terminal')}
+          label={t('commandLine.fill')}
           icon={Terminal}
           onClick={() => {
-            openTerminal(command)
-            onOpenTerminal?.()
+            openCommandPalette(command)
+            onFilled?.()
           }}
         />
         <IconAction

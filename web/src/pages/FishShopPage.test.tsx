@@ -1457,11 +1457,11 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect((bottomBar.firstElementChild as HTMLElement).contains(favorite)).toBe(true)
   })
 
-  it('顶栏顺序：刷新全部 / 管理卡片 → 页面设置 / 全屏 → 浮动终端', async () => {
+  it('顶栏顺序：刷新全部 / 管理卡片 → 页面设置 / 全屏', async () => {
     render(
       <I18nProvider lang="zh">
         <TopBarProvider>
-          <TopBarSlot extra={<span data-testid="terminal" />} />
+          <TopBarSlot />
           <DatasetProvider value={makeDataset()}>
             <ExecutionQueueProvider interval={0}>
               <CommandResultsProvider serverId="default">
@@ -1482,11 +1482,11 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     await screen.findByRole('button', { name: '生命水晶' })
 
     // 顶栏右侧插槽的 DOM 顺序 = 视觉顺序
-    const row = (await screen.findByTestId('terminal')).parentElement as HTMLElement
-    const order = [...row.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label'))
+    const order = screen
+      .getAllByRole('button')
+      .map((el) => el.getAttribute('aria-label'))
+      .filter((label) => label && ['刷新全部', '管理卡片', '页面设置', '全屏查看货架'].includes(label))
     expect(order).toEqual(['刷新全部', '管理卡片', '页面设置', '全屏查看货架'])
-    // 终端图标在最后
-    expect(row.lastElementChild).toBe(screen.getByTestId('terminal'))
   })
 
   it('页签收在工具条里，页面设置 / 全屏在顶栏', async () => {

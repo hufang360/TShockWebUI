@@ -21,7 +21,7 @@ import {
 import { IconAction } from '@/components/IconAction'
 import { SearchInput } from '@/components/SearchInput'
 import { useStickyHeaderOffset } from '@/hooks/usePageScroll'
-import { useTerminal } from '@/lib/terminalContext'
+import { openCommandPalette } from '@/lib/commandPalette'
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 import {
@@ -139,8 +139,6 @@ function SeedDataTable({ table, wikiLink }: { table: SeedTable; wikiLink?: React
   // 搜索条吸顶在顶栏下方，表头再吸在它下面（高度实测，避免写死偏移）。
   const toolbarRef = useRef<HTMLDivElement>(null)
   const stickyTop = useStickyHeaderOffset(toolbarRef)
-
-  const { open: openTerminal } = useTerminal()
 
   const copyCode = (code: string) => {
     void copyText(code).then((ok) => {
@@ -331,8 +329,8 @@ function SeedDataTable({ table, wikiLink }: { table: SeedTable; wikiLink?: React
                         icon={Terminal}
                         iconClassName="size-3.5"
                         onClick={() => {
-                          openTerminal(`/wm s ${detail.wm}`)
-                          // 填完就关掉弹框：终端在右下角浮出来，不被遮罩挡住
+                          openCommandPalette(`/wm s ${detail.wm}`)
+                          // 关掉弹框：搜索面板是模态的，免得两层弹框叠在一起
                           setDetail(null)
                         }}
                       />
@@ -359,7 +357,7 @@ function sectionRowStart(sections: CommonTableSection[], index: number): number 
 /**
  * 浮层里的代码块（带底色，和正文区分开）。
  *
- * `actions` 渲染在复制键**左边紧挨着**（如「相关指令」的填入终端键）；
+ * `actions` 渲染在复制键**左边紧挨着**（如「相关指令」的填入指令键）；
  * 容器本身不是按钮，避免按钮套按钮——复制键单独可点。
  */
 function CodeChip({

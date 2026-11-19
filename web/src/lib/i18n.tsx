@@ -34,7 +34,7 @@ const zh: Dict = {
   'tables.links': '常用链接',
   'tables.tab.commands': '指令',
   'tables.wm.label': '相关指令',
-  'tables.wm.fill': '填入浮动终端',
+  'tables.wm.fill': '填入指令',
   'tables.column.name': '名称',
   'tables.column.internal': '内部名称',
   'tables.column.seed': '种子',
@@ -115,7 +115,7 @@ const zh: Dict = {
   'commandLine.withCount': '{label}（{n}）',
   'commandLine.favorite': '收藏这条指令',
   'commandLine.unfavorite': '取消收藏',
-  'commandLine.terminal': '填充指令',
+  'commandLine.fill': '填入指令',
   'commandLine.note.spawnAll': '召唤所有Boss',
   'commandLine.note.summonItem': '召唤物品：{name}',
   'commandLine.note.setDungeon': '设置地牢点',
@@ -142,7 +142,7 @@ const zh: Dict = {
   'search.global.keys.remove': '删除',
   'search.action.copyId': '复制 ID',
   'search.action.copyCommand': '复制指令',
-  'search.action.fillTerminal': '填入终端',
+  'search.action.fillCommand': '填入指令',
   'search.action.run': '执行',
   'search.action.copyFailed': '复制失败',
   'search.global.seeMore': '更多',
@@ -347,7 +347,7 @@ const zh: Dict = {
   'commands.row.npcLink': '数据 ID → NPC',
   'commands.search.placeholder': '搜索指令或名称',
   'commands.search.empty': '没有匹配的指令',
-  'page.tips.desc': '单击一行查看详情，在详情里复制或把指令填进指令浮窗，不会自动执行。\n'
+  'page.tips.desc': '单击一行查看详情，在详情里复制，或「执行」把指令填进搜索框（Ctrl/Cmd+K，不自动执行）。\n'
     + '带占位符的语法行只能复制。\n'
     + '各指令权限不同，由服务器判定。',
   'pluginHelp.name': '插件名称：',
@@ -417,13 +417,6 @@ const zh: Dict = {
     '权限都很高（如 /off 会保存并关闭服务器），执行前请确认。\n'
     + '本页只列语法，不会替你执行。',
   'commands.group.chat': '聊天与统计',
-
-  'terminal.title': '指令',
-  'terminal.fab': '指令',
-  'terminal.open': '指令',
-  'terminal.close': '关闭终端',
-  'terminal.openInCommand': '在指令页中打开',
-  'terminal.shortcutHint': '打开 / 关闭终端',
 
   'result.clear': '清空结果',
 
@@ -1467,7 +1460,7 @@ const en: Dict = {
   'tables.links': 'Links',
   'tables.tab.commands': 'Commands',
   'tables.wm.label': 'Related command',
-  'tables.wm.fill': 'Fill in terminal',
+  'tables.wm.fill': 'Fill command',
   'tables.column.name': 'Name',
   'tables.column.internal': 'Internal name',
   'tables.column.seed': 'Seed',
@@ -1547,7 +1540,7 @@ const en: Dict = {
   'commandLine.withCount': '{label} ({n})',
   'commandLine.favorite': 'Save this command',
   'commandLine.unfavorite': 'Remove from saved',
-  'commandLine.terminal': 'Fill command',
+  'commandLine.fill': 'Fill command',
   'commandLine.note.spawnAll': 'Summon all bosses',
   'commandLine.note.summonItem': 'Summon item: {name}',
   'commandLine.note.setDungeon': 'Set the dungeon point',
@@ -1575,7 +1568,7 @@ const en: Dict = {
   'search.global.keys.remove': 'Remove',
   'search.action.copyId': 'Copy ID',
   'search.action.copyCommand': 'Copy command',
-  'search.action.fillTerminal': 'Fill terminal',
+  'search.action.fillCommand': 'Fill command',
   'search.action.run': 'Run',
   'search.action.copyFailed': 'Copy failed',
   'search.global.seeMore': 'More',
@@ -1781,7 +1774,7 @@ const en: Dict = {
   'commands.row.npcLink': 'Data IDs → NPC',
   'commands.search.placeholder': 'Search command or name',
   'commands.search.empty': 'No matching command',
-  'page.tips.desc': 'Click a row to open its details, then copy it or fill it into the command window — nothing runs automatically.\n'
+  'page.tips.desc': 'Click a row to open its details, then copy it or hit Run to put it into the search box (Ctrl/Cmd+K, nothing runs automatically).\n'
     + 'Syntax rows with placeholders can only be copied.\n'
     + 'Every command needs its own permission, checked by the server.',
   'pluginHelp.name': 'Plugin: ',
@@ -1851,13 +1844,6 @@ const en: Dict = {
     'These are high-privilege (e.g. /off saves and shuts the server down), so confirm before running.\n'
     + 'This page only shows syntax, it never runs anything for you.',
   'commands.group.chat': 'Chat & stats',
-
-  'terminal.title': 'Commands',
-  'terminal.fab': 'Commands',
-  'terminal.open': 'Commands',
-  'terminal.close': 'Close terminal',
-  'terminal.openInCommand': 'Open in command page',
-  'terminal.shortcutHint': 'Toggle terminal',
 
   'result.clear': 'Clear results',
 

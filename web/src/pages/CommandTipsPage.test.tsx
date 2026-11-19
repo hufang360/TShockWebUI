@@ -2,28 +2,12 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CommandTerminal } from '@/components/CommandTerminal'
 import { makeDataset } from '@/test/fixtures'
 import { NO_INGAME, type IngamePolicy } from '@/lib/ingame'
 import { I18nProvider } from '@/lib/i18n'
-import { TerminalProvider } from '@/lib/terminalContext'
-import { playerStubs } from '@/test/playerStubs'
-import type { BackendTransport } from '@/lib/tshock'
-import type { CommandDef, Dataset, Settings } from '@/types'
+import { installCommandPaletteSpy, lastFilled } from '@/test/commandPaletteSpy'
+import type { CommandDef, Dataset } from '@/types'
 import { CommandTipsPage } from './CommandTipsPage'
-
-const settings: Settings = {
-  theme: 'dark',
-  fontSize: 15,
-  showIcons: true,
-  insertWithCount: false,
-  liveMode: false,
-  language: 'zh',
-  compact: true,
-  commandInterval: 2000,
-  refreshInterval: 120000,
-  eventsRefreshInterval: 180000,
-}
 
 const npcs = [
   { id: 22, key: 'Guide', name: '向导', en: 'Guide' },
@@ -59,37 +43,15 @@ function makeTestDataset(overrides: Partial<Dataset> = {}): Dataset {
   }
 }
 
-const transport = {
-  mock: false,
-  label: 'test',
-  runCommand: async () => ({ status: 'ok', output: [] }),
-  ...playerStubs,
-} as unknown as BackendTransport
-
 function renderPage(
   dataset: Dataset = makeTestDataset(),
   onNavigate = vi.fn(),
   ingame: IngamePolicy = NO_INGAME,
 ) {
+  installCommandPaletteSpy()
   const view = render(
     <I18nProvider lang="zh">
-      <TerminalProvider>
-        <CommandTipsPage dataset={dataset} onNavigate={onNavigate} ingame={ingame} />
-        <CommandTerminal
-          visible
-          dataset={dataset}
-          transport={transport}
-          authenticated
-          serverId="default"
-          players={[]}
-          ingame={{ enabled: false, commands: [] }}
-          runtimeValues={{}}
-          settings={settings}
-          onTokenInvalid={vi.fn().mockResolvedValue(true)}
-          onLogin={vi.fn()}
-          onNavigate={vi.fn()}
-        />
-      </TerminalProvider>
+      <CommandTipsPage dataset={dataset} onNavigate={onNavigate} ingame={ingame} />
     </I18nProvider>,
   )
   return { ...view, onNavigate }
@@ -149,17 +111,16 @@ function hasDetail() {
   return screen.queryByTestId('command-detail') !== null
 }
 
-/** 展开详情浮层 → 点浮层里的「执行」（只是填进浮窗，不自动跑）。 */
+/** 展开详情浮层 → 点浮层里的「执行」（填进搜索面板，不自动跑）。 */
 function fill(command: string) {
   const panel = screen.queryByTestId('command-detail')
   const detail = panel && panel.textContent?.includes(command) ? within(panel) : openDetail(command)
   fireEvent.click(detail.getByRole('button', { name: '执行' }))
 }
 
-/** 打开（或复用）右下角浮窗里的输入框。 */
+/** 最后填进搜索面板的那条指令（`openCommandPalette` 的入参）。 */
 function inputValue(): string {
-  const input = screen.getByPlaceholderText(/输入指令/) as HTMLTextAreaElement
-  return input.value
+  return lastFilled()
 }
 
 beforeEach(() => {
@@ -179,7 +140,7 @@ describe('CommandTipsPage', () => {
     const help = /各指令权限不同，由服务器判定/
     // 默认展开：说明就在正文顶部。
     expect(await screen.findByText(help)).toBeTruthy()
-    expect(screen.getByText(/不会自动执行/)).toBeTruthy()
+    expect(screen.getByText(/把指令填进搜索框/)).toBeTruthy()
     // 关闭后不再自动显示（状态记在本机）。
     fireEvent.click(screen.getByRole('button', { name: '关闭' }))
     await waitFor(() => expect(screen.queryByText(help)).toBeNull())
@@ -289,8 +250,8 @@ describe('CommandTipsPage', () => {
     fireEvent.click(row('/hardmode'))
     expect(hasDetail()).toBe(true)
     expect(screen.getByTestId('command-detail').textContent).toContain('/hardmode')
-    // 单击行不会填浮窗
-    expect(screen.queryByTestId('terminal-window')).toBeNull()
+    // 单击行只开详情，不填指令
+    expect(inputValue()).toBe('')
 
     // 关掉再点另一条：始终只开一个
     fireEvent.click(within(screen.getByTestId('command-detail')).getByRole('button', { name: 'Close' }))
@@ -411,7 +372,7 @@ describe('CommandTipsPage', () => {
     const boss = findRow('data-fold', '/spawnboss')
     expect(boss?.textContent).not.toContain('仅游戏内')
 
-    // 详情里恢复「执行」（点它只是把指令填进浮窗，不自动发）。
+    // 详情里恢复「执行」（点它只是把指令填进搜索面板，不自动发）。
     expandAllGroups()
     const detail = openDetail('/spawnboss "king slime"')
     expect(detail.getByRole('button', { name: '执行' })).toBeTruthy()
@@ -492,7 +453,7 @@ describe('CommandTipsPage', () => {
     expect(shown).toEqual(['/evil', '/hardmode', '/worldinfo', '/worldmode'])
   })
 
-  it('事件 / 入侵二级 / 节日 / 世界模式 / 时间风 的指令都能填进浮窗', () => {
+  it('事件 / 入侵二级 / 节日 / 世界模式 / 时间风 的指令都能填进搜索面板', () => {
     renderPage()
     fill('/worldevent bloodmoon')
     expect(inputValue()).toBe('/worldevent bloodmoon')
@@ -527,10 +488,9 @@ describe('CommandTipsPage', () => {
     expect(inputValue()).toBe('/godmode')
   })
 
-  it('点 Boss 记录 → 打开浮窗并填入 /spawnboss <参数>，再点一条会覆盖', () => {
+  it('点 Boss 记录 → 填进搜索面板，再点一条会覆盖', () => {
     renderPage()
     fill('/spawnboss "eye of cthulhu"')
-    expect(screen.getByTestId('terminal-window')).toBeTruthy()
     expect(inputValue()).toBe('/spawnboss "eye of cthulhu"')
 
     fill('/spawnboss "king slime"')
@@ -619,7 +579,7 @@ describe('CommandTipsPage', () => {
     expect(table().getByText('/group add <group name> [permissions]')).toBeTruthy()
   })
 
-  it('权限配置：给 default 组开 WebUI / 插件权限，点一条填进浮窗', () => {
+  it('权限配置：给 default 组开 WebUI / 插件权限，点一条填进搜索面板', () => {
     renderPage(makeTestDataset({ commands: realCommands }))
     fireEvent.click(groupList().getByRole('button', { name: /^权限配置/ }))
     // 整个分组只剩两行：内置 /group（含 TShock 权限那两条）和插件权限的「hf 常用」
@@ -638,7 +598,7 @@ describe('CommandTipsPage', () => {
     expect(table().getByText('/group addperm default worldinfo bossinfo')).toBeTruthy()
     expect(table().getByText('/group addperm default lookbag')).toBeTruthy()
 
-    // 点了就填进浮窗（不自动执行）
+    // 点了就填进搜索面板（不自动执行）
     fill('/group addperm default lookbag')
     expect(inputValue()).toBe('/group addperm default lookbag')
 

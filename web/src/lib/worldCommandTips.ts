@@ -22,7 +22,7 @@
  */
 
 export interface CommandTip {
-  /** 点击后填进浮窗的**完整**指令（都是可执行的具体写法）。 */
+  /** 点击后填进搜索框的**完整**指令（都是可执行的具体写法）。 */
   command: string
   label: { zh: string; en: string }
   /** 备注列的一句话（可选；不给就不占位）。 */

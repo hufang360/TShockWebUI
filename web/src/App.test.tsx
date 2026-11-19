@@ -556,56 +556,41 @@ it('登录失败时提示服主赋权命令（addperm tshock.rest.useapi）', as
   ).toBeTruthy()
 })
 
-it('「终端」打开浮动终端，执行结果与指令页共享', async () => {
+it('指令小抄的「执行」把指令填进搜索面板（等于 Ctrl+K 后敲进去），回车就地跑', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')
   await loginAsAlice()
 
-  // 顶栏右侧的终端入口（未登录不渲染）：先进「物品 ID」。
-  fireEvent.click(screen.getAllByRole('button', { name: '物品 ID' })[0])
-  fireEvent.click(await screen.findByTestId('terminal-topbar'))
-  const win = await screen.findByTestId('terminal-window')
-  const input = within(win).getByPlaceholderText(/输入指令/)
-  fireEvent.change(input, { target: { value: '/time day' } })
-  // 先收起补全下拉，再回车执行（与指令页的编辑器行为一致）。
-  fireEvent.keyDown(input, { key: 'Escape' })
+  fireEvent.click(screen.getAllByRole('button', { name: '常用表格' })[0])
+  expect(await screen.findByPlaceholderText('搜索指令或名称')).toBeTruthy()
+
+  // 同前缀的行收在折叠组里（`/time day` 归 `/time`）。
+  const fold = (stem: string) =>
+    fireEvent.click(
+      [...document.querySelectorAll<HTMLElement>('tr[data-fold]')].find(
+        (el) => el.getAttribute('data-fold') === stem,
+      )!,
+    )
+  fold('/time')
+  const row = [...document.querySelectorAll<HTMLElement>('tr[data-command]')].find(
+    (el) => el.getAttribute('data-command') === '/time day',
+  )!
+  fireEvent.click(row)
+  fireEvent.click(within(await screen.findByTestId('command-detail')).getByRole('button', { name: '执行' }))
+
+  // 不跳页：搜索面板弹出来，输入框里就是这条指令，顶部是「执行指令」那一行（还没执行）。
+  const palette = await screen.findByTestId('global-search-dialog')
+  expect(window.location.hash).toBe('#/ref')
+  const input = within(palette).getByRole('combobox') as HTMLInputElement
+  expect(input.value).toBe('/time day')
+  expect(await within(palette).findByRole('option', { name: /执行指令：\/time day/ })).toBeTruthy()
+  expect(within(palette).queryByTestId('global-search-run')).toBeNull()
+
+  // 回车执行：结果就在面板里（与指令页共用同一份结果）。
   fireEvent.keyDown(input, { key: 'Enter' })
-  expect(await within(win).findByText(/世界时间/)).toBeTruthy()
-
-  // 切到指令页：终端自动收起（该页不需要它），终端跑过的结果已经在结果列表里（共用 tswui:commandResults）。
-  fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
-  await waitFor(() => expect(screen.queryByTestId('terminal-window')).toBeNull())
-  expect(await within(screen.getByRole('main')).findByText(/世界时间/)).toBeTruthy()
-})
-
-it('顶栏「指令」入口：未登录 / 指令 / 设置不显示，其余页面（含首页）显示', async () => {
-  mockFetch()
-  render(<App transport={new MockTransport()} />)
-  await screen.findByText('WebUI')
-
-  // 未登录：不显示入口。
-  expect(screen.queryByTestId('terminal-topbar')).toBeNull()
-
-  await loginAsAlice()
-  // 首页：右侧顶栏 = 上次刷新 / 刷新 / 管理卡片 / 终端。
-  expect(await screen.findByText('服务器状态')).toBeTruthy()
-  expect(await screen.findByTestId('terminal-topbar')).toBeTruthy()
-
-  // 指令页：隐藏。
-  fireEvent.click(screen.getAllByRole('button', { name: '指令' })[0])
-  expect(await screen.findByPlaceholderText(/输入指令/)).toBeTruthy()
-  await waitFor(() => expect(screen.queryByTestId('terminal-topbar')).toBeNull())
-
-  // 物品 ID：显示。
-  fireEvent.click(screen.getAllByRole('button', { name: '物品 ID' })[0])
-  expect(await screen.findByTestId('terminal-topbar')).toBeTruthy()
-
-  // 设置页：隐藏。
-  fireEvent.click(screen.getAllByRole('button', { name: '设置' })[0])
-  // 页面标题现在只在顶栏出现（内容区不再重复「设置」）。
-  expect(await screen.findByText('设置', { selector: '[data-slot="breadcrumb-page"]' })).toBeTruthy()
-  await waitFor(() => expect(screen.queryByTestId('terminal-topbar')).toBeNull())
+  const runView = await within(palette).findByTestId('global-search-run')
+  expect(await within(runView).findByText(/世界时间/)).toBeTruthy()
 })
 
 it('「玩家存档」是独立侧边栏菜单：未登录也能用，不依赖玩家管理模块', async () => {
@@ -630,7 +615,7 @@ it('「玩家存档」是独立侧边栏菜单：未登录也能用，不依赖�
 const mockAllowsIngame = (cmd: string) =>
   (MOCK_BATCH_CAPABILITIES.ingameCommands ?? []).includes(cmd.replace(/^\//, ''))
 
-it('「指令小抄」是常用表格页的第一张表：分组列出 Boss，点终端填进浮窗', async () => {
+it('「指令小抄」是常用表格页的第一张表：分组列出 Boss，详情里能复制', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)
   await screen.findByText('WebUI')

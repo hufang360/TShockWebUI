@@ -30,10 +30,6 @@ export const StorageKeys = {
    * 手动执行的卡片不会自己跑，刷新浏览器后「执行于 …」不该丢。
    */
   cardResults: 'cardResults',
-  /** 浮动终端的窗口位置与尺寸 `{ x, y, w, h }`（桌面端；每次拖动 / 缩放后写入）。 */
-  terminal: 'terminal',
-  /** 浮动终端的输入草稿。与指令页草稿分开：终端执行后清空输入，不应抹掉页面里的草稿。 */
-  terminalDraft: 'terminal:draft',
   /** 可折叠卡片（指令结果 / 首页与模块卡片）的展开状态 { key: open }。 */
   collapsedCards: 'collapsedCards',
   /** 物品图鉴里收藏的物品 id（在「指令」模块的收藏 tab 展示）。 */
@@ -199,6 +195,15 @@ export function writeJson(key: StorageKey, value: unknown): boolean {
 }
 
 export function removeKey(key: StorageKey): void {
+  try {
+    backend.removeItem(fullKey(key))
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 清理**已废弃**的键（旧版本写过、当前版本已不再使用，例如已删除功能的窗口位置）。 */
+export function removeLegacyKey(key: string): void {
   try {
     backend.removeItem(fullKey(key))
   } catch {

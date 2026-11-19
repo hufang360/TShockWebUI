@@ -1,28 +1,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
-import { useTerminal } from '@/lib/terminalContext'
-import { TerminalProvider } from '@/lib/terminalContext'
+import { installCommandPaletteSpy, lastFilled } from '@/test/commandPaletteSpy'
 import { CommandLine } from './CommandLine'
-
-/** 探针：把终端的开关状态与最后填进去的文本显示出来（真实终端由 App 渲染）。 */
-function TerminalProbe() {
-  const { isOpen, request } = useTerminal()
-  return (
-    <div>
-      <span data-testid="terminal-open">{isOpen ? 'open' : 'closed'}</span>
-      <span data-testid="terminal-text">{request?.text ?? ''}</span>
-    </div>
-  )
-}
 
 function renderLine(commands = ['/spawnmob 4', '/sb eoc']) {
   return render(
     <I18nProvider lang="zh">
-      <TerminalProvider>
-        <CommandLine label="相关指令" commands={commands} />
-        <TerminalProbe />
-      </TerminalProvider>
+      <CommandLine label="相关指令" commands={commands} />
     </I18nProvider>,
   )
 }
@@ -30,6 +15,7 @@ function renderLine(commands = ['/spawnmob 4', '/sb eoc']) {
 describe('CommandLine（相关指令）', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    installCommandPaletteSpy()
   })
 
   it('分组标题带条目数量，且可折叠', () => {
@@ -43,12 +29,10 @@ describe('CommandLine（相关指令）', () => {
   it('带 note 的条目（如 `/sb all`）悬停出说明 Tooltip', async () => {
     render(
       <I18nProvider lang="zh">
-        <TerminalProvider>
-          <CommandLine
-            label="相关指令"
-            commands={[{ command: '/sb all', note: { key: 'commandLine.note.spawnAll' } }]}
-          />
-        </TerminalProvider>
+        <CommandLine
+          label="相关指令"
+          commands={[{ command: '/sb all', note: { key: 'commandLine.note.spawnAll' } }]}
+        />
       </I18nProvider>,
     )
     expect(screen.queryByText('召唤所有Boss')).toBeNull()
@@ -67,7 +51,7 @@ describe('CommandLine（相关指令）', () => {
     expect(writeText).not.toHaveBeenCalled()
   })
 
-  it('复制按钮只复制，不执行也不开终端', async () => {
+  it('复制按钮只复制，不填指令', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     renderLine()
@@ -75,29 +59,25 @@ describe('CommandLine（相关指令）', () => {
     fireEvent.click(within(row).getByRole('button', { name: '复制' }))
     await screen.findByText('已复制')
     expect(writeText).toHaveBeenCalledWith('/spawnmob 4')
-    expect(screen.getByTestId('terminal-open').textContent).toBe('closed')
+    expect(lastFilled()).toBe('')
   })
 
-  it('终端按钮把指令填进浮动终端并让它弹出来', () => {
+  it('指令按钮把这条指令填进搜索面板（只填不执行）', () => {
     renderLine()
     const [, row] = screen.getAllByTestId('command-row')
-    expect(screen.getByTestId('terminal-open').textContent).toBe('closed')
-    fireEvent.click(within(row).getByRole('button', { name: '填充指令' }))
-    expect(screen.getByTestId('terminal-text').textContent).toBe('/sb eoc')
-    expect(screen.getByTestId('terminal-open').textContent).toBe('open')
+    fireEvent.click(within(row).getByRole('button', { name: '填入指令' }))
+    expect(lastFilled()).toBe('/sb eoc')
   })
 
-  it('填充指令后回调 onOpenTerminal（调用方用它关掉挡住浮窗的抽屉）', () => {
-    const onOpenTerminal = vi.fn()
+  it('填入后回调 onFilled（调用方用它关掉抽屉 / 弹框）', () => {
+    const onFilled = vi.fn()
     render(
       <I18nProvider lang="zh">
-        <TerminalProvider>
-          <CommandLine label="相关指令" commands={['/spawnmob 4']} onOpenTerminal={onOpenTerminal} />
-        </TerminalProvider>
+        <CommandLine label="相关指令" commands={['/spawnmob 4']} onFilled={onFilled} />
       </I18nProvider>,
     )
-    fireEvent.click(screen.getByRole('button', { name: '填充指令' }))
-    expect(onOpenTerminal).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: '填入指令' }))
+    expect(onFilled).toHaveBeenCalledTimes(1)
   })
 
   it('⭐ 收藏写进 tswui:favorites（与「指令」页共用）', () => {

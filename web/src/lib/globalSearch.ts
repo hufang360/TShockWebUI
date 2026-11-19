@@ -72,14 +72,14 @@ export interface SearchHit {
   meta?: string
   /** 行内「复制」的内容（物品 / NPC / Buff / 图格 / 墙的 ID，指令的 `/name`）。 */
   copy?: string
-  /** 有值时多一个「填入浮动终端」操作（只有指令有）。 */
+  /** 有值时多一个「填入指令」操作（只有指令有）。 */
   command?: string
   /**
    * 可以直接执行（只有指令有）：`allowServer !== false` 且**没有必填参数**（能裸跑）。
-   * 为 false 时回车不替你裸跑：`needsArgs` 的填进浮动终端，其余跳到「指令小抄」看用法。
+   * 为 false 时回车不替你裸跑：`needsArgs` 的填进搜索框，其余跳到「指令小抄」看用法。
    */
   runnable?: boolean
-  /** 有必填参数（需要先补参数才能跑）：回车改成填入浮动终端而不是执行。 */
+  /** 有必填参数（需要先补参数才能跑）：失败后多给一个「填入指令」的退路。 */
   needsArgs?: boolean
   /** `allowServer === false`：只能在游戏内执行（网页不能跑，列表里标红）。 */
   inGameOnly?: boolean

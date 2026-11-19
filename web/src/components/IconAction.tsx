@@ -39,7 +39,7 @@ interface IconActionProps
    */
   tooltip?: boolean
   className?: string
-  /** 测试定位用（如 `terminal-topbar`）。 */
+  /** 测试定位用（如 `global-search-open`）。 */
   testId?: string
 }
 

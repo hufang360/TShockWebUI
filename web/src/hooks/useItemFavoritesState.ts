@@ -13,8 +13,8 @@ import type { ItemFavorite } from '@/types'
 /**
  * 物品收藏（`tswui:itemFavorites`）的唯一状态实现。
  *
- * 为什么是 hook 而不是「只有 App 顶上那一份 state」：物品提示散落在页面、浮动终端、首页卡片、
- * 聊天等各处，提示里的 ⭐ 需要**到处都能点**。App 顶层挂一个 `ItemFavoritesStoreProvider`
+ * 为什么是 hook 而不是「只有 App 顶上那一份 state」：物品提示散落在页面、首页卡片、聊天等各处，
+ * 提示里的 ⭐ 需要**到处都能点**。App 顶层挂一个 `ItemFavoritesStoreProvider`
  * 覆盖所有非页面区域；页面（图鉴 / 指令）自己也调本 hook（收藏列表要做筛选 / tab）。
  * 多个实例之间靠 `useLocalState` 的 `STORAGE_EVENT` 同步：任意一处点 ⭐，其它位置的提示立刻跟着变。
  */

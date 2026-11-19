@@ -720,20 +720,20 @@ function DetailRow({
  * NPC 详情：贴图 + `#ID 名称` / 英文名 / 内部名，底部是「相关指令」。
  *
  * 相关指令**不按权限隐藏**：玩家照常能看到 / 复制（能不能执行由 TShock 判定，
- * 与「小抄」页一致：不把权限当展示门槛）。行内 ⭐ / 终端 / 复制见 `CommandLine`。
+ * 与「小抄」页一致：不把权限当展示门槛）。行内 ⭐ / 填入指令 / 复制见 `CommandLine`。
  */
 export function NpcDetail({
   npc,
   large = false,
   username = null,
-  onOpenTerminal,
+  onFilled,
 }: {
   npc: Npc
   large?: boolean
   /** 当前登录玩家名：Boss 召唤物那条要拼 `/give <物品> <玩家>`（未登录就没有这一行）。 */
   username?: string | null
-  /** 点了「填充指令」后关掉抽屉（浮动终端在抽屉下面，不关就看不见）。 */
-  onOpenTerminal?: () => void
+  /** 点了「填入指令」后关掉抽屉（搜索面板是模态的，不叠两层）。 */
+  onFilled?: () => void
 }) {
   const { t, lang } = useI18n()
   const dataset = useDataset()
@@ -761,7 +761,7 @@ export function NpcDetail({
       <CommandLine
         label={t('commandLine.related')}
         commands={npcRelatedCommands(npc, { itemName, username })}
-        onOpenTerminal={onOpenTerminal}
+        onFilled={onFilled}
       />
     </div>
   )
@@ -895,12 +895,12 @@ export function BuffDetail({
   buff,
   large = false,
   gbuffPlayer = null,
-  onOpenTerminal,
+  onFilled,
 }: {
   buff: Buff
   large?: boolean
-  /** 点了「填充指令」后关掉抽屉（浮动终端在抽屉下面）。 */
-  onOpenTerminal?: () => void
+  /** 点了「填入指令」后关掉抽屉（搜索面板是模态的）。 */
+  onFilled?: () => void
   /**
    * 当前玩家名 → 显示 `/gbuff <玩家> <buffID>`；未登录 / 不知道玩家名传 null（拼不出来，不显示）。
    * 不探测权限（见 `DataIdPage`：本页不请求 `/api/me`）。
@@ -924,7 +924,7 @@ export function BuffDetail({
         <CommandLine
           label={t('commandLine.related')}
           commands={[gbuffCommand(gbuffPlayer, buff.id)]}
-          onOpenTerminal={onOpenTerminal}
+          onFilled={onFilled}
         />
       )}
     </div>

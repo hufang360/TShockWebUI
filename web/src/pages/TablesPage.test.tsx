@@ -2,28 +2,22 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NO_INGAME } from '@/lib/ingame'
 import { I18nProvider } from '@/lib/i18n'
+import { installCommandPaletteSpy, lastFilled } from '@/test/commandPaletteSpy'
 import { resetSearchIntent, requestSearchIntent } from '@/lib/searchIntent'
 import { makeDataset } from '@/test/fixtures'
-import { TerminalProvider } from '@/lib/terminalContext'
 import type { Lang } from '@/types'
 
 const copyText = vi.fn((text: string) => Promise.resolve(text.length > 0))
 vi.mock('@/lib/clipboard', () => ({ copyText: (text: string) => copyText(text) }))
 
-const terminalOpen = vi.fn()
-vi.mock('@/lib/terminalContext', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/terminalContext')>()),
-  useTerminal: () => ({ isOpen: false, open: terminalOpen, close: vi.fn(), toggle: vi.fn(), request: null }),
-}))
-
 const { TablesPage } = await import('./TablesPage')
 
 function renderPage(lang: Lang = 'zh') {
+  installCommandPaletteSpy()
+  const onNavigate = vi.fn()
   return render(
     <I18nProvider lang={lang}>
-      <TerminalProvider>
-        <TablesPage dataset={makeDataset()} onNavigate={vi.fn()} ingame={NO_INGAME} />
-      </TerminalProvider>
+      <TablesPage dataset={makeDataset()} onNavigate={onNavigate} ingame={NO_INGAME} />
     </I18nProvider>,
   )
 }
@@ -127,9 +121,9 @@ describe('TablesPage', () => {
     fireEvent.click(dialog.getByRole('button', { name: '复制种子 /wm s ftw' }))
     expect(copyText).toHaveBeenCalledWith('/wm s ftw')
 
-    // 终端图标：把指令填进浮动终端，并主动关掉弹框（否则遮罩挡住终端）
-    fireEvent.click(dialog.getByRole('button', { name: '填入浮动终端' }))
-    expect(terminalOpen).toHaveBeenCalledWith('/wm s ftw')
+    // 终端图标：把这条指令填进搜索面板，同时关掉弹框（面板是模态的，不叠两层）
+    fireEvent.click(dialog.getByRole('button', { name: '填入指令' }))
+    expect(lastFilled()).toBe('/wm s ftw')
     expect(screen.queryByRole('dialog')).toBeNull()
 
     fireEvent.keyDown(document.body, { key: 'Escape' })

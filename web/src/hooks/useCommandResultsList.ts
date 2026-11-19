@@ -60,7 +60,7 @@ export function sanitizeResults(value: unknown): ResultEntry[] {
 /**
  * 指令执行结果（`tswui:commandResults`，**按服务器分开**）。
  *
- * 指令页与浮动终端共用同一份结果：在终端里执行完，切回指令页能直接看到那一条；
+ * 执行结果落在本机（`tswui:commandResults`，按服务器分）：刷新浏览器后还能看到最近几条；
  * 反过来也一样。追加时 seq 接着现有最大值，避免两边各自递增撞号。
  */
 export interface CommandResultsApi {

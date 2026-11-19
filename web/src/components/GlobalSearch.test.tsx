@@ -3,6 +3,7 @@ import { House } from 'lucide-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import type { GlobalSearchSources } from '@/lib/globalSearch'
+
 import { forgetDrill } from '@/lib/searchDrill'
 import { StorageKeys } from '@/lib/storage'
 import { makeDataset } from '@/test/fixtures'
@@ -38,7 +39,6 @@ function renderDialog(props: { onNavigate?: () => void; onOpenItem?: () => void 
         sources={sources()}
         onNavigate={onNavigate}
         onOpenItem={onOpenItem}
-        canFillTerminal
         canRunCommands={false}
         onRunCommand={async () => ({ status: 'ok', output: [] })}
       />
@@ -87,7 +87,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands={false}
           onRunCommand={vi.fn()}
         />
@@ -150,7 +149,7 @@ describe('GlobalSearchDialog', () => {
   })
 
   it('指令行：登录后 Enter 都是「执行」（含必填参数），未登录是「查看」（行内无按钮）', async () => {
-    const view = (canFillTerminal: boolean, canRunCommands: boolean) => (
+    const view = (canRunCommands: boolean) => (
       <I18nProvider lang="zh">
         <GlobalSearchDialog
           open
@@ -158,7 +157,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal={canFillTerminal}
           canRunCommands={canRunCommands}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -168,7 +166,7 @@ describe('GlobalSearchDialog', () => {
     /** 行里不再有图标按钮：动作只写在底栏。 */
     const rowIcons = (row: HTMLElement) => row.querySelectorAll('[role="presentation"]').length
 
-    const { rerender } = render(view(true, true))
+    const { rerender } = render(view(true))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'give' } })
     const giveRow = await screen.findByRole('option', { name: /\/give/ })
     // 必填参数不再拦执行：底栏写「执行」，行里也没有图标按钮。
@@ -177,19 +175,19 @@ describe('GlobalSearchDialog', () => {
     expect(rowIcons(giveRow)).toBe(0)
 
     // 未登录：不执行，Enter 变成「查看」（跳到指令小抄看用法）。
-    rerender(view(true, false))
+    rerender(view(false))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'give' } })
     await waitFor(() => expect(hints()).toContain('查看'))
     expect(hints()).not.toContain('执行')
 
     // 能裸跑的 /help：Enter = 执行（不是填终端）。
-    rerender(view(true, true))
+    rerender(view(true))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'help' } })
     await screen.findByRole('option', { name: /\/help/ })
     await waitFor(() => expect(hints()).toContain('执行'))
 
     // 未登录：不执行，Enter 只是打开（跳指令小抄）。
-    rerender(view(true, false))
+    rerender(view(false))
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'help' } })
     await waitFor(() => expect(hints()).not.toContain('执行'))
   })
@@ -217,7 +215,6 @@ describe('GlobalSearchDialog', () => {
           })}
           onNavigate={onNavigate}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -239,7 +236,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -277,7 +273,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -326,7 +321,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={async () => ({
             status: 'ok' as const,
@@ -359,7 +353,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={onNavigate}
           onOpenItem={() => {}}
-          canFillTerminal={false}
           canRunCommands={false}
           onRunCommand={vi.fn()}
         />
@@ -456,7 +449,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={onNavigate}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -499,7 +491,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -539,7 +530,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -575,7 +565,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />
@@ -611,7 +600,7 @@ describe('GlobalSearchDialog', () => {
     )
   })
 
-  it('有必填参数的指令也直接执行（数据里的 required 不拦）：失败后给「查看用法」+「填入终端」', async () => {
+  it('有必填参数的指令也直接执行（数据里的 required 不拦）：失败后给「查看用法」+「填入指令」', async () => {
     const onRunCommand = vi.fn(async () => ({
       status: 'command_error' as const,
       output: ['用法：/give <物品> <玩家>'],
@@ -625,7 +614,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={() => {}}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -637,9 +625,13 @@ describe('GlobalSearchDialog', () => {
     expect(onRunCommand).toHaveBeenCalledWith('/give')
     const view = await screen.findByTestId('global-search-run')
     expect(await within(view).findByText('参数不足')).toBeTruthy()
-    // 失败才给两个退路：看用法 / 填终端补参数。
+    // 失败才给两个退路：看用法 / 把指令放回输入框补参数。
     expect(within(view).getByRole('button', { name: '查看用法' })).toBeTruthy()
-    expect(within(view).getByRole('button', { name: '填入终端' })).toBeTruthy()
+    expect(within(view).getByRole('button', { name: '填入指令' })).toBeTruthy()
+
+    // 填入 = 指令回到输入框（等价于用户自己敲了一遍），补完参数再回车。
+    fireEvent.click(within(view).getByRole('button', { name: '填入指令' }))
+    expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('/give')
   })
 
   it('/give 29 Alice：置顶「执行指令」行，回车直接跑这一行', async () => {
@@ -652,7 +644,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -681,7 +672,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -712,7 +702,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={onNavigate}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={onRunCommand}
         />
@@ -742,7 +731,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={onNavigate2}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={onRun2}
         />
@@ -764,7 +752,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={vi.fn()}
           onOpenItem={() => {}}
-          canFillTerminal={false}
           canRunCommands={false}
           onRunCommand={vi.fn()}
         />
@@ -785,7 +772,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources()}
           onNavigate={onNavigate}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands
           onRunCommand={async () => ({ status: 'command_error', output: [], message: '用法错误' })}
         />
@@ -818,7 +804,6 @@ describe('GlobalSearchDialog', () => {
           sources={sources({ dataset: makeDataset({ items: many }) })}
           onNavigate={() => {}}
           onOpenItem={() => {}}
-          canFillTerminal
           canRunCommands={false}
           onRunCommand={async () => ({ status: 'ok', output: [] })}
         />

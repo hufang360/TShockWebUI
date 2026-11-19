@@ -841,14 +841,14 @@ export function DataIdPage({
                     npc={selectedNpc}
                     large
                     username={username}
-                    onOpenTerminal={() => setSelected(null)}
+                    onFilled={() => setSelected(null)}
                   />
                 ) : selectedBuff ? (
                   <BuffDetail
                     buff={selectedBuff}
                     large
                     gbuffPlayer={username}
-                    onOpenTerminal={() => setSelected(null)}
+                    onFilled={() => setSelected(null)}
                   />
                 ) : selectedData ? (
                   <DataDetail

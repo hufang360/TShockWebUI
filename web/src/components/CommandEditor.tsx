@@ -51,11 +51,9 @@ export interface CommandEditorProps {
    * - 草稿非空：只聚焦并把光标移到末尾，**不**改动已有内容；
    * - 焦点已经在输入框 / 弹框里（任何 `input` / `textarea` / contenteditable）时不抢。
    *
-   * 只在指令页开启（浮动终端不抢全局 `/`）。
+   * 只在指令页开启。
    */
   slashToFocus?: boolean
-  /** 紧凑尺寸（浮动终端用）：降低输入框高度与字号，节省纵向空间。 */
-  compact?: boolean
   /**
    * 输入模式（文案 / 图标随之变）：
    *
@@ -95,7 +93,6 @@ export function CommandEditor({
   leading,
   trailing,
   slashToFocus = false,
-  compact = false,
   mode = 'command',
   placeholder,
   maxLength,
@@ -115,7 +112,7 @@ export function CommandEditor({
   const draftRef = useRef('')
   // 幽灵文字要跟着输入框的横向滚动一起挪，否则长指令下会错位。
   const [ghostScroll, setGhostScroll] = useState(0)
-  const inputFontSize = compact ? Math.max(12, fontSize - 3) : fontSize
+  const inputFontSize = fontSize
   // 幽灵图层按输入框的横向滚动量整体平移；光靠 onScroll 会漏（删字时 scrollLeft 归零不一定触发事件），
   // 所以每次 value / caret 变化后都对一次，避免长指令之后幽灵文字整体偏左、被已输入文字盖住。
   useLayoutEffect(() => {
@@ -422,12 +419,11 @@ export function CommandEditor({
       <Composer
         leading={leading}
         invalid={invalid}
-        compact={compact}
         trailing={
           <>
             {trailing}
             <Button
-              size={compact ? 'icon-sm' : 'icon'}
+              size="icon"
               variant={mode === 'chat' ? 'secondary' : 'primary'}
               className="shrink-0 rounded-full"
               onClick={onExecute}
@@ -480,7 +476,7 @@ export function CommandEditor({
           maxLength={maxLength}
           className={cn(
             'editor relative w-full min-w-0 resize-none overflow-x-auto overflow-y-hidden bg-transparent px-1',
-            compact ? 'h-7' : 'h-8',
+            'h-8',
             'text-foreground placeholder:text-muted-foreground focus:outline-none',
             invalid && 'text-destructive caret-destructive',
           )}

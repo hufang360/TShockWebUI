@@ -58,7 +58,7 @@ export interface UseCommandRunnerOptions {
 }
 
 /**
- * 指令执行的唯一入口（指令页 / 浮动终端共用）。
+ * 指令执行的唯一入口（指令页与全局搜索就地执行共用）。
  *
  * 保持与改造前完全一致的流程：
  * 1. `inspectCommand` 前置校验（空输入 / `allowServer=false` 的 Tier A 拒绝）；

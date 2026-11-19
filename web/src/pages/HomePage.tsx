@@ -467,9 +467,8 @@ export function HomePage({
 
   const openInEditor = useCallback(
     (cmd: string) => {
-      // 写入草稿后跳到编辑器：CommandPage 挂载时会读取 tswui:draft。
+      // 点「最近执行」= 去指令页接着改：写入草稿、请求聚焦，再跳页（CommandPage 挂载时读草稿）。
       writeJson(StorageKeys.draft, cmd)
-      // 顺便把焦点交给输入框：点完就能直接改 / 直接回车。
       requestEditorFocus()
       onNavigate('editor')
     },

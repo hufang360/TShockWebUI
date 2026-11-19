@@ -365,7 +365,7 @@ export function ResultPanel({
    * 「↓ 最新」浮按钮的宿主（`pageScroll` 时投到吸底输入区上方）。
    *
    * 不传时：页面级滚动 → 不显示（按钮会落在视口外，看不见）；
-   * 自己滚动 → 浮在列表右下角（浮动终端用）。
+   * 自己滚动 → 浮在列表右下角。
    */
   jumpSlot?: HTMLElement | null
 }) {

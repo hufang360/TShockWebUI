@@ -3,7 +3,7 @@
  *
  * 两种分组：
  * - **有可点条目的**（世界事件、时间、召唤 Boss…）：语法行用 `usageKey`（只在详情抽屉里显示），具体指令在页面里生成
- *   （见 `CommandTipsPage` 的 `curatedRows`）；单击行打开详情，在详情里把完整指令填进「指令」浮窗。
+ *   （见 `CommandTipsPage` 的 `curatedRows`）；单击行打开详情，在详情里把完整指令填进「指令」页。
  * - **参考型分组**（物品、增益、传送、服务器…）：`commands` 列 TShock 内置指令名，
  *   语法取自 `data/commands.json` 的 `paramSets`（由 TShock 6.2.1 源码提取，**不猜**），
  *   页面渲染成参考行（详情里只能复制），`allowServer=false` 的会标「仅游戏内」。

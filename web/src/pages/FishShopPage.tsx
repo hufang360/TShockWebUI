@@ -430,7 +430,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
   const argTokens = splitFishArgs(args)
   const argsReady = !needArgs || argTokens.length >= Math.max(1, argCount)
 
-  /** 打开详情时的默认焦点（浮窗 / 抽屉共用）：需填参数 → 参数框，否则 → 购买按钮。 */
+  /** 打开详情时的默认焦点（抽屉 / 弹框共用）：需填参数 → 参数框，否则 → 购买按钮。 */
   const focusDetailOnOpen = useCallback(
     (event: Event) => {
       event.preventDefault()
@@ -1033,7 +1033,7 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             onConfigReloaded={() => void loadShop()}
           />
           {/* 顶栏挂载顺序 = 显示顺序：卡片那组（上次刷新 / 刷新全部 / 管理卡片）之后、
-              全局动作（浮动终端）之前，所以「页面设置 / 全屏」正好夹在两者中间。 */}
+              全局动作（搜索 / 页面设置）之前，所以「页面设置 / 全屏」正好夹在两者中间。 */}
           {/* 全屏时这两个入口在 `FullscreenDock` 里（顶栏已被盖住），不要再挂一份。 */}
           {!shelfFullscreen && (
             <TopBarActions>

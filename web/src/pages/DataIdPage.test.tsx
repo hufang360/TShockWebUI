@@ -9,6 +9,7 @@ import {
   ROW_PLATE_CLASS,
 } from '@/lib/iconGridSize'
 import { I18nProvider } from '@/lib/i18n'
+import { installCommandPaletteSpy, lastFilled } from '@/test/commandPaletteSpy'
 import { makeDataset } from '@/test/fixtures'
 import type { Dataset } from '@/types'
 import { DataIdPage } from './DataIdPage'
@@ -79,6 +80,7 @@ describe('DataIdPage', () => {
   }
 
   beforeEach(() => {
+    installCommandPaletteSpy()
     window.localStorage.clear()
     resetDataIdState()
     // 「两列表格」只在 xl（≥1280px）可用：默认按大屏跑，小屏用例再单独改小。
@@ -687,11 +689,12 @@ describe('DataIdPage', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('/spawnboss "eye of cthulhu"'))
   })
 
-  it('NPC 详情：点「填充指令」后关掉抽屉（浮动终端在抽屉下面）', async () => {
+  it('NPC 详情：点「填入指令」填进搜索面板，并关掉抽屉', async () => {
     renderPage()
     fireEvent.click(screen.getByTitle('克苏鲁之眼 #4'))
     const detail = await screen.findByTestId('dataid-detail')
-    fireEvent.click(within(detail).getAllByRole('button', { name: '填充指令' })[0])
+    fireEvent.click(within(detail).getAllByRole('button', { name: '填入指令' })[0])
+    expect(lastFilled()).toBe('/spawnboss "eye of cthulhu"')
     await waitFor(() => expect(screen.queryByTestId('dataid-detail')).toBeNull())
   })
 

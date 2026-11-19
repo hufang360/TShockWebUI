@@ -190,8 +190,8 @@ export function ItemDetailPanel({
           <CommandLine
             label={t('commandLine.related')}
             commands={[giveCommand]}
-            // 浮动终端在详情下面，填完就关掉整个详情（堆叠 / 弹框都一样）。
-            onOpenTerminal={onCloseAll}
+            // 关掉整个详情（堆叠 / 弹框都一样）：搜索面板是模态的，不叠两层。
+            onFilled={onCloseAll}
           />
         )}
 

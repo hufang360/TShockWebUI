@@ -133,7 +133,7 @@ export function CommandPage({
   // 聊天发送成功后让事件流立刻刷新（自己发的话马上上屏）。
   const [refreshToken, setRefreshToken] = useState(0)
   const [text, setText] = useLocalState(StorageKeys.draft, '')
-  // 历史 / 结果与浮动终端共用同一份存储（见 hooks/useCommandHistory、useCommandResultsList）。
+  // 历史 / 结果都存在本机（见 hooks/useCommandHistory、useCommandResultsList）。
   const {
     history,
     push: pushHistory,
@@ -148,7 +148,7 @@ export function CommandPage({
     setAllCollapsed,
     clear: clearResults,
   } = useCommandResultsList(serverId)
-  // 指令执行的唯一入口（与浮动终端共用）：前置校验 / token 失效重试 / 写历史与结果。
+  // 指令执行的唯一入口（与全局搜索的就地执行共用）：前置校验 / token 失效重试 / 写历史与结果。
   const { running, run: runCommandText } = useCommandRunner({
     dataset,
     transport,
@@ -241,7 +241,7 @@ export function CommandPage({
   // 状态由 `useItemFavoritesState` 统一管理：提示里的 ⭐ 与「物品」tab 用的是同一份数据。
   const { list: itemFavorites, api: favoritesApi } = useItemFavoritesState()
 
-  // 前端执行策略 / 补全 / 参数提示：与浮动终端共用一份实现。
+  // 前端执行策略 / 补全 / 参数提示：与全局搜索共用一份实现。
   const { check, getCompletions, getHelp } = useCommandEditing({
     dataset,
     text,
@@ -259,7 +259,7 @@ export function CommandPage({
    */
   const chatMode = text.trim().length > 0 && !text.startsWith('/')
 
-  /** 指令真正发出去后清空输入框（与浮动终端一致）；被前置校验拦下时保留原文，方便改后重发。 */
+  /** 指令真正发出去后清空输入框；被前置校验拦下时保留原文，方便改后重发。 */
   const executeCommand = useCallback(() => {
     if (running) return
     const sent = text
@@ -292,7 +292,7 @@ export function CommandPage({
     [setText, focusEnd],
   )
 
-  // 历史的删除 / 去重 / 清空由 useCommandHistory 提供（与浮动终端同一份存储）。
+  // 历史的删除 / 去重 / 清空由 useCommandHistory 提供（本机存储）。
   const removeHistory = removeHistoryEntry
 
   const insertText = useCallback((snippet: string) => {

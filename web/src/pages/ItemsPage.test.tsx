@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
+import { installCommandPaletteSpy, lastFilled } from '@/test/commandPaletteSpy'
 import { makeDataset } from '@/test/fixtures'
 import type { Item } from '@/types'
 import { resetDexState } from '@/lib/dexState'
@@ -87,6 +88,7 @@ function chooseCollection(name: string | RegExp, group: string) {
 
 beforeEach(() => {
   resetDexState()
+  installCommandPaletteSpy()
   localStorage.clear()
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
 })
@@ -525,7 +527,7 @@ describe('ItemsPage 图鉴', () => {
     expect(screen.queryByTestId('dex-detail')).toBeNull()
   })
 
-  it('相关指令的「填充指令」把整叠抽屉一起关掉（浮动终端在抽屉下面）', async () => {
+  it('相关指令的「填入指令」填进搜索面板，并把整叠抽屉一起关掉', async () => {
     renderPage(
       makeDataset({
         items: makeItems(3),
@@ -552,7 +554,8 @@ describe('ItemsPage 图鉴', () => {
     const layers = screen.getAllByTestId('dex-detail')
     expect(layers).toHaveLength(2)
 
-    fireEvent.click(within(layers[1]).getByRole('button', { name: '填充指令' }))
+    fireEvent.click(within(layers[1]).getByRole('button', { name: '填入指令' }))
+    expect(lastFilled()).toBe('/give 2 Alice')
     // 两层都进入收起动画 → 最终全部出栈（`queryAll` 因为期间会同时挂着两层）。
     await waitFor(() => expect(screen.queryAllByTestId('dex-detail')).toHaveLength(0))
   })

@@ -7,7 +7,7 @@ import type { CommandTip } from '@/lib/worldCommandTips'
  * 并用本服 `POST /v3/server/rawcmd` 实测过（`/user help`、`/ban help`、`/ban list` 都返回预期的帮助 / 列表）。
  *
  * 只有**参数固定、点了就能跑**的写法才做成可点的行；带占位符的（如 `/ban add <目标>`）
- * 只写进分区语法行 / 说明行，避免往浮窗里填一段跑不通的占位文本。
+ * 只写进分区语法行 / 说明行，避免把一段跑不通的占位文本填进搜索框。
  *
  * `allowServer=false` 的四条（`/login` `/logout` `/password` `/register`）网页端执行会被 TShock 拒绝，
  * 所以页面上只作为「游戏内怎么用」的说明。

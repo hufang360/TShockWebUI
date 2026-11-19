@@ -7,7 +7,7 @@ import type { HistoryEntry } from '@/types'
 /**
  * 指令历史（`tswui:history`）。
  *
- * 指令页与浮动终端共用同一份历史：在终端里执行过的指令，回到指令页能直接回翻 / 查看。
+ * 指令历史落在本机（`tswui:history`）：刷新浏览器后还能用 ↑↓ 回翻。
  * 存储层是同 key 的 `useLocalState`，两个组件同时挂载时通过 `STORAGE_EVENT` 实时同步。
  */
 export interface CommandHistoryApi {
