@@ -1032,8 +1032,8 @@ export function FishShopPage({ serverId, transport, authenticated, refreshInterv
             // 执行 `/fish reload` 之后货架已经变了：重新拉一次，别让页面停在旧价格上。
             onConfigReloaded={() => void loadShop()}
           />
-          {/* 顶栏挂载顺序 = 显示顺序：卡片那组（上次刷新 / 刷新全部 / 管理卡片）之后、
-              全局动作（搜索 / 页面设置）之前，所以「页面设置 / 全屏」正好夹在两者中间。 */}
+          {/* 顶栏挂载顺序 = 显示顺序：卡片那组（上次刷新 / 刷新全部 / 管理卡片）之后，
+              所以「页面设置 / 全屏」排在它们右边。 */}
           {/* 全屏时这两个入口在 `FullscreenDock` 里（顶栏已被盖住），不要再挂一份。 */}
           {!shelfFullscreen && (
             <TopBarActions>

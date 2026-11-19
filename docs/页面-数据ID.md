@@ -22,7 +22,7 @@
   （只用于 Buff 详情的 `/gbuff`：那条要填「你的玩家名」，未登录时填不出来）。
 - `/sb`（`spawnboss`）与 `/sm`（`spawnmob`）在 TShock 里是 `allowServer=false` 的指令，
   经 REST 无法执行（`docs/REST_API限制.md`）→ 详情里只**显示 + 复制**（**不按权限隐藏**，能不能执行由 TShock 判）；
-  `/gbuff`（给 buff）是 `allowServer=true`，可以复制到「指令」浮窗里直接执行。
+  `/gbuff`（给 buff）是 `allowServer=true`，复制后到「指令」页执行。
 - 图格 / 墙是 `TileID` / `WallID` 速查：ID、代表物品（图标 + 名称）、摆放尺寸、内部名。
 - Buff 是 `BuffID` 速查：ID、图标、本地化名称、内部名（图标取自游戏 `Content/Images/Buff_<id>.png`，见 §2）。
 - 旧的 tab id（`npcs` / `tiles`，以及改名前用的 `codex`）在 `App.tsx` 里做兼容映射到 `dataid`，老用户的侧边栏记忆不会失效。
@@ -213,8 +213,8 @@ NPC 详情 / Buff 详情用 `components/CommandLine.tsx` 列一块 **「相关�
 - 标题左边是 **149 号物品（书）的图标**，标题文字用绿色 `text-success`（与物品详情「相关指令」一致）（`lib/sectionTones.ts`）；
 - 每条指令一行，行外观同合成记录（无描边、`bg-accent/40`、悬停 `hover:bg-accent`）；
 - **点条目本身什么也不做**（不复制、不执行），右侧三个按钮**悬停或键盘聚焦才出现**（触屏常显），顺序：终端 → ⭐ → 复制：
-  - **终端**（提示词就叫「填充指令」）：把指令填进右下角的**浮动终端**并让它弹出来（`useTerminal().open(cmd)`）；
-    浮动终端在抽屉下面，所以点完**顺手关掉详情抽屉**（物品详情的堆叠抽屉是整叠一起关）；
+  - **终端**（提示词叫「填入指令」）：唤起 `Ctrl/Cmd+K` 搜索面板并预填这条指令（`openCommandPalette(cmd)`，
+    等价于用户自己敲进去，回车才执行）；面板是模态的，所以点完**顺手关掉详情抽屉**（物品详情的堆叠抽屉是整叠一起关）；
   - ⭐ 收藏这条指令（写进「指令」页的收藏 `tswui:favorites`，与结果卡片的星标同一份数据）；
   - 复制：只复制指令。
 - 带说明的条目（`note`）悬停整行时出 `Tooltip`：`/sb all` → 「召唤所有Boss」、`/setdungeon` → 「设置地牢点」、
@@ -386,7 +386,7 @@ NPC 详情 / Buff 详情用 `components/CommandLine.tsx` 列一块 **「相关�
 - NPC 详情：英文名在「内部名」上一行（英文界面不显示）；「相关指令（n）」按顺序列 Boss 召唤（含 `/sb all`）/
   召唤物（`/give`，登录时）/ `/sm` /（城镇 NPC）传送 + 改名 /（地牢 NPC）`/setdungeon` + `/wm dungeon` / `/npc`；
   带说明的条目（`/sb all`、`/setdungeon`、`/wm dungeon`、`/give`）悬停出 Tooltip。
-  点条目本身不复制；悬停行右侧出 终端（填充指令，弹浮动终端并关抽屉）、⭐（收藏）、复制（只复制）。
+  点条目本身不复制；悬停行右侧出 终端（填入指令，弹搜索面板并关抽屉）、⭐（收藏）、复制（只复制）。
 - 本页不请求 `/api/me`：未登录也能看到全部 NPC 指令；Buff 详情只在「知道玩家名」时给 `/gbuff`。
 - `web/src/lib/npcRelatedCommands.test.ts`：Boss / 普通 NPC 的行序、`/npc` 清单、`/renameNPC` 只给城镇 NPC 且用 ID 传参、占位符规则。
 - 「指令」页输入 `/spawnboss ` 候选中 `brain` 旁显示「克苏鲁之脑」；`/worldevent blood` 旁显示「血月」。

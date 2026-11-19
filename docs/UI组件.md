@@ -434,12 +434,11 @@
 - **`SidebarInset` 顶栏**（吸顶，`h-12`，**带下边线** `border-b`）分三段，互不干扰：
   1. **左**：`SidebarTrigger` + `Separator` + `Breadcrumb`（只显示当前页面）+ **页面说明 ⓘ**（`TopBarActions info=…` 的 `TopBarInfoSlot`）。
      顶栏只在侧栏收起时出现「显示侧栏」（桌面）；移动端保留「打开菜单」。
-  2. **右**：`上次刷新 → 刷新 → 管理卡片 / 页面设置 → 指令(>_)`，即刷新类在最左、管理类在右、终端最后
-     （首页同样有终端图标：`上次刷新 → 刷新 → 管理卡片 → 指令`；
-     指令 / 设置两页不放）。
+  2. **右**：`上次刷新 → 刷新 → 管理卡片 / 页面设置`，即刷新类在最左、管理类在右。
      图标固定：**管理卡片 = `PlayingCardsFan`**（首页 / 自定义模块 / 鱼店三处必须一致），**页面设置 = `Settings2`**——
      两者长得像，但一个是「挑卡片」，一个是「调这个页面的显示」，别混用。
-  3. **手机端**：右侧只保留 `…`（`DropdownMenu`），页面操作与终端都在菜单里，**一行一个按钮（图标 + 名称）**，`…` 永远最右。
+     需要随手跑一条指令时用 `Ctrl/Cmd+K` 搜索面板，顶栏不再挂全局指令入口。
+  3. **手机端**：右侧只保留 `…`（`DropdownMenu`），页面操作都在菜单里，**一行一个按钮（图标 + 名称）**，`…` 永远最右。
 - **页面操作进顶栏**：`components/TopBar.tsx` 的 `<TopBarActions>`，`info` 属性放标题右侧，children 放右侧；没有 Provider 时（页面单测）原地渲染。
   图标按钮用 `components/IconAction.tsx`（`Tooltip`，不是 `title`；图标按「次要灰」着色，`size-4` + `icon-sm` 容器，
   与卡片页头的图标按钮同一档，详见组件清单）；说明类小字用 `components/InfoPopover.tsx`；全屏操作坞用 `components/FullscreenDock.tsx`。
@@ -462,14 +461,14 @@
 - `theme='auto'` 由 `App` 监听 `prefers-color-scheme`（`systemDark`）决定是否加 `.dark`；`light` / `dark` 忽略系统。恢复默认 `dark`。
 - 设置页的「主题」`ToggleGroup` 同步支持三态（`settings.theme.auto/light/dark`）。
 
-## 浮层：模态 / 非模态 / 「只盖内容区」
+## 浮层：模态 / 「只盖内容区」
 
-全站浮层分三类，选型别混：
+全站浮层分两类，选型别混（**没有**「页面仍可点」的真·非模态浮层了：随时要用的指令入口已收进
+`Ctrl/Cmd+K` 搜索面板，见 [`功能-全局搜索.md`](功能-全局搜索.md)）：
 
 | 类 | 例子 | 页面可点 | 左栏导航 | 遮罩 |
 | --- | --- | --- | --- | --- |
 | 模态 | `Dialog`（确认框、物品详情弹框）、`Sheet`（管理卡片） | 否 | 被盖住 | `inset-0` |
-| 非模态 | 浮动终端（`z-40`） | 是 | 可用 | 无 |
 | **带遮罩但不盖导航** | 鱼店商品详情 / 物品详情（图鉴）/ 数据ID 详情 | 否 | **可用**（可切页） | `ContentScrim`（只盖内容区） |
 
 ### 只盖内容区的遮罩（`components/ContentScrim.tsx`）
@@ -483,7 +482,7 @@
 - 位置：`left-0 md:left-[var(--content-left,0px)]`、`inset-y-0 right-0`，`bg-black/50`（**不模糊**）；
 - `--content-left` 由 `AppShell` 写在布局外层：侧栏展开 = `var(--sidebar-width,16rem)`、收起 = `0px`，所以不用测 DOM；
   窄屏侧栏是抽屉本身、内容从 0 开始，故 `left-0`；
-- 层级 `z-[45]`：高于页面内容（`20`）与浮动终端，低于抽屉面板与其它模态（`50`）；
+- 层级 `z-[45]`：高于页面内容（`20`），低于抽屉面板与其它模态（`50`）；
 - **全屏页面里传 `full`**（`<ContentScrim full />`）：侧栏与顶栏都已经被全屏（`fixed inset-0 z-50`）盖住，
   再按 `--content-left` 留出左边一条，看起来就是「遮罩没盖满 / 布局错位」。物品 ID、数据 ID 全屏都这么用；
   鱼店全屏还要把遮罩**画在全屏容器内部**才有效——`z-45` 的遮罩画在外面会被 `z-50` 的容器压住；
@@ -528,17 +527,6 @@
 内容只有一份：`components/items/ItemDetailPanel.tsx`（`chrome: 'drawer' | 'dialog'` 只切换标题栏 / 底部外壳），
 抽屉与弹框都复用它。
 
-### 浮动终端（真·非模态）
-
-`components/CommandTerminal.tsx`，窗口标题「指令」。入口是**顶栏右侧的「指令」图标按钮**
-（`components/TerminalTopBarButton.tsx`，桌面排在页面操作之后；**手机端收在 `…` 菜单里**；「指令」「设置」页与**首页**不显示）：
-`role="dialog"` + `aria-modal="false"`，自己处理拖动 / 缩放 / `Esc`，**不做焦点陷阱、不压暗页面**。
-
-- 层级：`z-40`，低于所有模态层与上表的 `ContentScrim`（`z-45`）。打开模态时不强行关闭它。
-- 关闭只认 `×` / `Esc` / 再点入口按钮（**不**响应点击外部），这样「边看页面边执行」才成立。
-- 窗口几何存 `tswui:terminal`（见 `lib/terminalWindow.ts`），恢复时先 clamp 进视口。
-- 需要模态交互时**不要**改它的样式来凑，直接用 `Sheet` / `Dialog`。
-
 ## 页面设置弹框（物品 ID / 数据 ID / 鱼店共用）
 
 三处「页面设置」结构一致：标题用 `SettingsPopoverHeader`（左标题、右「恢复默认」图标按钮，`RotateCcw` + `icon-xs`）。
@@ -574,8 +562,7 @@
 | `SettingsPopoverHeader` | `components/SettingsPopoverHeader.tsx` | 页面设置 Popover 的标题栏：左标题、右「恢复默认」`IconAction`（`RotateCcw` + `icon-xs`）。三处页面设置共用，见「页面设置弹框」 |
 | `InfoPopover` | `components/InfoPopover.tsx` | 「页面说明」info 图标 + Popover，收纳原先铺在正文里的小字说明 |
 | `FullscreenDock` | `components/FullscreenDock.tsx` | 全屏结果页**右上角**操作坞：先露出，随后收成贴右边的竖条（左侧上下圆角、宽 12px）；悬停 / 聚焦 / 点击展开，展开后 4 秒无操作再收起 |
-| `CommandLine` | `components/CommandLine.tsx` | 「相关指令」分组（数据 ID → NPC / Buff、物品详情的给予指令共用）：标题 = 149 号物品图标 + 文字（绿色 `text-success`，**带条目数量** `相关指令（6）`）+ 折角箭头（可折叠），下面每条指令一行 —— 行外观同合成记录；**点条目本身什么也不做**，右侧 终端（`填充指令`：填进浮动终端并弹出，同时回调 `onOpenTerminal` 让调用方关抽屉）/ ⭐（收藏指令）/ 复制（只复制）三个按钮悬停或聚焦才出现（触屏常显）。条目可带 `note`（如 `/sb all` → 「召唤所有Boss」），悬停整行时用 Tooltip 出说明 |
-| `CommandTerminal` / `TerminalTopBarButton` | `components/CommandTerminal.tsx` / `components/TerminalTopBarButton.tsx` | 浮动终端（桌面非模态浮窗 / 窄屏底部抽屉）与顶栏入口（**首页是例外**：那里放；手机在 `…` 菜单里）；开关状态在 `lib/terminalContext.tsx`。见 [`功能-浮动终端.md`](功能-浮动终端.md) |
+| `CommandLine` | `components/CommandLine.tsx` | 「相关指令」分组（数据 ID → NPC / Buff、物品详情的给予指令共用）：标题 = 149 号物品图标 + 文字（绿色 `text-success`，**带条目数量** `相关指令（6）`）+ 折角箭头（可折叠），下面每条指令一行 —— 行外观同合成记录；**点条目本身什么也不做**，右侧 终端（`填入指令`：唤起全局搜索面板并预填这条指令，见 `lib/commandPalette.ts`，同时回调 `onFilled` 让调用方关掉抽屉 / 弹框）/ ⭐（收藏指令）/ 复制（只复制）三个按钮悬停或聚焦才出现（触屏常显）。条目可带 `note`（如 `/sb all` → 「召唤所有Boss」），悬停整行时用 Tooltip 出说明 |
 | `ContentScrim` | `components/ContentScrim.tsx` | 只盖内容区的遮罩（`z-[45]`、`bg-black/50`、不模糊），左栏导航不被压暗、可点。四处详情抽屉共用；见本章「浮层」一节 |
 | `ItemDetailDialog` / `ItemDetailPanel` | `components/items/ItemDetailDialog.tsx` / `ItemDetailPanel.tsx` | 物品详情弹框（图鉴以外的页面）+ 抽屉/弹框共用的内容面板（`chrome` 切换外壳）。见本章「物品详情弹框」 |
 | `FishDetailSurface` | `components/fishshop/FishDetailSurface.tsx` | 鱼店商品详情的抽屉：桌面端遮罩只盖内容区（侧栏仍可点）、点遮罩关；窄屏普通模态抽屉；切页面回来仍开着。见 [`插件-鱼店.md`](插件-鱼店.md) 与本章「浮层」一节 |
@@ -692,7 +679,7 @@
   `/renameNPC <ID> <newname>`（城镇 NPC）、`/setdungeon` + `/wm dungeon`（`NPC_DUNGEON_IDS`）、`/npc <ID>`；
   不探测权限、也不隐藏。标题左侧是 **149 号物品（书）图标**、文字绿色 `text-success`、**带条目数量**，标题可折叠；
   条目外观与合成记录一致；**点条目本身不会复制**，右侧 终端 / ⭐ / 复制 三个按钮悬停或键盘聚焦才出现（触屏常显）。
-  点「填充指令」会把指令填进浮动终端并**关掉抽屉**（浮窗在抽屉下面）。
+  点「填入指令」会唤起 `Ctrl/Cmd+K` 搜索面板并预填这条指令，同时**关掉抽屉**（面板是模态的）。
 
 ## 玩家存档（`pages/PlrPage.tsx`）
 
@@ -729,8 +716,7 @@
   工具按钮是**方形**（`size-7 rounded-control`）、图标 `size-3`（比默认 `size-4` 小一号，视觉重量贴近输入文字），
   按钮组用 `p-1 -m-1` 给聚焦光圈留余量（`overflow-x-auto` 本来会把 2px 光圈上下切掉），
   右下是发送键（指令模式主色飞机 / 聊天模式次级气泡）；「展开全部 / 折叠全部 / 清空结果」在**结果栏底部、图标居右**。
-  - 输入保持**单行横滚**（Enter 直接执行）；`compact`（浮动终端）内边距/字号更小，并且外壳收成**单一一行**：
-    左工具、中输入、右发送同排（`leading` 仍可用），不再多占一行工具行；
+  - 输入保持**单行横滚**（Enter 直接执行）；
     桌面尺寸：输入行 `h-8`、工具 / 发送键 `size-7` / `size-8`，外壳 `px-2 py-1.5`。
   - **聚焦是外发光**：`focus-within:ring-[3px] ring-ring/25` + 边框变主色（不再用 `outline` 硬描边）；
     外壳外面留 `p-1`，光圈画在边框外面也不被相邻区域切掉。错误态（只能游戏内执行）同理换成 `destructive` 光圈。
@@ -855,7 +841,7 @@
   `clientX/clientY`，靠近边缘自动翻转），**不抢焦点**（`onOpenAutoFocus` 阻止默认）；单开，
   点另一行换内容、点同一行 / 浮层外 / `Esc` 关闭（`onInteractOutside` 对 `tr[data-command]` 放行，避免「先关再开」）。
   内容：指令（等宽加粗 + 悬停复制）、说明、仅游戏内徽标、使用提示、指令语法、权限（悬停复制）、别名、
-  相关指令（点了把表格过滤到那条）、底部「数据 ID → NPC」与「执行」（只是把指令填进浮窗）。
+  相关指令（点了把表格过滤到那条）、底部「数据 ID → NPC」与「执行」（只是把指令填进搜索面板，不执行）。
 - 只能在游戏内执行的指令（`allowServer=false` 且服务器没放行）文字标红 + 说明里跟「仅游戏内」（多子项的只标折叠行）；
   参考行与它们都没有「执行」。放行之后（如 Tier B 的 `/spawnboss`、`/spawnmob`）恢复普通样式并重新有「执行」。
 - 整表按指令列 **a~z 排序**（折叠行用它的前缀参与），分区只决定折叠行的「说明」。
