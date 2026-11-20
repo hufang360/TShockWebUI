@@ -50,11 +50,15 @@ export function CardParamForm({
   })
 
   return (
-    <div className="flex flex-col gap-1.5" data-testid="card-param-form">
+    <div
+      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+      data-testid="card-param-form"
+    >
       {fields.map(({ arg, index, state }) => (
         <ParamValueField
           key={index}
           id={`${baseId}-${index}`}
+          layout="inline"
           dataset={dataset}
           command={command}
           arg={arg}
@@ -67,7 +71,9 @@ export function CardParamForm({
         />
       ))}
       {missingNames.length > 0 && (
-        <p className="text-2xs text-warning">{t('card.needArgs', { args: missingNames.join('、') })}</p>
+        <p className="basis-full text-2xs text-warning">
+          {t('card.needArgs', { args: missingNames.join('、') })}
+        </p>
       )}
     </div>
   )

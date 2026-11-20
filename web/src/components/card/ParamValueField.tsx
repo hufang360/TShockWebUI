@@ -35,6 +35,8 @@ export interface ParamValueFieldProps {
   invalid?: boolean
   /** 控件的无障碍名称（弹框里没有可见 label 时用）。 */
   label?: string
+  /** `stacked`（默认）= 标签在上；`inline` = 标签在左，给卡片页头的窄条用。 */
+  layout?: 'stacked' | 'inline'
 }
 
 /**
@@ -56,9 +58,32 @@ export function ParamValueField({
   disabled,
   invalid,
   label: ariaLabel,
+  layout = 'stacked',
 }: ParamValueFieldProps) {
   const { lang } = useI18n()
   const label = argLabel(arg, 0, lang)
+  if (layout === 'inline') {
+    // 卡片页头的窄条：标签在左、控件在右，一行一个参数；放不下就整体折行。
+    return (
+      <label className="flex min-w-0 shrink-0 items-center gap-1" data-slot="card-param-field">
+        <span className="shrink-0 text-2xs text-muted-foreground">{label}</span>
+        <ParamValueControl
+          id={id}
+          dataset={dataset}
+          command={command}
+          arg={arg}
+          value={value}
+          onChange={onChange}
+          players={players}
+          runtimeValues={runtimeValues}
+          disabled={disabled}
+          invalid={invalid}
+          label={ariaLabel ?? label}
+          compact
+        />
+      </label>
+    )
+  }
   return (
     <Field className="gap-1" data-slot="card-param-field">
       <FieldLabel htmlFor={id} className="text-2xs text-muted-foreground">
@@ -94,7 +119,8 @@ export function ParamValueControl({
   disabled,
   invalid,
   label,
-}: Omit<ParamValueFieldProps, 'id'> & { id?: string }) {
+  compact,
+}: Omit<ParamValueFieldProps, 'id' | 'layout'> & { id?: string; compact?: boolean }) {
   const { t, lang } = useI18n()
   if (arg.kind === 'enum') {
     return (
@@ -110,6 +136,7 @@ export function ParamValueControl({
         emptyLabel={t('card.argEmpty')}
         ariaLabel={label}
         placeholder={argPlaceholder(arg, lang)}
+        compact={compact}
       />
     )
   }
@@ -127,6 +154,7 @@ export function ParamValueControl({
       invalid={invalid}
       ariaLabel={label}
       placeholder={argPlaceholder(arg, lang)}
+      compact={compact}
     />
   )
 }
@@ -143,9 +171,11 @@ function EnumSelect({
   emptyLabel,
   ariaLabel,
   placeholder,
+  compact,
 }: {
   id?: string
   ariaLabel?: string
+  compact?: boolean
   arg: CommandParam
   command: CommandDef
   dataset: Dataset
@@ -179,7 +209,7 @@ function EnumSelect({
         size="sm"
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
-        className={cn('w-full', invalid && 'border-destructive')}
+        className={cn(compact ? 'h-6 w-28 text-xs' : 'w-full', invalid && 'border-destructive')}
       >
         {/* 空值时也要有提示：只有一个占位符的下拉看着像坏了（`/time` 这类必填枚举）。 */}
         <SelectValue placeholder={arg.required ? placeholder : emptyLabel} />
@@ -210,9 +240,11 @@ function SuggestInput({
   invalid,
   ariaLabel,
   placeholder,
+  compact,
 }: {
   id?: string
   ariaLabel?: string
+  compact?: boolean
   dataset: Dataset
   command: CommandDef
   arg: CommandParam
@@ -258,7 +290,8 @@ function SuggestInput({
           aria-invalid={invalid || undefined}
           aria-autocomplete="list"
           aria-expanded={open && candidates.length > 0}
-          className={cn('h-7 text-xs', invalid && 'border-destructive')}
+          data-suggest-anchor="true"
+          className={cn(compact ? 'h-6 w-24 text-xs' : 'h-7 text-xs', invalid && 'border-destructive')}
           onChange={(e) => {
             onChange(e.target.value)
             setHighlight(0)
@@ -299,6 +332,12 @@ function SuggestInput({
         // 候选是输入框的延伸：不抢焦点，焦点始终留在输入框（否则接着打字会断）。
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        // 没有 PopoverTrigger 时，点 anchor（输入框）这次 click 会被当成「点外部」而立刻关闭：
+        // 输入框自己身上的交互不算外部。
+        onInteractOutside={(e) => {
+          const target = e.target as Element | null
+          if (target?.closest?.('[data-suggest-anchor]')) e.preventDefault()
+        }}
       >
         <ul role="listbox" className="flex max-h-56 flex-col overflow-y-auto">
           {candidates.map((candidate, index) => (

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { NO_INGAME } from '@/lib/ingame'
 import { I18nProvider } from '@/lib/i18n'
@@ -64,6 +64,26 @@ describe('CardEditorPanel', () => {
       manual: true,
       hidden: true,
     } satisfies CardEditorDraft)
+  })
+
+  it('「指令参数」是指令输入框内的 addon（在 input 组的右端）', () => {
+    renderPanel()
+    fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'give' } })
+    const button = screen.getByRole('button', { name: /指令参数/ })
+    expect(button.closest('[data-slot="input-group"]')).toBeTruthy()
+    expect(button.closest('[data-align="inline-end"]')).toBeTruthy()
+  })
+
+  it('点输入框本身不会把候选关掉（回归：下拉闪一下就消失）', async () => {
+    renderPanel()
+    const input = screen.getByLabelText('指令') as HTMLInputElement
+    fireEvent.focus(input)
+    expect(await screen.findByRole('listbox')).toBeTruthy()
+
+    // Radix 在没有 PopoverTrigger 时会把 anchor 上的这次点击当成「点外部」。
+    fireEvent.pointerDown(input)
+    fireEvent.click(input)
+    await waitFor(() => expect(screen.getByRole('listbox')).toBeTruthy())
   })
 
   it('指令名有候选：输入片段点一条直接填成 /指令名', async () => {

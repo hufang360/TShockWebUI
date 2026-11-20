@@ -9,6 +9,9 @@ import {
   FieldGroup,
   FieldLabel,
   Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
   Popover,
   PopoverAnchor,
   PopoverContent,
@@ -188,6 +191,26 @@ export function CardEditorPanel({
           <CommandNameInput
             id={`${baseId}-command`}
             dataset={dataset}
+            trailing={
+              <ParamPopover
+                open={paramsOpen}
+                onOpenChange={setParamsOpen}
+                dataset={dataset}
+                def={def}
+                sets={sets}
+                setIndex={setIndex}
+                onSetIndex={(next) => {
+                  setSetIndex(next)
+                  setTemplate(null)
+                }}
+                template={template}
+                onTemplateChange={setTemplate}
+                players={players}
+                runtimeValues={runtimeValues}
+                count={paramCount}
+                emptyCommand={missingCommand}
+              />
+            }
             value={command}
             onChange={(next) => {
               setCommand(next)
@@ -239,24 +262,6 @@ export function CardEditorPanel({
         </PanelToggle>
 
         <div className="ml-auto flex min-w-0 items-center gap-1.5">
-          <ParamPopover
-            open={paramsOpen}
-            onOpenChange={setParamsOpen}
-            dataset={dataset}
-            def={def}
-            sets={sets}
-            setIndex={setIndex}
-            onSetIndex={(next) => {
-              setSetIndex(next)
-              setTemplate(null)
-            }}
-            template={template}
-            onTemplateChange={setTemplate}
-            players={players}
-            runtimeValues={runtimeValues}
-            count={paramCount}
-            emptyCommand={missingCommand}
-          />
           <Button size="sm" variant="ghost" onClick={onCancel}>
             {t('action.cancel')}
           </Button>
@@ -337,6 +342,7 @@ function CommandNameInput({
   value,
   onChange,
   onSubmit,
+  trailing,
   disabled,
 }: {
   id: string
@@ -344,6 +350,8 @@ function CommandNameInput({
   value: string
   onChange: (next: string) => void
   onSubmit: () => void
+  /** 输入框右侧的 addon（「指令参数」）。 */
+  trailing?: ReactNode
   disabled?: boolean
 }) {
   const { t, lang } = useI18n()
@@ -362,7 +370,8 @@ function CommandNameInput({
   return (
     <Popover open={open && candidates.length > 0} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
-        <Input
+        <InputGroup className="h-8">
+          <InputGroupInput
           id={id}
           value={value}
           disabled={disabled}
@@ -370,7 +379,8 @@ function CommandNameInput({
           aria-label={t('card.commandLabel')}
           autoComplete="off"
           aria-autocomplete="list"
-          className="h-8 font-pixel text-xs"
+          data-suggest-anchor="true"
+          className="h-8 px-2 font-pixel text-xs"
           onChange={(e) => {
             onChange(e.target.value)
             setHighlight(0)
@@ -401,7 +411,9 @@ function CommandNameInput({
               setOpen(false)
             }
           }}
-        />
+          />
+          {trailing && <InputGroupAddon align="inline-end" className="px-1">{trailing}</InputGroupAddon>}
+        </InputGroup>
       </PopoverAnchor>
       <PopoverContent
         align="start"
@@ -409,6 +421,11 @@ function CommandNameInput({
         className="w-[var(--radix-popover-trigger-width)] min-w-56 p-1"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        // 点输入框本身不该关候选（这里没有 PopoverTrigger，Radix 会把这次 click 当外部交互）。
+        onInteractOutside={(e) => {
+          const target = e.target as Element | null
+          if (target?.closest?.('[data-suggest-anchor]')) e.preventDefault()
+        }}
       >
         <ul role="listbox" className="flex max-h-56 flex-col overflow-y-auto">
           {candidates.map((def, index) => (
@@ -483,18 +500,27 @@ function ParamPopover({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={disabled}
-          onClick={() => onOpenChange(!open)}
-          aria-expanded={open}
-          className="gap-1"
-        >
-          <SlidersHorizontal data-icon="inline-start" />
-          {t('card.paramsButton')}
-          {count > 0 && <span className="text-2xs text-muted-foreground">{count}</span>}
-        </Button>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => onOpenChange(!open)}
+                aria-expanded={open}
+                aria-label={t('card.paramsButton')}
+                className="h-6 w-auto gap-0.5 px-1 text-muted-foreground hover:text-foreground"
+              >
+                <SlidersHorizontal className="size-3.5" aria-hidden />
+                {count > 0 && (
+                  <span className="text-2xs tabular-nums text-muted-foreground">{count}</span>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('card.paramsButton')}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </PopoverAnchor>
       <PopoverContent
         align="end"
