@@ -179,7 +179,18 @@ export function CustomCommandCard({
       unavailable={unavailable}
       unavailableText={unavailableText}
       emptyText={emptyText}
-      footerNote={footerNote}
+      // 参数卡片把「最终会执行的那条指令」放在页脚：填完能先看一眼再点执行。
+      footerNote={
+        footerNote ?? (
+          <code
+            className="min-w-0 truncate font-pixel text-2xs text-muted-foreground"
+            data-testid="card-command-preview"
+            title={built.command}
+          >
+            {built.command}
+          </code>
+        )
+      }
       action={action}
       collapseKey={collapseKey}
       showLastRunAt={showLastRunAt}

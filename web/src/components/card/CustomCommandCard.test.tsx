@@ -65,6 +65,15 @@ describe('CustomCommandCard', () => {
     expect(onRun).toHaveBeenCalledWith('/give 29 Alice')
   })
 
+  it('页脚显示最终会执行的指令（填完先看一眼再点执行）', () => {
+    renderCard()
+    const preview = screen.getByTestId('card-command-preview')
+    expect(preview.textContent).toBe('/give')
+    fireEvent.change(screen.getByLabelText('item type/id'), { target: { value: '29' } })
+    fireEvent.change(screen.getByLabelText('player'), { target: { value: 'Alice' } })
+    expect(screen.getByTestId('card-command-preview').textContent).toBe('/give 29 Alice')
+  })
+
   it('输入的值会写回存储（停止输入后才写）', async () => {
     const { onTemplateChange } = renderCard()
     fireEvent.change(screen.getByLabelText('player'), { target: { value: 'Alice' } })
