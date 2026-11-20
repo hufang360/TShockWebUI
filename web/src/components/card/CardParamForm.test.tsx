@@ -51,9 +51,14 @@ describe('CardParamForm', () => {
     expect(onChange).toHaveBeenCalledWith(1, 'Alice')
   })
 
-  it('必填没填时给出「还需要填写」提示', () => {
+  it('必填没填：输入框进 warning 态，不再多一行文字提示', () => {
     renderForm({ missing: [1] })
-    expect(screen.getByText('还需要填写：参数2')).toBeTruthy()
+    const empty = screen.getByLabelText('参数2')
+    expect(empty.getAttribute('aria-invalid')).toBe('true')
+    expect(empty.className).toContain('border-warning')
+    // 已填的那个不标。
+    expect(screen.getByLabelText('参数1').getAttribute('aria-invalid')).toBeNull()
+    expect(screen.queryByText(/还需要填写/)).toBeNull()
   })
 
   it('没有「执行时填」的参数时不渲染表单', () => {

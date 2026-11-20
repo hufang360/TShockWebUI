@@ -179,9 +179,10 @@ export function CustomCommandCard({
       unavailable={unavailable}
       unavailableText={unavailableText}
       emptyText={emptyText}
-      // 参数卡片把「最终会执行的那条指令」放在页脚：填完能先看一眼再点执行。
+      // 没有输入框可「贴在下面」的参数卡片（全固定值）：预览仍放页脚，别把它弄丢。
       footerNote={
-        footerNote ?? (
+        footerNote ??
+        (showForm ? undefined : (
           <code
             className="min-w-0 truncate font-pixel text-2xs text-muted-foreground"
             data-testid="card-command-preview"
@@ -189,7 +190,7 @@ export function CustomCommandCard({
           >
             {built.command}
           </code>
-        )
+        ))
       }
       action={action}
       collapseKey={collapseKey}
@@ -197,17 +198,27 @@ export function CustomCommandCard({
       runDisabled={!ready}
       paramForm={
         showForm ? (
-          <CardParamForm
-            dataset={dataset}
-            command={resolved.def}
-            set={resolved.set}
-            template={liveTemplate}
-            onChange={setValue}
-            players={players}
-            runtimeValues={runtimeValues}
-            missing={built.missing}
-            disabled={unavailable}
-          />
+          <div className="flex min-w-0 flex-col gap-1">
+            <CardParamForm
+              dataset={dataset}
+              command={resolved.def}
+              set={resolved.set}
+              template={liveTemplate}
+              onChange={setValue}
+              players={players}
+              runtimeValues={runtimeValues}
+              missing={built.missing}
+              disabled={unavailable}
+            />
+            {/* 最终会执行的那条指令就贴在输入框下面：填完先看一眼再点右上角的执行。 */}
+            <code
+              className="min-w-0 truncate font-pixel text-2xs text-muted-foreground"
+              data-testid="card-command-preview"
+              title={built.command}
+            >
+              {built.command}
+            </code>
+          </div>
         ) : undefined
       }
       // 参数没填也保留按钮（灰着）：让玩家看得见「这里有东西可以点，只是还没填完」。

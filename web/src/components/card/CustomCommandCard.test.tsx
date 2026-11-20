@@ -64,7 +64,10 @@ describe('CustomCommandCard', () => {
 
   it('必填参数没填：按钮置灰 + 提示还缺什么；填完就能执行', () => {
     const { onRun } = renderCard()
-    expect(screen.getByText('还需要填写：参数1、参数2')).toBeTruthy()
+    // 缺值只体现在输入框的 warning 态上（不再多一行「还需要填写」）。
+    expect(screen.queryByText(/还需要填写/)).toBeNull()
+    expect(screen.getByLabelText('参数1').getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByLabelText('参数2').getAttribute('aria-invalid')).toBe('true')
     const run = screen.getByRole('button', { name: '执行' })
     expect(run.hasAttribute('disabled')).toBe(true)
     fireEvent.click(run)
@@ -72,9 +75,22 @@ describe('CustomCommandCard', () => {
 
     fireEvent.change(screen.getByLabelText('参数1'), { target: { value: '29' } })
     fireEvent.change(screen.getByLabelText('参数2'), { target: { value: 'Alice' } })
-    expect(screen.queryByText(/还需要填写/)).toBeNull()
+    expect(screen.getByLabelText('参数1').getAttribute('aria-invalid')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '执行' }))
     expect(onRun).toHaveBeenCalledWith('/give 29 Alice')
+  })
+
+  it('指令预览在输入框下面一行（不在页脚右下角）', () => {
+    const { container } = renderCard()
+    const preview = screen.getByTestId('card-command-preview')
+    const form = screen.getByTestId('card-param-form')
+    // 两者在同一个正文容器里，且预览排在输入区之后。
+    expect(preview.parentElement).toBe(form.parentElement)
+    expect(
+      form.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    const body = container.querySelector('[data-slot="card-body"]')
+    expect(body?.contains(preview)).toBe(true)
   })
 
   it('页脚显示最终会执行的指令（填完先看一眼再点执行）', () => {

@@ -70,18 +70,6 @@ export function CardParamForm({
           invalid={missing.includes(index)}
         />
       ))}
-      {missing.length > 0 && (
-        <p className="basis-full text-2xs text-warning">
-          {t('card.needArgs', {
-            args: missing
-              .map((index) => {
-                const order = fields.findIndex((field) => field.index === index)
-                return order >= 0 ? paramName(order + 1) : '?'
-              })
-              .join('、'),
-          })}
-        </p>
-      )}
     </div>
   )
 }

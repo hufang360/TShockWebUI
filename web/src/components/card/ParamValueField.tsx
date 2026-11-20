@@ -216,7 +216,11 @@ function EnumSelect({
         size="sm"
         aria-label={ariaLabel}
         aria-invalid={invalid || undefined}
-        className={cn(compact ? 'h-6 w-28 text-xs' : 'w-full', invalid && 'border-destructive')}
+        className={cn(
+          compact ? 'h-6 w-28 text-xs' : 'w-full',
+          // 必填没填：描边用 warning（不是错误红）—— 还没到「出错」，只是提醒该填了。
+          invalid && 'border-warning ring-1 ring-warning/40',
+        )}
       >
         {/* 空值时也要有提示：只有一个占位符的下拉看着像坏了（`/time` 这类必填枚举）。 */}
         <SelectValue placeholder={arg.required ? placeholder : emptyLabel} />
@@ -298,7 +302,10 @@ function SuggestInput({
           aria-autocomplete="list"
           aria-expanded={open && candidates.length > 0}
           data-suggest-anchor="true"
-          className={cn(compact ? 'h-6 w-24 text-xs' : 'h-7 text-xs', invalid && 'border-destructive')}
+          className={cn(
+            compact ? 'h-6 w-24 text-xs' : 'h-7 text-xs',
+            invalid && 'border-warning ring-1 ring-warning/40 placeholder:text-warning',
+          )}
           onChange={(e) => {
             onChange(e.target.value)
             setHighlight(0)

@@ -203,6 +203,12 @@ export function CommandCard({
             <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-wide text-foreground select-text">
               {title}
             </span>
+            {/* 状态文字也在右上角（与「压成一行」的普通卡片一致）：未执行 / 刷新中。 */}
+            {!unavailable && !result && (
+              <span className="shrink-0 text-2xs text-muted-foreground">
+                {loading ? t('home.refreshing') : (emptyText ?? t('home.notRun'))}
+              </span>
+            )}
             {/* 操作按钮固定在右上角：没有结果时常显（这时它是卡片唯一的主操作），
                 有结果 / 加载中才 hover 出现（正文有内容，按钮不必抢眼）。折叠时不显示。 */}
             {open && onRefresh && (
@@ -246,7 +252,7 @@ export function CommandCard({
                   atlas={atlas}
                   fill
                 />
-              ) : (
+              ) : paramForm ? null : (
                 <p className="text-xs text-muted-foreground">
                   {loading ? t('home.refreshing') : (emptyText ?? t('home.notRun'))}
                 </p>
