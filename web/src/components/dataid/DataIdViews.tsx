@@ -406,8 +406,9 @@ export function BuffGrid({
           style={{ width: row ? '100%' : spec.cell }}
         >
           {row ? (
-            // 横条：提示锚点放在整条格子上（Buff 没有物品，用「#ID + 名称」）
-            <RowTip id={buff.id} name={buff.name}>
+            // 横条：提示锚点放在整条格子上。Buff 本身不是物品（来源物品可能有很多件，弹某一件的属性会误导），
+            // 所以用「#ID + 名称 + 游戏内描述」。
+            <RowTip id={buff.id} name={buff.name} note={buff.tip}>
               <span
                 data-testid="dataid-icon-surface"
                 className={iconSurfaceClass(size)}
@@ -897,6 +898,8 @@ export function BuffDetail({
   buff,
   large = false,
   gbuffPlayer = null,
+  itemsById,
+  atlas,
   onFilled,
 }: {
   buff: Buff
@@ -908,8 +911,14 @@ export function BuffDetail({
    * 不探测权限（见 `DataIdPage`：本页不请求 `/api/me`）。
    */
   gbuffPlayer?: string | null
+  /** 解析 buff.items（能获得它的物品的图标 / 名称）；不传时这一行只显示条数或不显示明细。 */
+  itemsById?: Map<number, Item>
+  atlas?: Atlas
 }) {
   const { t } = useI18n()
+  const items = (buff.items ?? [])
+    .map((id) => itemsById?.get(id))
+    .filter((item): item is Item => item != null)
   return (
     <div className={cn('flex flex-col gap-2', large && 'gap-4')}>
       <div className={cn(large ? 'flex flex-col items-center gap-3' : 'flex items-center gap-3')}>
@@ -921,7 +930,54 @@ export function BuffDetail({
           <div className="font-pixel text-xs text-muted-foreground">BuffID #{buff.id}</div>
         </div>
       </div>
+      {buff.tip && (
+        <p
+          data-testid="buff-tip"
+          className={cn('text-xs text-muted-foreground', large && 'text-center text-sm')}
+        >
+          {buff.tip}
+        </p>
+      )}
       <DetailRow label={t('dataId.field.internal')} value={buff.key} mono />
+      <div className="flex flex-col gap-1">
+        <div className="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 text-xs">
+          <span className="text-muted-foreground">{t('dataId.field.buffItems')}</span>
+          {items.length === 0 ? (
+            <span className="text-right text-muted-foreground">—</span>
+          ) : items.length === 1 ? (
+            <span className="flex min-w-0 items-center justify-end gap-2">
+              <ItemIcon item={items[0]} atlas={atlas} size={20} name={items[0]!.name} />
+              <span className="truncate text-foreground">
+                {items[0]!.name} #{items[0]!.id}
+              </span>
+            </span>
+          ) : (
+            <span className="text-right text-muted-foreground">
+              {t('dataId.field.buffItemsCount', { n: items.length })}
+            </span>
+          )}
+        </div>
+        {/* 多件（吃得好有 42 种食物）：单列限高滚动。抽屉只有 ~384px 宽，两列会把物品名截成四五个字。 */}
+        {items.length > 1 && (
+          <div
+            data-testid="buff-items"
+            className="flex max-h-60 flex-col gap-1 overflow-y-auto overscroll-contain"
+          >
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="flex min-w-0 items-center gap-2 rounded-control border border-border/60 px-2 py-1"
+              >
+                <ItemIcon item={item} atlas={atlas} size={20} name={item.name} />
+                <span className="truncate text-xs text-foreground">{item.name}</span>
+                <span className="ml-auto shrink-0 font-mono text-2xs text-muted-foreground">
+                  #{item.id}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {gbuffPlayer && (
         <CommandLine
           label={t('commandLine.related')}

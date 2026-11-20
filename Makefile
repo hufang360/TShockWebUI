@@ -75,6 +75,7 @@ data:
 	python3 tools/gen-player-atlas.py
 	python3 tools/gen-npc-atlas.py
 	python3 tools/gen-buff-atlas.py
+	python3 tools/gen-bestiary-icons.py
 	python3 tools/gen-brand-assets.py
 	bash tools/gen-game-data.sh
 	node tools/gen-world-colors.mjs   # 世界缩略图颜色表 → web/src/lib/save/worldColors.generated.ts（需 TEDIT_DIR）

@@ -38,6 +38,9 @@ TR_SRC="$TR_SRC" RAW="$RECIPES_RAW" OUT="$REPO/data/recipes.json" node "$HERE/ge
 echo "== gen-item-stats =="
 TR_SRC="$TR_SRC" RAW="$ITEMS_RAW" OUT="$REPO/data/item-stats.json" node "$HERE/gen-item-stats.mjs"
 
+echo "== gen-buff-items（Buff → 来源物品） =="
+TR_SRC="$TR_SRC" OUT="$REPO/data/buff-items.json" node "$HERE/gen-buff-items.mjs"
+
 echo "== gen-item-groups =="
 RAW="$GROUPS_RAW" OUT="$REPO/data/item-groups.json" node "$HERE/gen-item-groups.mjs"
 
@@ -58,6 +61,10 @@ TR_SRC="$TR_SRC" OUT="$REPO/data/tile-names.json" node "$HERE/gen-tile-names.mjs
 
 echo "== gen-permissions（权限节点 + 内置用户组） =="
 TSHOCK_SRC="${TSHOCK_SRC:-$REPO/../TShock}" OUT="$REPO/data/permissions.json" node "$HERE/gen-permissions.mjs"
+
+echo "== bestiary（怪物图鉴筛选器 / 排序键 + 负值 NPC 变体） =="
+dotnet "$HERE/gamedump/bin/Release/net9.0/GameDump.dll" --bestiary \
+  "$REPO/data/npc-bestiary.json" "$REPO/data/npc-variants.json" "$TR_SRC"
 
 echo "== tile styles =="
 dotnet "$HERE/gamedump/bin/Release/net9.0/GameDump.dll" --tile-styles "$TILE_STYLES_RAW"

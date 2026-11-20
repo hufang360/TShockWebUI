@@ -34,6 +34,8 @@ describe('npcCollections', () => {
     expect(npcIds).toEqual(expect.arrayContaining([22, 18, 17, 38, 19, 20]))
     // 受缚形态
     expect(npcIds).toEqual(expect.arrayContaining([105, 106, 123, 354, 376, 579]))
+    // 534 痛苦亡魂：税收官在地狱的前置形态
+    expect(npcIds).toEqual(expect.arrayContaining([534]))
     // 猫狗兔 / 城镇史莱姆
     expect(npcIds).toEqual(expect.arrayContaining([637, 638, 656, 670, 678, 679, 680, 681, 682, 683, 684]))
   })

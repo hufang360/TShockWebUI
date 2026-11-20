@@ -1,13 +1,16 @@
 # 数据 ID（DataIdPage）
 
-文档版本：1.10
+文档版本：1.11
 对应页面：`web/src/pages/DataIdPage.tsx`（导航「数据 ID」，tab id `dataid`）
 相关数据：`data/npcs.json`、`data/tiles.json`、`data/walls.json`、`data/buffs.json`、`data/items.json`、
-`data/loc.<culture>.json`（`NPCName` / `ItemName` / `BuffName`）、`data/npc-atlas.json` / `.png`、
-`data/buff-atlas.json` / `.png`
+`data/npc-variants.json`、`data/npc-bestiary.json`、`data/bestiary-icons.json` / `bestiary-tags.webp` / `bestiary-rank.webp`、
+`data/buff-items.json`、
+`data/loc.<culture>.json`（`NPCName` / `ItemName` / `BuffName` / `BuffDescription` / `BestiaryInfo` / `Bestiary_Biomes` 等）、
+`data/npc-atlas.json` / `npc-atlas.webp`、`data/buff-atlas.json` / `buff-atlas.webp`
 相关代码：`web/src/components/NpcSprite.tsx`、`web/src/components/ItemIcon.tsx`、`web/src/components/BuffIcon.tsx`、
-`web/src/lib/npcAtlas.ts`、`web/src/lib/buffAtlas.ts`、`web/src/lib/npcCollections.ts`、`web/src/components/SearchInput.tsx`、
-`web/src/lib/pagination.ts`、`web/src/hooks/usePageScroll.ts`、`web/src/hooks/useSearchHistory.ts`
+`web/src/components/BestiaryFilterIcon.tsx`、`web/src/lib/npcAtlas.ts`、`web/src/lib/buffAtlas.ts`、
+`web/src/lib/npcCollections.ts`、`web/src/lib/bestiary.ts`、`web/src/components/SearchInput.tsx`、
+`web/src/hooks/usePageScroll.ts`、`web/src/hooks/useSearchHistory.ts`
 
 > 本文件描述「数据 ID」（代码页 `DataIdPage`）的定位、布局、数据来源与验收方式。它是原「NPC 图鉴」（`NpcDexPage`）与
 > 「数据 ID」（`TileWallPage`）**合并后的单页**：**同一套网格组件，只是数据源不同**。
@@ -24,7 +27,12 @@
   经 REST 无法执行（`docs/REST_API限制.md`）→ 详情里只**显示 + 复制**（**不按权限隐藏**，能不能执行由 TShock 判）；
   `/gbuff`（给 buff）是 `allowServer=true`，复制后到「指令」页执行。
 - 图格 / 墙是 `TileID` / `WallID` 速查：ID、代表物品（图标 + 名称）、摆放尺寸、内部名。
-- Buff 是 `BuffID` 速查：ID、图标、本地化名称、内部名（图标取自游戏 `Content/Images/Buff_<id>.png`，见 §2）。
+- Buff 是 `BuffID` 速查：ID、图标、本地化名称、内部名、**游戏内描述**（`BuffDescription`）与**能获得它的物品**
+  （图标取自游戏 `Content/Images/Buff_<id>.png`，见 §2）。
+- NPC 除 `NPCID` 正数常量，还收录 **-1..-65 的变体 id**（史莱姆颜色 / 僵尸与骷髅体型 / 黄蜂变种…）：
+  没有自己的名字时显示母体名，贴图用母体贴图按 `scale` 缩放（见 §2）。
+- **怪物图鉴的「分组」与「排序」**是本页独有的参考数据：分组 = 游戏图鉴的 59 个筛选器（Boss / 稀有 / 各生物群系与事件，
+  与游戏同一个图标网格），排序 = 图鉴排序菜单那 7 项。数据都跑游戏自身逻辑导出，不手工枚举（见 §2）。
 - 旧的 tab id（`npcs` / `tiles`，以及改名前用的 `codex`）在 `App.tsx` 里做兼容映射到 `dataid`，老用户的侧边栏记忆不会失效。
 
 ---
@@ -33,10 +41,10 @@
 
 | 数据 | 文件 | 说明 |
 | --- | --- | --- |
-| NPC | `data/npcs.json` | `{ id, key, en, sb?, sbAliases?, sbAll? }`，694 条；中文名不落盘（`en` 落盘：`/tpnpc` **只认名称**，用英文名不受服务器语言影响） |
+| NPC | `data/npcs.json` | `{ id, key, en, base?, scale?, color?, sb?, sbAliases?, sbAll? }`，759 条（694 正数 + 65 负值变体）；中文名不落盘（`en` 落盘：`/tpnpc` **只认名称**，用英文名不受服务器语言影响） |
 | NPC 名称 | `data/loc.<culture>.json` | 官方本地化 `NPCName.<key>`，按界面语言加载 |
-| NPC 贴图 | `data/npc-atlas.json` / `.png` | `regions[npcId] = [x, y, w, h]`（第一帧），懒加载 |
-| NPC 分类 | `web/src/lib/npcCollections.ts` | 手工维护：分类名 + 里面的 NPC id（来源见该文件注释） |
+| NPC 贴图 | `data/npc-atlas.json` / `.webp` | `regions[npcId] = [x, y, w, h]`（第一帧；负值变体是母体帧 × scale），759 个，懒加载 |
+| NPC 分类 | `web/src/lib/npcCollections.ts` | 手工维护：分类名 + 里面的 NPC id（来源见该文件注释）；负值变体只在「全部」与搜索里出现，不单列分类 |
 | NPC 相关指令 | `web/src/lib/npcRelatedCommands.ts` | 详情「相关指令」的拼装 + 可切换解救状态的 NPC id（来源见该文件注释） |
 | 图格 | `data/tiles.json` | `{ id, key, item, size?, frameImportant? }`，754 条 |
 | 墙 | `data/walls.json` | `{ id, key, item }`，367 条（墙没有尺寸概念） |
@@ -46,6 +54,11 @@
 | Buff | `data/buffs.json` | `{ id, key }`，400 条；名称不落盘 |
 | Buff 名称 | `data/loc.<culture>.json` | 官方本地化 `BuffName.<key>`，按界面语言加载；缺名时回退内部名 |
 | Buff 图标 | `data/buff-atlas.{json,png}` | 游戏原图 `Buff_<id>.png`（32×32 静态图标，400 个）拼成的图集；懒加载 |
+| Buff 描述 | `data/loc.<culture>.json` | 官方本地化 `BuffDescription.<key>`，按界面语言加载；`{$BuffName.xxx}` 这类引用在运行期展开 |
+| Buff 来源物品 | `data/buff-items.json` | `items[buffId] = [物品 id…]`（升序），221 个 buff / 303 对；来源见 §2 下方 |
+| NPC 负值变体 | `data/npc-variants.json` | `{ id, key, baseId, scale, color }`，65 条；`npcs.json` 已合并这些 id、图集按母体贴图缩放 |
+| 图鉴分组 / 排序数据 | `data/npc-bestiary.json` | 59 个筛选器（顺序 + 图标贴图）+ 761 个 NPC 的 `sortId` / `rarity` / 攻击·防御·钱币·生命 / 命中的筛选器 |
+| 图鉴筛选器图标 | `data/bestiary-icons.{json}` + `bestiary-tags.webp` / `bestiary-rank.webp` | 游戏原图 `Icon_Tags_Shadow`（16×5、每格 30×30）与 `Icon_Rank_Light`；帧号解析自构造参数，带内容 hash |
 | 自备 NPC 贴图 | `tools/npc-overrides.json` + `tools/npc-overrides/` | 可给指定 NPC 换成自己的图片（见 §7） |
 
 - NPC 的 `sb` / `sbAliases` / `sbAll` 由 `tools/gen-data.mjs` 从 `TShockAPI/Commands.cs` 的 `SpawnBoss()` 解析，
@@ -57,6 +70,18 @@
   `regions[buffId]` 与 `data/buffs.json` 的 id 一致。
 - NPC 图集由 `tools/gen-npc-atlas.py` 生成，帧高 = `贴图高 / Main.npcFrameCount[id]`，
   第一帧为空时回退到整张贴图的紧包围盒。图集 PNG 版权属 Re-Logic。
+- **负值 NPC（-1..-65）**：`GameDump --bestiary` 跑 `NPC.SetDefaults(id)` 导出母体（`NPCID.FromNetId`）、
+  `scale`、`color`（`scale` 会受 `remixWorld` / `getGoodWorld` 影响，只能运行时取）；`tools/gen-data.mjs` 并进 `npcs.json`，
+  `tools/gen-npc-atlas.py` 用**母体贴图第一帧 × scale** 生成图标。名字回退链：自己的 `NPCName` → 母体的 `NPCName` → 内部名
+  （游戏里 `Lang.InitializeLegacyLocalization` 也是把负值名字缓存镜像成母体名）。
+- **负值变体不做染色**：游戏是 `NPC.GetColor()` 的两遍叠色（`Main.DrawNPCDirect` 里 `GetAlpha` + `GetColor`），
+  单通道近似会把红史莱姆涂成发暗的褐色，比「统一用母体原色」更误导，因此只还原尺寸。
+- **Buff 来源物品**（`tools/gen-buff-items.mjs`）：`Item.buffType`（药水 / 食物 / 宠物 / 召唤法杖 / 灌注药剂）
+  与坐骑（`Item.mountType` → `Mount.cs` 的 `mountData.buff` / `SetAsMinecart`）。护甲套装、附近家具、鞭子叠层这类间接来源不收录，
+  其余 buff（多为 debuff）没有来源物品时页面显示 `—`。
+- **图鉴分组 / 排序**（`GameDump --bestiary`）：`ContentSamples.Initialize()` + `BestiaryDatabaseNPCsPopulator.Populate()`，
+  按图鉴条目算命中筛选器与排序键；「未解锁」筛选器依赖玩家自己的图鉴进度（无头环境没有），本页是参考表也永远为真，**故意不导出**；
+  多个分组之间是**并集**（`EntryFilterer.FitsFilter` 语义）。
 - **多列网格贴图**例外：少数 NPC 的贴图是横铺的网格，游戏在 `Main.DrawNPCDirect` 里用
   `Frame(列, 行, ...)` 选单帧（`frame.Width` 不等于可见帧宽）——生成脚本的 `FRAME_GRIDS` 照抄这些分格，
   取左上角那一帧。当前：`396`(3,3)、`564`/`565`(5,9)、`576`/`577`(5,10)、`696`(6,27)。
@@ -86,7 +111,7 @@
 │ NPC │ 图格 │ 墙 │ Buff                                            │
 └──────────────────────────────────────────────────────────────────┘
 ┌ 工具行（不套卡片，直接铺在页面上）────────────────────────────┐
-│ 搜索框  结果数        [全部│Boss│NPC│小动物]（胶囊）  ⚙  ⛶       │
+│ [全部 Boss NPC 小动物] │ [分组] [×]                    ……  搜索框 │
 └──────────────────────────────────────────────────────────────────┘
 ┌ 页面设置 Popover（所有 tab 共用）───────────────────────────────┐
 │ 页面设置                                            ↺ 恢复默认 │
@@ -104,9 +129,20 @@
   页面**不固定高度、整页滚动**（滚动条是浏览器右侧那条），工具条（数据源 Tab + 搜索 / 筛选）`sticky top-12` 吸在顶栏下面，
   表头再吸在工具条下面（`--page-sticky-top`）。规则见 `docs/UI组件.md` 的「整页滚动」。
 - 数据源 tablist 独立放在页面顶部，**不包在 Card 内**（shadcn `Tabs` 的 **line 变体**）。
-- NPC 分类由下拉框改为胶囊 Tabs，位于工具行右侧；**「页面设置」与「全屏」按钮在内容区顶栏右侧**（`TopBarActions`），不再占工具行。
-- **工具行：左边筛选、行尾搜索**。搜索框固定在行尾（`sm:w-64`、字号 `text-xs`），NPC 分类 Tabs 与视图开关在左侧；
-  窄屏搜索独占一行；**图格 / 墙 / Buff 没有分类 Tabs，搜索框排最左**。搜索行吸在顶栏下面（`sticky top-12`），表头再吸在它下面。
+- NPC 分类是工具行最左的**幽灵按钮组**（`ToggleGroup variant="ghost"`，同物品 ID 的分类 tab）：`全部 / Boss / NPC / 小动物`；
+  **「页面设置」与「全屏」按钮在内容区顶栏右侧**（`TopBarActions`），不占工具行。
+- **工具行（NPC）**：`分类组 │ 分组 [×] …… 搜索框`。分类组与「分组」之间一条竖分割线；
+  窄屏分类组横向滚动（隐藏滚动条），搜索框单独占一行。
+  **「排序」与「前往 Wiki」收在「分组」弹层里**（不在工具行上），弹层从下到上依次是
+  分组图标网格 →（分割线）→ 排序按钮组 →（分割线）→ 前往 Wiki。
+- **工具行（图格 / 墙 / Buff）**：搜索框居左、`前往 Wiki` 紧贴它右边。
+- 搜索行吸在顶栏下面（`sticky top-12`），表头再吸在它下面。
+- **怪物图鉴「分组」**：按钮 → 弹层里的 59 格图标网格（`flex-wrap`，桌面一行 12 格，窄屏自动换行，纵向滚动、不出横向滚动条）；
+  每格 30×30 游戏原图图标 + 手型光标 + 悬停提示（分组名 + 该分组条数），多选、选中项右下角打勾，**并集**生效；
+  按钮上显示 `分组（N）`，旁边一颗 × 一键清空。
+- **怪物图鉴「排序」**（在分组弹层里，小标题「排序」+ 一行幽灵按钮组，自动换行）：7 项
+  （怪物图鉴ID / 名称 / 攻击 / 防御 / 钱币 / 生命 / 稀有度），文案取自 `loc.BestiaryInfo.Sort_*`；
+  **默认不选 = 按 NPC 自身 ID 升序**；选中某项 = 按该项排完再整体倒序（数值大的在前、名称 Z→A）；再点已选项取消、回到默认。
 - **工具行的上下间距就是 `gap-2`（8px）**：工具条自身不加上下内边距，与上面「数据源 Tab 行」、下面「图标区」的距离
   都只由页面根容器的 `gap-2` 决定（以前是 18px / 22px，看着这一行浮在中间）。
 - **全屏**：右上角只剩「退出全屏（Esc）」——常驻、不自动收起（`FullscreenDock persistent`），尺寸比顶栏那颗小一档；
@@ -170,7 +206,9 @@
   「展开侧栏」按钮浮在遮罩上（详见 `docs/UI组件.md` 的「浮层」一节）。窄屏仍是自带遮罩的模态抽屉。
 - **切页面回来抽屉还在**：`{ kind, id }` 记进 `lib/dataIdState.ts` 的模块内存（与数据源 tab / 筛选 / 滚动位置同一套），
   回到本页时照旧打开；关掉之后不再弹。刷新页面按既有策略回到默认（不弹详情）。
-- **Wiki 链接**：在页面设置 Popover 的当前数据源分区，按当前语言显示中文 / 英文站点；NPC 同时给出「NPC ID」与「数据 ID」两个入口。
+- **Wiki 入口**：一颗 ghost 按钮 + 外链图标「前往 Wiki」，地址跟着当前数据源走
+  （NPC → `NPC_ID`、图格 → `图格_ID`、墙 → `墙_ID`、Buff → `增益_ID`），新标签页打开。
+  **NPC 的在分组弹层底部**，图格 / 墙 / Buff 的在工具行、紧贴搜索框右边；页面设置 Popover 里仍保留完整的一排（含「数据 ID」）。
 - **详情**：NPC / Buff 点格子或行 → **右侧抽屉**（图标 **128×128**，名称 / ID / 英文名（非英文界面）/ 内部名 / 相关指令，去掉了冗余说明文字）；
   图格 / 墙用同一个抽屉（`Sheet side="right"`）。
 
@@ -181,8 +219,10 @@
 | 行为 | 规则 |
 | --- | --- |
 | 数据源 | `NPC` / `图格` / `墙` / `Buff` 单选 **shadcn `Tabs`（line 下划线变体）**；切换会**清空搜索**并复位列表滚动（不同源的名称互不通用） |
-| NPC 筛选 | 工具行右侧、页面设置左侧的胶囊 Tabs：`全部` / `Boss` / 各分类（`lib/npcCollections.ts` 配置），与搜索叠加；`Boss` = `npcs.json` 的 `sb` 与 `EXTRA_BOSS_IDS` 的并集（已移除 440 / 565 / 577）；切换数据源时保持分类状态 |
-| 搜索 | 胶囊输入框，放大镜位于最右侧；工具行上下各 4px（`p-1`，左右同样 4px 以保护聚焦环）；手机端 NPC 分类胶囊（全部 / Boss / …）独占下一行；占位符统一为 `名称 / ID`；NPC 另支持内部名 / `/sb` 参数与别名；防抖 150ms；最近搜索可逐条删除 |
+| NPC 分类 | 工具行最左的幽灵按钮组（`ToggleGroup`）：`全部` / `Boss` / 各分类（`lib/npcCollections.ts` 配置），与搜索叠加；`Boss` = `npcs.json` 的 `sb` 与 `EXTRA_BOSS_IDS` 的并集（已移除 440 / 565 / 577）；切换数据源时保持分类状态 |
+| 搜索 | 搜索框（占位符 `名称 / ID`）；NPC 在行尾、图格 / 墙 / Buff 居左；工具行上下各 4px（`p-1`，左右同样 4px 以保护聚焦环）；窄屏分类组横向滚动、搜索独占一行；NPC 另支持内部名 / `/sb` 参数与别名；防抖 150ms；最近搜索可逐条删除 |
+| 怪物图鉴分组 | 「分组」弹层里的图标网格，多选**并集**（游戏 `EntryFilterer.FitsFilter` 语义）；条数是当前「分类 + 搜索」结果下的命中数；与分类、搜索三者取交集 |
+| 排序 | 在「分组」弹层里：7 项幽灵按钮，默认不选（按 NPC ID 升序）；选中 = 按该项排完再倒序；再点已选项取消。与搜索 / 分类 / 分组都是「且」的关系 |
 | 分页 | **无分页**：一次展示全部结果，搜索 / 切数据源 / 切筛选都会把列表滚动复位 |
 | 视图切换 | 统一在页面设置 Popover 的「视图」区切换表格；默认不勾 = 图标网格 |
 | 导出 | 页面设置的「表格视图」旁提供「导出表格」，按当前筛选结果导出 CSV。 |
@@ -197,11 +237,12 @@
 
 ## 5. 搜索框
 
-进入页面会**自动聚焦**搜索框（`searchRef`），但**聚焦本身不弹「最近搜索」**——否则一进页面就有一层菜单
-盖住结果。条数 / 去重 / 打开时机等**统一规则见 [`功能-搜索记录.md`](功能-搜索记录.md)**，本页只记自己的部分：
+进入页面会**自动聚焦**搜索框（`searchRef`），但**聚焦、打字都不弹「最近搜索」**——否则一进页面或边输边筛时
+有一层菜单盖住结果；只有点输入框右侧的历史图标才展开（`historyOnInput={false}`，与物品图鉴一致）。条数 / 去重 / 打开时机等**统一规则见 [`功能-搜索记录.md`](功能-搜索记录.md)**，本页只记自己的部分：
 
 - 防抖 150ms；占位符 `名称 / ID`；NPC 另支持内部名、`/sb` 参数与别名；
-- 实现走 `components/SearchInput.tsx`（`historyOnFocus` 默认 `false`、`historyToggle` 默认 `true`、`onHistoryRemove`）；
+- 实现走 `components/SearchInput.tsx`（`historyOnFocus` 默认 `false`、`historyOnInput` 传 `false`、`historyToggle` 默认 `true`、`onHistoryRemove`）；
+- 工具行位置：NPC 在行尾（`ml-auto`、`sm:w-64`），图格 / 墙 / Buff 居左；
 - 点输入框外、按 Esc、点某条记录、清空（✕）都会收起下拉。
 
 ---
@@ -376,7 +417,12 @@ NPC 详情 / Buff 详情用 `components/CommandLine.tsx` 列一块 **「相关�
 ## 8. 验收
 
 - 进「数据ID」默认是 **NPC** 网格（贴图 + 名称 + ID），搜索框已聚焦，但**不会**自动弹出「最近搜索」。
-- 打字后建议下拉出现，可边输边筛、点一条填入；点右侧历史按钮也能展开；点外面 / Esc 收起。
+- 打字**不会**弹建议下拉（结果本身就在下面）；只有点右侧历史按钮才展开，点一条填入，点外面 / Esc 收起。
+- NPC 工具行：`[分类幽灵按钮组] │ [分组] [×] …… [搜索框]`；分组弹层里 59 格图标可多选（并集）、
+  悬停显示「分组名 + 条数」，选中打勾、按钮显示 `分组（N）`、× 清空；弹层下方还有排序按钮组与「前往 Wiki」。
+- NPC 排序默认按 ID 升序；在分组弹层里选「攻击」等项后按该项倒序；再点同一项回到默认。
+- NPC 列表含 -1..-65 的变体（在「全部」里能看到，名字是母体名如「僵尸」「黄蜂」，贴图按 scale 缩放）。
+- Buff 详情显示游戏内描述（如 1 号「对熔岩免疫」）与「代表物品」（1 号 → 288 黑曜石皮药水）；多来源时列出全部并可滚动。
 - 「图格」「墙」默认都是图标网格，在页面设置中勾选「表格视图」后为表格；图格还可勾选「展开子 ID」平铺样式。墙图标使用代表物品，名称使用物品本地化名，无代表物品时显示斜体内部名；
   Buff 默认图标网格（96×96，图标底同上），勾选「表格视图」后为 `ID / 图标 / 名称 / 内部名` 表格。
 - 无翻页器：全部结果一次展示；搜索 / 切 tab / 切筛选都会回到顶部。

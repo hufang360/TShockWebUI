@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Download, Maximize2, Minimize2, Search, Settings2 } from 'lucide-react'
+import {
+  Check,
+  Download,
+  ExternalLink,
+  ListFilter,
+  Maximize2,
+  Minimize2,
+  Search,
+  Settings2,
+  X,
+} from 'lucide-react'
 import {
   BuffDetail,
   BuffGrid,
@@ -13,6 +23,7 @@ import {
   NpcTableLayout,
   TileIconGrid,
 } from '@/components/dataid/DataIdViews'
+import { BestiaryFilterIcon } from '@/components/BestiaryFilterIcon'
 import { IconAction } from '@/components/IconAction'
 import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
 import { ContentScrim } from '@/components/ContentScrim'
@@ -38,6 +49,12 @@ import {
   SelectTrigger,
   SelectValue,
   Separator,
+  ToggleGroup,
+  ToggleGroupItem,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -52,6 +69,15 @@ import { useSettingsPopoverFocus } from '@/hooks/useSettingsPopoverFocus'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { usePageScrollReset, usePageScroller, useStickyHeaderOffset } from '@/hooks/usePageScroll'
+import {
+  BESTIARY_SORTS,
+  bestiaryFilterCounts,
+  bestiarySortById,
+  matchesBestiaryFilters,
+  sortNpcs,
+  type BestiarySortId,
+} from '@/lib/bestiary'
+import { locText } from '@/lib/loc'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import { cn } from '@/lib/cn'
 import {
@@ -73,6 +99,8 @@ import {
 import { resolveIconGridSize, showsMetaToggle } from '@/lib/iconGridSize'
 import { StorageKeys } from '@/lib/storage'
 import type { TileWallData, TileWallEntry } from '@/types'
+
+const EMPTY_BESTIARY = new Map<number, never>()
 
 const EMPTY_TILEWALL: TileWallData = {
   meta: { gameVersion: '', count: 0, withItem: 0, source: '', generatedBy: '', note: '' },
@@ -104,6 +132,8 @@ export function DataIdPage({
   const dataset = useDataset()
   const npcs = useMemo(() => dataset?.npcs ?? [], [dataset])
   const buffs = useMemo(() => dataset?.buffs ?? [], [dataset])
+  const bestiary = dataset?.bestiary
+  const bestiaryByNpcId = dataset?.bestiaryByNpcId ?? EMPTY_BESTIARY
 
   // 页面状态（数据源 tab / NPC 分类 / 页码 / 每页数量 / 两列表格 / 滚动位置）记在模块内存里：
   // 切到其它页面再回来会还原，刷新页面则重置（见 lib/dataIdState.ts）。
@@ -130,6 +160,10 @@ export function DataIdPage({
   const [tableView, setTableView] = useState(initial.tableView)
   // 图格是否把子 ID 平铺成独立行（默认关闭，只在详情里看）。
   const [expandStyles, setExpandStyles] = useState(false)
+  /** 怪物图鉴筛选器（下标，并集）与排序项；只在 NPC 数据源生效。 */
+  const [bestiaryFilters, setBestiaryFilters] = useState<number[]>([])
+  /** 当前排序项；`null` = 默认（怪物图鉴ID 倒序），点已选项即取消回默认。 */
+  const [bestiarySort, setBestiarySort] = useState<BestiarySortId | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsFocus = useSettingsPopoverFocus()
   const [resultsFullscreen, setResultsFullscreen] = useState(false)
@@ -218,7 +252,8 @@ export function DataIdPage({
     return c ? new Set(c.ids) : null
   }, [npcFilter])
 
-  const filteredNpcs = useMemo(() => {
+  /** 分类 tab + 搜索的结果（图鉴筛选器的条数也按它算）。 */
+  const npcBase = useMemo(() => {
     if (kind !== 'npc') return []
     const q = debounced.trim().toLowerCase()
     return npcs.filter((n) => {
@@ -232,6 +267,25 @@ export function DataIdPage({
       return (n.sbAliases ?? []).some((a) => a.toLowerCase().includes(q))
     })
   }, [kind, npcs, debounced, npcFilter, collectionIds])
+
+  /** 筛选器条数：按当前「分类 + 搜索」结果算（与游戏里筛选器网格的数字同义）。 */
+  const filterCounts = useMemo(
+    () =>
+      kind === 'npc' && bestiary
+        ? bestiaryFilterCounts(npcBase, bestiaryByNpcId, bestiary.filters.length)
+        : [],
+    [kind, bestiary, npcBase, bestiaryByNpcId],
+  )
+
+  // 怪物图鉴：筛选器是**并集**（与游戏 `EntryFilterer.FitsFilter` 一致），再按排序项重排。
+  const filteredNpcs = useMemo(() => {
+    if (kind !== 'npc') return []
+    const kept =
+      bestiaryFilters.length === 0
+        ? npcBase
+        : npcBase.filter((n) => matchesBestiaryFilters(bestiaryByNpcId.get(n.id), bestiaryFilters))
+    return sortNpcs(kept, bestiaryByNpcId, bestiarySort ? bestiarySortById(bestiarySort) : null, lang)
+  }, [kind, npcBase, bestiaryByNpcId, bestiaryFilters, bestiarySort, lang])
 
   // 图格 / 墙：名称取「放置它的代表物品」的本地化名，没有代表物品时回退内部名。
   // 展开子 ID 时，优先用该样式的代表物品名。
@@ -372,6 +426,23 @@ export function DataIdPage({
       ? `https://terraria.wiki.gg/wiki/${en}`
       : `https://terraria.wiki.gg/zh/wiki/${encodeURIComponent(zh)}`
   const dataWikiLink = { href: wiki('数据_ID', 'Data_IDs'), label: t('dataId.wiki.data') }
+  /** 当前数据源对应的 Wiki ID 页（与「页面设置」里那排入口同一个地址），工具行上常驻一颗按钮。 */
+  const kindWikiHref =
+    kind === 'npc'
+      ? wiki('NPC_ID', 'NPC_IDs')
+      : kind === 'tile'
+        ? wiki('图格_ID', 'Tile_IDs')
+        : kind === 'wall'
+          ? wiki('墙_ID', 'Wall_IDs')
+          : wiki('增益_ID', 'Buff_IDs')
+  const kindWikiButton = (
+    <Button variant="ghost" size="sm" asChild className="shrink-0">
+      <a href={kindWikiHref} target="_blank" rel="noreferrer noopener">
+        <ExternalLink />
+        {t('dex.wiki')}
+      </a>
+    </Button>
+  )
   const otherWikiLinks = [
     { href: wiki('NPC_ID', 'NPC_IDs'), label: t('dataId.wiki.npc') },
     { href: wiki('图格_ID', 'Tile_IDs'), label: t('dataId.wiki.tile') },
@@ -595,9 +666,6 @@ export function DataIdPage({
     </Popover>
   )
 
-  /** NPC 有「全部 / Boss / 各分类」这一行；其它数据源没有分类 tab，搜索框就排最左。 */
-  const hasCategoryTabs = kind === 'npc'
-
   /** 搜索框本体：NPC 贴行尾，图格 / 墙 / Buff 排最左。 */
   const searchField = (
     <SearchInput
@@ -619,9 +687,117 @@ export function DataIdPage({
       leadingIcon={<Search className="size-4 text-muted-foreground" />}
       // 结果数在输入框右侧：失焦且没内容时让位给 `/` 快捷键提示。
       resultLabel={t('dataId.resultCount', { n: total })}
+      // 本页搜索框不主动弹「最近搜索」：页面进入会自动聚焦、结果本身就在下面，
+      // 打字时再盖一层下拉会挡住结果。只有点输入框里的历史按钮才展开。
+      historyOnInput={false}
       shortcut
       inputClassName="text-xs"
     />
+  )
+
+  /** 怪物图鉴筛选器：图标网格弹层（与游戏同款），多选并集；条数按当前分类 + 搜索算。 */
+  const bestiaryFilterControl = bestiary && (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="bestiary-filters"
+          className={cn(
+            'h-8 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground',
+            bestiaryFilters.length > 0 && 'font-medium text-foreground',
+          )}
+        >
+          <ListFilter className="size-3.5 shrink-0" />
+          <span className="truncate">
+            {bestiaryFilters.length > 0
+              ? `${t('dataId.bestiary.filters')}（${bestiaryFilters.length}）`
+              : t('dataId.bestiary.filters')}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto max-w-[min(92vw,27rem)] p-2">
+        <TooltipProvider delayDuration={0}>
+          <div
+            data-testid="bestiary-groups"
+            className="flex max-h-72 max-w-full flex-wrap gap-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+          >
+            {bestiary.filters.map((filter, index) => {
+              const active = bestiaryFilters.includes(index)
+              const name = locText(dataset?.loc ?? {}, filter.key)
+              const count = filterCounts[index] ?? 0
+              return (
+                <Tooltip key={filter.key}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={name}
+                      aria-pressed={active}
+                      data-testid={`bestiary-filter-${index}`}
+                      onClick={() =>
+                        setBestiaryFilters((current) =>
+                          current.includes(index)
+                            ? current.filter((i) => i !== index)
+                            : [...current, index],
+                        )
+                      }
+                      className={cn(
+                        'relative flex size-8 cursor-pointer items-center justify-center rounded-control border transition-colors',
+                        active ? 'border-primary bg-accent' : 'border-border/60 hover:bg-accent',
+                      )}
+                    >
+                      <BestiaryFilterIcon id={filter.key} filterKey={filter.icon.texture} size={24} />
+                      {/* 打勾贴在格子**内侧**：悬到外面会撑出横向滚动条（弹层宽度按内容算）。 */}
+                      {active && (
+                        <span className="pointer-events-none absolute right-0.5 bottom-0.5 flex size-3 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="size-2" />
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" data-testid={`bestiary-filter-tip-${index}`}>
+                    <span className="block font-medium">{name}</span>
+                    <span className="block opacity-80">
+                      {t('dataId.bestiary.groupCount', { n: count })}
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            })}
+          </div>
+        </TooltipProvider>
+        <Separator className="my-2" />
+        <div className="flex flex-col gap-1.5">
+          <span className="text-2xs font-medium text-muted-foreground">
+            {t('dataId.bestiary.sort')}
+          </span>
+          <ToggleGroup
+            variant="ghost"
+            size="sm"
+            type="single"
+            aria-label={t('dataId.bestiary.sort')}
+            data-testid="bestiary-sort"
+            value={bestiarySort ?? ''}
+            // 再点已选项 = 取消排序（回到按 NPC ID 升序）
+            onValueChange={(value) => setBestiarySort((value || null) as BestiarySortId | null)}
+            className="flex-wrap"
+          >
+            {BESTIARY_SORTS.map((sort) => (
+              <ToggleGroupItem
+                key={sort.id}
+                value={sort.id}
+                data-testid={`bestiary-sort-${sort.id}`}
+                className="flex-none px-2"
+              >
+                {locText(dataset?.loc ?? {}, sort.labelKey)}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        <Separator className="my-2" />
+        {kindWikiButton}
+      </PopoverContent>
+    </Popover>
   )
 
   const fullscreenControl = (
@@ -695,42 +871,52 @@ export function DataIdPage({
             // 上下不留内边距：与「数据源 Tab 行」「图标区」的距离都只由根容器的 `gap-2` 决定（各 8px）。
             className="sticky top-12 z-20 flex flex-col gap-2 bg-background"
           >
-            {/* 工具行：不再套卡片，直接铺在页面上 */}
+            {/* 工具行：不再套卡片，直接铺在页面上。
+                NPC：分类（幽灵按钮组，同「物品 ID」）│ 分组 / 排序 │ 前往 Wiki …… 搜索在行尾；
+                图格 / 墙 / Buff：搜索居左、Wiki 紧贴它右边。 */}
             <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-1">
-              {/* 图格 / 墙 / Buff 没有分类 tab：搜索框排最左，别让右边空着。 */}
-              {!hasCategoryTabs && <div className="w-full min-w-0 sm:w-64">{searchField}</div>}
-              {/* 左：NPC 分类（只有 NPC 有）。 */}
-              <div className="flex min-w-0 flex-wrap items-center gap-1">
-                {kind === 'npc' && (
-                  <Tabs
-                    value={npcFilter || 'all'}
-                    onValueChange={(value) => setNpcFilter(value === 'all' ? '' : value)}
-                    className="w-auto max-w-full shrink-0 gap-0"
-                  >
-                    <TabsList
+              {kind === 'npc' ? (
+                <>
+                  <div className="flex min-w-0 max-w-full items-center overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <ToggleGroup
+                      variant="ghost"
+                      size="sm"
+                      type="single"
                       aria-label={t('npcs.collections')}
                       data-testid="npc-category-tabs"
-                      className="h-8 max-w-full justify-start overflow-x-auto p-0.5"
+                      value={npcFilter || 'all'}
+                      onValueChange={(value) => setNpcFilter(!value || value === 'all' ? '' : value)}
+                      className="flex-nowrap"
                     >
-                      <TabsTrigger value="all" className="h-7 flex-none px-2">
-                        {t('npcs.filter.all')}
-                      </TabsTrigger>
-                      <TabsTrigger value="boss" className="h-7 flex-none px-2">
-                        {t('npcs.filter.boss')}
-                      </TabsTrigger>
-                      {NPC_COLLECTIONS.map((c) => (
-                        <TabsTrigger key={c.id} value={c.id} className="h-7 flex-none px-2">
-                          {npcCollectionName(c, lang)}
-                        </TabsTrigger>
+                      {[
+                        { id: 'all', name: t('npcs.filter.all') },
+                        { id: 'boss', name: t('npcs.filter.boss') },
+                        ...NPC_COLLECTIONS.map((c) => ({ id: c.id, name: npcCollectionName(c, lang) })),
+                      ].map((item) => (
+                        <ToggleGroupItem key={item.id} value={item.id} className="flex-none px-2">
+                          {item.name}
+                        </ToggleGroupItem>
                       ))}
-                    </TabsList>
-                  </Tabs>
-                )}
-              </div>
-
-              {/* NPC 有分类 tab：搜索贴行尾（与物品 ID 一致）；其它数据源见行首。 */}
-              {hasCategoryTabs && (
-                <div className="ml-auto w-full min-w-0 sm:w-64">{searchField}</div>
+                    </ToggleGroup>
+                  </div>
+                  <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
+                  {bestiaryFilterControl}
+                  {bestiaryFilters.length > 0 && (
+                    <IconAction
+                      size="icon-xs"
+                      label={t('dataId.bestiary.clear')}
+                      icon={X}
+                      testId="bestiary-filters-clear"
+                      onClick={() => setBestiaryFilters([])}
+                    />
+                  )}
+                  <div className="ml-auto w-full min-w-0 sm:w-64">{searchField}</div>
+                </>
+              ) : (
+                <>
+                  <div className="min-w-0 flex-1 sm:w-64 sm:flex-none">{searchField}</div>
+                  {kindWikiButton}
+                </>
               )}
             </div>
           </div>
@@ -859,6 +1045,8 @@ export function DataIdPage({
                     buff={selectedBuff}
                     large
                     gbuffPlayer={username}
+                    itemsById={dataset?.itemsById}
+                    atlas={dataset?.atlas}
                     onFilled={() => setSelected(null)}
                   />
                 ) : selectedData ? (

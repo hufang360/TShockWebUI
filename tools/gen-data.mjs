@@ -571,6 +571,12 @@ function main() {
     'LegacyInterface',
     'PaintingArtist',
     'BuffDescription',
+    // 「数据 ID → NPC」的怪物图鉴筛选器 / 排序文案（Bestiary_Biomes.Surface 这类 key）。
+    'BestiaryInfo',
+    'Bestiary_Biomes',
+    'Bestiary_Invasions',
+    'Bestiary_Times',
+    'Bestiary_Events',
   ];
   // 按键触发器的展示名（游戏里是当前绑定的按键，这里用固定可读名；
   // 与 tools/gen-item-stats.mjs 的 INPUT_SUBS 保持一致，否则默认 tips 与运行期重算会不一致）。
@@ -669,6 +675,31 @@ function main() {
   // 英文名一并写入：`/tpnpc` 只认**名字**（不认 ID），且 TShock 会同时匹配英文名，
   // 用英文名生成的指令在中文 / 英文服务器上都有效（见 docs/页面-召唤NPC.md）。
   const enNpcName = locEn.NPCName ?? {};
+  // 负值 NPC（-1..-65）：NPCID 里的变体常量（Slimeling / BigZombie …），母体贴图 + scale/color。
+  // scale/color 只有跑游戏 `NPC.SetDefaults(id)` 才知道（有的还受 remixWorld 影响），
+  // 所以来自 GameDump 的 `data/npc-variants.json`（`--bestiary` 一并产出，先于本脚本运行）。
+  // 名称规则：自己有 NPCName 就用自己（如 -1 小史莱姆），否则回退母体名（大僵尸 → 僵尸）。
+  const variantFile = join(outDir, 'npc-variants.json');
+  const variants = existsSync(variantFile) ? parseJsonLoose(variantFile).variants ?? [] : [];
+  if (variants.length === 0) {
+    console.warn('[npcs] 缺少 data/npc-variants.json（先跑 tools/gen-game-data.sh），本次不写负值 NPC');
+  }
+  const negativeNpcs = variants
+    .slice()
+    .sort((a, b) => a.id - b.id)
+    .map((v) => {
+      const baseKey = npcId2key.get(v.baseId) ?? null;
+      // 英文名同样回退母体（负数里只有史莱姆等少数有独立名字）。
+      const nameKey = v.key ?? baseKey;
+      return {
+        id: v.id,
+        key: v.key ?? baseKey,
+        en: enNpcName[nameKey] ?? enNpcName[baseKey] ?? v.key ?? baseKey,
+        base: v.baseId,
+        scale: v.scale,
+        ...(v.color && v.color.some((c) => c > 0) ? { color: v.color } : {}),
+      };
+    });
   const npcs = [...npcId2key.keys()].sort((a, b) => a - b).map((id) => {
     const key = npcId2key.get(id);
     const entry = { id, key, en: enNpcName[key] ?? key };
@@ -801,10 +832,12 @@ function main() {
   writeJson('npcs.json', {
     meta: {
       gameVersion,
-      count: npcs.length,
-      source: 'Terraria.ID/NPCID.cs + loc.NPCName + loc.en-US + TShockAPI/Commands.cs SpawnBoss()',
+      count: npcs.length + negativeNpcs.length,
+      source:
+        'Terraria.ID/NPCID.cs + loc.NPCName + loc.en-US + TShockAPI/Commands.cs SpawnBoss()' +
+        (negativeNpcs.length ? ' + data/npc-variants.json（负值变体：母体 / scale / color）' : ''),
     },
-    npcs,
+    npcs: [...negativeNpcs, ...npcs],
   });
   writeJson('buffs.json', {
     meta: { gameVersion, count: buffs.length, source: 'Terraria.ID/BuffID.cs + loc.BuffName' },

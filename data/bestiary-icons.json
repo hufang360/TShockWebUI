@@ -1,0 +1,319 @@
+{
+ "meta": {
+  "gameVersion": "1.4.5.8",
+  "source": "Content/Images/UI/Bestiary/Icon_Tags_Shadow.png + Icon_Rank_Light.png（帧号取 BestiaryDatabaseNPCsPopulator.cs 的构造参数）",
+  "generatedBy": "tools/gen-bestiary-icons.py",
+  "note": "filters 顺序与 data/npc-bestiary.json 一致；帧号是贴图 16×5 网格里的下标",
+  "tags": {
+   "file": "bestiary-tags.webp",
+   "hash": "2fbab54c9094",
+   "cols": 16,
+   "rows": 5,
+   "cell": 30
+  },
+  "rank": {
+   "file": "bestiary-rank.webp",
+   "hash": "935cca55e4bb",
+   "cols": 1,
+   "rows": 1,
+   "cell": 30
+  }
+ },
+ "filters": [
+  {
+   "key": "BestiaryInfo.IsBoss",
+   "texture": "tags",
+   "frame": 63
+  },
+  {
+   "key": "BestiaryInfo.IsRare",
+   "texture": "rank",
+   "frame": 0
+  },
+  {
+   "key": "Bestiary_Biomes.Surface",
+   "texture": "tags",
+   "frame": 0
+  },
+  {
+   "key": "Bestiary_Times.DayTime",
+   "texture": "tags",
+   "frame": 36
+  },
+  {
+   "key": "Bestiary_Events.Party",
+   "texture": "tags",
+   "frame": 48
+  },
+  {
+   "key": "Bestiary_Events.WindyDay",
+   "texture": "tags",
+   "frame": 41
+  },
+  {
+   "key": "Bestiary_Events.Rain",
+   "texture": "tags",
+   "frame": 40
+  },
+  {
+   "key": "Bestiary_Times.NightTime",
+   "texture": "tags",
+   "frame": 37
+  },
+  {
+   "key": "Bestiary_Events.BloodMoon",
+   "texture": "tags",
+   "frame": 38
+  },
+  {
+   "key": "Bestiary_Biomes.Graveyard",
+   "texture": "tags",
+   "frame": 35
+  },
+  {
+   "key": "Bestiary_Biomes.Underground",
+   "texture": "tags",
+   "frame": 1
+  },
+  {
+   "key": "Bestiary_Biomes.Caverns",
+   "texture": "tags",
+   "frame": 2
+  },
+  {
+   "key": "Bestiary_Biomes.Granite",
+   "texture": "tags",
+   "frame": 30
+  },
+  {
+   "key": "Bestiary_Biomes.Marble",
+   "texture": "tags",
+   "frame": 29
+  },
+  {
+   "key": "Bestiary_Biomes.UndergroundMushroom",
+   "texture": "tags",
+   "frame": 25
+  },
+  {
+   "key": "Bestiary_Biomes.SpiderNest",
+   "texture": "tags",
+   "frame": 34
+  },
+  {
+   "key": "Bestiary_Biomes.Snow",
+   "texture": "tags",
+   "frame": 5
+  },
+  {
+   "key": "Bestiary_Biomes.UndergroundSnow",
+   "texture": "tags",
+   "frame": 6
+  },
+  {
+   "key": "Bestiary_Biomes.Desert",
+   "texture": "tags",
+   "frame": 3
+  },
+  {
+   "key": "Bestiary_Biomes.UndergroundDesert",
+   "texture": "tags",
+   "frame": 4
+  },
+  {
+   "key": "Bestiary_Events.Sandstorm",
+   "texture": "tags",
+   "frame": 43
+  },
+  {
+   "key": "Bestiary_Biomes.Ocean",
+   "texture": "tags",
+   "frame": 28
+  },
+  {
+   "key": "Bestiary_Biomes.Jungle",
+   "texture": "tags",
+   "frame": 22
+  },
+  {
+   "key": "Bestiary_Biomes.UndergroundJungle",
+   "texture": "tags",
+   "frame": 23
+  },
+  {
+   "key": "Bestiary_Biomes.Meteor",
+   "texture": "tags",
+   "frame": 44
+  },
+  {
+   "key": "Bestiary_Biomes.TheDungeon",
+   "texture": "tags",
+   "frame": 32
+  },
+  {
+   "key": "Bestiary_Biomes.TheUnderworld",
+   "texture": "tags",
+   "frame": 33
+  },
+  {
+   "key": "Bestiary_Biomes.Sky",
+   "texture": "tags",
+   "frame": 26
+  },
+  {
+   "key": "Bestiary_Biomes.TheCorruption",
+   "texture": "tags",
+   "frame": 7
+  },
+  {
+   "key": "Bestiary_Biomes.UndergroundCorruption",
+   "texture": "tags",
+   "frame": 8
+  },
+  {
+   "key": "Bestiary_Biomes.CorruptIce",
+   "texture": "tags",
+   "frame": 11
+  },
+  {
+   "key": "Bestiary_Biomes.CorruptDesert",
+   "texture": "tags",
+   "frame": 9
+  },
+  {
+   "key": "Bestiary_Biomes.CorruptUndergroundDesert",
+   "texture": "tags",
+   "frame": 10
+  },
+  {
+   "key": "Bestiary_Biomes.Crimson",
+   "texture": "tags",
+   "frame": 12
+  },
+  {
+   "key": "Bestiary_Biomes.UndergroundCrimson",
+   "texture": "tags",
+   "frame": 13
+  },
+  {
+   "key": "Bestiary_Biomes.CrimsonIce",
+   "texture": "tags",
+   "frame": 16
+  },
+  {
+   "key": "Bestiary_Biomes.CrimsonDesert",
+   "texture": "tags",
+   "frame": 14
+  },
+  {
+   "key": "Bestiary_Biomes.CrimsonUndergroundDesert",
+   "texture": "tags",
+   "frame": 15
+  },
+  {
+   "key": "Bestiary_Biomes.TheHallow",
+   "texture": "tags",
+   "frame": 17
+  },
+  {
+   "key": "Bestiary_Biomes.UndergroundHallow",
+   "texture": "tags",
+   "frame": 18
+  },
+  {
+   "key": "Bestiary_Biomes.HallowIce",
+   "texture": "tags",
+   "frame": 21
+  },
+  {
+   "key": "Bestiary_Biomes.HallowDesert",
+   "texture": "tags",
+   "frame": 19
+  },
+  {
+   "key": "Bestiary_Biomes.HallowUndergroundDesert",
+   "texture": "tags",
+   "frame": 20
+  },
+  {
+   "key": "Bestiary_Biomes.SurfaceMushroom",
+   "texture": "tags",
+   "frame": 24
+  },
+  {
+   "key": "Bestiary_Biomes.TheTemple",
+   "texture": "tags",
+   "frame": 31
+  },
+  {
+   "key": "Bestiary_Invasions.Goblins",
+   "texture": "tags",
+   "frame": 49
+  },
+  {
+   "key": "Bestiary_Invasions.OldOnesArmy",
+   "texture": "tags",
+   "frame": 55
+  },
+  {
+   "key": "Bestiary_Invasions.Pirates",
+   "texture": "tags",
+   "frame": 50
+  },
+  {
+   "key": "Bestiary_Invasions.Martian",
+   "texture": "tags",
+   "frame": 53
+  },
+  {
+   "key": "Bestiary_Events.Eclipse",
+   "texture": "tags",
+   "frame": 39
+  },
+  {
+   "key": "Bestiary_Invasions.PumpkinMoon",
+   "texture": "tags",
+   "frame": 51
+  },
+  {
+   "key": "Bestiary_Invasions.FrostMoon",
+   "texture": "tags",
+   "frame": 52
+  },
+  {
+   "key": "Bestiary_Events.Halloween",
+   "texture": "tags",
+   "frame": 45
+  },
+  {
+   "key": "Bestiary_Events.Christmas",
+   "texture": "tags",
+   "frame": 46
+  },
+  {
+   "key": "Bestiary_Invasions.FrostLegion",
+   "texture": "tags",
+   "frame": 54
+  },
+  {
+   "key": "Bestiary_Biomes.NebulaPillar",
+   "texture": "tags",
+   "frame": 58
+  },
+  {
+   "key": "Bestiary_Biomes.SolarPillar",
+   "texture": "tags",
+   "frame": 56
+  },
+  {
+   "key": "Bestiary_Biomes.VortexPillar",
+   "texture": "tags",
+   "frame": 57
+  },
+  {
+   "key": "Bestiary_Biomes.StardustPillar",
+   "texture": "tags",
+   "frame": 59
+  }
+ ]
+}

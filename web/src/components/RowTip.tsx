@@ -28,6 +28,8 @@ export function RowTip({
   hideDetailLink,
   id,
   name,
+  /** 无物品时的补充说明（Buff 的游戏内描述）。 */
+  note,
   children,
 }: {
   item?: Item
@@ -43,6 +45,8 @@ export function RowTip({
   id: string | number
   /** 无物品时那句提示里的名称。 */
   name: string
+  /** 无物品时的补充说明（Buff 描述）；没有就不显示。 */
+  note?: string
   children: ReactNode
 }) {
   const stat = useItemStat(item?.id)
@@ -81,6 +85,7 @@ export function RowTip({
         <>
           <span className="block font-pixel text-2xs opacity-70">#{id}</span>
           <span className="block font-semibold">{name}</span>
+          {note && <span className="mt-1 block max-w-64 opacity-80">{note}</span>}
         </>
       }
     >

@@ -52,6 +52,12 @@ export interface Npc {
   id: number
   key: string
   name: string
+  /** 负值变体（-1..-65）的母体 id：贴图取自母体（图集里已按 scale 缩好），名字也回退母体。 */
+  base?: number
+  /** 负值变体的缩放（游戏 `NPC.scale`，图集烘焙用）。 */
+  scale?: number
+  /** 负值变体的染色（游戏 `NPC.color`，RGBA）；图集不做染色，保留备用。 */
+  color?: number[]
   /** 英文名（`loc.en-US` 的 `NPCName`）。`/tpnpc` 等只认名字的指令用它，避免依赖服务器语言。 */
   en?: string
   /** `/sb`（spawnboss）可用参数（规范写法，如 `eye of cthulhu`）；仅 TShock 支持的 Boss 有。 */
@@ -104,11 +110,77 @@ export interface TileWallData {
   entries: TileWallEntry[]
 }
 
-/** Buff（ID → 内部名；显示名从 loc.BuffName 解析）。 */
+/** Buff（ID → 内部名；显示名 / 描述从 `loc.BuffName` / `loc.BuffDescription` 解析）。 */
 export interface Buff {
   id: number
   key: string
   name: string
+  /** 游戏内描述（官方本地化 `BuffDescription`，已展开 `{$…}` 占位符）；没有描述时不填。 */
+  tip?: string
+  /**
+   * 能获得这个 buff 的物品（升序）。只收「用 / 骑某件物品就会获得」的来源（药水、食物、宠物、召唤物、坐骑）；
+   * 护甲套装、附近家具、鞭子叠层这类间接来源不收录，没来源时不填。
+   */
+  items?: number[]
+}
+
+/** 怪物图鉴筛选器（`data/npc-bestiary.json` 的 `filters[]`）：图标取自 `data/bestiary-icons.json`。 */
+export interface BestiaryFilter {
+  /** 本地化 key（`Bestiary_Biomes.Surface` / `BestiaryInfo.IsBoss`…）。 */
+  key: string
+  icon: { texture: 'tags' | 'rank' }
+}
+
+/** 单个 NPC 的图鉴数据（负值变体沿用母体条目）。 */
+export interface BestiaryNpc {
+  /** 「怪物图鉴ID」排序键（游戏 `NpcBestiarySortingId`）。 */
+  sortId: number
+  /** 稀有度星数（游戏 `NpcBestiaryRarityStars`）。 */
+  rarity: number
+  damage: number
+  defense: number
+  coins: number
+  life: number
+  /** 命中的 `filters` 下标。 */
+  filters: number[]
+}
+
+/** `data/npc-bestiary.json`：怪物图鉴的筛选器 / 排序数据。 */
+export interface BestiaryData {
+  meta: {
+    gameVersion: string
+    filterCount: number
+    npcCount: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  filters: BestiaryFilter[]
+  npcs: Record<string, BestiaryNpc>
+}
+
+/** `data/bestiary-icons.json`：筛选器图标的裁切表（贴图 + 帧号 + 内容哈希）。 */
+export interface BestiaryIconsData {
+  meta: {
+    gameVersion: string
+    tags: { file: string; hash: string; cols: number; rows: number; cell: number }
+    rank: { file: string; hash: string; cols: number; rows: number; cell: number }
+  }
+  filters: { key: string; texture: 'tags' | 'rank'; frame: number }[]
+}
+
+/** `data/buff-items.json`：`items[buffId]` = 能获得该 buff 的物品 id 列表（升序）。 */
+export interface BuffItemsData {
+  meta: {
+    gameVersion: string
+    buffCount: number
+    withItems: number
+    pairCount: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  items: Record<string, number[]>
 }
 
 export interface RecipeIngredient {
@@ -509,6 +581,12 @@ export interface Dataset {
   /** walls.id -> wall */
   wallsById: Map<number, TileWallEntry>
   buffs: Buff[]
+  /** `data/npc-bestiary.json`：怪物图鉴筛选器 / 排序数据 */
+  bestiary: BestiaryData
+  /** `data/bestiary-icons.json`：筛选器图标裁切表 */
+  bestiaryIcons: BestiaryIconsData
+  /** npcId -> 图鉴数据（含负值变体） */
+  bestiaryByNpcId: Map<number, BestiaryNpc>
   commands: CommandDef[]
   atlas: Atlas
   recipes: RecipesData

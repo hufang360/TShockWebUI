@@ -220,6 +220,7 @@ def main():
     missing = []
     used_overrides = []
     used_grids = []
+    used_variants = []
     for n in npcs:
         nid = n["id"]
         # 1) 优先用用户自备的覆盖图片。
@@ -229,6 +230,27 @@ def main():
                 sprites[nid] = crop
                 regions_src[nid] = crop.size
                 used_overrides.append(nid)
+                continue
+        # 1.5) 负值 NPC（-1..-65）：没有自己的贴图，用母体的第一帧按 scale 缩放。
+        #      游戏里的颜色是 `NPC.GetColor()` 双通道叠色（见 Main.DrawNPCDirect），
+        #      单通道近似会明显偏暗，这里只还原尺寸、不做染色。
+        base = n.get("base")
+        if nid < 0 and base is not None:
+            base_path = os.path.join(args.sprite_dir, f"NPC_{base}.png")
+            if os.path.exists(base_path):
+                im = Image.open(base_path).convert("RGBA")
+                fc = frame_counts[base] if base < len(frame_counts) else 1
+                box = pick_region(im, fc, frame_widths.get(base), FRAME_GRIDS.get(base))
+                crop = im.crop(box)
+                scale = float(n.get("scale") or 1)
+                if abs(scale - 1) > 1e-6:
+                    crop = crop.resize(
+                        (max(1, round(crop.width * scale)), max(1, round(crop.height * scale))),
+                        Image.NEAREST,
+                    )
+                sprites[nid] = crop
+                regions_src[nid] = crop.size
+                used_variants.append(nid)
                 continue
         # 2) 否则用游戏原图的第一帧。
         path = os.path.join(args.sprite_dir, f"NPC_{nid}.png")
@@ -283,8 +305,8 @@ def main():
             "sheet": os.path.basename(args.out_image),
             "hash": atlas_hash,
             "generatedBy": "tools/gen-npc-atlas.py",
-            "source": "Terraria NPC_<id>.png 第一帧（帧高 = 高 / Main.npcFrameCount；多列网格见 FRAME_GRIDS）",
-            "note": "regions[npcId] = [x, y, w, h]；第一帧为空时回退为整张贴图的紧包围盒；多列网格贴图按 Main.DrawNPCDirect 的 Frame(列, 行) 取左上角一帧。",
+            "source": "Terraria NPC_<id>.png 第一帧（帧高 = 高 / Main.npcFrameCount；多列网格见 FRAME_GRIDS）；负值 NPC 用母体贴图按 scale 缩放",
+            "note": "regions[npcId] = [x, y, w, h]；第一帧为空时回退为整张贴图的紧包围盒；多列网格贴图按 Main.DrawNPCDirect 的 Frame(列, 行) 取左上角一帧；负值变体不做染色（游戏是 GetColor 双通道叠色，单通道近似会偏暗）。",
         },
         "regions": {str(k): list(v) for k, v in placed.items()},
     }
@@ -297,6 +319,8 @@ def main():
         print(f"使用自备覆盖图片 {len(used_overrides)} 个：{used_overrides}")
     if used_grids:
         print(f"按游戏 Frame(列, 行) 取左上角一帧 {len(used_grids)} 个：{used_grids}")
+    if used_variants:
+        print(f"负值变体（母体贴图 × scale）{len(used_variants)} 个")
     if missing:
         print("缺贴图 id:", missing[:50], file=sys.stderr)
 

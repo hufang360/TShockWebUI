@@ -1,6 +1,10 @@
 import type {
   Atlas,
+  BestiaryData,
+  BestiaryIconsData,
+  BestiaryNpc,
   Buff,
+  BuffItemsData,
   CommandDef,
   Dataset,
   DatasetMeta,
@@ -25,7 +29,7 @@ import type {
 } from '@/types'
 import { ATLAS_JSON_FETCH } from './atlas'
 import { mergeLocBundle } from './loc'
-import { composeItemTip } from './itemTips'
+import { composeItemTip, expandLocText } from './itemTips'
 import { readJson, removeKey, StorageKeys, writeJson } from './storage'
 import { extraParamSetsFor } from './commandMeta'
 import { resolveTileName } from './tiles'
@@ -91,7 +95,7 @@ function withCommandMeta(base: Dataset): Dataset {
 export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBundle): Promise<Dataset> {
   const culture = cultureOf(lang)
   const overrideActive = overrides != null && Object.keys(overrides).length > 0
-  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, baseLoc, tiles, walls, drops, tileNames, permissions] = await Promise.all([
+  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, baseLoc, tiles, walls, drops, tileNames, permissions, buffItemsFile, bestiaryFile, bestiaryIconsFile] = await Promise.all([
     fetchJson<{ items: Omit<Item, 'name'>[] }>('items.json'),
     fetchJson<{ prefixes: Omit<Prefix, 'name'>[] }>('prefixes.json'),
     fetchJson<{ npcs: Omit<Npc, 'name'>[] }>('npcs.json'),
@@ -113,6 +117,9 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
     fetchJson<ItemDropsData>('item-drops.json'),
     fetchJson<TileNamesData>('tile-names.json'),
     fetchJson<PermissionsData>('permissions.json'),
+    fetchJson<BuffItemsData>('buff-items.json'),
+    fetchJson<BestiaryData>('npc-bestiary.json'),
+    fetchJson<BestiaryIconsData>('bestiary-icons.json'),
   ])
 
   const loc: LocalizationBundle = overrideActive ? mergeLocBundle(baseLoc, overrides) : baseLoc
@@ -122,11 +129,34 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
   const prefixName = loc.Prefix ?? {}
   const npcName = loc.NPCName ?? {}
   const buffName = loc.BuffName ?? {}
+  const buffDescription = loc.BuffDescription ?? {}
   const items: Item[] = itemsFile.items.map((it) => ({ ...it, name: itemName[it.key] ?? it.key }))
   const prefixes: Prefix[] = prefixesFile.prefixes.map((pf) => ({ ...pf, name: prefixName[pf.key] ?? pf.key }))
   // NPC / buff：没有本地化名的（如内部占位）保留内部名作为回退，不清空。
-  const npcs: Npc[] = npcsFile.npcs.map((n) => ({ ...n, name: npcName[n.key] ?? n.key }))
-  const buffs: Buff[] = buffsFile.buffs.map((b) => ({ ...b, name: buffName[b.key] ?? b.key }))
+  // 负值变体（-1..-65）大多没有自己的名字，游戏里就显示母体名（`Lang.InitializeLegacyLocalization`
+  // 把 `_negativeNpcNameCache` 镜像成母体名），这里照抄；否则界面会出现 `BigHornetStingy` 这种内部名。
+  const npcKeyById = new Map(npcsFile.npcs.map((n) => [n.id, n.key]))
+  const npcs: Npc[] = npcsFile.npcs.map((n) => {
+    const baseKey = n.base != null ? npcKeyById.get(n.base) : undefined
+    const name = npcName[n.key] ?? (baseKey != null ? npcName[baseKey] : undefined) ?? n.key
+    return { ...n, name }
+  })
+  // buff 名称 / 描述里带 `{$BuffName.xxx}` 引用（矿车系列），要展开，否则界面上直接显示花括号。
+  const buffItemsById = new Map<number, number[]>()
+  for (const [id, list] of Object.entries(buffItemsFile.items)) buffItemsById.set(Number(id), list)
+  // 怪物图鉴：筛选器 / 排序键按 NPC id 建索引（负值变体也在里面，沿用母体条目的筛选器）。
+  const bestiaryByNpcId = new Map<number, BestiaryNpc>()
+  for (const [id, entry] of Object.entries(bestiaryFile.npcs)) bestiaryByNpcId.set(Number(id), entry)
+
+  const buffs: Buff[] = buffsFile.buffs.map((b) => {
+    const tip = buffDescription[b.key]
+    return {
+      ...b,
+      name: expandLocText(buffName[b.key] ?? b.key, loc),
+      ...(tip ? { tip: expandLocText(tip, loc) } : {}),
+      ...(buffItemsById.has(b.id) ? { items: buffItemsById.get(b.id) } : {}),
+    }
+  })
 
   // item-stats（语言无关）与 item-tips（当前语言）合并成前端单一模型。
   const itemStats: ItemStatsData = { meta: stats.meta, items: {} }
@@ -199,6 +229,9 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
     /** walls.id -> wall */
     wallsById: new Map(walls.entries.map((w) => [w.id, w])),
     buffs,
+    bestiary: bestiaryFile,
+    bestiaryIcons: bestiaryIconsFile,
+    bestiaryByNpcId,
     atlas,
     recipes,
     itemStats,

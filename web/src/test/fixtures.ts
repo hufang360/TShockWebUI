@@ -152,6 +152,44 @@ function withCommandMeta(commands: CommandDef[]): CommandDef[] {
   })
 }
 
+/** 怪物图鉴夹具：两个筛选器（Boss / 地表）+ 两只 NPC 的图鉴数据。 */
+const testBestiary = {
+  meta: {
+    gameVersion: '1.4.5.8',
+    filterCount: 2,
+    npcCount: 2,
+    source: 'test',
+    generatedBy: 'test',
+    note: '',
+  },
+  filters: [
+    { key: 'BestiaryInfo.IsBoss', icon: { texture: 'tags' as const } },
+    { key: 'Bestiary_Biomes.Surface', icon: { texture: 'tags' as const } },
+  ],
+  npcs: {
+    '1': { sortId: 2, rarity: 1, damage: 7, defense: 2, coins: 25, life: 25, filters: [1] },
+    '4': { sortId: 1, rarity: 2, damage: 15, defense: 12, coins: 30000, life: 2800, filters: [0] },
+  },
+}
+
+const testBestiaryIcons = {
+  meta: {
+    gameVersion: '1.4.5.8',
+    tags: { file: 'bestiary-tags.webp', hash: 'test', cols: 16, rows: 5, cell: 30 },
+    rank: { file: 'bestiary-rank.webp', hash: 'test', cols: 1, rows: 1, cell: 30 },
+  },
+  filters: [
+    { key: 'BestiaryInfo.IsBoss', texture: 'tags' as const, frame: 63 },
+    { key: 'Bestiary_Biomes.Surface', texture: 'tags' as const, frame: 0 },
+  ],
+}
+
+/** Buff fixture：1 号单件来源（药水），2 号多件来源（验证「都显示」）。 */
+const testBuffs = [
+  { id: 1, key: 'ObsidianSkin', name: '黑曜石皮', tip: '对熔岩免疫', items: [288] },
+  { id: 2, key: 'Regeneration', name: '再生', tip: '提供生命再生', items: [29, 75] },
+]
+
 export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
   const items = overrides.items ?? testItems
   const commands = withCommandMeta(overrides.commands ?? testCommands)
@@ -229,10 +267,12 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
         sbAll: true,
       },
     ],
-    buffs: [
-      { id: 1, key: 'ObsidianSkin', name: '黑曜石皮' },
-      { id: 2, key: 'Regeneration', name: '再生' },
-    ],
+    buffs: overrides.buffs ?? testBuffs,
+    bestiary: overrides.bestiary ?? testBestiary,
+    bestiaryIcons: overrides.bestiaryIcons ?? testBestiaryIcons,
+    bestiaryByNpcId:
+      overrides.bestiaryByNpcId ??
+      new Map(Object.entries(testBestiary.npcs).map(([id, entry]) => [Number(id), entry])),
     tiles: overrides.tiles ?? {
       meta: {
         gameVersion: '1.4.5.8',
@@ -311,15 +351,24 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
         },
       ],
     ]),
-    buffsById: new Map([
-      [1, { id: 1, key: 'ObsidianSkin', name: '黑曜石皮' }],
-      [2, { id: 2, key: 'Regeneration', name: '再生' }],
-    ]),
+    buffsById: overrides.buffsById ?? new Map(testBuffs.map((b) => [b.id, b])),
     loc: {
       ItemName: { LifeCrystal: '生命水晶', FallenStar: '坠落之星', Zenith: '天顶剑', Wood: '木材' },
       Prefix: { Legendary: '传奇' },
       NPCName: { BlueSlime: '蓝史莱姆', EyeOfCthulhu: '克苏鲁之眼' },
       BuffName: { ObsidianSkin: '黑曜石皮', Regeneration: '再生' },
+      BestiaryInfo: {
+        IsBoss: 'Boss',
+        IsRare: '稀有生物',
+        Sort_BestiaryID: '怪物图鉴ID',
+        Sort_Alphabetical: '名称',
+        Sort_Attack: '攻击',
+        Sort_Defense: '防御',
+        Sort_Coins: '钱币',
+        Sort_HitPoints: '生命',
+        Sort_Rarity: '稀有度',
+      },
+      Bestiary_Biomes: { Surface: '地表' },
     },
     recipes: {
       meta: { gameVersion: '1.4.5.8', count: 0, groupCount: 0, source: 'test', generatedBy: 'test' },

@@ -10,8 +10,8 @@ import {
 } from '@/lib/iconGridSize'
 import { I18nProvider } from '@/lib/i18n'
 import { installCommandPaletteSpy, lastFilled } from '@/test/commandPaletteSpy'
-import { makeDataset } from '@/test/fixtures'
-import type { Dataset } from '@/types'
+import { makeDataset, testItems } from '@/test/fixtures'
+import type { Buff, Dataset, Item } from '@/types'
 import { DataIdPage } from './DataIdPage'
 
 function renderPage(
@@ -58,8 +58,13 @@ describe('DataIdPage', () => {
     fireEvent.click(within(popover).getByRole('checkbox', { name: '表格视图' }))
   }
 
+  /** 分类是工具行上的幽灵按钮组（同「物品 ID」），直接点即可。 */
+  function openGroups() {
+    return screen.getByTestId('npc-category-tabs')
+  }
+
   function selectNpcCategory(name: string) {
-    fireEvent.mouseDown(within(screen.getByTestId('npc-category-tabs')).getByRole('tab', { name }))
+    fireEvent.click(within(openGroups()).getByRole('radio', { name }))
   }
 
   /**
@@ -104,9 +109,14 @@ describe('DataIdPage', () => {
       tablist.compareDocumentPosition(screen.getByLabelText('数据 ID')) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
-    const categoryTabs = screen.getByTestId('npc-category-tabs')
+    // 分类常驻工具行（幽灵按钮组）
+    const categoryTabs = openGroups()
     expect(categoryTabs).toBeTruthy()
-    expect(categoryTabs.className).toContain('bg-accent')
+    // 参考「物品 ID」的分类：幽灵按钮组（没有灰底容器），选中项 `data-state=on`
+    expect(categoryTabs.className).toContain('bg-transparent')
+    expect(within(categoryTabs).getByRole('radio', { name: '全部' }).getAttribute('data-state')).toBe(
+      'on',
+    )
     // 页面设置 / 全屏在顶栏右侧（见 AppShell 的 TopBarActions），不再占工具行。
     expect(screen.getByRole('button', { name: '页面设置' })).toBeTruthy()
     // 默认图标视图（表格视图未勾选），视图选项收进页面设置；不再有底部翻页器。
@@ -210,22 +220,63 @@ describe('DataIdPage', () => {
     expect(width()).toBe('72px')
   })
 
-  it('搜索框位置：NPC 贴在分类 tab 行尾，图格 / 墙 / Buff 没有分类 tab 就排最左', () => {
+  it('工具行：NPC 是分类 → 分组，搜索在行尾（排序 / Wiki 收进分组弹层）', async () => {
     renderPage()
     const tab = (name: string) => fireEvent.mouseDown(screen.getByRole('tab', { name }))
     const input = () => screen.getByLabelText('数据 ID')
+    const row = () => input().closest('.sm\\:w-64')?.parentElement as HTMLElement
 
-    // NPC：左侧有分类 tab，搜索贴行尾
+    // NPC：首个是分类组，随后 分组 → 排序 → 分割线 → Wiki；搜索在行尾（ml-auto）
     expect(screen.getByTestId('npc-category-tabs')).toBeTruthy()
     expect(input().closest('.ml-auto')).toBeTruthy()
+    const npcIds = Array.from(row().querySelectorAll('[data-testid]'))
+      .map((el) => el.getAttribute('data-testid')!)
+      .filter((id) => id.startsWith('bestiary-') || id === 'npc-toolbar-divider')
+    expect(npcIds).toEqual(['bestiary-filters'])
+    // 排序与 Wiki 现在在分组弹层里
+    fireEvent.click(screen.getByTestId('bestiary-filters'))
+    expect(await screen.findByTestId('bestiary-sort')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '前往 Wiki' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
 
-    // 图格 / 墙 / Buff：没有分类 tab，搜索排最左（工具行的第一个子元素）
+    // 图格 / 墙 / Buff：同样是搜索居左、Wiki 紧贴右边
     for (const name of ['图格', '墙', 'Buff']) {
       tab(name)
-      expect(screen.queryByTestId('npc-category-tabs')).toBeNull()
-      expect(input().closest('.ml-auto')).toBeNull()
-      const toolbarRow = input().closest('.sm\\:w-64')?.parentElement as HTMLElement
-      expect(toolbarRow.firstElementChild?.contains(input())).toBe(true)
+      expect(row().firstElementChild?.contains(input())).toBe(true)
+      expect(screen.queryByTestId('bestiary-sort')).toBeNull()
+      expect(screen.queryByTestId('bestiary-filters')).toBeNull()
+      expect(screen.getByRole('link', { name: '前往 Wiki' })).toBeTruthy()
+    }
+  })
+
+  it('Wiki 入口：NPC 在分组弹层底部，图格 / 墙 / Buff 挨着搜索框右边', async () => {
+    // 用英文界面验地址：中文界面走 `zh/wiki/图格_ID`（URL 编码后看不出 slug）。
+    renderPage(makeDataset(), 'en')
+    const tab = (name: string) => fireEvent.mouseDown(screen.getByRole('tab', { name }))
+    const input = () => screen.getByLabelText('Data IDs')
+    const wikiLink = () => screen.getByRole('link', { name: 'Open Wiki' })
+
+    // NPC：Wiki 收进「分组」弹层底部（工具行上不再有）
+    expect(screen.queryByRole('link', { name: 'Open Wiki' })).toBeNull()
+    fireEvent.click(screen.getByTestId('bestiary-filters'))
+    const npcWiki = await screen.findByRole('link', { name: 'Open Wiki' })
+    expect(npcWiki.getAttribute('href')).toContain('NPC_ID')
+    expect(npcWiki.getAttribute('target')).toBe('_blank')
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+
+    // 图格 / 墙 / Buff：紧贴输入框左侧，地址跟着数据源走
+    const cases = [
+      ['Tile', 'Tile_IDs'],
+      ['Wall', 'Wall_IDs'],
+      ['Buff', 'Buff_IDs'],
+    ] as const
+    for (const [name, slug] of cases) {
+      tab(name)
+      const wiki = wikiLink()
+      expect(wiki.getAttribute('href')).toContain(slug)
+      expect(wiki.getAttribute('rel')).toContain('noreferrer')
+      // 挨着输入框右边
+      expect(wiki.previousElementSibling?.contains(input())).toBe(true)
     }
   })
 
@@ -260,7 +311,7 @@ describe('DataIdPage', () => {
     expect(within(openSettings()).queryByLabelText('隐藏 ID 和名称')).toBeNull()
 
     // Boss 分类照旧放大一倍，但横条档保持 1×（否则一行 320px 撑爆容器）。
-    fireEvent.mouseDown(within(screen.getByTestId('npc-category-tabs')).getByRole('tab', { name: 'Boss' }))
+    selectNpcCategory('Boss')
     const boss = screen.getByTitle('克苏鲁之眼 #4')
     expect(boss.style.width).toBe('100%')
   })
@@ -737,6 +788,123 @@ describe('DataIdPage', () => {
     expect(within(detail).queryByText('相关指令')).toBeNull()
   })
 
+  it('NPC：怪物图鉴分组（图标网格多选、并集、悬停提示带条数）与排序', async () => {
+    renderPage()
+    // 夹具：1 号蓝史莱姆 → 地表(1)，4 号克苏鲁之眼 → Boss(0)
+    expect(screen.getByTitle('蓝史莱姆 #1')).toBeTruthy()
+    expect(screen.getByTitle('克苏鲁之眼 #4')).toBeTruthy()
+
+    // 文案叫「分组」（与鱼店的分组同一套说法），图标网格在弹层里
+    expect(screen.getByTestId('bestiary-filters').textContent).toContain('分组')
+    fireEvent.click(screen.getByTestId('bestiary-filters'))
+    const boss = await screen.findByTestId('bestiary-filter-0')
+    // 悬停出现提示：分组名 + 该分组下的条数
+    fireEvent.focus(boss)
+    const tip = await screen.findByTestId('bestiary-filter-tip-0')
+    expect(tip.textContent).toBe('Boss1 个 NPC')
+    expect(boss.className).toContain('cursor-pointer')
+    fireEvent.blur(boss)
+    fireEvent.click(boss)
+    expect(screen.queryByTitle('蓝史莱姆 #1')).toBeNull()
+    expect(screen.getByTitle('克苏鲁之眼 #4')).toBeTruthy()
+    // 按钮上显示已选数量
+    expect(screen.getByTestId('bestiary-filters').textContent).toBe('分组（1）')
+
+    // 并集：再选「地表」→ 两只都在
+    fireEvent.click(screen.getByTestId('bestiary-filter-1'))
+    expect(screen.getByTitle('蓝史莱姆 #1')).toBeTruthy()
+    expect(screen.getByTitle('克苏鲁之眼 #4')).toBeTruthy()
+
+    // 清除
+    // 工具行只剩分类 + 分组（× 有选中时才有）
+    const row = screen.getByTestId('npc-category-tabs').closest('.flex-wrap') as HTMLElement
+    expect(
+      Array.from(row.querySelectorAll('[data-testid]'))
+        .map((el) => el.getAttribute('data-testid')!)
+        .filter((id) => id.startsWith('bestiary-') || id === 'npc-toolbar-divider'),
+    ).toEqual(['bestiary-filters', 'bestiary-filters-clear'])
+
+    fireEvent.click(screen.getByTestId('bestiary-filters-clear'))
+    expect(screen.getByTestId('bestiary-filters').textContent).toBe('分组')
+    expect(screen.queryByTestId('bestiary-filters-clear')).toBeNull()
+
+    // 排序：默认没选排序项 = 按 NPC ID 升序（1 号蓝史莱姆 → 4 号克苏鲁之眼）
+    const npcOrder = () =>
+      within(screen.getByTestId('dataid-list'))
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('title') ?? '')
+        .filter((t) => t.includes('蓝史莱姆') || t.includes('克苏鲁之眼'))
+    expect(npcOrder()[0]).toContain('蓝史莱姆')
+
+    // 排序在分组弹层里，是一组幽灵按钮（7 项，默认全未选）
+    const sortGroup = screen.getByTestId('bestiary-sort')
+    expect(within(sortGroup).getAllByRole('radio')).toHaveLength(7)
+    for (const radio of within(sortGroup).getAllByRole('radio')) {
+      expect(radio.getAttribute('data-state')).toBe('off')
+    }
+
+    fireEvent.click(within(sortGroup).getByTestId('bestiary-sort-attack'))
+    expect(within(sortGroup).getByTestId('bestiary-sort-attack').getAttribute('data-state')).toBe(
+      'on',
+    )
+    // 攻击 15 > 7 → 克苏鲁之眼在前（数值项倒序）
+    expect(npcOrder()[0]).toContain('克苏鲁之眼')
+
+    // 再点同一项 = 取消排序，回到默认（按 NPC ID 升序 → 蓝史莱姆在前）
+    fireEvent.click(within(sortGroup).getByTestId('bestiary-sort-attack'))
+    expect(within(sortGroup).getByTestId('bestiary-sort-attack').getAttribute('data-state')).toBe(
+      'off',
+    )
+    expect(npcOrder()[0]).toContain('蓝史莱姆')
+    fireEvent.keyDown(screen.getByTestId('bestiary-sort'), { key: 'ArrowDown' })
+    fireEvent.click(await screen.findByTestId('bestiary-sort-name'))
+    expect(npcOrder()).toHaveLength(2)
+  })
+
+  it('Buff 详情：显示游戏内描述与唯一的代表物品', async () => {
+    const potion: Item = {
+      id: 288,
+      key: 'ObsidianSkinPotion',
+      name: '黑曜石皮药水',
+      icon: 288,
+      frames: 1,
+      sprite: [16, 16],
+      tags: [],
+    }
+    renderPage(makeDataset({ items: [...testItems, potion] }))
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
+    fireEvent.click(await screen.findByTitle('黑曜石皮 #1'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(within(detail).getByTestId('buff-tip').textContent).toBe('对熔岩免疫')
+    expect(within(detail).getByText('黑曜石皮药水 #288')).toBeTruthy()
+    expect(within(detail).queryByTestId('buff-items')).toBeNull()
+  })
+
+  it('Buff 详情：多件来源物品全部列出', async () => {
+    renderPage()
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
+    fireEvent.click(await screen.findByTitle('再生 #2'))
+    const detail = await screen.findByTestId('dataid-detail')
+    const list = within(detail).getByTestId('buff-items')
+    expect(within(list).getByText('生命水晶')).toBeTruthy()
+    expect(within(list).getByText('坠落之星')).toBeTruthy()
+    expect(within(detail).getByText('2 件')).toBeTruthy()
+  })
+
+  it('Buff 详情：没有描述 / 来源物品的 buff 不显示空行', async () => {
+    const bare: Buff[] = [...makeDataset().buffs, { id: 3, key: 'Unknown', name: '未命名' }]
+    renderPage(makeDataset({ buffs: bare, buffsById: new Map(bare.map((b) => [b.id, b])) }))
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Buff' }))
+    fireEvent.click(await screen.findByTitle('未命名 #3'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(within(detail).queryByTestId('buff-tip')).toBeNull()
+    expect(within(detail).queryByTestId('buff-items')).toBeNull()
+    expect(within(detail).getByText('—')).toBeTruthy()
+  })
+
   it('表格行整行可点（指针手型），行内不再有详情按钮；键盘也能开抽屉', () => {
     renderPage()
     enableTable()
@@ -753,7 +921,7 @@ describe('DataIdPage', () => {
     expect(screen.getByTestId('dataid-detail')).toBeTruthy()
   })
 
-  it('最近搜索：聚焦不弹，打字才弹；清空后可用历史按钮打开并点回搜', async () => {
+  it('最近搜索：聚焦 / 打字都不弹，只有点历史按钮才出现', async () => {
     window.localStorage.setItem('tswui:npcs:searchHistory', JSON.stringify(['史莱姆']))
     renderPage()
     const input = screen.getByLabelText('数据 ID') as HTMLInputElement
@@ -761,17 +929,15 @@ describe('DataIdPage', () => {
     // 进入页面即聚焦，但「最近搜索」不该自己弹出来
     expect(screen.queryByTestId('search-history-item')).toBeNull()
 
-    // 打字时才出现建议（边输边筛）
+    // 打字也不弹：结果本身就在下面，别再盖一层下拉
     fireEvent.change(input, { target: { value: '史' } })
-    const item = await screen.findByTestId('search-history-item')
-    expect(item.textContent).toBe('史莱姆')
-
-    // 清空收起；点输入框里的历史按钮重新打开
-    fireEvent.click(screen.getByRole('button', { name: '清空' }))
-    expect(input.value).toBe('')
+    await new Promise((r) => setTimeout(r, 300))
     expect(screen.queryByTestId('search-history-item')).toBeNull()
+
+    // 点输入框里的历史按钮才展开（打过字，历史里已同时有「史」和「史莱姆」）
     fireEvent.click(screen.getByRole('button', { name: '最近搜索' }))
-    fireEvent.click(await screen.findByTestId('search-history-item'))
+    const list = await screen.findByTestId('search-history-list')
+    fireEvent.click(within(list).getByRole('option', { name: '史莱姆' }))
     expect(input.value).toBe('史莱姆')
   })
 

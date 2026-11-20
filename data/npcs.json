@@ -1,10 +1,513 @@
 {
  "meta": {
   "gameVersion": "1.4.5.8",
-  "count": 694,
-  "source": "Terraria.ID/NPCID.cs + loc.NPCName + loc.en-US + TShockAPI/Commands.cs SpawnBoss()"
+  "count": 759,
+  "source": "Terraria.ID/NPCID.cs + loc.NPCName + loc.en-US + TShockAPI/Commands.cs SpawnBoss() + data/npc-variants.json（负值变体：母体 / scale / color）"
  },
  "npcs": [
+  {
+   "id": -65,
+   "key": "BigHornetStingy",
+   "en": "Hornet",
+   "base": 235,
+   "scale": 1.21
+  },
+  {
+   "id": -64,
+   "key": "LittleHornetStingy",
+   "en": "Hornet",
+   "base": 235,
+   "scale": 0.87
+  },
+  {
+   "id": -63,
+   "key": "BigHornetSpikey",
+   "en": "Hornet",
+   "base": 234,
+   "scale": 1.16
+  },
+  {
+   "id": -62,
+   "key": "LittleHornetSpikey",
+   "en": "Hornet",
+   "base": 234,
+   "scale": 0.78
+  },
+  {
+   "id": -61,
+   "key": "BigHornetLeafy",
+   "en": "Hornet",
+   "base": 233,
+   "scale": 1.1
+  },
+  {
+   "id": -60,
+   "key": "LittleHornetLeafy",
+   "en": "Hornet",
+   "base": 233,
+   "scale": 0.92
+  },
+  {
+   "id": -59,
+   "key": "BigHornetHoney",
+   "en": "Hornet",
+   "base": 232,
+   "scale": 1.15
+  },
+  {
+   "id": -58,
+   "key": "LittleHornetHoney",
+   "en": "Hornet",
+   "base": 232,
+   "scale": 0.8
+  },
+  {
+   "id": -57,
+   "key": "BigHornetFatty",
+   "en": "Hornet",
+   "base": 231,
+   "scale": 1.25
+  },
+  {
+   "id": -56,
+   "key": "LittleHornetFatty",
+   "en": "Hornet",
+   "base": 231,
+   "scale": 0.85
+  },
+  {
+   "id": -55,
+   "key": "BigRainZombie",
+   "en": "Zombie",
+   "base": 223,
+   "scale": 1.1
+  },
+  {
+   "id": -54,
+   "key": "SmallRainZombie",
+   "en": "Zombie",
+   "base": 223,
+   "scale": 0.9
+  },
+  {
+   "id": -53,
+   "key": "BigPantlessSkeleton",
+   "en": "Skeleton",
+   "base": 203,
+   "scale": 1.15
+  },
+  {
+   "id": -52,
+   "key": "SmallPantlessSkeleton",
+   "en": "Skeleton",
+   "base": 203,
+   "scale": 0.85
+  },
+  {
+   "id": -51,
+   "key": "BigMisassembledSkeleton",
+   "en": "Skeleton",
+   "base": 202,
+   "scale": 1.13
+  },
+  {
+   "id": -50,
+   "key": "SmallMisassembledSkeleton",
+   "en": "Skeleton",
+   "base": 202,
+   "scale": 0.87
+  },
+  {
+   "id": -49,
+   "key": "BigHeadacheSkeleton",
+   "en": "Skeleton",
+   "base": 201,
+   "scale": 1.07
+  },
+  {
+   "id": -48,
+   "key": "SmallHeadacheSkeleton",
+   "en": "Skeleton",
+   "base": 201,
+   "scale": 0.93
+  },
+  {
+   "id": -47,
+   "key": "BigSkeleton",
+   "en": "Skeleton",
+   "base": 21,
+   "scale": 1.1
+  },
+  {
+   "id": -46,
+   "key": "SmallSkeleton",
+   "en": "Skeleton",
+   "base": 21,
+   "scale": 0.9
+  },
+  {
+   "id": -45,
+   "key": "BigFemaleZombie",
+   "en": "Zombie",
+   "base": 200,
+   "scale": 1.05
+  },
+  {
+   "id": -44,
+   "key": "SmallFemaleZombie",
+   "en": "Zombie",
+   "base": 200,
+   "scale": 0.87
+  },
+  {
+   "id": -43,
+   "key": "DemonEye2",
+   "en": "Demon Eye",
+   "base": 2,
+   "scale": 1.15
+  },
+  {
+   "id": -42,
+   "key": "PurpleEye2",
+   "en": "Demon Eye",
+   "base": 194,
+   "scale": 1.1
+  },
+  {
+   "id": -41,
+   "key": "GreenEye2",
+   "en": "Demon Eye",
+   "base": 193,
+   "scale": 0.85
+  },
+  {
+   "id": -40,
+   "key": "DialatedEye2",
+   "en": "Demon Eye",
+   "base": 192,
+   "scale": 0.9
+  },
+  {
+   "id": -39,
+   "key": "SleepyEye2",
+   "en": "Demon Eye",
+   "base": 191,
+   "scale": 1.1
+  },
+  {
+   "id": -38,
+   "key": "CataractEye2",
+   "en": "Demon Eye",
+   "base": 190,
+   "scale": 1.15
+  },
+  {
+   "id": -37,
+   "key": "BigTwiggyZombie",
+   "en": "Zombie",
+   "base": 189,
+   "scale": 1.08
+  },
+  {
+   "id": -36,
+   "key": "SmallTwiggyZombie",
+   "en": "Zombie",
+   "base": 189,
+   "scale": 0.92
+  },
+  {
+   "id": -35,
+   "key": "BigSwampZombie",
+   "en": "Zombie",
+   "base": 188,
+   "scale": 1.13
+  },
+  {
+   "id": -34,
+   "key": "SmallSwampZombie",
+   "en": "Zombie",
+   "base": 188,
+   "scale": 0.87
+  },
+  {
+   "id": -33,
+   "key": "BigSlimedZombie",
+   "en": "Zombie",
+   "base": 187,
+   "scale": 1.11
+  },
+  {
+   "id": -32,
+   "key": "SmallSlimedZombie",
+   "en": "Zombie",
+   "base": 187,
+   "scale": 0.89
+  },
+  {
+   "id": -31,
+   "key": "BigPincushionZombie",
+   "en": "Zombie",
+   "base": 186,
+   "scale": 1.13
+  },
+  {
+   "id": -30,
+   "key": "SmallPincushionZombie",
+   "en": "Zombie",
+   "base": 186,
+   "scale": 0.93
+  },
+  {
+   "id": -29,
+   "key": "BigBaldZombie",
+   "en": "Zombie",
+   "base": 132,
+   "scale": 1.15
+  },
+  {
+   "id": -28,
+   "key": "SmallBaldZombie",
+   "en": "Zombie",
+   "base": 132,
+   "scale": 0.85
+  },
+  {
+   "id": -27,
+   "key": "BigZombie",
+   "en": "Zombie",
+   "base": 3,
+   "scale": 1.1
+  },
+  {
+   "id": -26,
+   "key": "SmallZombie",
+   "en": "Zombie",
+   "base": 3,
+   "scale": 0.9
+  },
+  {
+   "id": -25,
+   "key": "BigCrimslime",
+   "en": "Crimslime",
+   "base": 183,
+   "scale": 1.15
+  },
+  {
+   "id": -24,
+   "key": "LittleCrimslime",
+   "en": "Crimslime",
+   "base": 183,
+   "scale": 0.85
+  },
+  {
+   "id": -23,
+   "key": "BigCrimera",
+   "en": "Crimera",
+   "base": 173,
+   "scale": 1.15
+  },
+  {
+   "id": -22,
+   "key": "LittleCrimera",
+   "en": "Crimera",
+   "base": 173,
+   "scale": 0.85
+  },
+  {
+   "id": -21,
+   "key": "GiantMossHornet",
+   "en": "Moss Hornet",
+   "base": 176,
+   "scale": 1.2
+  },
+  {
+   "id": -20,
+   "key": "BigMossHornet",
+   "en": "Moss Hornet",
+   "base": 176,
+   "scale": 1.1
+  },
+  {
+   "id": -19,
+   "key": "LittleMossHornet",
+   "en": "Moss Hornet",
+   "base": 176,
+   "scale": 0.9
+  },
+  {
+   "id": -18,
+   "key": "TinyMossHornet",
+   "en": "Moss Hornet",
+   "base": 176,
+   "scale": 0.8
+  },
+  {
+   "id": -17,
+   "key": "BigStinger",
+   "en": "Hornet",
+   "base": 42,
+   "scale": 1.2
+  },
+  {
+   "id": -16,
+   "key": "LittleStinger",
+   "en": "Hornet",
+   "base": 42,
+   "scale": 0.85
+  },
+  {
+   "id": -15,
+   "key": "HeavySkeleton",
+   "en": "Armored Skeleton",
+   "base": 77,
+   "scale": 1.15
+  },
+  {
+   "id": -14,
+   "key": "BigBoned",
+   "en": "Angry Bones",
+   "base": 31,
+   "scale": 1.15
+  },
+  {
+   "id": -13,
+   "key": "ShortBones",
+   "en": "Angry Bones",
+   "base": 31,
+   "scale": 0.9
+  },
+  {
+   "id": -12,
+   "key": "BigEater",
+   "en": "Eater of Souls",
+   "base": 6,
+   "scale": 1.15
+  },
+  {
+   "id": -11,
+   "key": "LittleEater",
+   "en": "Eater of Souls",
+   "base": 6,
+   "scale": 0.85
+  },
+  {
+   "id": -10,
+   "key": "JungleSlime",
+   "en": "Jungle Slime",
+   "base": 1,
+   "scale": 1.1,
+   "color": [
+    143,
+    215,
+    93,
+    100
+   ]
+  },
+  {
+   "id": -9,
+   "key": "YellowSlime",
+   "en": "Yellow Slime",
+   "base": 1,
+   "scale": 1.2,
+   "color": [
+    255,
+    255,
+    0,
+    100
+   ]
+  },
+  {
+   "id": -8,
+   "key": "RedSlime",
+   "en": "Red Slime",
+   "base": 1,
+   "scale": 1.025,
+   "color": [
+    255,
+    30,
+    0,
+    100
+   ]
+  },
+  {
+   "id": -7,
+   "key": "PurpleSlime",
+   "en": "Purple Slime",
+   "base": 1,
+   "scale": 1.2,
+   "color": [
+    200,
+    0,
+    255,
+    150
+   ]
+  },
+  {
+   "id": -6,
+   "key": "BlackSlime",
+   "en": "Black Slime",
+   "base": 1,
+   "scale": 1.05,
+   "color": [
+    0,
+    0,
+    0,
+    50
+   ]
+  },
+  {
+   "id": -5,
+   "key": "BabySlime",
+   "en": "Baby Slime",
+   "base": 1,
+   "scale": 0.9,
+   "color": [
+    0,
+    0,
+    0,
+    50
+   ]
+  },
+  {
+   "id": -4,
+   "key": "Pinky",
+   "en": "Pinky",
+   "base": 1,
+   "scale": 0.6,
+   "color": [
+    250,
+    30,
+    90,
+    90
+   ]
+  },
+  {
+   "id": -3,
+   "key": "GreenSlime",
+   "en": "Green Slime",
+   "base": 1,
+   "scale": 0.9,
+   "color": [
+    0,
+    220,
+    40,
+    100
+   ]
+  },
+  {
+   "id": -2,
+   "key": "Slimer2",
+   "en": "Slimer",
+   "base": 81,
+   "scale": 0.9
+  },
+  {
+   "id": -1,
+   "key": "Slimeling",
+   "en": "Slimeling",
+   "base": 81,
+   "scale": 0.6
+  },
   {
    "id": 1,
    "key": "BlueSlime",

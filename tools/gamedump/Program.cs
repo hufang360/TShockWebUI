@@ -30,6 +30,19 @@ internal static class Program
             return;
         }
 
+        // 轻量模式：导出「怪物图鉴」的筛选器 / 排序数据 + 负值 NPC 变体（-1..-65）。
+        //   dotnet GameDump.dll --bestiary /tmp/npc-bestiary.json /tmp/npc-variants.json
+        // 图鉴条目、筛选器归属、排序 id 都是游戏运行期用几千行 Add(...) 组出来的，
+        // 只能跑游戏自己的 BestiaryDatabaseNPCsPopulator 拿，不能靠解析源码。
+        if (args.Length > 0 && args[0] == "--bestiary")
+        {
+            Bootstrap();
+            DumpBestiary(args.Length > 1 ? args[1] : "/tmp/npc-bestiary.json",
+                args.Length > 2 ? args[2] : "/tmp/npc-variants.json",
+                args.Length > 3 ? args[3] : Environment.GetEnvironmentVariable("TR_SRC") ?? "");
+            return;
+        }
+
         // 轻量模式：导出「每件物品的 maxStack + 不允许出现在背包里的物品」。
         //   dotnet GameDump.dll --item-limits /tmp/item-limits.json
         // 用途：`.plr` 编辑器的数量校验 —— 游戏加载存档时 `Item.FixAgainstExploit()`
@@ -251,6 +264,158 @@ internal static class Program
                 try { it.SetDefaults(i); } catch { }
                 Terraria.ID.ContentSamples.ItemsByType[i] = it;
             }
+        }
+    }
+
+    // ── 怪物图鉴（筛选器 / 排序键 / 负值变体）───────────────
+    // 数据全部来自运行期：
+    //   ContentSamples.Initialize()                -> NpcsByNetId（含 -65..-1）、NpcBestiaryCreditIds、rarity
+    //   BestiaryDatabaseNPCsPopulator.Populate()   -> 图鉴条目 + 每个条目命中的筛选器
+    //   ContentSamples.RebuildBestiarySortingIDs…  -> 「怪物图鉴ID」排序键
+    // 筛选器图标：FilterProviderInfoElement 的私有 `_filterIconFrame` 是
+    //   `Images/UI/Bestiary/Icon_Tags_Shadow`（16 列 × 5 行）里的帧号；Boss / 未解锁 / 稀有
+    //   三个筛选器的图标是写死在 Filters.cs 里的（前两个同上贴图，稀有是 Icon_Rank_Light）。
+    private static void DumpBestiary(string outPath, string variantsOut, string trSrc)
+    {
+        LoadNpcNameLocalization(trSrc);
+        Terraria.ID.ContentSamples.Initialize();
+        var database = new Terraria.GameContent.Bestiary.BestiaryDatabase();
+        new Terraria.GameContent.Bestiary.BestiaryDatabaseNPCsPopulator().Populate(database);
+        Terraria.ID.ContentSamples.RebuildBestiarySortingIDsByBestiaryDatabaseContents(database);
+
+        // 「未解锁」筛选器依赖玩家自己的图鉴进度（Main.BestiaryTracker，无头环境没有），
+        // 而且本站是参考表、条目没有解锁状态，导出来只会是个永远为真的死按钮 → 不要它。
+        var usedFilters = database.Filters
+            .Where(f => f.GetType().Name != "ByUnlockState")
+            .ToList();
+        var filters = new List<object>();
+        foreach (var filter in usedFilters)
+        {
+            filters.Add(new { key = filter.GetDisplayNameKey(), icon = DescribeFilterIcon(filter) });
+        }
+
+        // netId -> 图鉴条目（一个条目可被多个 netId 共用：正数形态、负值变体都记在母体上）
+        var entryOfNpc = new Dictionary<int, Terraria.GameContent.Bestiary.BestiaryEntry>();
+        foreach (var entry in database.Entries)
+        {
+            foreach (var element in entry.Info)
+            {
+                if (element is Terraria.GameContent.Bestiary.NPCNetIdBestiaryInfoElement netIdElement)
+                {
+                    entryOfNpc[netIdElement.NetId] = entry;
+                }
+            }
+        }
+
+        var npcs = new SortedDictionary<int, object>();
+        var variants = new List<object>();
+        for (int id = -65; id < NPCID.Count; id++)
+        {
+            if (id == 0) continue;
+            if (!Terraria.ID.ContentSamples.NpcsByNetId.TryGetValue(id, out var npc)) continue;
+
+            // 负值变体自己没有图鉴条目：按游戏的 credit id 记到母体条目上。
+            int creditNetId = id;
+            if (Terraria.ID.ContentSamples.NpcBestiaryCreditIdsByNpcNetIds.TryGetValue(id, out var creditName)
+                && creditName != null
+                && Terraria.ID.ContentSamples.NpcNetIdsByPersistentIds.TryGetValue(creditName, out var creditId))
+            {
+                creditNetId = creditId;
+            }
+            entryOfNpc.TryGetValue(creditNetId, out var entry);
+            var hits = new List<int>();
+            if (entry != null)
+            {
+                for (int i = 0; i < usedFilters.Count; i++)
+                {
+                    if (usedFilters[i].FitsFilter(entry)) hits.Add(i);
+                }
+            }
+
+            npcs[id] = new
+            {
+                id,
+                sortId = Terraria.ID.ContentSamples.NpcBestiarySortingId.TryGetValue(creditNetId, out var sortId) ? sortId : 0,
+                rarity = Terraria.ID.ContentSamples.NpcBestiaryRarityStars.TryGetValue(id, out var rarity) ? rarity : 0,
+                damage = npc.damage,
+                defense = npc.defense,
+                coins = Math.Round(npc.value, 2),
+                life = npc.lifeMax,
+                filters = hits,
+            };
+
+            if (id < 0)
+            {
+                string key = Terraria.ID.ContentSamples.NpcPersistentIdsByNetIds.TryGetValue(id, out var name) ? name : null;
+                variants.Add(new
+                {
+                    id,
+                    key,
+                    baseId = NPCID.FromNetId(id),
+                    scale = Math.Round(npc.scale, 4),
+                    color = new[] { (int)npc.color.R, (int)npc.color.G, (int)npc.color.B, (int)npc.color.A },
+                });
+            }
+        }
+
+        var meta = new
+        {
+            gameVersion = AssemblyVersion(),
+            filterCount = filters.Count,
+            npcCount = npcs.Count,
+            source = "BestiaryDatabaseNPCsPopulator + ContentSamples (NpcBestiarySortingId / NpcBestiaryRarityStars) @ OTAPI " + AssemblyVersion(),
+            generatedBy = "tools/gamedump/Program.cs DumpBestiary",
+            note = "filters 顺序与游戏一致；npcs.filters 是该 NPC 命中的 filters 下标（负值变体沿用母体条目）",
+        };
+        File.WriteAllText(outPath, JsonSerializer.Serialize(new { meta, filters, npcs }));
+        Console.WriteLine($"[bestiary] {filters.Count} filters, {npcs.Count} npcs -> {outPath}");
+
+        var variantsMeta = new
+        {
+            gameVersion = AssemblyVersion(),
+            count = variants.Count,
+            source = "NPC.SetDefaults(id) for id in -65..-1 (scale / color / 母体 id) @ OTAPI " + AssemblyVersion(),
+            generatedBy = "tools/gamedump/Program.cs DumpBestiary",
+            note = "负值变体与母体共用贴图（NPCID.FromNetId），只有 scale / color 不同",
+        };
+        File.WriteAllText(variantsOut, JsonSerializer.Serialize(new { meta = variantsMeta, variants }));
+        Console.WriteLine($"[bestiary] {variants.Count} negative variants -> {variantsOut}");
+    }
+
+    /// <summary>
+    /// 图鉴条目构造时会取 `Lang.GetNPCName(id).Key`（无头环境里名字缓存是空的 → 空引用），
+    /// 所以先把官方英文语言包里的 NPCName 灌进去，再让游戏自己建缓存。
+    /// </summary>
+    private static void LoadNpcNameLocalization(string trSrc)
+    {
+        if (string.IsNullOrEmpty(trSrc)) return;
+        var path = Path.Combine(trSrc, "Terraria.Localization.Content.en-US.NPCs.json");
+        if (!File.Exists(path)) return;
+        try
+        {
+            Terraria.Localization.LanguageManager.Instance
+                .LoadLanguageFromFileTextJson(File.ReadAllText(path), canCreateCategories: true);
+            Terraria.Lang.InitializeLegacyLocalization();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"[bestiary] 警告：语言包加载失败（{e.GetType().Name}: {e.Message}），图鉴条目可能缺名字");
+        }
+    }
+
+    /// <summary>筛选器图标：贴图名 + 帧号（Icon_Tags_Shadow 是 16×5 网格）。</summary>
+    /// <summary>
+    /// 筛选器用哪张图标贴图：绝大多数是 `Icon_Tags_Shadow`（16 列 × 5 行），
+    /// 「稀有」用 `Icon_Rank_Light`。**帧号不在这里取**：它写在源码构造函数参数里
+    /// （`new SpawnConditionBestiaryInfoElement("Bestiary_Biomes.Surface", 0, …)`），
+    /// 由 `tools/gen-bestiary-icons.py` 解析后写进 `data/bestiary-icons.json`。
+    /// </summary>
+    private static object DescribeFilterIcon(Terraria.GameContent.Bestiary.IBestiaryEntryFilter filter)
+    {
+        switch (filter.GetType().Name)
+        {
+            case "ByRareCreature": return new { texture = "rank" };
+            default: return new { texture = "tags" };
         }
     }
 

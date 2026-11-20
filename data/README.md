@@ -8,7 +8,7 @@ python3 tools/gen-atlas.py         # 2) 物品图标图集（需 Pillow）
 python3 tools/gen-player-atlas.py  # 3) 玩家角色图集（需 Pillow）
 python3 tools/gen-npc-atlas.py     # 4) NPC 贴图图集（需 Pillow）
 python3 tools/gen-buff-atlas.py    # 5) Buff 图标图集（需 Pillow）
-bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + item-groups + shimmer + prefix + 图格/墙表（需 dotnet 9）
+bash tools/gen-game-data.sh        # 6) 合成表 + 怪物图鉴（npc-bestiary / npc-variants）+ 属性 stats + item-tips + item-groups + shimmer + prefix + 图格/墙表（需 dotnet 9）
 ```
 
 数据对应 **Terraria 1.4.5.8**。版本不匹配时必须重新生成，否则物品 ID / 名称 / 图标可能错位。
@@ -52,6 +52,10 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 属性 stats + item-tips + i
 | `tiles.json` | 图格 ID：内部名（`TileID`）、代表物品 id、摆放尺寸 | 754 |
 | `walls.json` | 墙 ID：内部名（`WallID`）、代表物品 id | 367 |
 | `buffs.json` | Buff：ID、内部名（**无名称**，名称取 `loc.BuffName`；参数补全用） | 400 |
+| `npc-bestiary.json` | 怪物图鉴：筛选器（顺序 + 图标贴图）+ 每个 NPC 的排序键 / 稀有度 / 攻击·防御·钱币·生命 / 命中的筛选器（含负值变体） | 59 筛选器 / 761 NPC |
+| `npc-variants.json` | 负值 NPC（-1..-65）：内部名、母体 id、`scale`、`color` | 65 |
+| `bestiary-icons.json` | 筛选器图标裁切表（`bestiary-tags.webp` / `bestiary-rank.webp`，带内容 hash） | 59 |
+| `buff-items.json` | Buff → 能获得它的物品 id（`Item.buffType` + 坐骑 `mountType`→`Mount.cs`） | 221 个 buff / 303 对 |
 | `commands.json` | TShock 核心指令（源码 best-effort 解析，含参数表 `paramSets`） | 95（70 条带参数表） |
 | `recipes.json` | 合成表：配方、配方组（**只有本地化 `key`**）、产出/材料倒排索引 | 3603 |
 | `item-stats.json` | 物品属性 `stats`（语言无关） | 6195 |
