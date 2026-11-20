@@ -172,20 +172,17 @@ describe('CommandModulePage', () => {
     expect(await screen.findByText(/世界信息 \/ Boss 进度（WorldModify）/)).toBeTruthy()
   })
 
-  it('帮助默认展开、关过就不再自动弹（按模块单独记忆）', async () => {
+  it('页面说明默认收起，点 ⓘ 才展开', async () => {
     renderPage(fakeTransport(vi.fn().mockResolvedValue({ status: 'ok', output: [] })))
     const help = /世界信息 \/ Boss 进度（WorldModify）/
+    // 默认不显示。
+    expect(screen.queryByText(help)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '页面说明' }))
     expect(await screen.findByText(help)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '关闭' }))
     await waitFor(() => expect(screen.queryByText(help)).toBeNull())
-    expect(JSON.parse(localStorage.getItem('tswui:helpClosed') ?? '{}')).toEqual({
-      'panel:world:': true,
-    })
-
-    // 再点 ⓘ 仍能打开。
-    fireEvent.click(screen.getByRole('button', { name: '页面说明' }))
-    expect(await screen.findByText(help)).toBeTruthy()
   })
 
   it('参数卡片：卡片上直接填参数，执行时按模板拼指令（不走自动刷新）', async () => {

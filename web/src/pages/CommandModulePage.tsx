@@ -129,7 +129,7 @@ export function CommandModulePage({
     <div className="flex flex-col gap-2">
       {/* 页面说明：顶栏 ⓘ 控制，正文里占满一行（在左右两栏上面）。 */}
       {desc && (
-        <PageHelp scopeId={`panel:${keyPrefix}`} forceOpen={allHidden}>
+        <PageHelp forceOpen={allHidden}>
           {desc}
         </PageHelp>
       )}

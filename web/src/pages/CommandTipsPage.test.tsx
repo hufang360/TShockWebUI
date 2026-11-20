@@ -135,20 +135,19 @@ afterEach(() => {
 })
 
 describe('CommandTipsPage', () => {
-  it('权限提示收进标题旁的 ⓘ（首次自动展开，可关闭）', async () => {
+  it('页面说明默认收起，点标题旁的 ⓘ 才展开', async () => {
     renderPage()
     const help = /各指令权限不同，由服务器判定/
-    // 默认展开：说明就在正文顶部。
-    expect(await screen.findByText(help)).toBeTruthy()
-    expect(screen.getByText(/把指令填进搜索框/)).toBeTruthy()
-    // 关闭后不再自动显示（状态记在本机）。
-    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
-    await waitFor(() => expect(screen.queryByText(help)).toBeNull())
-    expect(JSON.parse(localStorage.getItem('tswui:helpClosed') ?? '{}')).toEqual({ tips: true })
+    // 默认不显示：说明不能自己弹出来。
+    expect(screen.queryByText(help)).toBeNull()
 
-    // 再点标题旁的 ⓘ 又能打开。
     fireEvent.click(screen.getByRole('button', { name: '页面说明' }))
     expect(await screen.findByText(help)).toBeTruthy()
+    expect(screen.getByText(/把指令填进搜索框/)).toBeTruthy()
+
+    // ✕ 收起后回到不显示。
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    await waitFor(() => expect(screen.queryByText(help)).toBeNull())
   })
 
   it('没有顶部 tab：搜索框 + 分组 popover', () => {

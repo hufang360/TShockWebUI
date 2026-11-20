@@ -103,8 +103,6 @@ export const StorageKeys = {
    * `{ closed: 当前是否收起, everClosed: 是否曾经收起过（收起过一次后就一直显示 ⓘ 入口） }`。
    */
   cardHelp: 'cardHelp',
-  /** 页面「使用说明」弹层的关闭记忆：`{ [scopeId]: true }` = 关过，不再自动展开。 */
-  helpClosed: 'helpClosed',
   /** 鱼店记事本内容（`{ [serverId]: string }`，按服务器分开存在本机）。 */
   fishNote: 'fishNote',
   /** 指令卡片「是否手动执行」偏好（key -> true）。 */

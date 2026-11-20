@@ -252,7 +252,7 @@ export function PlayerManagerPage({
   return (
     <div className="flex flex-col gap-4">
       {/* 页面说明：顶栏 ⓘ 控制，正文里占一行（在本页所有区块上面）。 */}
-      <PageHelp scopeId="players">
+      <PageHelp>
         <PluginHelp
           plugin={t('plugin.players.name')}
           en="TShockPlayerManager"

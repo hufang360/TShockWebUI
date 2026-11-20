@@ -868,7 +868,7 @@ export function FishShopPage({
   )
 
   const pageActions = (
-    <PageHelp scopeId="store" className="col-span-full" forceOpen={!cardsVisible}>
+    <PageHelp className="col-span-full" forceOpen={!cardsVisible}>
       <PluginHelp plugin={t('plugin.store.name')} en="FishShop" href={PLUGIN_LINKS.fishShop}>
         {t('page.store.desc')}
       </PluginHelp>

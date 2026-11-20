@@ -985,7 +985,7 @@ export function CommandTipsPage({
       className="relative flex min-h-[360px] flex-col gap-2"
       style={{ '--page-sticky-top': `${stickyTop}px` } as CSSProperties}
     >
-      <PageHelp scopeId="tips">
+      <PageHelp>
         <span className="whitespace-pre-line">{t('page.tips.desc')}</span>
       </PageHelp>
 
