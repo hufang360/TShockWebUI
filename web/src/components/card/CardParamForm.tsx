@@ -58,6 +58,7 @@ export function CardParamForm({
           id={`${baseId}-${index}`}
           layout="inline"
           label={paramName(order + 1)}
+          placeholder={paramName(order + 1)}
           dataset={dataset}
           command={command}
           arg={arg}

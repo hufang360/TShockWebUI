@@ -203,10 +203,15 @@ export function CommandCard({
             <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-wide text-foreground select-text">
               {title}
             </span>
-            {/* 操作按钮：默认隐藏，hover 表头才显示；折叠时不显示；点击不触发折叠。 */}
-            {open && (result || loading) && (
+            {/* 操作按钮固定在右上角：没有结果时常显（这时它是卡片唯一的主操作），
+                有结果 / 加载中才 hover 出现（正文有内容，按钮不必抢眼）。折叠时不显示。 */}
+            {open && onRefresh && (
               <div
-                className="flex shrink-0 touch-visible items-center gap-1 opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100"
+                className={cn(
+                  'flex shrink-0 touch-visible items-center gap-1',
+                  (result || loading) &&
+                    'opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100',
+                )}
                 onClick={(e) => e.stopPropagation()}
               >
                 {refreshButton(true)}
@@ -242,12 +247,9 @@ export function CommandCard({
                   fill
                 />
               ) : (
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    {loading ? t('home.refreshing') : (emptyText ?? t('home.notRun'))}
-                  </p>
-                  {!loading && refreshButton(false)}
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  {loading ? t('home.refreshing') : (emptyText ?? t('home.notRun'))}
+                </p>
               )}
             </div>
             {(footerNote || lastRunLabel) && (

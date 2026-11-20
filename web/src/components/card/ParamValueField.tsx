@@ -35,6 +35,8 @@ export interface ParamValueFieldProps {
   invalid?: boolean
   /** 控件的无障碍名称（弹框里没有可见 label 时用）。 */
   label?: string
+  /** 输入框的占位文案（卡片上写「参数1」这种顺序名，不用类型提示）。 */
+  placeholder?: string
   /** `stacked`（默认）= 标签在上；`inline` = 标签在左，给卡片页头的窄条用。 */
   layout?: 'stacked' | 'inline'
 }
@@ -58,20 +60,17 @@ export function ParamValueField({
   disabled,
   invalid,
   label: ariaLabel,
+  placeholder,
   layout = 'stacked',
 }: ParamValueFieldProps) {
   const { lang } = useI18n()
-  // 卡片上只显示「参数1 / 参数2」这种顺序名（指令库里的英文参数名太技术），
-  // 类型提示留在 placeholder；完整参数名放 title，悬停能看到。
-  const technical = argLabel(arg, 0, lang)
-  const label = ariaLabel ?? technical
+  /** 指令库里的参数名 + 类型提示：卡片上不显示标签，只挂在 title 里供悬停查看。 */
+  const technical = `${argLabel(arg, 0, lang)} · ${argPlaceholder(arg, lang)}`
+  const label = ariaLabel ?? argLabel(arg, 0, lang)
   if (layout === 'inline') {
-    // 卡片页头的窄条：标签在左、控件在右，一行一个参数；放不下就整体折行。
+    // 卡片上的窄条：没有可见标签，占位文案就是「参数1」，类型提示放 title。
     return (
-      <label className="flex min-w-0 shrink-0 items-center gap-1" data-slot="card-param-field">
-        <span className="shrink-0 text-2xs text-muted-foreground" title={technical}>
-          {label}
-        </span>
+      <div className="min-w-0 shrink-0" data-slot="card-param-field" title={technical}>
         <ParamValueControl
           id={id}
           dataset={dataset}
@@ -84,9 +83,10 @@ export function ParamValueField({
           disabled={disabled}
           invalid={invalid}
           label={label}
+          placeholder={placeholder ?? label}
           compact
         />
-      </label>
+      </div>
     )
   }
   return (
@@ -106,6 +106,7 @@ export function ParamValueField({
         disabled={disabled}
         invalid={invalid}
         label={label}
+        placeholder={placeholder}
       />
     </Field>
   )
@@ -124,6 +125,7 @@ export function ParamValueControl({
   disabled,
   invalid,
   label,
+  placeholder,
   compact,
 }: Omit<ParamValueFieldProps, 'id' | 'layout'> & { id?: string; compact?: boolean }) {
   const { t, lang } = useI18n()
@@ -140,7 +142,7 @@ export function ParamValueControl({
         invalid={invalid}
         emptyLabel={t('card.argEmpty')}
         ariaLabel={label}
-        placeholder={argPlaceholder(arg, lang)}
+        placeholder={placeholder ?? argPlaceholder(arg, lang)}
         compact={compact}
       />
     )
@@ -158,7 +160,7 @@ export function ParamValueControl({
       disabled={disabled}
       invalid={invalid}
       ariaLabel={label}
-      placeholder={argPlaceholder(arg, lang)}
+      placeholder={placeholder ?? argPlaceholder(arg, lang)}
       compact={compact}
     />
   )
