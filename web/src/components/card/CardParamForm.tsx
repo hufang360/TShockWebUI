@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { ParamValueField } from '@/components/card/ParamValueField'
-import { argMissingLabel, isLiteralArg, type CardTemplate } from '@/lib/cardParams'
+import { isLiteralArg, type CardTemplate } from '@/lib/cardParams'
 import { useI18n } from '@/lib/i18n'
 import type { CommandDef, CommandParamSet, Dataset } from '@/types'
 
@@ -35,7 +35,7 @@ export function CardParamForm({
   missing = [],
   disabled,
 }: CardParamFormProps) {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const baseId = useId()
 
   const fields = set.args
@@ -44,21 +44,20 @@ export function CardParamForm({
 
   if (fields.length === 0) return null
 
-  const missingNames = missing.map((index) => {
-    const arg = set.args[index]
-    return arg ? argMissingLabel(arg, index, lang) : '?'
-  })
+  /** 卡片上按「渲染出来的第几个」编号：参数1 / 参数2 …（不含固定值、不传的那些）。 */
+  const paramName = (order: number) => t('card.paramN', { n: order })
 
   return (
     <div
       className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
       data-testid="card-param-form"
     >
-      {fields.map(({ arg, index, state }) => (
+      {fields.map(({ arg, index, state }, order) => (
         <ParamValueField
           key={index}
           id={`${baseId}-${index}`}
           layout="inline"
+          label={paramName(order + 1)}
           dataset={dataset}
           command={command}
           arg={arg}
@@ -70,9 +69,16 @@ export function CardParamForm({
           invalid={missing.includes(index)}
         />
       ))}
-      {missingNames.length > 0 && (
+      {missing.length > 0 && (
         <p className="basis-full text-2xs text-warning">
-          {t('card.needArgs', { args: missingNames.join('、') })}
+          {t('card.needArgs', {
+            args: missing
+              .map((index) => {
+                const order = fields.findIndex((field) => field.index === index)
+                return order >= 0 ? paramName(order + 1) : '?'
+              })
+              .join('、'),
+          })}
         </p>
       )}
     </div>

@@ -61,12 +61,17 @@ export function ParamValueField({
   layout = 'stacked',
 }: ParamValueFieldProps) {
   const { lang } = useI18n()
-  const label = argLabel(arg, 0, lang)
+  // 卡片上只显示「参数1 / 参数2」这种顺序名（指令库里的英文参数名太技术），
+  // 类型提示留在 placeholder；完整参数名放 title，悬停能看到。
+  const technical = argLabel(arg, 0, lang)
+  const label = ariaLabel ?? technical
   if (layout === 'inline') {
     // 卡片页头的窄条：标签在左、控件在右，一行一个参数；放不下就整体折行。
     return (
       <label className="flex min-w-0 shrink-0 items-center gap-1" data-slot="card-param-field">
-        <span className="shrink-0 text-2xs text-muted-foreground">{label}</span>
+        <span className="shrink-0 text-2xs text-muted-foreground" title={technical}>
+          {label}
+        </span>
         <ParamValueControl
           id={id}
           dataset={dataset}
@@ -78,7 +83,7 @@ export function ParamValueField({
           runtimeValues={runtimeValues}
           disabled={disabled}
           invalid={invalid}
-          label={ariaLabel ?? label}
+          label={label}
           compact
         />
       </label>
@@ -86,7 +91,7 @@ export function ParamValueField({
   }
   return (
     <Field className="gap-1" data-slot="card-param-field">
-      <FieldLabel htmlFor={id} className="text-2xs text-muted-foreground">
+      <FieldLabel htmlFor={id} className="text-2xs text-muted-foreground" title={technical}>
         {label}
       </FieldLabel>
       <ParamValueControl
@@ -100,7 +105,7 @@ export function ParamValueField({
         runtimeValues={runtimeValues}
         disabled={disabled}
         invalid={invalid}
-        label={ariaLabel ?? label}
+        label={label}
       />
     </Field>
   )

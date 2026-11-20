@@ -48,30 +48,30 @@ describe('CustomCommandCard', () => {
     const header = container.querySelector('[data-slot="card-header"]')
     expect(header ? header.querySelector('[data-slot="card-param-field"]') : null).toBeNull()
     // 输入框是固定宽度（不铺满一行）。
-    const input = screen.getByLabelText('player')
+    const input = screen.getByLabelText('参数2')
     expect(input.className).toContain('w-24')
   })
 
   it('参数卡片：渲染需要现场填的参数，页脚显示拼好的指令', () => {
     const { container } = renderCard()
     expect(screen.getByTestId('card-param-form')).toBeTruthy()
-    expect(screen.getByLabelText('item type/id')).toBeTruthy()
-    expect(screen.getByLabelText('player')).toBeTruthy()
+    expect(screen.getByLabelText('参数1')).toBeTruthy()
+    expect(screen.getByLabelText('参数2')).toBeTruthy()
     // 可选参数默认不传：卡片上没有它们的输入框。
-    expect(screen.queryByLabelText('item amount')).toBeNull()
+    expect(screen.queryByLabelText('参数3')).toBeNull()
     expect(container.querySelector('[data-command]')?.getAttribute('data-command')).toBe('/give')
   })
 
   it('必填参数没填：按钮置灰 + 提示还缺什么；填完就能执行', () => {
     const { onRun } = renderCard()
-    expect(screen.getByText('还需要填写：物品、玩家')).toBeTruthy()
+    expect(screen.getByText('还需要填写：参数1、参数2')).toBeTruthy()
     const run = screen.getByRole('button', { name: '执行' })
     expect(run.hasAttribute('disabled')).toBe(true)
     fireEvent.click(run)
     expect(onRun).not.toHaveBeenCalled()
 
-    fireEvent.change(screen.getByLabelText('item type/id'), { target: { value: '29' } })
-    fireEvent.change(screen.getByLabelText('player'), { target: { value: 'Alice' } })
+    fireEvent.change(screen.getByLabelText('参数1'), { target: { value: '29' } })
+    fireEvent.change(screen.getByLabelText('参数2'), { target: { value: 'Alice' } })
     expect(screen.queryByText(/还需要填写/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '执行' }))
     expect(onRun).toHaveBeenCalledWith('/give 29 Alice')
@@ -81,14 +81,14 @@ describe('CustomCommandCard', () => {
     renderCard()
     const preview = screen.getByTestId('card-command-preview')
     expect(preview.textContent).toBe('/give')
-    fireEvent.change(screen.getByLabelText('item type/id'), { target: { value: '29' } })
-    fireEvent.change(screen.getByLabelText('player'), { target: { value: 'Alice' } })
+    fireEvent.change(screen.getByLabelText('参数1'), { target: { value: '29' } })
+    fireEvent.change(screen.getByLabelText('参数2'), { target: { value: 'Alice' } })
     expect(screen.getByTestId('card-command-preview').textContent).toBe('/give 29 Alice')
   })
 
   it('输入的值会写回存储（停止输入后才写）', async () => {
     const { onTemplateChange } = renderCard()
-    fireEvent.change(screen.getByLabelText('player'), { target: { value: 'Alice' } })
+    fireEvent.change(screen.getByLabelText('参数2'), { target: { value: 'Alice' } })
     await waitFor(() =>
       expect(onTemplateChange).toHaveBeenCalledWith({
         ...template,

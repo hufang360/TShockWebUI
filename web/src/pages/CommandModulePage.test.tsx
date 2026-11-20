@@ -212,9 +212,9 @@ describe('CommandModulePage', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    // 固定值不进表单；必填的 player 在卡片上。
-    expect(screen.queryByLabelText('item type/id')).toBeNull()
-    const player = await screen.findByLabelText('player')
+    // 固定值不进表单；必填的 player 在卡片上（只剩一个参数框）。
+    const player = await screen.findByLabelText('参数1')
+    expect(screen.getAllByLabelText(/^参数\d+$/)).toHaveLength(1)
 
     // 参数卡片不参与自动刷新（进页面不会跑）。
     expect(runCommand.mock.calls.some(([cmd]) => String(cmd).startsWith('/give'))).toBe(false)

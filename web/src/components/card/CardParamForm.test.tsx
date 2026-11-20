@@ -30,22 +30,22 @@ function renderForm(overrides: Partial<Parameters<typeof CardParamForm>[0]> = {}
 describe('CardParamForm', () => {
   it('只渲染「执行时填」的参数（固定 / 不传的不出现在卡片上）', () => {
     renderForm()
-    expect(screen.getByLabelText('item type/id')).toBeTruthy()
-    expect(screen.getByLabelText('player')).toBeTruthy()
+    expect(screen.getByLabelText('参数1')).toBeTruthy()
+    expect(screen.getByLabelText('参数2')).toBeTruthy()
     // 可选参数默认「不传」：卡片上没有它们的输入框。
-    expect(screen.queryByLabelText('item amount')).toBeNull()
-    expect(screen.queryByLabelText('prefix id/name')).toBeNull()
+    expect(screen.queryByLabelText('参数3')).toBeNull()
+    expect(screen.queryByLabelText('参数4')).toBeNull()
   })
 
   it('输入值回调带参数下标', () => {
     const { onChange } = renderForm()
-    fireEvent.change(screen.getByLabelText('item type/id'), { target: { value: '29' } })
+    fireEvent.change(screen.getByLabelText('参数1'), { target: { value: '29' } })
     expect(onChange).toHaveBeenCalledWith(0, '29')
   })
 
   it('玩家参数给在线玩家候选，点一下填入', async () => {
     const { onChange } = renderForm()
-    const input = screen.getByLabelText('player')
+    const input = screen.getByLabelText('参数2')
     fireEvent.focus(input)
     fireEvent.click(await screen.findByRole('option', { name: /Alice/ }))
     expect(onChange).toHaveBeenCalledWith(1, 'Alice')
@@ -53,7 +53,7 @@ describe('CardParamForm', () => {
 
   it('必填没填时给出「还需要填写」提示', () => {
     renderForm({ missing: [1] })
-    expect(screen.getByText('还需要填写：玩家')).toBeTruthy()
+    expect(screen.getByText('还需要填写：参数2')).toBeTruthy()
   })
 
   it('没有「执行时填」的参数时不渲染表单', () => {

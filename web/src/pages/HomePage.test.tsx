@@ -185,9 +185,9 @@ describe('HomePage 卡片管理', () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    // 只渲染「执行时填」的参数（物品是固定值 29，卡片上不出现）。
-    expect(screen.queryByLabelText('item type/id')).toBeNull()
-    const player = await screen.findByLabelText('player')
+    // 只渲染「执行时填」的参数（物品是固定值 29，卡片上不出现 → 只剩一个参数框）。
+    const player = await screen.findByLabelText('参数1')
+    expect(screen.getAllByLabelText(/^参数\d+$/)).toHaveLength(1)
 
     // 缺必填项时按钮灰着：不发一条半截指令。
     const run = screen.getByRole('button', { name: '执行' })
