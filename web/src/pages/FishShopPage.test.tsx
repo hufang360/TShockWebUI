@@ -14,7 +14,7 @@ import {
   ROW_PLATE_CLASS,
 } from '@/lib/iconGridSize'
 import { NO_INGAME } from '@/lib/ingame'
-import { addCardThroughDialog } from '@/test/managerSheet'
+import { addCardViaPanel } from '@/test/managerSheet'
 import { makeDataset } from '@/test/fixtures'
 import { playerStubs } from '@/test/playerStubs'
 import type { BackendTransport, FishGood, FishShop } from '@/lib/tshock'
@@ -336,7 +336,7 @@ describe('FishShopPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const sheet = await screen.findByRole('dialog')
     // 加一张自定义卡片 + 把鱼罐改成显示。
-    await addCardThroughDialog('常用购买', '/fish buy 1')
+    await addCardViaPanel('常用购买', '/fish buy 1')
     // 把鱼罐（默认显示）先藏起来。
     fireEvent.click(within(within(sheet).getByRole('listitem', { name: '鱼罐' })).getByLabelText('显示中'))
     expect(within(within(sheet).getByRole('listitem', { name: '鱼罐' })).getByLabelText('已隐藏')).toBeTruthy()

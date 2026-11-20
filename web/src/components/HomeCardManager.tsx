@@ -1,7 +1,8 @@
-import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { CardManagerSheet, type ManagerCard } from '@/components/CardManagerSheet'
-import type { CardDraft } from '@/components/card/CardTemplateDialog'
+import { LazyCardEditorPanel } from '@/components/card/LazyCardEditorPanel'
+import type { CardEditorDraft } from '@/components/card/CardEditorPanel'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import { Badge } from '@/components/ui'
 import { cardRunState, needsUserInput } from '@/lib/cardParams'
@@ -21,11 +22,6 @@ import {
   type HomeCardsPrefs,
 } from '@/lib/homeCards'
 import type { Dataset, FavoriteEntry } from '@/types'
-
-// 只在点「添加 / 编辑」时才需要：不占首屏兜底。
-const CardTemplateDialog = lazy(() =>
-  import('@/components/card/CardTemplateDialog').then((m) => ({ default: m.CardTemplateDialog })),
-)
 
 interface HomeCardManagerProps {
   open: boolean
@@ -66,9 +62,8 @@ export function HomeCardManager({
   runtimeValues,
 }: HomeCardManagerProps) {
   const { t } = useI18n()
-  /** 添加 / 编辑卡片的弹框：`null` 关闭；`{ id }` = 编辑那张参数卡片。 */
-  const [dialog, setDialog] = useState<{ id: string } | null>(null)
-  const [addOpen, setAddOpen] = useState(false)
+  /** 添加 / 编辑卡片的面板：`null` = 收起；`{ mode: 'add' }` 新增；`{ mode: 'edit', id }` 编辑。 */
+  const [editor, setEditor] = useState<{ mode: 'add' } | { mode: 'edit'; id: string } | null>(null)
 
   // 指令输入框的下拉候选：本机收藏的指令（tswui:favorites）。
   const [rawFavorites] = useLocalState<FavoriteEntry[]>(StorageKeys.favorites, [])
@@ -110,29 +105,39 @@ export function HomeCardManager({
     }
   })
 
-  const editingCard = dialog ? customById.get(dialog.id) : undefined
+  const editingCard = editor?.mode === 'edit' ? customById.get(editor.id) : undefined
 
-  /** 添加 / 编辑提交：带模板 = 参数卡片，命令以模板为准。 */
-  const saveDraft = (draft: CardDraft) => {
-    if (dialog) {
+  /** 面板提交：卡片字段 + 行级设置（尺寸 / 自动执行 / 显示）一次写完。 */
+  const saveDraft = (draft: CardEditorDraft) => {
+    const hidden = { ...prefs.hidden }
+    if (editor?.mode === 'edit') {
+      const id = editor.id
+      if (draft.hidden) hidden[id] = true
+      else delete hidden[id]
       onChange({
         ...prefs,
+        hidden,
+        width: { ...prefs.width, [id]: draft.width },
         custom: prefs.custom.map((c) =>
-          c.id === dialog.id
-            ? { ...c, name: draft.name, command: draft.command, template: draft.template }
-            : c,
+          c.id === id ? { ...c, name: draft.name, command: draft.command, template: draft.template } : c,
         ),
       })
-      setDialog(null)
+      onToggleManual?.(id, draft.manual)
+      setEditor(null)
       return
     }
     const card = createCustomCard(draft.name, draft.command, draft.template)
+    if (draft.hidden) hidden[card.id] = true
     onChange({
       ...prefs,
       order: [...prefs.order, card.id],
       custom: [...prefs.custom, card],
+      hidden,
+      width: { ...prefs.width, [card.id]: draft.width },
     })
-    setAddOpen(false)
+    // 新卡片的「自动执行」是默认手动之后的例外，交给偏好存储。
+    onToggleManual?.(card.id, draft.manual)
+    setEditor(null)
   }
 
   const moveBy = (id: string, delta: number) => {
@@ -197,8 +202,38 @@ export function HomeCardManager({
         set: (id: string, width: CardWidth) =>
           onChange({ ...prefs, width: { ...prefs.width, [id]: width } }),
       }}
-      add={{ label: t('home.manageAddCard'), onClick: () => setAddOpen(true) }}
-      onEditTemplate={(id) => setDialog({ id })}
+      add={
+        editor
+          ? undefined
+          : { label: t('home.manageAddCard'), onClick: () => setEditor({ mode: 'add' }) }
+      }
+      onEditTemplate={(id) => setEditor({ mode: 'edit', id })}
+      editor={
+        editor ? (
+          <LazyCardEditorPanel
+            dataset={dataset}
+            ingame={ingame}
+            players={players}
+            runtimeValues={runtimeValues}
+            initial={
+              editingCard
+                ? {
+                    name: editingCard.name,
+                    command: editingCard.command,
+                    template: editingCard.template,
+                    width: cardWidth(prefs, editingCard.id),
+                    manual: isManual?.(editingCard.id) ?? false,
+                    hidden: prefs.hidden[editingCard.id] === true,
+                  }
+                // 新卡片默认「手动执行」（与老的自定义卡片一致）。
+                : { name: '', command: '', width: 'half', manual: true, hidden: false }
+            }
+            submitLabel={editor.mode === 'edit' ? t('action.save') : t('home.manageAdd')}
+            onSubmit={saveDraft}
+            onCancel={() => setEditor(null)}
+          />
+        ) : undefined
+      }
       footerExtra={
         // 只留图标（悬停出「恢复默认」提示），点一下就地二次确认。
         <ConfirmButton
@@ -221,40 +256,6 @@ export function HomeCardManager({
       doneLabel={t('home.manageDone')}
     />
 
-      <Suspense fallback={null}>
-      <CardTemplateDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        dataset={dataset}
-        ingame={ingame}
-        players={players}
-        runtimeValues={runtimeValues}
-        onSubmit={saveDraft}
-        submitLabel={t('home.manageAdd')}
-      />
-
-      <CardTemplateDialog
-        open={dialog != null}
-        onOpenChange={(next) => {
-          if (!next) setDialog(null)
-        }}
-        dataset={dataset}
-        ingame={ingame}
-        players={players}
-        runtimeValues={runtimeValues}
-        initial={
-          editingCard
-            ? {
-                name: editingCard.name,
-                command: editingCard.command,
-                template: editingCard.template,
-              }
-            : undefined
-        }
-        onSubmit={saveDraft}
-        submitLabel={t('action.save')}
-      />
-      </Suspense>
     </>
   )
 }

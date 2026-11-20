@@ -19,7 +19,8 @@ export function useModuleCards(
   moduleId: string,
 ): {
   cards: ModuleCard[]
-  add: (name: string, command: string, template?: CardTemplate) => void
+  /** 新增卡片，返回新卡片 id（页面据此写入尺寸 / 自动执行 / 显示）。 */
+  add: (name: string, command: string, template?: CardTemplate) => string
   update: (id: string, patch: Partial<Pick<ModuleCard, 'name' | 'command' | 'template'>>) => void
   remove: (id: string) => void
   /** 恢复默认：清掉这个模块里用户添加的全部卡片。 */
@@ -35,6 +36,7 @@ export function useModuleCards(
       // 在里面生成 id 会一次点击加出两张卡。
       const card = createModuleCard(name, command, template)
       setRaw((prev) => addModuleCard(sanitizeModuleCards(prev), serverId, moduleId, card))
+      return card.id
     },
     [setRaw, serverId, moduleId],
   )

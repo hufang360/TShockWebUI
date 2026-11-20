@@ -6,7 +6,7 @@ import { ExecutionQueueProvider } from '@/lib/executionQueue'
 import { DatasetProvider } from '@/lib/datasetContext'
 import { resetRefreshGate } from '@/lib/refreshGate'
 import { NO_INGAME } from '@/lib/ingame'
-import { addCardThroughDialog } from '@/test/managerSheet'
+import { addCardViaPanel } from '@/test/managerSheet'
 import { makeDataset } from '@/test/fixtures'
 import { closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { playerStubs } from '@/test/playerStubs'
@@ -100,7 +100,7 @@ describe('CommandModulePage', () => {
 
     // 管理卡片弹框里添加一张卡片
     fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
-    await addCardThroughDialog('时间', 'time')
+    await addCardViaPanel('时间', 'time')
 
     expect((await screen.findAllByText('时间')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('/time').length).toBeGreaterThan(0)
@@ -231,7 +231,7 @@ describe('CommandModulePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /管理卡片/ }))
     const sheet = await screen.findByRole('dialog')
-    await addCardThroughDialog('时间', 'time')
+    await addCardViaPanel('时间', 'time')
 
     const row = within(sheet).getByRole('listitem', { name: '时间' })
     expect(within(row).getByLabelText('左·小')).toBeTruthy()
@@ -256,7 +256,7 @@ describe('CommandModulePage', () => {
     const sheet = await screen.findByRole('dialog')
 
     // 先改出一点非默认状态：加一张卡 + 把固定卡改成「小」。
-    await addCardThroughDialog('时间', 'time')
+    await addCardViaPanel('时间', 'time')
     const infoRow = within(sheet).getByRole('listitem', { name: '世界信息' })
     // 固定卡默认「左·大」，点一下循环到「右栏」。
     fireEvent.click(within(infoRow).getByLabelText('左·大'))

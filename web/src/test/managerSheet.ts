@@ -28,16 +28,16 @@ export async function openRowMenu(row: HTMLElement) {
 }
 
 /**
- * 通过「添加卡片」弹框加一张**普通指令卡片**：搜索框里输入 `/指令` → 「使用「…」」→ 填名称 → 添加。
+ * 通过「管理卡片」抽屉里的**添加面板**加一张卡片：名称 / 指令 / （可选）参数 → 添加。
  *
- * 参数卡片走列表里的 `/指令` 选项（见 `CardTemplateDialog` 的用例），这里只覆盖「照旧写一条指令」的路径。
+ * 参数卡片请直接用 `addParamCard`（先填指令，再在「指令参数」里配）。
  */
-export async function addCardThroughDialog(name: string, command: string) {
+export async function addCardViaPanel(name: string, command: string, withinScope?: HTMLElement) {
   const raw = command.startsWith('/') ? command : `/${command}`
-  fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
-  // 弹框是按需加载的 chunk：等它挂上来。
-  fireEvent.change(await screen.findByLabelText('搜索指令'), { target: { value: raw } })
-  fireEvent.click(screen.getByRole('button', { name: `使用「${raw}」` }))
-  fireEvent.change(screen.getByLabelText('名称'), { target: { value: name } })
-  fireEvent.click(screen.getByRole('button', { name: '添加' }))
+  const scope = withinScope ?? document.body
+  fireEvent.click(within(scope).getByRole('button', { name: '添加卡片' }))
+  const panel = await screen.findByTestId('card-editor-panel')
+  fireEvent.change(within(panel).getByLabelText('名称'), { target: { value: name } })
+  fireEvent.change(within(panel).getByLabelText('指令'), { target: { value: raw } })
+  fireEvent.click(within(panel).getByRole('button', { name: '添加' }))
 }

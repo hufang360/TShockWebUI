@@ -8,7 +8,7 @@ import { resetRefreshGate } from '@/lib/refreshGate'
 import { consumeEditorFocus } from '@/lib/editorFocus'
 import type { BackendTransport } from '@/lib/tshock'
 import { NO_INGAME } from '@/lib/ingame'
-import { addCardThroughDialog } from '@/test/managerSheet'
+import { addCardViaPanel } from '@/test/managerSheet'
 import { makeDataset } from '@/test/fixtures'
 import { closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { playerStubs } from '@/test/playerStubs'
@@ -153,7 +153,7 @@ describe('HomePage 卡片管理', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
-    await addCardThroughDialog('全服 公告', '/say hello')
+    await addCardViaPanel('全服 公告', '/say hello')
 
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
     await waitFor(() => expect(screen.getByText('全服 公告')).toBeTruthy())

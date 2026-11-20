@@ -1,19 +1,15 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { CardManagerSheet, type ManagerCard } from '@/components/CardManagerSheet'
-import type { CardDraft } from '@/components/card/CardTemplateDialog'
+import { LazyCardEditorPanel } from '@/components/card/LazyCardEditorPanel'
+import type { CardEditorDraft } from '@/components/card/CardEditorPanel'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import { Badge } from '@/components/ui'
 import type { CardTemplate } from '@/lib/cardParams'
-import type { CardWidth } from '@/lib/cardLayout'
+import { CARD_WIDTHS, type CardWidth } from '@/lib/cardLayout'
 import type { IngamePolicy } from '@/lib/ingame'
 import { useI18n } from '@/lib/i18n'
 import type { Dataset } from '@/types'
-
-// 只在点「添加 / 编辑」时才需要：不占首屏兜底。
-const CardTemplateDialog = lazy(() =>
-  import('@/components/card/CardTemplateDialog').then((m) => ({ default: m.CardTemplateDialog })),
-)
 
 export interface ManageableCard {
   id: string
@@ -41,7 +37,10 @@ interface ModuleCardManagerDialogProps {
   cards: ManageableCard[]
   isManual: (card: ManageableCard) => boolean
   onToggleManual: (card: ManageableCard, manual: boolean) => void
-  onAdd: (name: string, command: string, template?: CardTemplate) => void
+  /** 新增卡片，返回新卡片 id（用来立刻写入尺寸 / 自动执行 / 显示）。 */
+  onAdd: (name: string, command: string, template?: CardTemplate) => string | void
+  /** 新增后写入行级设置（页面持有布局与自动执行偏好）。 */
+  applyNewCard?: (id: string, preset: { width: CardWidth; manual: boolean; hidden: boolean }) => void
   /** 编辑自定义卡片的名称 / 指令（内置卡片不可编辑）。 */
   onUpdate: (id: string, patch: { name?: string; command?: string; template?: CardTemplate }) => void
   onRemove: (id: string) => void
@@ -96,6 +95,7 @@ export function ModuleCardManagerDialog({
   pluginMissing,
   visibility,
   onReset,
+  applyNewCard,
   dataset,
   ingame,
   players,
@@ -103,22 +103,31 @@ export function ModuleCardManagerDialog({
 }: ModuleCardManagerDialogProps) {
   const { t } = useI18n()
   const byId = new Map(cards.map((c) => [c.id, c]))
-  /** 添加 / 编辑卡片的弹框：`null` 关闭；`{ id }` = 编辑那张参数卡片。 */
-  const [addOpen, setAddOpen] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)
+  /** 添加 / 编辑卡片的面板：`null` 收起；`add` 新增；`{ id }` 编辑。 */
+  const [editor, setEditor] = useState<{ mode: 'add' } | { mode: 'edit'; id: string } | null>(null)
+  const editingCard = editor?.mode === 'edit' ? byId.get(editor.id) : undefined
 
-  const saveDraft = (draft: CardDraft) => {
-    if (editId) {
-      onUpdate(editId, {
+  const saveDraft = (draft: CardEditorDraft) => {
+    if (editor?.mode === 'edit') {
+      const card = byId.get(editor.id)
+      onUpdate(editor.id, {
         name: draft.name,
         command: draft.command,
         template: draft.template,
       })
-      setEditId(null)
+      width?.set(editor.id, draft.width)
+      if (card && visibility && visibility.isHidden(editor.id) !== draft.hidden) {
+        visibility.onToggle(editor.id)
+      }
+      if (card) onToggleManual(card, draft.manual)
+      setEditor(null)
       return
     }
-    onAdd(draft.name, draft.command, draft.template)
-    setAddOpen(false)
+    const id = onAdd(draft.name, draft.command, draft.template)
+    if (typeof id === 'string') {
+      applyNewCard?.(id, { width: draft.width, manual: draft.manual, hidden: draft.hidden })
+    }
+    setEditor(null)
   }
 
   const items: ManagerCard[] = cards.map((card) => {
@@ -193,42 +202,42 @@ export function ModuleCardManagerDialog({
         },
         label: t('home.autoExec'),
       }}
-      add={{ label: t('home.manageAddCard'), onClick: () => setAddOpen(true) }}
-      onEditTemplate={setEditId}
+      add={
+        editor
+          ? undefined
+          : { label: t('home.manageAddCard'), onClick: () => setEditor({ mode: 'add' }) }
+      }
+      onEditTemplate={(id) => setEditor({ mode: 'edit', id })}
+      editor={
+        editor ? (
+          <LazyCardEditorPanel
+            dataset={dataset}
+            ingame={ingame}
+            players={players}
+            runtimeValues={runtimeValues}
+            widthOptions={width?.disabled ? CARD_WIDTHS.filter((w) => !width.disabled?.includes(w)) : undefined}
+            initial={
+              editingCard
+                ? {
+                    name: editingCard.name,
+                    command: editingCard.command,
+                    template: editingCard.template,
+                    width: width?.get(editingCard.id) ?? 'full',
+                    manual: isManual(editingCard),
+                    hidden: editingCard.hidden === true || visibility?.isHidden(editingCard.id) === true,
+                  }
+                : { name: '', command: '', width: 'half', manual: true, hidden: false }
+            }
+            submitLabel={editor.mode === 'edit' ? t('action.save') : t('home.manageAdd')}
+            onSubmit={saveDraft}
+            onCancel={() => setEditor(null)}
+          />
+        ) : undefined
+      }
       doneLabel={t('modules.cards.done')}
       helpExtra={t('cards.manageDescRail')}
       />
 
-      <Suspense fallback={null}>
-      <CardTemplateDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        dataset={dataset}
-        ingame={ingame}
-        players={players}
-        runtimeValues={runtimeValues}
-        onSubmit={saveDraft}
-        submitLabel={t('home.manageAdd')}
-      />
-
-      <CardTemplateDialog
-        open={editId != null}
-        onOpenChange={(next) => {
-          if (!next) setEditId(null)
-        }}
-        dataset={dataset}
-        ingame={ingame}
-        players={players}
-        runtimeValues={runtimeValues}
-        initial={(() => {
-          const card = editId ? byId.get(editId) : undefined
-          if (!card) return undefined
-          return { name: card.name, command: card.command, template: card.template }
-        })()}
-        onSubmit={saveDraft}
-        submitLabel={t('action.save')}
-      />
-      </Suspense>
     </>
   )
 }

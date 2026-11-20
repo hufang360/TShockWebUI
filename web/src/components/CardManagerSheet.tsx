@@ -13,9 +13,6 @@ import {
   Play,
   PlayOff,
   Plus,
-  SquarePaddingHorizontal,
-  SquarePaddingLeft,
-  SquarePaddingRight,
   Trash2,
 } from 'lucide-react'
 import { HelpCard } from '@/components/HelpCard'
@@ -44,6 +41,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui'
 import { useLocalState } from '@/hooks/useLocalState'
+import { WIDTH_ICON, WIDTH_LABEL_KEY } from '@/components/card/cardWidthControls'
 import { CARD_WIDTHS, type CardWidth } from '@/lib/cardLayout'
 import { copyText } from '@/lib/clipboard'
 import { normalizeCustomCommand } from '@/lib/homeCards'
@@ -74,21 +72,6 @@ export interface ManagerCard {
   badges?: ReactNode
 }
 
-const WIDTH_LABEL_KEY: Record<CardWidth, string> = {
-  half: 'home.widthSmall',
-  full: 'home.widthLarge',
-  right: 'home.widthRight',
-}
-
-/**
- * 尺寸用图标表示（不再写字）：左·小 = 方块靠左填充，左·大 = 横向铺满，右栏 = 靠右填充。
- * 文字只留在 `aria-label` / 悬停提示里，行内更窄、三档一眼能对上。
- */
-const WIDTH_ICON: Record<CardWidth, typeof SquarePaddingLeft> = {
-  half: SquarePaddingLeft,
-  full: SquarePaddingHorizontal,
-  right: SquarePaddingRight,
-}
 
 export interface CardManagerSheetProps {
   open: boolean
@@ -132,6 +115,11 @@ export interface CardManagerSheetProps {
   }
   /** 参数卡片行尾的「参数设置」（不给则参数卡片不能编辑）。 */
   onEditTemplate?: (id: string) => void
+  /**
+   * 添加 / 编辑卡片的面板（`components/card/CardEditorPanel.tsx`）。
+   * 页面自己控制开关：开着时把底部的「添加卡片」按钮藏掉，面板自带取消 / 提交。
+   */
+  editor?: ReactNode
   /** 卡片名称 / 指令输入框的无障碍文案（自定义卡片内联编辑用）。 */
   nameLabel?: string
   commandLabel?: string
@@ -257,6 +245,7 @@ export function CardManagerSheet({
   width,
   add,
   onEditTemplate,
+  editor,
   nameLabel,
   commandLabel,
   commandSuggestions,
@@ -629,6 +618,9 @@ export function CardManagerSheet({
               )
             })}
           </ul>
+
+          {/* 添加 / 编辑卡片的面板（两行：名称+指令 / 操作按钮组+指令参数）。 */}
+          {editor && <div className="px-5 pb-3">{editor}</div>}
 
           {/* 使用说明：贴在滚动区底部（内容少时到底，内容多时跟在最后一张卡后面）。
               收起后不再占位，改由页脚的 ⓘ 重新打开。 */}

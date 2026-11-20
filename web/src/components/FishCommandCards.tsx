@@ -531,6 +531,11 @@ export function FishCommandCards({
         players={players}
         runtimeValues={runtimeValues}
         onAdd={(name, cmd, template) => addCard(name, cmd, template)}
+        // 鱼店只有右栏：宽度不写（`width.set` 是空实现），只应用自动执行 / 显示。
+        applyNewCard={(id, preset) => {
+          if (preset.hidden && !isHidden(id)) toggleHidden(id)
+          setAutoExec((prev) => setManual(sanitizeAutoExec(prev), `fish:${id}`, preset.manual))
+        }}
         onUpdate={(id, patch) => updateCard(id, patch)}
         onRemove={(id) => removeCard(id)}
         // 鱼罐 / 消费榜 / 鱼篓榜 / 记事本都可以隐藏，玩家在这里打开「是否显示」才出现。

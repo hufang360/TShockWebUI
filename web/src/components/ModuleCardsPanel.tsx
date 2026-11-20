@@ -530,6 +530,13 @@ export function ModuleCardsPanel({
           onAdd={onAddCard}
           onUpdate={onUpdateCard ?? (() => {})}
           onRemove={onRemoveCard ?? (() => {})}
+          applyNewCard={(id, preset) => {
+            if (widthOf(id) !== preset.width) setWidth(id, preset.width)
+            if (preset.hidden && !isHidden(id)) toggleHidden(id)
+            setAutoExec((prev) =>
+              setManual(sanitizeAutoExec(prev), `${keyPrefix}${id}`, preset.manual),
+            )
+          }}
           dataset={dataset as Dataset}
           ingame={ingame}
           players={players}

@@ -6,6 +6,7 @@ import {
   defaultArgMode,
   hasFillParams,
   hasValueParams,
+  parseCardCommandInput,
   quoteParamValue,
   resolveCardTemplate,
   sanitizeCardTemplate,
@@ -237,5 +238,22 @@ describe('展示辅助', () => {
     for (const def of testCommands) {
       expect(dataset.commandsByToken.has(def.name)).toBe(true)
     }
+  })
+})
+
+describe('parseCardCommandInput', () => {
+  it('带不带前导斜杠、带不带参数都能解析', () => {
+    expect(parseCardCommandInput(dataset, '/give').token).toBe('give')
+    expect(parseCardCommandInput(dataset, '  Give ').def?.name).toBe('give')
+    expect(parseCardCommandInput(dataset, '/give 29 张三')).toMatchObject({
+      token: 'give',
+      args: '29 张三',
+    })
+    expect(parseCardCommandInput(dataset, 'g').def?.name).toBe('give')
+  })
+
+  it('空输入 / 未收录的指令', () => {
+    expect(parseCardCommandInput(dataset, '   ')).toMatchObject({ token: '', def: null })
+    expect(parseCardCommandInput(dataset, '/nope 1').def).toBeNull()
   })
 })

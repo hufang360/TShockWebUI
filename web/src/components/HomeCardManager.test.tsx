@@ -5,7 +5,7 @@ import { I18nProvider } from '@/lib/i18n'
 import { DEFAULT_HOME_CARDS, type HomeCardsPrefs } from '@/lib/homeCards'
 import { NO_INGAME } from '@/lib/ingame'
 import { makeDataset } from '@/test/fixtures'
-import { addCardThroughDialog, closeRowMenu, openRowMenu } from '@/test/managerSheet'
+import { addCardViaPanel, closeRowMenu, openRowMenu } from '@/test/managerSheet'
 import { HomeCardManager } from './HomeCardManager'
 
 function Harness({ initial = DEFAULT_HOME_CARDS }: { initial?: HomeCardsPrefs }) {
@@ -37,17 +37,17 @@ function openEditor(row: HTMLElement) {
   fireEvent.click(within(row).getByRole('button', { name: '编辑' }))
 }
 
-const addCard = addCardThroughDialog
+const addCard = addCardViaPanel
 
 afterEach(() => {
   localStorage.clear()
 })
 
 describe('HomeCardManager', () => {
-  it('添加走弹框（抽屉里不再展开表单）；行内徽标直接显示「自动执行」状态（不必进菜单）', async () => {
+  it('添加走抽屉里的两行面板；行内徽标直接显示「自动执行」状态（不必进菜单）', async () => {
     render(<Harness />)
     // 抽屉里没有内联表单。
-    expect(screen.queryByLabelText('卡片名称')).toBeNull()
+    expect(screen.queryByTestId('card-editor-panel')).toBeNull()
 
     // 内置卡片默认自动执行 → 行内是「自动执行」徽标。
     const row = screen.getByRole('listitem', { name: '游戏时间' })
@@ -64,9 +64,16 @@ describe('HomeCardManager', () => {
     ])
     await closeRowMenu()
 
-    // 点「添加卡片」开的是按需加载的弹框。
+    // 点「添加卡片」在抽屉里展开两行面板（名称+指令 / 操作按钮组+指令参数）。
     fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
-    expect(await screen.findByLabelText('搜索指令')).toBeTruthy()
+    const panel = await screen.findByTestId('card-editor-panel')
+    expect(within(panel).getByLabelText('名称')).toBeTruthy()
+    expect(within(panel).getByLabelText('指令')).toBeTruthy()
+    expect(within(panel).getByLabelText('左·小')).toBeTruthy()
+    expect(within(panel).getByRole('button', { name: '指令参数' })).toBeTruthy()
+    // 取消收起面板。
+    fireEvent.click(within(panel).getByRole('button', { name: '取消' }))
+    await waitFor(() => expect(screen.queryByTestId('card-editor-panel')).toBeNull())
   })
 
   it('点行内「自动执行」徽标即可切换成「不自动执行」', () => {
@@ -118,18 +125,23 @@ describe('HomeCardManager', () => {
     expect(last.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('添加按钮在选到指令前保持禁用', async () => {
+  it('面板的「添加」在填指令前保持禁用', async () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('button', { name: '添加卡片' }))
-    await screen.findByLabelText('搜索指令')
-    const add = screen.getByRole('button', { name: '添加' })
+    const panel = await screen.findByTestId('card-editor-panel')
+    const add = within(panel).getByRole('button', { name: '添加' })
     expect(add.hasAttribute('disabled')).toBe(true)
-    fireEvent.change(screen.getByLabelText('搜索指令'), { target: { value: '/time' } })
-    fireEvent.click(screen.getByRole('button', { name: '使用「/time」' }))
+
+    fireEvent.change(within(panel).getByLabelText('指令'), { target: { value: '/time' } })
     expect(add.hasAttribute('disabled')).toBe(false)
+
+    // 带参数的写法（/time 有参数表）不让提交：参数要在右侧配。
+    fireEvent.change(within(panel).getByLabelText('指令'), { target: { value: '/time night' } })
+    expect(add.hasAttribute('disabled')).toBe(true)
+    expect(within(panel).getByText(/指令只填指令名/)).toBeTruthy()
   })
 
-  it('弹框里可添加自定义卡片（默认小尺寸、不自动执行）', async () => {
+  it('面板里可添加自定义卡片（默认小尺寸、不自动执行）', async () => {
     render(<Harness />)
     await addCard('我的卡片', 'time')
     const row = screen.getByRole('listitem', { name: '我的卡片' })
@@ -252,7 +264,7 @@ describe('HomeCardManager', () => {
   it('自定义卡片指令输入框关联收藏指令的下拉候选', async () => {
     seedFavorites(['/time 12:00', '/who'])
     render(<Harness />)
-    await addCard('卡片', 'time')
+    await addCard('卡片', '/help')
     const row = screen.getByRole('listitem', { name: '卡片' })
     openEditor(row)
 
@@ -269,7 +281,7 @@ describe('HomeCardManager', () => {
 
   it('无收藏时指令输入框不关联下拉候选（不报错）', async () => {
     render(<Harness />)
-    await addCard('卡片', 'time')
+    await addCard('卡片', '/help')
     const row = screen.getByRole('listitem', { name: '卡片' })
     openEditor(row)
     const cmdInput = screen.getAllByPlaceholderText('/指令').find((el) => el.getAttribute('list'))

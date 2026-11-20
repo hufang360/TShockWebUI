@@ -347,3 +347,28 @@ export function cardRunState(dataset: Dataset, card: CardLike): CardRunState {
     resolved,
   }
 }
+
+// ── 指令输入框的解析（添加 / 编辑卡片面板用） ────────────────────────────────
+
+export interface CardCommandInput {
+  /** 去掉前导 `/` 的指令名（只取第一个词，小写）。 */
+  token: string
+  /** 指令名之后的原文（可能为空；参数卡片不该有）。 */
+  args: string
+  /** 指令库里对应的指令；没收录为 null。 */
+  def: CommandDef | null
+}
+
+/**
+ * 解析「指令」输入框：`/give`、`give`、`/give 29 张三` 都认。
+ *
+ * 参数卡片只接受指令名 —— 带了参数由调用方提示「参数请在「指令参数」里填」，
+ * 不去猜那些多出来的词该落到哪个参数上。
+ */
+export function parseCardCommandInput(dataset: Dataset, input: string): CardCommandInput {
+  const line = firstCommandLine(input).trim().replace(/^\/+/, '')
+  const match = /^(\S*)\s*([\s\S]*)$/.exec(line)
+  const token = (match?.[1] ?? '').toLowerCase()
+  const args = (match?.[2] ?? '').trim()
+  return { token, args, def: token ? (dataset.commandsByToken.get(token) ?? null) : null }
+}
