@@ -499,28 +499,23 @@ function ParamPopover({
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
+      {/* 锚点必须直接包一个 DOM 元素：包 TooltipProvider 这类无 DOM 的组件会丢锚点，浮层打不开。 */}
       <PopoverAnchor asChild>
-        <TooltipProvider delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={disabled}
-                onClick={() => onOpenChange(!open)}
-                aria-expanded={open}
-                aria-label={t('card.paramsButton')}
-                className="h-6 w-auto gap-0.5 px-1 text-muted-foreground hover:text-foreground"
-              >
-                <SlidersHorizontal className="size-3.5" aria-hidden />
-                {count > 0 && (
-                  <span className="text-2xs tabular-nums text-muted-foreground">{count}</span>
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t('card.paramsButton')}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={disabled}
+          onClick={() => onOpenChange(!open)}
+          aria-expanded={open}
+          aria-label={t('card.paramsButton')}
+          title={t('card.paramsButton')}
+          className="h-6 w-auto gap-0.5 px-1 text-muted-foreground hover:text-foreground"
+        >
+          <SlidersHorizontal className="size-3.5" aria-hidden />
+          {count > 0 && (
+            <span className="text-2xs tabular-nums text-muted-foreground">{count}</span>
+          )}
+        </Button>
       </PopoverAnchor>
       <PopoverContent
         align="end"

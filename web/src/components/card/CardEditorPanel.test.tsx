@@ -94,6 +94,14 @@ describe('CardEditorPanel', () => {
     expect(input.value).toBe('/give')
   })
 
+  it('点「指令参数」能打开浮层（回归：锚点被无 DOM 的组件包住时打不开）', async () => {
+    renderPanel()
+    fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'give' } })
+    fireEvent.click(screen.getByRole('button', { name: /指令参数/ }))
+    const popover = await screen.findByTestId('card-params-popover')
+    expect(within(popover).getByText('item type/id')).toBeTruthy()
+  })
+
   it('指令参数：按参数表配值，提交带上模板', async () => {
     const { onSubmit } = renderPanel()
     fireEvent.change(screen.getByLabelText('指令'), { target: { value: 'give' } })

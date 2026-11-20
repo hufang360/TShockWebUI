@@ -185,10 +185,7 @@ export function CommandCard({
         <CollapsibleTrigger asChild>
           {/* 整个头部可点击折叠；标题可鼠标选中复制（选中时不折叠）。 */}
           <CardHeader
-            className={cn(
-              'group/header shrink-0 cursor-pointer select-text [&_svg]:shrink-0 [&_svg:not([class*=\'size-\'])]:size-4',
-              paramForm && 'flex-wrap gap-x-2 gap-y-1',
-            )}
+            className="group/header shrink-0 cursor-pointer select-text [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
             role="button"
             tabIndex={0}
             aria-label={open ? t('result.collapse') : t('result.expand')}
@@ -206,17 +203,6 @@ export function CommandCard({
             <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-wide text-foreground select-text">
               {title}
             </span>
-            {/* 参数输入区在页头右侧：正文只留结果，卡片仍然「一眼能填、一眼能看」。 */}
-            {paramForm && (
-              <div
-                className="flex min-w-0 flex-wrap items-center justify-end gap-1.5"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                role="presentation"
-              >
-                {paramForm}
-              </div>
-            )}
             {/* 操作按钮：默认隐藏，hover 表头才显示；折叠时不显示；点击不触发折叠。 */}
             {open && (result || loading) && (
               <div
@@ -237,6 +223,11 @@ export function CommandCard({
             {/* 撑满剩余高度：卡片被同行更高的卡拉高时，多出来的空间留在灰底正文区里，
                 正文与卡片底部（或页脚备注 / 「上次刷新」）之间的间距保持和「Boss 进度」一样紧。 */}
             <div className="flex min-h-0 flex-1 flex-col">
+              {paramForm && (
+                <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {paramForm}
+                </div>
+              )}
               {unavailable ? (
                 <p className="text-xs text-muted-foreground">
                   {unavailableText ?? t('home.needLogin')}

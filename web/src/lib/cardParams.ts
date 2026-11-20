@@ -190,7 +190,8 @@ export function argPlaceholder(arg: CommandParam, lang: Lang): string {
     warp: ['传送点名', 'Warp'],
     group: ['用户组', 'Group'],
     permission: ['权限节点', 'Permission'],
-    command: ['指令名', 'Command'],
+    // 「指令」类型是参数（要查的那一条），别和卡片自己的指令混为一谈。
+    command: ['要查的指令名', 'Command to look up'],
     number: ['数字', 'Number'],
     text: ['文本', 'Text'],
   }

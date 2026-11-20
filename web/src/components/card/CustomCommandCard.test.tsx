@@ -40,6 +40,18 @@ describe('CustomCommandCard', () => {
     expect(onRun).toHaveBeenCalledWith('/who')
   })
 
+  it('参数卡片：输入区在卡片正文里（不放页头），控件不占满整行', () => {
+    const { container } = renderCard()
+    const form = screen.getByTestId('card-param-form')
+    expect(form.closest('[data-slot="card-body"]')).toBeTruthy()
+    // 页头里没有参数输入框。
+    const header = container.querySelector('[data-slot="card-header"]')
+    expect(header ? header.querySelector('[data-slot="card-param-field"]') : null).toBeNull()
+    // 输入框是固定宽度（不铺满一行）。
+    const input = screen.getByLabelText('player')
+    expect(input.className).toContain('w-24')
+  })
+
   it('参数卡片：渲染需要现场填的参数，页脚显示拼好的指令', () => {
     const { container } = renderCard()
     expect(screen.getByTestId('card-param-form')).toBeTruthy()
