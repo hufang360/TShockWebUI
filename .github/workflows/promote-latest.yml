@@ -1,0 +1,64 @@
+name: Promote latest
+
+# 把某个已发布的版本提升为 `latest`。
+#
+# 为什么需要它：`release.yml` 只在**正式版**（版本号不带 `-rc.`）时推 `latest`，
+# 预发布刻意不覆盖 `latest`。想临时把某个 rc 设为「当前推荐镜像」时，跑这个工作流即可
+# （在 registry 内直接复制 manifest，不重新构建，几秒钟完成）。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要提升为 latest 的版本（如 0.1.0-rc.12，可带 v 前缀）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Promote
+        env:
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          repo_lc=$(echo "$REPO" | tr '[:upper:]' '[:lower:]')
+          ghcr="ghcr.io/$repo_lc"
+          echo "::group::GHCR $ghcr:$version -> latest"
+          docker buildx imagetools create -t "$ghcr:latest" "$ghcr:$version"
+          docker buildx imagetools inspect "$ghcr:latest"
+          echo "::endgroup::"
+          if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+            dh="$DOCKERHUB_USERNAME/$(basename "$repo_lc")"
+            echo "::group::Docker Hub $dh:$version -> latest"
+            docker buildx imagetools create -t "$dh:latest" "$dh:$version"
+            docker buildx imagetools inspect "$dh:latest"
+            echo "::endgroup::"
+          else
+            echo "未配置 DOCKERHUB_* 密钥，跳过 Docker Hub"
+          fi
