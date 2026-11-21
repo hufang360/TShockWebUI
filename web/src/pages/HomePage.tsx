@@ -54,6 +54,13 @@ import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
 /** 「最近执行」最多展示几条（去重后）。 */
 const RECENT_LIMIT = 5
 
+/**
+ * 默认**不自动执行**的内置卡片：世界信息 / 我的背包。
+ * 它们变动频繁、只在需要时看，进页面顺手打两条指令不值（默认值而已：
+ * 在「管理卡片」里打开自动执行后照旧生效）。
+ */
+const MANUAL_BY_DEFAULT = new Set<string>(['world', 'lookbag'])
+
 interface HomePageProps {
   dataset: Dataset
   transport: BackendTransport
@@ -486,12 +493,13 @@ export function HomePage({
   )
 
   const customById = useMemo(() => new Map(prefs.custom.map((c) => [c.id, c])), [prefs.custom])
-  // 卡片是否「不自动执行」：内置卡默认自动，用户添加的卡片默认手动（只能点卡片自己的按钮跑）。
+  // 卡片是否「不自动执行」：内置卡默认自动，世界信息 / 我的背包默认手动，
+  // 用户添加的卡片默认手动（只能点卡片自己的按钮跑）。
   const cardIsManual = useCallback(
     (id: string) => {
       const card = customById.get(id)
       if (card && needsUserInput(card)) return true
-      return isManual(autoExec, `home:${id}`, isCustomCardId(id))
+      return isManual(autoExec, `home:${id}`, isCustomCardId(id) || MANUAL_BY_DEFAULT.has(id))
     },
     [autoExec, customById],
   )

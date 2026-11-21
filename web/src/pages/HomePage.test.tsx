@@ -190,11 +190,12 @@ describe('HomePage 卡片管理', () => {
     expect(screen.getAllByLabelText(/^参数\d+$/)).toHaveLength(1)
 
     // 缺必填项时按钮灰着：不发一条半截指令。
-    const run = screen.getByRole('button', { name: '执行' })
+    const cardEl = screen.getByText('给物品').closest('[data-slot="card"]') as HTMLElement
+    const run = within(cardEl).getByRole('button', { name: '执行' })
     expect(run.hasAttribute('disabled')).toBe(true)
 
     fireEvent.change(player, { target: { value: '张三' } })
-    fireEvent.click(screen.getByRole('button', { name: '执行' }))
+    fireEvent.click(within(cardEl).getByRole('button', { name: '执行' }))
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/give 29 张三'))
 
     // 输入的值写回本机（下次打开还是这个值）。
@@ -226,20 +227,32 @@ describe('HomePage 卡片管理', () => {
     expect(stored.byServer?.builtin.custom).toHaveLength(0)
   })
 
-  it('刷新按实际卡片顺序串行执行（自定义卡片默认不参与）', async () => {
+  it('自动刷新只跑「自动执行」的卡片（世界信息 / 我的背包默认手动）', async () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
     seedHomeCards({ ...DEFAULT_HOME_CARDS, order: [card.id, ...DEFAULT_HOME_CARDS.order], custom: [card] })
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    // 等最后一条内置卡片执行完，检查整体调用顺序（v4 默认顺序：世界信息在在线玩家之前）。
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/alldeath'))
+    // 等最后一条自动卡片执行完，检查整体调用顺序（按首页卡片顺序）。
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
     const calls = runCommand.mock.calls.map((c) => c[0])
-    expect(calls[0]).toBe('/worldinfo')
-    expect(calls[1]).toBe('/lookbag Alice')
-    expect(calls[2]).toBe('/who')
-    // 自定义卡片默认手动：自动刷新不碰它。
+    expect(calls).toEqual(['/who', '/time', '/alldeath', '/bossdamage', '/bossinfo'])
+    // 世界信息 / 我的背包默认手动、自定义卡片默认手动：自动刷新都不碰。
+    expect(calls).not.toContain('/worldinfo')
+    expect(calls).not.toContain('/lookbag Alice')
     expect(calls).not.toContain('/fish 鲈鱼')
+  })
+
+  it('世界信息 / 我的背包默认手动：卡片显示「执行」，点了才跑', async () => {
+    const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
+    renderPage(fakeTransport(runCommand))
+
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
+    const worldCard = screen.getByText('世界信息').closest('[data-slot="card"]') as HTMLElement
+    expect(within(worldCard).getByText('等待执行…')).toBeTruthy()
+    fireEvent.click(within(worldCard).getByRole('button', { name: '执行' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/worldinfo'))
+    expect(runCommand.mock.calls.some(([cmd]) => cmd === '/lookbag Alice')).toBe(false)
   })
 
   it('不自动执行的卡片没结果时显示「等待执行…」', async () => {

@@ -19,6 +19,7 @@ import { makeDataset } from '@/test/fixtures'
 import { playerStubs } from '@/test/playerStubs'
 import type { BackendTransport, FishGood, FishShop } from '@/lib/tshock'
 import { TshockRequestError } from '@/lib/tshock'
+import { FISH_SHELF_CACHE_VERSION, FISH_SHELF_STALE_MS } from '@/lib/fishShelfCache'
 import { FishShopPage } from './FishShopPage'
 
 const GOOD: FishGood = {
@@ -643,13 +644,69 @@ describe('FishShopPage', () => {
     expect(screen.queryByText('需安装 鱼店 插件，无法获取货架数据。')).toBeNull()
   })
 
-  it('离开后再进入页面会重新拉货架（不受刷新间隔闸门影响）', async () => {
+  it('再次进入页面直接读缓存：不再请求货架，也不再探测插件', async () => {
+    const fishCapabilities = vi.fn(async () => ({ plugin: true, rest: true, permission: true }))
     const fishList = vi.fn(async () => shopOf([GOOD]))
-    const first = renderPage(fakeTransport({ fishList }))
+    const first = renderPage(fakeTransport({ fishCapabilities, fishList }))
     await screen.findAllByText('生命水晶')
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(1))
     first.unmount()
+
+    // 货架是配置数据：本机存着就用它，进页面 0 次上游请求。
+    renderPage(fakeTransport({ fishCapabilities, fishList }))
+    expect(await screen.findByText('生命水晶')).toBeTruthy()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fishList).toHaveBeenCalledTimes(1)
+    expect(fishCapabilities).toHaveBeenCalledTimes(1)
+  })
+
+  it('货架超过 24 小时没更新：时间戳用 warning 色', async () => {
+    const at = Date.now() - FISH_SHELF_STALE_MS - 60_000
+    localStorage.setItem(
+      'tswui:fishShelf',
+      JSON.stringify({
+        byServer: {
+          default: {
+            version: FISH_SHELF_CACHE_VERSION,
+            at,
+            shop: shopOf([GOOD]),
+            capability: { plugin: true, rest: true, permission: true },
+          },
+        },
+      }),
+    )
+    const fishList = vi.fn(async () => shopOf([GOOD]))
     renderPage(fakeTransport({ fishList }))
-    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
+
+    expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
+    expect(screen.getByTestId('fish-shelf-updated').className).toContain('text-warning')
+    expect(fishList).not.toHaveBeenCalled()
+  })
+
+  it('货架缓存是新的：时间戳常态色；点「刷新货架」才重拉', async () => {
+    localStorage.setItem(
+      'tswui:fishShelf',
+      JSON.stringify({
+        byServer: {
+          default: {
+            version: FISH_SHELF_CACHE_VERSION,
+            at: Date.now(),
+            shop: shopOf([GOOD]),
+            capability: { plugin: true, rest: true, permission: true },
+          },
+        },
+      }),
+    )
+    const fishList = vi.fn(async () => shopOf([GOOD]))
+    renderPage(fakeTransport({ fishList }))
+
+    expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
+    const stamp = screen.getByTestId('fish-shelf-updated')
+    expect(stamp.className).not.toContain('text-warning')
+    expect(fishList).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId('fish-shelf-refresh'))
+    await waitFor(() => expect(fishList).toHaveBeenCalledTimes(1))
   })
 
   it('服务类商品用 icon 字段配置的图标（desc 无 [i:..] 也能显示）', async () => {
@@ -761,57 +818,54 @@ describe('FishShopPage', () => {
     expect(within(dialog).getByText('参数（2 个，用空格分隔）')).toBeTruthy()
   })
 
-  it('个人状态：先按 self=1 拉货架，拿不到就静默退回普通货架', async () => {
-    const fishList = vi
-      .fn()
-      .mockRejectedValueOnce(new TshockRequestError('validation', '玩家 Alice 不在线，请先进入游戏', 400))
-      .mockResolvedValue(shopOf([GOOD]))
+  it('货架不带 self 拉取：个人限购 / 冷却交给购买时上游判', async () => {
+    const fishList = vi.fn(async () => shopOf([GOOD]))
     renderPage(fakeTransport({ fishList }))
 
     expect(await screen.findByRole('button', { name: '生命水晶' })).toBeTruthy()
-    // 不在线不是错误：页面上不该出现那条文案
-    expect(screen.queryByText(/不在线/)).toBeNull()
-    // 第一次要个人状态，失败后第二次退回不带 self 的普通货架。
-    expect(fishList.mock.calls[0][0]).toEqual({ self: true })
-    expect(fishList.mock.calls[1]).toEqual([])
+    expect(fishList).toHaveBeenCalledTimes(1)
+    // 不带任何参数 = 普通货架（不再为了个人状态多打一次）。
+    expect(fishList.mock.calls[0]).toEqual([])
   })
 
-  it('个人状态：显示还能买几次 / 冷却剩余', async () => {
-    const good: FishGood = { ...GOOD, limit: 3, myCount: 2, myRemain: 1, myCdRemain: 30 }
+  it('详情只展示静态限制，不展示「还能买几次」（那要看购买时的结果）', async () => {
+    const good: FishGood = { ...GOOD, limit: 3 }
     renderPage(fakeTransport({ fishList: async () => shopOf([good]) }))
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText('我的进度')).toBeTruthy()
-    expect(within(dialog).getByText(/还能买 1 次/)).toBeTruthy()
-    expect(within(dialog).getByText(/冷却中，还需 30 秒/)).toBeTruthy()
+    // 静态上限照旧显示
+    expect(within(dialog).getByText(/每人限购 3 次/)).toBeTruthy()
+    // 个人进度不在了（货架不带 self）
+    expect(within(dialog).queryByText('我的进度')).toBeNull()
+    expect(within(dialog).queryByText(/还能买/)).toBeNull()
     expect((within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('买完刷新货架后，弹框里的「我的进度」跟着更新', async () => {
-    let remain = 1
-    const fishList = vi.fn(async () =>
-      shopOf([{ ...GOOD, limit: 3, myRemain: remain, myCount: 3 - remain }]),
-    )
-    const fishBuy = vi.fn(async () => {
-      remain = 0
-      return { serial: 1, name: '生命水晶', amount: 1, requested: 1, refunded: false, cost: '5 金币' }
-    })
+  it('买完不重拉货架（货架是配置快照，购买不会改它）', async () => {
+    const fishList = vi.fn(async () => shopOf([GOOD]))
+    const fishBuy = vi.fn(async () => ({
+      serial: 1,
+      name: '生命水晶',
+      amount: 1,
+      requested: 1,
+      refunded: false,
+      cost: '5 金币',
+    }))
     renderPage(fakeTransport({ fishList, fishBuy }))
 
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText(/还能买 1 次/)).toBeTruthy()
-
     fireEvent.click(within(dialog).getByRole('button', { name: '购买' }))
     fireEvent.click(await within(dialog).findByRole('button', { name: '确认购买' }))
+    await waitFor(() => expect(fishBuy).toHaveBeenCalled())
 
-    // 刷新后回到「还能买 0 次」（货架只报进度，买没买成看 buy 的结果）
-    await waitFor(() => expect(within(dialog).getByText(/还能买 0 次/)).toBeTruthy())
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fishList).toHaveBeenCalledTimes(1)
   })
 
   it('货架不预判能不能买：点购买后由上游在 buy 时报原因', async () => {
     // 限购已满也不在货架上拦（快照会过期），按钮照常能点，原因来自 buy 的报错。
-    const good: FishGood = { ...GOOD, limit: 3, myCount: 3, myRemain: 0 }
+    const good: FishGood = { ...GOOD, limit: 3 }
     renderPage(
       fakeTransport({
         fishList: async () => shopOf([good]),
@@ -822,7 +876,6 @@ describe('FishShopPage', () => {
     )
     fireEvent.click(await screen.findByRole('button', { name: '生命水晶' }))
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText(/还能买 0 次/)).toBeTruthy()
     const buy = within(dialog).getByRole('button', { name: '购买' }) as HTMLButtonElement
     expect(buy.disabled).toBe(false)
 
@@ -1485,12 +1538,13 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
-    // 服主在前面插了一件新商品：生命水晶 的 serial 从 1 变成 5，而 #1 现在是别的东西。
+    // 服主前面插了一件新商品：生命水晶 的 serial 从 1 变成 5，而 #1 现在是别的东西。
     goods = [
       { ...GOOD, serial: 1, id: 30, name: '别的东西', desc: '[i:30] 别的东西' },
       { ...GOOD, serial: 5 },
     ]
-    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    // 货架是配置数据：改了配置后手动「刷新货架」重拉。
+    fireEvent.click(screen.getByTestId('fish-shelf-refresh'))
     await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
 
     fireEvent.click(screen.getByTestId('fish-tab-favorite'))
@@ -1514,7 +1568,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
 
     // 货架上没有这件了
     goods = [{ ...GOOD, serial: 9, id: 30, name: '别的商品', desc: '[i:30] 别的商品' }]
-    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    fireEvent.click(screen.getByTestId('fish-shelf-refresh'))
     await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
 
     fireEvent.click(screen.getByTestId('fish-tab-favorite'))
@@ -1608,6 +1662,9 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     // 空分组不出现（不留死入口）
     expect(screen.queryByTestId('fish-cat-fishing')).toBeNull()
     expect(screen.queryByTestId('fish-cat-reforge')).toBeNull()
+    // 第一条固定是「全部」= 不筛分组，条数就是整张货架的数量
+    expect(screen.getAllByRole('menuitem')[0].getAttribute('data-testid')).toBe('fish-cat-all')
+    expect(screen.getByTestId('fish-cat-count-all').textContent).toBe('4')
     // 每个条目带该分组的物品图标；数量紧跟在名称后面，右侧留空 / 给对钩
     const dungeonItem = screen.getByTestId('fish-cat-dungeon')
     expect(dungeonItem.querySelector('canvas')).toBeTruthy()
@@ -1693,11 +1750,12 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     fireEvent.change(search, { target: { value: '生命' } })
     await screen.findByText('这个分组下暂时没有商品')
 
-    // 清掉搜索词，点旁边的 × = 取消分组
+    // 清掉搜索词，在菜单里点第一项「全部」= 取消分组（组旁不再有 × 按钮）
     fireEvent.change(search, { target: { value: '' } })
-    fireEvent.click(screen.getByTestId('fish-category-clear'))
-    await waitFor(() => expect(screen.getByRole('button', { name: '生命水晶' })).toBeTruthy())
     expect(screen.queryByTestId('fish-category-clear')).toBeNull()
+    await pickCategory('all')
+    await waitFor(() => expect(screen.getByRole('button', { name: '生命水晶' })).toBeTruthy())
+    expect(screen.getByTestId('fish-category').textContent).toContain('分组')
 
     // 再选一次，然后在菜单里再点同一项 = 也取消
     await pickCategory('dungeon')
@@ -1785,13 +1843,18 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
   })
 
-  it('顶栏「刷新全部」同时刷新货架（输入框里不再有刷新按钮）', async () => {
+  it('顶栏「刷新全部」只刷卡片；货架由「刷新货架」手动拉', async () => {
     const fishList = vi.fn(async () => shopOf([GOOD]))
     renderPage(fakeTransport({ fishList }))
     await screen.findByRole('button', { name: '生命水晶' })
     await waitFor(() => expect(fishList).toHaveBeenCalledTimes(1))
 
+    // 卡片的「刷新全部」不碰货架。
     fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fishList).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByTestId('fish-shelf-refresh'))
     await waitFor(() => expect(fishList).toHaveBeenCalledTimes(2))
   })
 })

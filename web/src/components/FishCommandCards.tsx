@@ -100,12 +100,6 @@ interface FishCommandCardsProps {
   /** token 失效 → 弹出登录框；返回是否重登成功。 */
   onTokenInvalid: () => Promise<boolean>
   /**
-   * 「刷新全部」被**手动**点下时额外要做的事（鱼店页用它同时刷新货架）。
-   *
-   * 只在 `force`（人手点击）时调用，自动刷新不会触发 —— 否则进页面会重复拉一次货架。
-   */
-  onManualRefresh?: () => void
-  /**
    * 「重载配置」执行成功后回调：服主改完货架，重载完就该重新拉一次货架，
    * 否则页面上还是旧的价格 / 旧的商品。
    */
@@ -147,7 +141,6 @@ export function FishCommandCards({
   serverId,
   refreshInterval,
   onTokenInvalid,
-  onManualRefresh,
   onConfigReloaded,
   onContentChange,
   ingame,
@@ -341,8 +334,6 @@ export function FishCommandCards({
       const scope = refreshScope(serverId, 'fish')
       if (!force && !isRefreshDue(scope, refreshInterval)) return
       setLastRefreshAt(markRefreshed(scope))
-      // 手动刷新连货架一起刷（顶栏只有一个刷新按钮 —— 输入框那边不再重复放一个）。
-      if (force) onManualRefresh?.()
       // 只刷新「显示着的 + 自动执行」的卡片（隐藏的 / 手动的只能点卡片自己的按钮）。
       // 只刷新「显示着的 + 自动执行 + 有指令」的卡片（隐藏 / 手动 / 记事本都不跑）。
       const runnable = entries.filter(
@@ -382,7 +373,6 @@ export function FishCommandCards({
       runOne,
       serverId,
       refreshInterval,
-      onManualRefresh,
     ],
   )
 

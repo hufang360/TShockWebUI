@@ -16,7 +16,6 @@ import {
   ShieldAlert,
   ShoppingCart,
   Star,
-  X,
 } from 'lucide-react'
 import { IconAction } from '@/components/IconAction'
 import { SettingsPopoverHeader } from '@/components/SettingsPopoverHeader'
@@ -103,15 +102,27 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   ToggleGroup,
   ToggleGroupItem,
 } from '@/components/ui'
+import { useLocalState } from '@/hooks/useLocalState'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useModuleState } from '@/hooks/useModuleState'
+import { useNow } from '@/hooks/useNow'
+import { formatClockWithDate, formatShortClock, formatShortDateTime } from '@/lib/clock'
 import { useDataset } from '@/lib/datasetContext'
+import {
+  EMPTY_FISH_SHELF_STORE,
+  isShelfStale,
+  readFishShelfCache,
+  writeFishShelfCache,
+  type FishShelfStore,
+} from '@/lib/fishShelfCache'
 import { useI18n } from '@/lib/i18n'
 import { useSearchIntent } from '@/lib/searchIntent'
+import { StorageKeys } from '@/lib/storage'
 
 import { TshockRequestError } from '@/lib/tshock'
 import type { BackendTransport, FishBuyResult, FishCapabilities, FishGood, FishShop } from '@/lib/tshock'
@@ -127,6 +138,10 @@ import type { BackendTransport, FishBuyResult, FishCapabilities, FishGood, FishS
  *   - /api/fish/list → 货架（含 icon / iconId / buyMax / needArgs / argCount / 限购与时机）
  *   - /api/fish/buy  → 为自己购买
  *
+ * 货架是**配置快照**：拉到一次就存本机（按服务器，见 `lib/fishShelfCache.ts`），
+ * 只有手动「刷新货架」与 `/fish reload` 成功后才重拉 — 服主改完配置通知玩家点一下即可。
+ * 个人限购 / 冷却由购买时上游当场判，所以请求不带 `self`。
+ *
  * 插件版本过旧（v1.6.2 之前只有游戏内指令）或没权限时，左侧只显示提示；
  * 右侧指令卡片只走 rawcmd，不依赖 REST，因此照常可用。
  */
@@ -135,7 +150,7 @@ interface FishShopPageProps {
   serverId: string
   transport: BackendTransport
   authenticated: boolean
-  /** 页面数据自动刷新间隔（毫秒，0 = 不自动刷新）。 */
+  /** 右侧指令卡片的自动刷新间隔（毫秒，0 = 不自动刷新）。货架不参与：它只在手动刷新 / 重载配置时重拉。 */
   refreshInterval: number
   /** 哪些 `allowServer=false` 的指令能在网页执行（右侧卡片添加弹框用）。 */
   ingame: IngamePolicy
@@ -203,7 +218,7 @@ export function FishShopPage({
   onTokenInvalid,
   onLogin,
 }: FishShopPageProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const dataset = useDataset()
   const [ui, setUi] = useModuleState<FishUiState>(serverId, 'store', DEFAULT_STATE)
 
@@ -224,6 +239,23 @@ export function FishShopPage({
   const [shop, setShop] = useState<FishShop | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 货架是配置快照：缓存在本机（按服务器分开），有缓存就不再请求。
+  const [shelfStore, setShelfStore] = useLocalState<FishShelfStore>(
+    StorageKeys.fishShelf,
+    EMPTY_FISH_SHELF_STORE,
+  )
+  const shelfStoreRef = useRef(shelfStore)
+  useEffect(() => {
+    shelfStoreRef.current = shelfStore
+  }, [shelfStore])
+  /** 货架上次拉到的时间（ms）；null = 还没有货架。 */
+  const [shelfAt, setShelfAt] = useState<number | null>(null)
+  /** 已经为哪台服务器自动拉过一次（避免持续失败时无限重试；登出 / 换服时重置）。 */
+  const autoFetchedFor = useRef<string | null>(null)
+  // 每分钟重算一次：跨过 24 小时后「更新于 …」要自己变成警告色。
+  const now = useNow(60_000)
+  const shelfStale = isShelfStale(shelfAt, now)
 
   // 详情弹框：`selectedSnapshot` 只是「点了哪一条」，真正展示/购买用的是派生出来的
   // `selected`（同一 serial 的最新货架数据）——这样刷新货架后「我的进度」「能不能买」
@@ -312,8 +344,25 @@ export function FishShopPage({
     }
   }, [authenticated, transport, onTokenInvalid, kindMessage])
 
-  // serverId 也进依赖：切换服务器要重新探（插件 / 权限可能不同）。
+  // 能力 / 货架的写入方，给「拉完货架顺手把缓存写掉」用（避免给 loadShop 多加依赖）。
+  const capabilityRef = useRef<FishCapabilities | null>(null)
   useEffect(() => {
+    capabilityRef.current = capability
+  }, [capability])
+
+  // 进入页面 / 切换服务器 / 登入登出：有货架缓存就直接换上（连能力一起），**不发任何请求**。
+  useEffect(() => {
+    autoFetchedFor.current = null
+    const hit = authenticated ? readFishShelfCache(shelfStoreRef.current, serverId) : null
+    setCapability(hit?.capability ?? null)
+    setShop(hit?.shop ?? null)
+    setShelfAt(hit?.at ?? null)
+    setProbeError(null)
+  }, [authenticated, serverId])
+
+  // 没有缓存才探测插件（serverId 也进依赖：切换服务器要重新探，插件 / 权限可能不同）。
+  useEffect(() => {
+    if (readFishShelfCache(shelfStoreRef.current, serverId)) return
     void probe()
   }, [serverId, probe])
 
@@ -325,40 +374,34 @@ export function FishShopPage({
     setLoading(true)
     setError(null)
     try {
-      // 先要「个人状态」（self=1）：能知道「还能买几次 / 冷却还剩几秒 / 为什么不能买」。
-      // 它要求玩家在游戏里在线，不在线时上游 400 → 静默退回普通货架，不打扰玩家。
-      let data: FishShop
-      try {
-        data = await transport.fishList({ self: true })
-      } catch (err) {
-        if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) throw err
-        data = await transport.fishList()
-      }
+      // 不带 `self`：货架是配置快照，个人限购 / 冷却由购买（`/fishshop/buy`）当场判。
+      const data = await transport.fishList()
+      const at = Date.now()
       setShop(data)
+      setShelfAt(at)
+      const cap = capabilityRef.current
+      if (cap) {
+        setShelfStore((prev) => writeFishShelfCache(prev, serverId, { at, shop: data, capability: cap }))
+      }
     } catch (err) {
       if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
         onTokenInvalid()
       }
-      setShop(null)
+      // 拉失败时保留上一次的货架（缓存里的也算），别把已经看到的商品清成空白。
       setError(kindMessage(err))
     } finally {
       setLoading(false)
     }
-  }, [transport, onTokenInvalid, kindMessage])
+  }, [transport, onTokenInvalid, kindMessage, serverId, setShelfStore])
 
-  // 进入页面（含从其它页面切回来）总是拉一次货架：货架是组件内状态，离开页面即丢弃，
-  // 若也走「刷新间隔」闸门就会出现「2 分钟内回到鱼店一片空白」。
+  // 货架为空才主动拉一次（首次进入 / 换服务器 / 缓存被清）。之后只有手动刷新与重载配置会重拉：
+  // 正常的再次进入命中缓存 → 0 次请求。
   useEffect(() => {
-    if (!canUse) return
+    if (!authenticated || !canUse || shop) return
+    if (autoFetchedFor.current === serverId) return
+    autoFetchedFor.current = serverId
     void loadShop()
-  }, [canUse, loadShop, serverId])
-
-  // 停留在页面时按「页面数据刷新间隔」自动刷新货架（0 = 不自动刷新）。
-  useEffect(() => {
-    if (!canUse || refreshInterval <= 0) return
-    const timer = setInterval(() => void loadShop(), refreshInterval)
-    return () => clearInterval(timer)
-  }, [canUse, refreshInterval, loadShop, serverId])
+  }, [authenticated, canUse, shop, serverId, loadShop])
 
   const openDetail = useCallback((good: FishGood) => {
     setSelected(good)
@@ -494,9 +537,8 @@ export function FishShopPage({
     [needArgs],
   )
 
-  // 个人进度（只有货架带 `myCount` 时才有；没带 = 这次没要 self，不显示进度）。
-  const hasSelfState = selected?.myCount !== undefined
-  // 能否购买由上游 `buy` 当场判：货架只是快照，NPC 在场 / 昼夜 / 生态这些都可能在两次刷新之间变。
+  // 能否购买由上游 `buy` 当场判：货架只是配置快照，NPC 在场 / 昼夜 / 生态 / 个人限购与冷却
+  // 都可能在两次刷新之间变。
   // 降级条目：商品自身配置有误时插件只回基础字段（其余为空），点进去也买不了。
   const degraded = isDegradedGood(selected)
   // 从「买过 / 收藏」打开、但货架上已经没有这件：只能看快照，不能买。
@@ -514,20 +556,6 @@ export function FishShopPage({
   }, [selected, selectedSnapshot, favoriteStamps])
   // 建造类商品（鱼池 / 小房间 / 钓棚）多一张注解图：站哪个位置、上下几格、左右误差多少。
   const diagram = diagramUrl(selected)
-  const personalNotes: string[] = []
-  if (hasSelfState) {
-    if ((selected?.myRemain ?? -1) >= 0) {
-      personalNotes.push(t('fish.myRemain', { n: selected?.myRemain ?? 0 }))
-    }
-    if ((selected?.serverRemain ?? -1) >= 0) {
-      personalNotes.push(t('fish.serverRemain', { n: selected?.serverRemain ?? 0 }))
-    }
-    if ((selected?.myCdRemain ?? 0) > 0) {
-      personalNotes.push(t('fish.myCd', { n: selected?.myCdRemain ?? 0 }))
-    } else if ((selected?.serverCdRemain ?? 0) > 0) {
-      personalNotes.push(t('fish.serverCdRemain', { n: selected?.serverCdRemain ?? 0 }))
-    }
-  }
   // 限购 / 冷却 / 时机：插件给的都是**静态上限**（"你还剩几次"只有购买时才知道），只做展示。
   const limitLines: string[] = []
   if (selected?.allowGroup?.length) {
@@ -579,7 +607,6 @@ export function FishShopPage({
       // 冷却数秒：按钮禁用 + 提示闪烁，避免玩家连点重复购买。
       // 没发货（已自动全额退款）时不给冷却：什么都没拿到，让人干等 3 秒只会莫名其妙。
       setBuyCooldown(res.refunded === true ? 0 : 3)
-      void loadShop()
     } catch (err) {
       if (err instanceof TshockRequestError && (err.kind === 'token' || err.kind === 'auth')) {
         onTokenInvalid()
@@ -596,7 +623,6 @@ export function FishShopPage({
     buyAmount,
     needArgs,
     args,
-    loadShop,
     onTokenInvalid,
     kindMessage,
     rememberPurchase,
@@ -985,7 +1011,8 @@ export function FishShopPage({
             )}
           >
             {/* 左：页签（全部 / 买过 / 收藏）+ 分组。
-                分组照抄「物品 ID」那一颗：竖线 + 幽灵按钮（`ListFilter` 图标 + 文字） + 选中的 ×。
+                分组照抄「物品 ID」那一颗：竖线 + 幽灵按钮（`ListFilter` 图标 + 文字）。
+                取消分组走菜单第一项「全部」（不另占一颗 × 按钮）。
                 页签与分组二选一：选中分组时不再有任何页签处于选中态，点「全部」就回到整张货架。 */}
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground sm:w-auto">
               <div className="flex min-w-0 flex-wrap items-center rounded-container bg-accent p-0.5">
@@ -1051,6 +1078,25 @@ export function FishShopPage({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="min-w-48">
+                      {/* 「全部」= 不筛分组（与页签的「全部」同一个意思）。 */}
+                      <DropdownMenuItem
+                        data-testid="fish-cat-all"
+                        onSelect={() => setUi({ category: undefined })}
+                        className="gap-2"
+                      >
+                        <ListFilter className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate" data-testid="fish-cat-name-all">
+                          {t('fish.tab.all')}
+                        </span>
+                        <span
+                          className="tabular-nums text-muted-foreground"
+                          data-testid="fish-cat-count-all"
+                        >
+                          {sourceGoods.length}
+                        </span>
+                        {!category && <Check className="ml-auto size-3.5 shrink-0" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       {visibleCategories.map(({ id, iconId, count }) => (
                         <DropdownMenuItem
                           key={id}
@@ -1079,16 +1125,36 @@ export function FishShopPage({
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  {category && (
-                    <IconAction
-                      size="icon-xs"
-                      label={t('fish.categoryClear')}
-                      icon={X}
-                      testId="fish-category-clear"
-                      onClick={() => setUi({ category: undefined })}
-                    />
-                  )}
                 </>
+              )}
+            </div>
+
+            {/* 货架是配置快照：只在手动刷新 / 重载配置后重拉。
+                「更新于 …」超过 24 小时变 warning 色 —— 服主可能改了价格但还没人重拉。 */}
+            <div className="flex items-center gap-1">
+              <IconAction
+                size="icon-xs"
+                label={t('fish.shelfRefresh')}
+                icon={RefreshCw}
+                loading={loading}
+                testId="fish-shelf-refresh"
+                onClick={() => void loadShop()}
+              />
+              {shelfAt != null && (
+                <span
+                  data-testid="fish-shelf-updated"
+                  className={cn(
+                    'text-2xs tabular-nums',
+                    shelfStale ? 'text-warning' : 'text-muted-foreground',
+                  )}
+                  title={shelfStale ? t('fish.shelfStaleHint') : formatClockWithDate(lang, shelfAt)}
+                >
+                  {t('fish.shelfUpdated', {
+                    time: shelfStale
+                      ? formatShortDateTime(lang, shelfAt)
+                      : formatShortClock(lang, shelfAt),
+                  })}
+                </span>
               )}
             </div>
 
@@ -1207,8 +1273,6 @@ export function FishShopPage({
             players={players}
             runtimeValues={runtimeValues}
             onTokenInvalid={onTokenInvalid}
-            // 顶栏那个「刷新全部」同时刷新货架（输入框里不再单独放刷新按钮）。
-            onManualRefresh={() => void loadShop()}
             // 执行 `/fish reload` 之后货架已经变了：重新拉一次，别让页面停在旧价格上。
             onConfigReloaded={() => void loadShop()}
           />
@@ -1255,9 +1319,6 @@ export function FishShopPage({
                 <DetailField label={t('fish.cost')}>
                   {selected.cost.trim() ? renderRich(selected.cost) : renderRich(t('fish.free'))}
                 </DetailField>
-                {personalNotes.length > 0 && (
-                  <DetailField label={t('fish.myState')}>{renderRichLines(personalNotes)}</DetailField>
-                )}
                 {selected.unlock.trim() && (
                   <DetailField label={t('fish.unlock')}>{renderRich(selected.unlock)}</DetailField>
                 )}

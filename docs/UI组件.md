@@ -303,7 +303,8 @@
 ## 页面数据刷新间隔（设置）
 
 - 「设置 → 页面数据刷新间隔」存于 `settings.refreshInterval`（毫秒，`0` = 不自动刷新），控制：首页自动刷新全部、
-  鱼店货架、鱼店右侧指令卡片刷新全部。
+  鱼店右侧指令卡片刷新全部。**鱼店货架不参与**（它是配置快照，只在手动「刷新货架」/`/fish reload` 成功后重拉，
+  见 [`插件-鱼店.md`](插件-鱼店.md) §4）。
 - 另有「设置 → 服务器动态刷新间隔」（`settings.eventsRefreshInterval`，1/3/5/15 分钟）：控制服务器动态轮询；
   **1 分钟仅 `GM` / `superadmin` / `vip` 组可选**（设置页拉 `/api/me` 得到组名）。
 - 门控在 `lib/refreshGate.ts`：按 `服务器:模块`（`home` / `shelf` / `fish` / `panel:*`）分别记「上次刷新全部」时间；
@@ -328,7 +329,8 @@
 - **自动执行偏好**（`tswui:autoExec`，`lib/autoExec.ts`，key 如 `home:<id>` / `world:fixed:/relive`）：
   关闭后该卡片不随自动刷新 /「刷新全部」执行，只能点自己的按钮。首页「管理卡片」和模块「管理卡片」都有这个开关
   （在每行行尾的「更多设置」菜单里；关掉的卡片行内会多一个「手动」芯片）；
-  首页默认开，世界管理的 `/relive`、`/cleartomb` 默认关（`ModuleCardDef.manual`）。
+  首页默认开，世界管理的 `/relive`、`/cleartomb` 默认关（`ModuleCardDef.manual`）；
+  首页的「世界信息」与「我的背包」也默认关（数据变得快、只在需要时看，`HomePage` 的 `MANUAL_BY_DEFAULT`）。
 - **参数卡片恒为手动执行**：卡片上有「每次填写」的参数时（`lib/cardParams.ts` 的 `needsUserInput`），
   它不参与自动刷新 /「刷新全部」/「统一执行」，管理列表里的「自动执行」开关**置灰**并提示原因
   （拿上次的值替你跑 `/give` 不是「省事」，是替你做决定）。

@@ -399,18 +399,16 @@ export class MockTransport implements BackendTransport {
     return { plugin: true, rest: true, permission: true }
   }
 
-  async fishList(opts?: { self?: boolean }): Promise<FishShop> {
+  async fishList(): Promise<FishShop> {
     await delay(220)
-    // self=1：Mock 直接给「个人状态」，方便看详情里的「还能买几次 / 冷却」。
-    const goods = opts?.self ? MOCK_GOODS.map((g) => ({ ...g, ...mockSelfState(g) })) : MOCK_GOODS
-    return { name: 'Mock 鱼店', total: goods.length, goods }
+    return { name: 'Mock 鱼店', total: MOCK_GOODS.length, goods: MOCK_GOODS }
   }
 
-  async fishAsk(serial: number, opts?: { self?: boolean }): Promise<FishGood> {
+  async fishAsk(serial: number): Promise<FishGood> {
     await delay(160)
     const good = MOCK_GOODS.find((g) => g.serial === serial)
     if (!good) throw new TshockRequestError('validation', `没有这个商品: ${serial}`)
-    return { ...good, allowGroup: ['所有用户组'], ...(opts?.self ? mockSelfState(good) : {}) }
+    return { ...good, allowGroup: ['所有用户组'] }
   }
 
   async fishBuy(serial: number, amount: number, _args?: string): Promise<FishBuyResult> {
@@ -665,24 +663,6 @@ const MOCK_GOODS: FishGood[] = [
     cmds: ['/igen pond water'],
   },
 ]
-
-/** Mock 的「个人进度」（对照插件 `?self=1` 的 6 个字段；能不能买不在这里判）。 */
-function mockSelfState(good: FishGood): Pick<
-  FishGood,
-  'myCount' | 'serverCount' | 'myRemain' | 'serverRemain' | 'myCdRemain' | 'serverCdRemain'
-> {
-  const myCount = 1
-  const myRemain = (good.limit ?? 0) > 0 ? Math.max(0, (good.limit ?? 0) - myCount) : -1
-  const serverRemain = (good.serverLimit ?? 0) > 0 ? Math.max(0, (good.serverLimit ?? 0) - 1) : -1
-  return {
-    myCount,
-    serverCount: 1,
-    myRemain,
-    serverRemain,
-    myCdRemain: 0,
-    serverCdRemain: 0,
-  }
-}
 
 /** Mock 背包：固定几个格子（索引同 TShock NetItem 布局）。 */
 function mockInventory(): PlayerItem[] {

@@ -22,6 +22,26 @@ export function formatClock(lang: Lang, date: Date | number): string {
   })
 }
 
+/** 时 / 分（不含秒）：给「更新于 …」这类状态文案用。 */
+export function formatShortClock(lang: Lang, date: Date | number): string {
+  return new Date(date).toLocaleTimeString(localeOf(lang), {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+/** 日期 + 时 / 分：跨天的时间戳（如「11/20 20:08」）。 */
+export function formatShortDateTime(lang: Lang, date: Date | number): string {
+  return new Date(date).toLocaleString(localeOf(lang), {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
 /** 时钟 + 日期（用于 title 悬浮提示）。 */
 export function formatClockWithDate(lang: Lang, date: Date | number): string {
   return new Date(date).toLocaleString(localeOf(lang))

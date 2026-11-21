@@ -105,6 +105,8 @@ export const StorageKeys = {
   cardHelp: 'cardHelp',
   /** 鱼店记事本内容（`{ [serverId]: string }`，按服务器分开存在本机）。 */
   fishNote: 'fishNote',
+  /** 鱼店货架缓存（`{ byServer: { [serverId]: { at, shop, capability } } }`，见 `lib/fishShelfCache.ts`）。 */
+  fishShelf: 'fishShelf',
   /** 指令卡片「是否手动执行」偏好（key -> true）。 */
   autoExec: 'autoExec',
   /** 各模块界面状态记忆（如玩家管理的玩家名、鱼店的筛选）。 */

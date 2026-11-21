@@ -578,6 +578,8 @@ export interface BackendTransport {
   /**
    * 查看鱼店货架（新版插件不需要额外权限；老版本需要 fishshop.rest.use）。
    *
+   * 页面目前**不带** `self`：货架是配置快照（本机缓存，手动刷新才重拉），个人限购 / 冷却由 `fishBuy` 当场判。
+   *
    * `self: true` → 让上游按「当前登录玩家」算限购 / 冷却，每条多返回个人进度
    * （`myRemain` / `myCdRemain` …）。代价是该玩家必须在线，否则上游 400。
    */
