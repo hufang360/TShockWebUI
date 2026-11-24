@@ -111,9 +111,10 @@ type Server struct {
 	capCache map[string]capCacheEntry
 
 	// data/*.json 的 ETag 缓存（内容哈希 + 原始字节）。
-	// 内嵌资源在进程生命周期内不可变，所以不必失效；测试里每个 Server 各一份。
+	// 内嵌资源在进程生命周期内不可变（mtime 为零值），等于只算一次；
+	// 磁盘来源（WEB_DIST_DIR，本地开发）按 mtime + size 失效 —— 改完数据刷新即可，不用重启容器。
 	dataMu    sync.Mutex
-	dataCache map[string]dataAsset
+	dataCache map[dataCacheKey]dataAsset
 }
 
 type metaCacheEntry struct {
@@ -1082,17 +1083,29 @@ func isDataJSON(name string) bool {
 	return strings.HasPrefix(name, "data/") && strings.HasSuffix(name, ".json")
 }
 
-// dataAsset 是 `data/*.json` 的内容哈希与原始字节（内嵌资源不可变，算一次即可）。
+// dataAsset 是 `data/*.json` 的内容哈希与原始字节。
 type dataAsset struct {
 	etag string
 	body []byte
 }
 
+// dataCacheKey 带上文件的 mtime / size：磁盘来源改一个字节就换 key，内嵌资源两者恒为零、等价于永久缓存。
+type dataCacheKey struct {
+	name    string
+	modNano int64
+	size    int64
+}
+
 // dataFile 取（必要时首次读取并计算）某个数据文件的 ETag 与内容。
 func (s *Server) dataFile(name string) (dataAsset, error) {
+	key := dataCacheKey{name: name}
+	if info, err := fs.Stat(s.web, name); err == nil {
+		key.modNano = info.ModTime().UnixNano()
+		key.size = info.Size()
+	}
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
-	if a, ok := s.dataCache[name]; ok {
+	if a, ok := s.dataCache[key]; ok {
 		return a, nil
 	}
 	body, err := fs.ReadFile(s.web, name)
@@ -1104,9 +1117,9 @@ func (s *Server) dataFile(name string) (dataAsset, error) {
 	sum := sha256.Sum256(body)
 	a := dataAsset{etag: `W/"` + hex.EncodeToString(sum[:16]) + `"`, body: body}
 	if s.dataCache == nil {
-		s.dataCache = make(map[string]dataAsset)
+		s.dataCache = make(map[dataCacheKey]dataAsset)
 	}
-	s.dataCache[name] = a
+	s.dataCache[key] = a
 	return a, nil
 }
 
@@ -1127,10 +1140,11 @@ func setCacheHeaders(w http.ResponseWriter, name string) {
 	switch {
 	case strings.HasPrefix(name, "assets/"):
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	case name == "data/items-atlas.webp", name == "data/player-atlas.webp",
-		name == "data/npc-atlas.webp", name == "data/buff-atlas.webp":
-		// 图集长缓存；前端用「内容哈希 ?v=...」做缓存失效（见 web/src/lib/atlas.ts），
-		// 图集一变哈希就变，不会出现「新 regions + 旧图」的图标错位。
+	case strings.HasPrefix(name, "data/") && strings.HasSuffix(name, ".webp"):
+		// 图集（物品 / 玩家 / NPC / Buff / 射弹 / 图鉴图标）都是**内容寻址**的：前端用
+		// `?v=<内容哈希>` 拉图（见 web/src/lib/atlas.ts 与 BestiaryFilterIcon），所以同一个 URL
+		// 内容永远不变，可以长缓存；图集一变哈希就变，不会出现「新 regions + 旧图」的图标错位。
+		// 按扩展名而不是文件名白名单：新增一张图集不会默默退化成短缓存。
 		w.Header().Set("Cache-Control", "public, max-age=604800")
 	case strings.HasPrefix(name, "data/"):
 		// `data/*.json` 根本不会走到这里（走 serveDataJSON，ETag + no-cache）；

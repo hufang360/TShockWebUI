@@ -8,7 +8,11 @@ python3 tools/gen-atlas.py         # 2) 物品图标图集（需 Pillow）
 python3 tools/gen-player-atlas.py  # 3) 玩家角色图集（需 Pillow）
 python3 tools/gen-npc-atlas.py     # 4) NPC 贴图图集（需 Pillow）
 python3 tools/gen-buff-atlas.py    # 5) Buff 图标图集（需 Pillow）
-bash tools/gen-game-data.sh        # 6) 合成表 + 怪物图鉴（npc-bestiary / npc-variants）+ 属性 stats + item-tips + item-groups + shimmer + prefix + 图格/墙表（需 dotnet 9）
+node tools/gen-paints.mjs          # 6) 油漆 / 涂料 ID 表（PaintID / PaintCoatingID + Item.cs）
+node tools/gen-projectiles.mjs     # 7) 射弹 ID 表（ProjectileID）
+python3 tools/gen-projectile-atlas.py  # 8) 射弹图标图集（首帧，需 Pillow）
+node tools/gen-tile-name-overrides.mjs # 9) 图格 / 墙中文名补齐表（需联网：中文 Wiki）
+bash tools/gen-game-data.sh        # 10) 合成表 + 怪物图鉴（npc-bestiary / npc-variants）+ 属性 stats + item-tips + item-groups + shimmer + prefix + 图格/墙表（需 dotnet 9）
 ```
 
 数据对应 **Terraria 1.4.5.8**。版本不匹配时必须重新生成，否则物品 ID / 名称 / 图标可能错位。
@@ -52,6 +56,10 @@ bash tools/gen-game-data.sh        # 6) 合成表 + 怪物图鉴（npc-bestiary 
 | `tiles.json` | 图格 ID：内部名（`TileID`）、代表物品 id、摆放尺寸 | 754 |
 | `walls.json` | 墙 ID：内部名（`WallID`）、代表物品 id | 367 |
 | `buffs.json` | Buff：ID、内部名（**无名称**，名称取 `loc.BuffName`；参数补全用） | 400 |
+| `paints.json` | 油漆 / 涂料：两套 ID（`paint` / `coating`）、内部名（`PaintID` / `PaintCoatingID`）、对应物品 id | 30 + 2 |
+| `projectiles.json` | 射弹：ID、内部名（**无名称**，名称取 `loc.ProjectileName`） | 1136 |
+| `projectile-atlas.json` | 射弹图标裁切表（`projectile-atlas.webp`，首帧等比缩进 48px 框，带内容 hash） | 1117 |
+| `tile-name-overrides.json` | 图格 / 墙的中文名补齐表（游戏内没有名字的那些：藤蔓 / 草丛 / 苔藓砖 / 未安全墙…） | 70 图格 / 74 墙 |
 | `npc-bestiary.json` | 怪物图鉴：筛选器（顺序 + 图标贴图）+ 每个 NPC 的排序键 / 稀有度 / 攻击·防御·钱币·生命 / 命中的筛选器（含负值变体） | 59 筛选器 / 761 NPC |
 | `npc-variants.json` | 负值 NPC（-1..-65）：内部名、母体 id、`scale`、`color` | 65 |
 | `bestiary-icons.json` | 筛选器图标裁切表（`bestiary-tags.webp` / `bestiary-rank.webp`，带内容 hash） | 59 |
@@ -279,6 +287,70 @@ Boss 还会从 TShock `SpawnBoss()` 的 switch 解析出 `/sb` 信息（供「�
 - 来源：`TShockAPI/Commands.cs` 的 `SpawnBoss()`（`case` 标签 → `npc.SetDefaults(N)`；`NPC.SpawnWOF` → 113）；
   `en` 来自 `loc.en-US` 的 `NPCName`。
 - 普通怪物只有 `id` / `key` / `en`；`/sm` 对任意 NPC 都可用（名称或数字 ID），所以图鉴总是给出 `/sm`。
+
+### paints.json 结构（数据图鉴 · 油漆）
+
+```jsonc
+{
+  "meta": { "gameVersion": "1.4.5.8", "count": 32, "paintCount": 30, "coatingCount": 2,
+            "skipped": [{ "id": 31, "key": "IlluminantPaint" }] },
+  "entries": [
+    { "id": 1, "group": "paint",   "key": "RedPaint", "item": 1073 },  // 红漆
+    { "id": 1, "group": "coating", "key": "Glow",     "item": 4668 }   // 夜明涂料
+  ]
+}
+```
+
+- **两套独立 ID 空间**：`paint` = 图格 / 墙的 `paintColor`（1–30），`coating` = `paintCoating`（1 夜明 / 2 回声）；
+  数字会重复（油漆 1 ≠ 涂料 1），所以每条都带 `group`。
+- `key` 是 `Terraria.ID/PaintID.cs` / `PaintCoatingID.cs` 的常量名；`item` 是「哪种漆对应哪件物品」
+  （`Terraria/Item.cs` 里 `item.paint` / `item.paintCoating` 赋值），名称 / 图标都取这件物品。
+- `meta.skipped` 是没有对应物品的 ID：`PaintID.IlluminantPaint = 31` 只是 1.4 前的别名（1.4 起「发光」改为涂料），
+  官方 Wiki 的油漆表也只到 30 —— 记在这里，不静默丢数据。
+- 由 `tools/gen-paints.mjs` 生成。
+
+### projectiles.json / projectile-atlas 结构（数据图鉴 · 射弹）
+
+```jsonc
+{
+  "meta": { "gameVersion": "1.4.5.8", "count": 1136 },
+  "projectiles": [
+    { "id": 1, "key": "WoodenArrowFriendly" },   // 名称取 loc.ProjectileName（木箭）
+    { "id": 60, "key": "..." }                   // 约 100 个内部 / 占位 ID 没有官方名 → 显示内部名
+  ]
+}
+```
+
+- 内部名来自 `Terraria.ID/ProjectileID.cs`（0–1135，`Count = 1136`；`0 = None` 不是射弹）。
+- 名称来自官方本地化的独立分类 `ProjectileName`（`Terraria.Localization.Content.<culture>.Projectiles.json`，
+  由 `tools/gen-data.mjs` 合并进 `loc.<culture>.json`）；该分类里有些条目是**空字符串**，运行期按「无名称」回退内部名。
+- 图标图集 `projectile-atlas.{json,webp}`：每张 `Projectile_<id>.png` 取**第一帧**
+  （帧数 = `Main.projFrames`，281 条 > 1 帧，最多 54 帧），再**等比缩进 48px 方框**（只缩不放）——
+  原尺寸首帧合计约 11.1M 像素，整张入库不现实。1×1 占位贴图（19 个）不收录（`meta.empty`）。
+- `regions[projectileId] = [x, y, w, h]`，与 `data/projectiles.json` 的 id 一致；带 PNG 内容哈希（缓存失效用）。
+- 由 `tools/gen-projectiles.mjs` + `tools/gen-projectile-atlas.py` 生成（后者需 Pillow）。
+
+### tile-name-overrides.json 结构（图格 / 墙的中文名补齐）
+
+```jsonc
+{
+  "meta": { "gameVersion": "1.4.5.8", "tileCount": 70, "wallCount": 74,
+            "source": "https://terraria.wiki.gg/zh/wiki/图格 ID + .../墙 ID" },
+  "tiles": { "52": "常规藤蔓", "24": "矮野生腐化植物", "512": "绿苔藓（灰砖上）" },
+  "walls": { "3": "黑檀石墙", "40": "雪墙" }
+}
+```
+
+- **为什么需要**：图格 / 墙的显示名在游戏里只有三条来源 —— `MapObject` 地图图例名、图例物品名、代表物品名
+  （见 `web/src/lib/tiles.ts` 的命名链）。**世界里生成、玩家不能放置**的那些（藤蔓、草丛、苔藓砖、未安全的天然墙…）
+  三条都命中不了，只能显示 `Vines` 这种内部常量名。游戏本身**没有**给它们官方本地化名。
+- 名字取自 **Terraria 中文 Wiki** 的「图格 ID」（9 个分段）与「墙 ID」表格；已去掉平台标注
+  `(电脑版、主机版、和移动版)` 与脚注 `[1]`。
+- **逐条按内部常量名校验**：Wiki 该行的内部名必须等于 `tiles.json` / `walls.json` 的 `key`，否则跳过并告警
+  （防版本错位把名字安到别的图格上）。只收录「三条来源都落空」的 ID，其余一律以游戏数据为准。
+- 运行期是命名链的**第 4 步**（在代表物品之后、回退常量名之前），图格与墙各自一张表（两套 ID 空间）。
+- 由 `tools/gen-tile-name-overrides.mjs` 生成（**需要联网**；升级游戏版本后重跑一次，diff 可看出新增 / 改名）。
+- 例外：墙 `0`（`None` = 没有墙）Wiki 表里没有，保持内部名。
 
 ### tiles.json / walls.json 结构（数据图鉴）
 

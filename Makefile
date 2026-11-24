@@ -76,6 +76,10 @@ data:
 	python3 tools/gen-npc-atlas.py
 	python3 tools/gen-buff-atlas.py
 	python3 tools/gen-bestiary-icons.py
+	node tools/gen-paints.mjs
+	node tools/gen-projectiles.mjs
+	python3 tools/gen-projectile-atlas.py
+	node tools/gen-tile-name-overrides.mjs   # 需联网：图格/墙中文名补齐表（中文 Wiki）
 	python3 tools/gen-brand-assets.py
 	bash tools/gen-game-data.sh
 	node tools/gen-world-colors.mjs   # 世界缩略图颜色表 → web/src/lib/save/worldColors.generated.ts（需 TEDIT_DIR）

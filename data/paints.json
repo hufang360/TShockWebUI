@@ -1,0 +1,219 @@
+{
+ "meta": {
+  "gameVersion": "1.4.5.8",
+  "count": 32,
+  "paintCount": 30,
+  "coatingCount": 2,
+  "source": "Terraria.ID/PaintID.cs + PaintCoatingID.cs（常量名）+ Terraria/Item.cs（item.paint / item.paintCoating → 物品 id）",
+  "generatedBy": "tools/gen-paints.mjs",
+  "skipped": [
+   {
+    "id": 31,
+    "key": "IlluminantPaint"
+   }
+  ],
+  "none": {
+   "paint": [
+    "None"
+   ],
+   "coating": [
+    "None"
+   ]
+  },
+  "note": "group = paint（油漆，图格/墙的 paintColor）| coating（涂料，paintCoating）；两套 ID 空间互不相干、数字会重复。 item = 该漆对应的物品 id（名称 / 图标都用它，运行期取 loc.ItemName）。 没有对应物品的 ID（如 PaintID.IlluminantPaint = 31，1.4 起改为「夜明涂料」）记在 meta.skipped。"
+ },
+ "entries": [
+  {
+   "id": 1,
+   "group": "paint",
+   "key": "RedPaint",
+   "item": 1073
+  },
+  {
+   "id": 2,
+   "group": "paint",
+   "key": "OrangePaint",
+   "item": 1074
+  },
+  {
+   "id": 3,
+   "group": "paint",
+   "key": "YellowPaint",
+   "item": 1075
+  },
+  {
+   "id": 4,
+   "group": "paint",
+   "key": "LimePaint",
+   "item": 1076
+  },
+  {
+   "id": 5,
+   "group": "paint",
+   "key": "GreenPaint",
+   "item": 1077
+  },
+  {
+   "id": 6,
+   "group": "paint",
+   "key": "TealPaint",
+   "item": 1078
+  },
+  {
+   "id": 7,
+   "group": "paint",
+   "key": "CyanPaint",
+   "item": 1079
+  },
+  {
+   "id": 8,
+   "group": "paint",
+   "key": "SkyBluePaint",
+   "item": 1080
+  },
+  {
+   "id": 9,
+   "group": "paint",
+   "key": "BluePaint",
+   "item": 1081
+  },
+  {
+   "id": 10,
+   "group": "paint",
+   "key": "PurplePaint",
+   "item": 1082
+  },
+  {
+   "id": 11,
+   "group": "paint",
+   "key": "VioletPaint",
+   "item": 1083
+  },
+  {
+   "id": 12,
+   "group": "paint",
+   "key": "PinkPaint",
+   "item": 1084
+  },
+  {
+   "id": 13,
+   "group": "paint",
+   "key": "DeepRedPaint",
+   "item": 1085
+  },
+  {
+   "id": 14,
+   "group": "paint",
+   "key": "DeepOrangePaint",
+   "item": 1086
+  },
+  {
+   "id": 15,
+   "group": "paint",
+   "key": "DeepYellowPaint",
+   "item": 1087
+  },
+  {
+   "id": 16,
+   "group": "paint",
+   "key": "DeepLimePaint",
+   "item": 1088
+  },
+  {
+   "id": 17,
+   "group": "paint",
+   "key": "DeepGreenPaint",
+   "item": 1089
+  },
+  {
+   "id": 18,
+   "group": "paint",
+   "key": "DeepTealPaint",
+   "item": 1090
+  },
+  {
+   "id": 19,
+   "group": "paint",
+   "key": "DeepCyanPaint",
+   "item": 1091
+  },
+  {
+   "id": 20,
+   "group": "paint",
+   "key": "DeepSkyBluePaint",
+   "item": 1092
+  },
+  {
+   "id": 21,
+   "group": "paint",
+   "key": "DeepBluePaint",
+   "item": 1093
+  },
+  {
+   "id": 22,
+   "group": "paint",
+   "key": "DeepPurplePaint",
+   "item": 1094
+  },
+  {
+   "id": 23,
+   "group": "paint",
+   "key": "DeepVioletPaint",
+   "item": 1095
+  },
+  {
+   "id": 24,
+   "group": "paint",
+   "key": "DeepPinkPaint",
+   "item": 1096
+  },
+  {
+   "id": 25,
+   "group": "paint",
+   "key": "BlackPaint",
+   "item": 1097
+  },
+  {
+   "id": 26,
+   "group": "paint",
+   "key": "WhitePaint",
+   "item": 1098
+  },
+  {
+   "id": 27,
+   "group": "paint",
+   "key": "GrayPaint",
+   "item": 1099
+  },
+  {
+   "id": 28,
+   "group": "paint",
+   "key": "BrownPaint",
+   "item": 1966
+  },
+  {
+   "id": 29,
+   "group": "paint",
+   "key": "ShadowPaint",
+   "item": 1967
+  },
+  {
+   "id": 30,
+   "group": "paint",
+   "key": "NegativePaint",
+   "item": 1968
+  },
+  {
+   "id": 1,
+   "group": "coating",
+   "key": "Glow",
+   "item": 4668
+  },
+  {
+   "id": 2,
+   "group": "coating",
+   "key": "Echo",
+   "item": 5344
+  }
+ ]
+}

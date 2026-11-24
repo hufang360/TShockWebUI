@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -2035,6 +2037,44 @@ func doWithHeader(h http.Handler, method, path, key, value string) *httptest.Res
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
+}
+
+// 磁盘来源（WEB_DIST_DIR，本地开发）改完 data/*.json 后不用重启：缓存按 mtime + size 失效。
+// 内嵌资源（embed.FS）的 mtime 恒为零值，行为等价于「进程内只算一次」。
+func TestDataJSONCacheInvalidatesOnDiskChange(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "data"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "data", "loc.zh-Hans.json")
+	if err := os.WriteFile(path, []byte(`{"ProjectileName":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := newServerWithWeb(t, os.DirFS(dir)).Handler()
+
+	first := do(h, http.MethodGet, "/data/loc.zh-Hans.json", nil, nil, false)
+	if got := first.Body.String(); got != `{"ProjectileName":{}}` {
+		t.Fatalf("body = %q", got)
+	}
+	oldEtag := first.Header().Get("ETag")
+
+	// 模拟「重新生成数据」（内容与体量都变）后刷新页面：同一个进程必须回新内容。
+	if err := os.WriteFile(path, []byte(`{"ProjectileName":{"KrakenWave":"克拉肯球"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second := doWithHeader(h, http.MethodGet, "/data/loc.zh-Hans.json", "If-None-Match", oldEtag)
+	if second.Code != http.StatusOK {
+		t.Fatalf("数据变化后应 200，实际 %d", second.Code)
+	}
+	if got := second.Body.String(); got != `{"ProjectileName":{"KrakenWave":"克拉肯球"}}` {
+		t.Fatalf("改完数据仍返回旧内容：%q", got)
+	}
+	if second.Header().Get("ETag") == oldEtag {
+		t.Fatal("数据变化后 ETag 不应相同")
+	}
 }
 
 // /data/*.json 必须带 ETag + no-cache：升级后不会继续用一小时的旧 commands.json，

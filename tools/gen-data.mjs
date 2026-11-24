@@ -562,6 +562,8 @@ function main() {
     'LegacyMisc',
     'NPCName',
     'BuffName',
+    // 射弹显示名（单独的 `...Projectiles.json`，见下方 files）；「数据 ID → 射弹」用。
+    'ProjectileName',
     'MapObject',
     // 材质包（语言 Resource Pack）会改写物品提示 / Buff 描述等，运行期需要这些基础表。
     'ItemTooltip',
@@ -604,6 +606,7 @@ function main() {
       `Terraria.Localization.Content.${culture}.Legacy.json`,
       `Terraria.Localization.Content.${culture}.json`,
       `Terraria.Localization.Content.${culture}.NPCs.json`,
+      `Terraria.Localization.Content.${culture}.Projectiles.json`,
       `Terraria.Localization.Content.${culture}.Game.json`,
     ];
     const merged = {};

@@ -1,0 +1,4555 @@
+{
+ "meta": {
+  "gameVersion": "1.4.5.8",
+  "count": 1136,
+  "source": "Terraria.ID/ProjectileID.cs + loc.ProjectileName",
+  "generatedBy": "tools/gen-projectiles.mjs",
+  "note": "id 0 = None（不是射弹）。名称为空时显示内部名（约 100 个内部 / 占位 ID 没有官方本地化名）。 图标见 data/projectile-atlas.json（首帧，等比缩进 48px 框）。"
+ },
+ "projectiles": [
+  {
+   "id": 0,
+   "key": "None"
+  },
+  {
+   "id": 1,
+   "key": "WoodenArrowFriendly"
+  },
+  {
+   "id": 2,
+   "key": "FireArrow"
+  },
+  {
+   "id": 3,
+   "key": "Shuriken"
+  },
+  {
+   "id": 4,
+   "key": "UnholyArrow"
+  },
+  {
+   "id": 5,
+   "key": "JestersArrow"
+  },
+  {
+   "id": 6,
+   "key": "EnchantedBoomerang"
+  },
+  {
+   "id": 7,
+   "key": "VilethornBase"
+  },
+  {
+   "id": 8,
+   "key": "VilethornTip"
+  },
+  {
+   "id": 9,
+   "key": "Starfury"
+  },
+  {
+   "id": 10,
+   "key": "PurificationPowder"
+  },
+  {
+   "id": 11,
+   "key": "VilePowder"
+  },
+  {
+   "id": 12,
+   "key": "FallingStar"
+  },
+  {
+   "id": 13,
+   "key": "Hook"
+  },
+  {
+   "id": 14,
+   "key": "Bullet"
+  },
+  {
+   "id": 15,
+   "key": "BallofFire"
+  },
+  {
+   "id": 16,
+   "key": "MagicMissile"
+  },
+  {
+   "id": 17,
+   "key": "DirtBall"
+  },
+  {
+   "id": 18,
+   "key": "ShadowOrb"
+  },
+  {
+   "id": 19,
+   "key": "Flamarang"
+  },
+  {
+   "id": 20,
+   "key": "GreenLaser"
+  },
+  {
+   "id": 21,
+   "key": "Bone"
+  },
+  {
+   "id": 22,
+   "key": "WaterStream"
+  },
+  {
+   "id": 23,
+   "key": "Harpoon"
+  },
+  {
+   "id": 24,
+   "key": "SpikyBall"
+  },
+  {
+   "id": 25,
+   "key": "BallOHurt"
+  },
+  {
+   "id": 26,
+   "key": "BlueMoon"
+  },
+  {
+   "id": 27,
+   "key": "WaterBolt"
+  },
+  {
+   "id": 28,
+   "key": "Bomb"
+  },
+  {
+   "id": 29,
+   "key": "Dynamite"
+  },
+  {
+   "id": 30,
+   "key": "Grenade"
+  },
+  {
+   "id": 31,
+   "key": "SandBallFalling"
+  },
+  {
+   "id": 32,
+   "key": "IvyWhip"
+  },
+  {
+   "id": 33,
+   "key": "ThornChakram"
+  },
+  {
+   "id": 34,
+   "key": "Flamelash"
+  },
+  {
+   "id": 35,
+   "key": "Sunfury"
+  },
+  {
+   "id": 36,
+   "key": "MeteorShot"
+  },
+  {
+   "id": 37,
+   "key": "StickyBomb"
+  },
+  {
+   "id": 38,
+   "key": "HarpyFeather"
+  },
+  {
+   "id": 39,
+   "key": "MudBall"
+  },
+  {
+   "id": 40,
+   "key": "AshBallFalling"
+  },
+  {
+   "id": 41,
+   "key": "HellfireArrow"
+  },
+  {
+   "id": 42,
+   "key": "SandBallGun"
+  },
+  {
+   "id": 43,
+   "key": "Tombstone"
+  },
+  {
+   "id": 44,
+   "key": "DemonSickle"
+  },
+  {
+   "id": 45,
+   "key": "DemonScythe"
+  },
+  {
+   "id": 46,
+   "key": "DarkLance"
+  },
+  {
+   "id": 47,
+   "key": "Trident"
+  },
+  {
+   "id": 48,
+   "key": "ThrowingKnife"
+  },
+  {
+   "id": 49,
+   "key": "Spear"
+  },
+  {
+   "id": 50,
+   "key": "Glowstick"
+  },
+  {
+   "id": 51,
+   "key": "Seed"
+  },
+  {
+   "id": 52,
+   "key": "WoodenBoomerang"
+  },
+  {
+   "id": 53,
+   "key": "StickyGlowstick"
+  },
+  {
+   "id": 54,
+   "key": "PoisonedKnife"
+  },
+  {
+   "id": 55,
+   "key": "Stinger"
+  },
+  {
+   "id": 56,
+   "key": "EbonsandBallFalling"
+  },
+  {
+   "id": 57,
+   "key": "CobaltChainsaw"
+  },
+  {
+   "id": 58,
+   "key": "MythrilChainsaw"
+  },
+  {
+   "id": 59,
+   "key": "CobaltDrill"
+  },
+  {
+   "id": 60,
+   "key": "FixedDamageForRockets"
+  },
+  {
+   "id": 61,
+   "key": "AdamantiteChainsaw"
+  },
+  {
+   "id": 62,
+   "key": "AdamantiteDrill"
+  },
+  {
+   "id": 63,
+   "key": "TheDaoofPow"
+  },
+  {
+   "id": 64,
+   "key": "MythrilHalberd"
+  },
+  {
+   "id": 65,
+   "key": "EbonsandBallGun"
+  },
+  {
+   "id": 66,
+   "key": "AdamantiteGlaive"
+  },
+  {
+   "id": 67,
+   "key": "PearlSandBallFalling"
+  },
+  {
+   "id": 68,
+   "key": "PearlSandBallGun"
+  },
+  {
+   "id": 69,
+   "key": "HolyWater"
+  },
+  {
+   "id": 70,
+   "key": "UnholyWater"
+  },
+  {
+   "id": 71,
+   "key": "SiltBall"
+  },
+  {
+   "id": 72,
+   "key": "BlueFairy"
+  },
+  {
+   "id": 73,
+   "key": "DualHookBlue"
+  },
+  {
+   "id": 74,
+   "key": "DualHookRed"
+  },
+  {
+   "id": 75,
+   "key": "HappyBomb"
+  },
+  {
+   "id": 76,
+   "key": "QuarterNote"
+  },
+  {
+   "id": 77,
+   "key": "EighthNote"
+  },
+  {
+   "id": 78,
+   "key": "TiedEighthNote"
+  },
+  {
+   "id": 79,
+   "key": "RainbowRodBullet"
+  },
+  {
+   "id": 80,
+   "key": "IceBlock"
+  },
+  {
+   "id": 81,
+   "key": "WoodenArrowHostile"
+  },
+  {
+   "id": 82,
+   "key": "FlamingArrow"
+  },
+  {
+   "id": 83,
+   "key": "EyeLaser"
+  },
+  {
+   "id": 84,
+   "key": "PinkLaser"
+  },
+  {
+   "id": 85,
+   "key": "Flames"
+  },
+  {
+   "id": 86,
+   "key": "PinkFairy"
+  },
+  {
+   "id": 87,
+   "key": "GreenFairy"
+  },
+  {
+   "id": 88,
+   "key": "PurpleLaser"
+  },
+  {
+   "id": 89,
+   "key": "CrystalBullet"
+  },
+  {
+   "id": 90,
+   "key": "CrystalShard"
+  },
+  {
+   "id": 91,
+   "key": "HolyArrow"
+  },
+  {
+   "id": 92,
+   "key": "HallowStar"
+  },
+  {
+   "id": 93,
+   "key": "MagicDagger"
+  },
+  {
+   "id": 94,
+   "key": "CrystalStorm"
+  },
+  {
+   "id": 95,
+   "key": "CursedFlameFriendly"
+  },
+  {
+   "id": 96,
+   "key": "CursedFlameHostile"
+  },
+  {
+   "id": 97,
+   "key": "CobaltNaginata"
+  },
+  {
+   "id": 98,
+   "key": "PoisonDart"
+  },
+  {
+   "id": 99,
+   "key": "Boulder"
+  },
+  {
+   "id": 100,
+   "key": "DeathLaser"
+  },
+  {
+   "id": 101,
+   "key": "EyeFire"
+  },
+  {
+   "id": 102,
+   "key": "BombSkeletronPrime"
+  },
+  {
+   "id": 103,
+   "key": "CursedArrow"
+  },
+  {
+   "id": 104,
+   "key": "CursedBullet"
+  },
+  {
+   "id": 105,
+   "key": "Gungnir"
+  },
+  {
+   "id": 106,
+   "key": "LightDisc"
+  },
+  {
+   "id": 107,
+   "key": "Hamdrax"
+  },
+  {
+   "id": 108,
+   "key": "Explosives"
+  },
+  {
+   "id": 109,
+   "key": "SnowBallHostile"
+  },
+  {
+   "id": 110,
+   "key": "BulletSnowman"
+  },
+  {
+   "id": 111,
+   "key": "Bunny"
+  },
+  {
+   "id": 112,
+   "key": "Penguin"
+  },
+  {
+   "id": 113,
+   "key": "IceBoomerang"
+  },
+  {
+   "id": 114,
+   "key": "UnholyTridentFriendly"
+  },
+  {
+   "id": 115,
+   "key": "UnholyTridentHostile"
+  },
+  {
+   "id": 116,
+   "key": "SwordBeam"
+  },
+  {
+   "id": 117,
+   "key": "BoneArrow"
+  },
+  {
+   "id": 118,
+   "key": "IceBolt"
+  },
+  {
+   "id": 119,
+   "key": "FrostBoltSword"
+  },
+  {
+   "id": 120,
+   "key": "FrostArrow"
+  },
+  {
+   "id": 121,
+   "key": "AmethystBolt"
+  },
+  {
+   "id": 122,
+   "key": "TopazBolt"
+  },
+  {
+   "id": 123,
+   "key": "SapphireBolt"
+  },
+  {
+   "id": 124,
+   "key": "EmeraldBolt"
+  },
+  {
+   "id": 125,
+   "key": "RubyBolt"
+  },
+  {
+   "id": 126,
+   "key": "DiamondBolt"
+  },
+  {
+   "id": 127,
+   "key": "Turtle"
+  },
+  {
+   "id": 128,
+   "key": "FrostBlastHostile"
+  },
+  {
+   "id": 129,
+   "key": "RuneBlast"
+  },
+  {
+   "id": 130,
+   "key": "MushroomSpear"
+  },
+  {
+   "id": 131,
+   "key": "Mushroom"
+  },
+  {
+   "id": 132,
+   "key": "TerraBeam"
+  },
+  {
+   "id": 133,
+   "key": "GrenadeI"
+  },
+  {
+   "id": 134,
+   "key": "RocketI"
+  },
+  {
+   "id": 135,
+   "key": "ProximityMineI"
+  },
+  {
+   "id": 136,
+   "key": "GrenadeII"
+  },
+  {
+   "id": 137,
+   "key": "RocketII"
+  },
+  {
+   "id": 138,
+   "key": "ProximityMineII"
+  },
+  {
+   "id": 139,
+   "key": "GrenadeIII"
+  },
+  {
+   "id": 140,
+   "key": "RocketIII"
+  },
+  {
+   "id": 141,
+   "key": "ProximityMineIII"
+  },
+  {
+   "id": 142,
+   "key": "GrenadeIV"
+  },
+  {
+   "id": 143,
+   "key": "RocketIV"
+  },
+  {
+   "id": 144,
+   "key": "ProximityMineIV"
+  },
+  {
+   "id": 145,
+   "key": "PureSpray"
+  },
+  {
+   "id": 146,
+   "key": "HallowSpray"
+  },
+  {
+   "id": 147,
+   "key": "CorruptSpray"
+  },
+  {
+   "id": 148,
+   "key": "MushroomSpray"
+  },
+  {
+   "id": 149,
+   "key": "CrimsonSpray"
+  },
+  {
+   "id": 150,
+   "key": "NettleBurstRight"
+  },
+  {
+   "id": 151,
+   "key": "NettleBurstLeft"
+  },
+  {
+   "id": 152,
+   "key": "NettleBurstEnd"
+  },
+  {
+   "id": 153,
+   "key": "TheRottedFork"
+  },
+  {
+   "id": 154,
+   "key": "TheMeatball"
+  },
+  {
+   "id": 155,
+   "key": "BeachBall"
+  },
+  {
+   "id": 156,
+   "key": "LightBeam"
+  },
+  {
+   "id": 157,
+   "key": "NightBeam"
+  },
+  {
+   "id": 158,
+   "key": "CopperCoin"
+  },
+  {
+   "id": 159,
+   "key": "SilverCoin"
+  },
+  {
+   "id": 160,
+   "key": "GoldCoin"
+  },
+  {
+   "id": 161,
+   "key": "PlatinumCoin"
+  },
+  {
+   "id": 162,
+   "key": "CannonballFriendly"
+  },
+  {
+   "id": 163,
+   "key": "Flare"
+  },
+  {
+   "id": 164,
+   "key": "Landmine"
+  },
+  {
+   "id": 165,
+   "key": "WebSlingerHook"
+  },
+  {
+   "id": 166,
+   "key": "SnowBallFriendly"
+  },
+  {
+   "id": 167,
+   "key": "RocketFireworkRed"
+  },
+  {
+   "id": 168,
+   "key": "RocketFireworkGreen"
+  },
+  {
+   "id": 169,
+   "key": "RocketFireworkBlue"
+  },
+  {
+   "id": 170,
+   "key": "RocketFireworkYellow"
+  },
+  {
+   "id": 171,
+   "key": "RopeCoil"
+  },
+  {
+   "id": 172,
+   "key": "FrostburnArrow"
+  },
+  {
+   "id": 173,
+   "key": "EnchantedBeam"
+  },
+  {
+   "id": 174,
+   "key": "IceSpike"
+  },
+  {
+   "id": 175,
+   "key": "BabyEater"
+  },
+  {
+   "id": 176,
+   "key": "JungleSpike"
+  },
+  {
+   "id": 177,
+   "key": "IcewaterSpit"
+  },
+  {
+   "id": 178,
+   "key": "ConfettiGun"
+  },
+  {
+   "id": 179,
+   "key": "SlushBall"
+  },
+  {
+   "id": 180,
+   "key": "BulletDeadeye"
+  },
+  {
+   "id": 181,
+   "key": "Bee"
+  },
+  {
+   "id": 182,
+   "key": "PossessedHatchet"
+  },
+  {
+   "id": 183,
+   "key": "Beenade"
+  },
+  {
+   "id": 184,
+   "key": "PoisonDartTrap"
+  },
+  {
+   "id": 185,
+   "key": "SpikyBallTrap"
+  },
+  {
+   "id": 186,
+   "key": "SpearTrap"
+  },
+  {
+   "id": 187,
+   "key": "FlamethrowerTrap"
+  },
+  {
+   "id": 188,
+   "key": "FlamesTrap"
+  },
+  {
+   "id": 189,
+   "key": "Wasp"
+  },
+  {
+   "id": 190,
+   "key": "MechanicalPiranha"
+  },
+  {
+   "id": 191,
+   "key": "Pygmy"
+  },
+  {
+   "id": 192,
+   "key": "Pygmy2"
+  },
+  {
+   "id": 193,
+   "key": "Pygmy3"
+  },
+  {
+   "id": 194,
+   "key": "Pygmy4"
+  },
+  {
+   "id": 195,
+   "key": "PygmySpear"
+  },
+  {
+   "id": 196,
+   "key": "SmokeBomb"
+  },
+  {
+   "id": 197,
+   "key": "BabySkeletronHead"
+  },
+  {
+   "id": 198,
+   "key": "BabyHornet"
+  },
+  {
+   "id": 199,
+   "key": "TikiSpirit"
+  },
+  {
+   "id": 200,
+   "key": "PetLizard"
+  },
+  {
+   "id": 201,
+   "key": "GraveMarker"
+  },
+  {
+   "id": 202,
+   "key": "CrossGraveMarker"
+  },
+  {
+   "id": 203,
+   "key": "Headstone"
+  },
+  {
+   "id": 204,
+   "key": "Gravestone"
+  },
+  {
+   "id": 205,
+   "key": "Obelisk"
+  },
+  {
+   "id": 206,
+   "key": "Leaf"
+  },
+  {
+   "id": 207,
+   "key": "ChlorophyteBullet"
+  },
+  {
+   "id": 208,
+   "key": "Parrot"
+  },
+  {
+   "id": 209,
+   "key": "Truffle"
+  },
+  {
+   "id": 210,
+   "key": "Sapling"
+  },
+  {
+   "id": 211,
+   "key": "Wisp"
+  },
+  {
+   "id": 212,
+   "key": "PalladiumPike"
+  },
+  {
+   "id": 213,
+   "key": "PalladiumDrill"
+  },
+  {
+   "id": 214,
+   "key": "PalladiumChainsaw"
+  },
+  {
+   "id": 215,
+   "key": "OrichalcumHalberd"
+  },
+  {
+   "id": 216,
+   "key": "OrichalcumDrill"
+  },
+  {
+   "id": 217,
+   "key": "OrichalcumChainsaw"
+  },
+  {
+   "id": 218,
+   "key": "TitaniumTrident"
+  },
+  {
+   "id": 219,
+   "key": "TitaniumDrill"
+  },
+  {
+   "id": 220,
+   "key": "TitaniumChainsaw"
+  },
+  {
+   "id": 221,
+   "key": "FlowerPetal"
+  },
+  {
+   "id": 222,
+   "key": "ChlorophytePartisan"
+  },
+  {
+   "id": 223,
+   "key": "ChlorophyteDrill"
+  },
+  {
+   "id": 224,
+   "key": "ChlorophyteChainsaw"
+  },
+  {
+   "id": 225,
+   "key": "ChlorophyteArrow"
+  },
+  {
+   "id": 226,
+   "key": "CrystalLeaf"
+  },
+  {
+   "id": 227,
+   "key": "CrystalLeafShot"
+  },
+  {
+   "id": 228,
+   "key": "SporeCloud"
+  },
+  {
+   "id": 229,
+   "key": "ChlorophyteOrb"
+  },
+  {
+   "id": 230,
+   "key": "GemHookAmethyst"
+  },
+  {
+   "id": 231,
+   "key": "GemHookTopaz"
+  },
+  {
+   "id": 232,
+   "key": "GemHookSapphire"
+  },
+  {
+   "id": 233,
+   "key": "GemHookEmerald"
+  },
+  {
+   "id": 234,
+   "key": "GemHookRuby"
+  },
+  {
+   "id": 235,
+   "key": "GemHookDiamond"
+  },
+  {
+   "id": 236,
+   "key": "BabyDino"
+  },
+  {
+   "id": 237,
+   "key": "RainCloudMoving"
+  },
+  {
+   "id": 238,
+   "key": "RainCloudRaining"
+  },
+  {
+   "id": 239,
+   "key": "RainFriendly"
+  },
+  {
+   "id": 240,
+   "key": "CannonballHostile"
+  },
+  {
+   "id": 241,
+   "key": "CrimsandBallFalling"
+  },
+  {
+   "id": 242,
+   "key": "BulletHighVelocity"
+  },
+  {
+   "id": 243,
+   "key": "BloodCloudMoving"
+  },
+  {
+   "id": 244,
+   "key": "BloodCloudRaining"
+  },
+  {
+   "id": 245,
+   "key": "BloodRain"
+  },
+  {
+   "id": 246,
+   "key": "Stynger"
+  },
+  {
+   "id": 247,
+   "key": "FlowerPow"
+  },
+  {
+   "id": 248,
+   "key": "FlowerPowPetal"
+  },
+  {
+   "id": 249,
+   "key": "StyngerShrapnel"
+  },
+  {
+   "id": 250,
+   "key": "RainbowFront"
+  },
+  {
+   "id": 251,
+   "key": "RainbowBack"
+  },
+  {
+   "id": 252,
+   "key": "ChlorophyteJackhammer"
+  },
+  {
+   "id": 253,
+   "key": "BallofFrost"
+  },
+  {
+   "id": 254,
+   "key": "MagnetSphereBall"
+  },
+  {
+   "id": 255,
+   "key": "MagnetSphereBolt"
+  },
+  {
+   "id": 256,
+   "key": "SkeletronHand"
+  },
+  {
+   "id": 257,
+   "key": "FrostBeam"
+  },
+  {
+   "id": 258,
+   "key": "Fireball"
+  },
+  {
+   "id": 259,
+   "key": "EyeBeam"
+  },
+  {
+   "id": 260,
+   "key": "HeatRay"
+  },
+  {
+   "id": 261,
+   "key": "BoulderStaffOfEarth"
+  },
+  {
+   "id": 262,
+   "key": "GolemFist"
+  },
+  {
+   "id": 263,
+   "key": "IceSickle"
+  },
+  {
+   "id": 264,
+   "key": "RainNimbus"
+  },
+  {
+   "id": 265,
+   "key": "PoisonFang"
+  },
+  {
+   "id": 266,
+   "key": "BabySlime"
+  },
+  {
+   "id": 267,
+   "key": "PoisonDartBlowgun"
+  },
+  {
+   "id": 268,
+   "key": "EyeSpring"
+  },
+  {
+   "id": 269,
+   "key": "BabySnowman"
+  },
+  {
+   "id": 270,
+   "key": "Skull"
+  },
+  {
+   "id": 271,
+   "key": "BoxingGlove"
+  },
+  {
+   "id": 272,
+   "key": "Bananarang"
+  },
+  {
+   "id": 273,
+   "key": "ChainKnife"
+  },
+  {
+   "id": 274,
+   "key": "DeathSickle"
+  },
+  {
+   "id": 275,
+   "key": "SeedPlantera"
+  },
+  {
+   "id": 276,
+   "key": "PoisonSeedPlantera"
+  },
+  {
+   "id": 277,
+   "key": "ThornBall"
+  },
+  {
+   "id": 278,
+   "key": "IchorArrow"
+  },
+  {
+   "id": 279,
+   "key": "IchorBullet"
+  },
+  {
+   "id": 280,
+   "key": "GoldenShowerFriendly"
+  },
+  {
+   "id": 281,
+   "key": "ExplosiveBunny"
+  },
+  {
+   "id": 282,
+   "key": "VenomArrow"
+  },
+  {
+   "id": 283,
+   "key": "VenomBullet"
+  },
+  {
+   "id": 284,
+   "key": "PartyBullet"
+  },
+  {
+   "id": 285,
+   "key": "NanoBullet"
+  },
+  {
+   "id": 286,
+   "key": "ExplosiveBullet"
+  },
+  {
+   "id": 287,
+   "key": "GoldenBullet"
+  },
+  {
+   "id": 288,
+   "key": "GoldenShowerHostile"
+  },
+  {
+   "id": 289,
+   "key": "ConfettiMelee"
+  },
+  {
+   "id": 290,
+   "key": "ShadowBeamHostile"
+  },
+  {
+   "id": 291,
+   "key": "InfernoHostileBolt"
+  },
+  {
+   "id": 292,
+   "key": "InfernoHostileBlast"
+  },
+  {
+   "id": 293,
+   "key": "LostSoulHostile"
+  },
+  {
+   "id": 294,
+   "key": "ShadowBeamFriendly"
+  },
+  {
+   "id": 295,
+   "key": "InfernoFriendlyBolt"
+  },
+  {
+   "id": 296,
+   "key": "InfernoFriendlyBlast"
+  },
+  {
+   "id": 297,
+   "key": "LostSoulFriendly"
+  },
+  {
+   "id": 298,
+   "key": "SpiritHeal"
+  },
+  {
+   "id": 299,
+   "key": "Shadowflames"
+  },
+  {
+   "id": 300,
+   "key": "PaladinsHammerHostile"
+  },
+  {
+   "id": 301,
+   "key": "PaladinsHammerFriendly"
+  },
+  {
+   "id": 302,
+   "key": "SniperBullet"
+  },
+  {
+   "id": 303,
+   "key": "RocketSkeleton"
+  },
+  {
+   "id": 304,
+   "key": "VampireKnife"
+  },
+  {
+   "id": 305,
+   "key": "VampireHeal"
+  },
+  {
+   "id": 306,
+   "key": "EatersBite"
+  },
+  {
+   "id": 307,
+   "key": "TinyEater"
+  },
+  {
+   "id": 308,
+   "key": "FrostHydra"
+  },
+  {
+   "id": 309,
+   "key": "FrostBlastFriendly"
+  },
+  {
+   "id": 310,
+   "key": "BlueFlare"
+  },
+  {
+   "id": 311,
+   "key": "CandyCorn"
+  },
+  {
+   "id": 312,
+   "key": "JackOLantern"
+  },
+  {
+   "id": 313,
+   "key": "Spider"
+  },
+  {
+   "id": 314,
+   "key": "Squashling"
+  },
+  {
+   "id": 315,
+   "key": "BatHook"
+  },
+  {
+   "id": 316,
+   "key": "Bat"
+  },
+  {
+   "id": 317,
+   "key": "Raven"
+  },
+  {
+   "id": 318,
+   "key": "RottenEgg"
+  },
+  {
+   "id": 319,
+   "key": "BlackCat"
+  },
+  {
+   "id": 320,
+   "key": "BloodyMachete"
+  },
+  {
+   "id": 321,
+   "key": "FlamingJack"
+  },
+  {
+   "id": 322,
+   "key": "WoodHook"
+  },
+  {
+   "id": 323,
+   "key": "Stake"
+  },
+  {
+   "id": 324,
+   "key": "CursedSapling"
+  },
+  {
+   "id": 325,
+   "key": "FlamingWood"
+  },
+  {
+   "id": 326,
+   "key": "GreekFire1"
+  },
+  {
+   "id": 327,
+   "key": "GreekFire2"
+  },
+  {
+   "id": 328,
+   "key": "GreekFire3"
+  },
+  {
+   "id": 329,
+   "key": "FlamingScythe"
+  },
+  {
+   "id": 330,
+   "key": "StarAnise"
+  },
+  {
+   "id": 331,
+   "key": "CandyCaneHook"
+  },
+  {
+   "id": 332,
+   "key": "ChristmasHook"
+  },
+  {
+   "id": 333,
+   "key": "FruitcakeChakram"
+  },
+  {
+   "id": 334,
+   "key": "Puppy"
+  },
+  {
+   "id": 335,
+   "key": "OrnamentFriendly"
+  },
+  {
+   "id": 336,
+   "key": "PineNeedleFriendly"
+  },
+  {
+   "id": 337,
+   "key": "Blizzard"
+  },
+  {
+   "id": 338,
+   "key": "RocketSnowmanI"
+  },
+  {
+   "id": 339,
+   "key": "RocketSnowmanII"
+  },
+  {
+   "id": 340,
+   "key": "RocketSnowmanIII"
+  },
+  {
+   "id": 341,
+   "key": "RocketSnowmanIV"
+  },
+  {
+   "id": 342,
+   "key": "NorthPoleWeapon"
+  },
+  {
+   "id": 343,
+   "key": "NorthPoleSpear"
+  },
+  {
+   "id": 344,
+   "key": "NorthPoleSnowflake"
+  },
+  {
+   "id": 345,
+   "key": "PineNeedleHostile"
+  },
+  {
+   "id": 346,
+   "key": "OrnamentHostile"
+  },
+  {
+   "id": 347,
+   "key": "OrnamentHostileShrapnel"
+  },
+  {
+   "id": 348,
+   "key": "FrostWave"
+  },
+  {
+   "id": 349,
+   "key": "FrostShard"
+  },
+  {
+   "id": 350,
+   "key": "Missile"
+  },
+  {
+   "id": 351,
+   "key": "Present"
+  },
+  {
+   "id": 352,
+   "key": "Spike"
+  },
+  {
+   "id": 353,
+   "key": "BabyGrinch"
+  },
+  {
+   "id": 354,
+   "key": "CrimsandBallGun"
+  },
+  {
+   "id": 355,
+   "key": "VenomFang"
+  },
+  {
+   "id": 356,
+   "key": "SpectreWrath"
+  },
+  {
+   "id": 357,
+   "key": "PulseBolt"
+  },
+  {
+   "id": 358,
+   "key": "WaterGun"
+  },
+  {
+   "id": 359,
+   "key": "FrostBoltStaff"
+  },
+  {
+   "id": 360,
+   "key": "BobberWooden"
+  },
+  {
+   "id": 361,
+   "key": "BobberReinforced"
+  },
+  {
+   "id": 362,
+   "key": "BobberFiberglass"
+  },
+  {
+   "id": 363,
+   "key": "BobberFisherOfSouls"
+  },
+  {
+   "id": 364,
+   "key": "BobberGolden"
+  },
+  {
+   "id": 365,
+   "key": "BobberMechanics"
+  },
+  {
+   "id": 366,
+   "key": "BobbersittingDuck"
+  },
+  {
+   "id": 367,
+   "key": "ObsidianSwordfish"
+  },
+  {
+   "id": 368,
+   "key": "Swordfish"
+  },
+  {
+   "id": 369,
+   "key": "SawtoothShark"
+  },
+  {
+   "id": 370,
+   "key": "LovePotion"
+  },
+  {
+   "id": 371,
+   "key": "FoulPotion"
+  },
+  {
+   "id": 372,
+   "key": "FishHook"
+  },
+  {
+   "id": 373,
+   "key": "Hornet"
+  },
+  {
+   "id": 374,
+   "key": "HornetStinger"
+  },
+  {
+   "id": 375,
+   "key": "FlyingImp"
+  },
+  {
+   "id": 376,
+   "key": "ImpFireball"
+  },
+  {
+   "id": 377,
+   "key": "SpiderHiver"
+  },
+  {
+   "id": 378,
+   "key": "SpiderEgg"
+  },
+  {
+   "id": 379,
+   "key": "BabySpider"
+  },
+  {
+   "id": 380,
+   "key": "ZephyrFish"
+  },
+  {
+   "id": 381,
+   "key": "BobberFleshcatcher"
+  },
+  {
+   "id": 382,
+   "key": "BobberHotline"
+  },
+  {
+   "id": 383,
+   "key": "Anchor"
+  },
+  {
+   "id": 384,
+   "key": "Sharknado"
+  },
+  {
+   "id": 385,
+   "key": "SharknadoBolt"
+  },
+  {
+   "id": 386,
+   "key": "Cthulunado"
+  },
+  {
+   "id": 387,
+   "key": "Retanimini"
+  },
+  {
+   "id": 388,
+   "key": "Spazmamini"
+  },
+  {
+   "id": 389,
+   "key": "MiniRetinaLaser"
+  },
+  {
+   "id": 390,
+   "key": "VenomSpider"
+  },
+  {
+   "id": 391,
+   "key": "JumperSpider"
+  },
+  {
+   "id": 392,
+   "key": "DangerousSpider"
+  },
+  {
+   "id": 393,
+   "key": "OneEyedPirate"
+  },
+  {
+   "id": 394,
+   "key": "SoulscourgePirate"
+  },
+  {
+   "id": 395,
+   "key": "PirateCaptain"
+  },
+  {
+   "id": 396,
+   "key": "SlimeHook"
+  },
+  {
+   "id": 397,
+   "key": "StickyGrenade"
+  },
+  {
+   "id": 398,
+   "key": "MiniMinotaur"
+  },
+  {
+   "id": 399,
+   "key": "MolotovCocktail"
+  },
+  {
+   "id": 400,
+   "key": "MolotovFire"
+  },
+  {
+   "id": 401,
+   "key": "MolotovFire2"
+  },
+  {
+   "id": 402,
+   "key": "MolotovFire3"
+  },
+  {
+   "id": 403,
+   "key": "TrackHook"
+  },
+  {
+   "id": 404,
+   "key": "Flairon"
+  },
+  {
+   "id": 405,
+   "key": "FlaironBubble"
+  },
+  {
+   "id": 406,
+   "key": "SlimeGun"
+  },
+  {
+   "id": 407,
+   "key": "Tempest"
+  },
+  {
+   "id": 408,
+   "key": "MiniSharkron"
+  },
+  {
+   "id": 409,
+   "key": "Typhoon"
+  },
+  {
+   "id": 410,
+   "key": "Bubble"
+  },
+  {
+   "id": 411,
+   "key": "CopperCoinsFalling"
+  },
+  {
+   "id": 412,
+   "key": "SilverCoinsFalling"
+  },
+  {
+   "id": 413,
+   "key": "GoldCoinsFalling"
+  },
+  {
+   "id": 414,
+   "key": "PlatinumCoinsFalling"
+  },
+  {
+   "id": 415,
+   "key": "RocketFireworksBoxRed"
+  },
+  {
+   "id": 416,
+   "key": "RocketFireworksBoxGreen"
+  },
+  {
+   "id": 417,
+   "key": "RocketFireworksBoxBlue"
+  },
+  {
+   "id": 418,
+   "key": "RocketFireworksBoxYellow"
+  },
+  {
+   "id": 419,
+   "key": "FireworkFountainYellow"
+  },
+  {
+   "id": 420,
+   "key": "FireworkFountainRed"
+  },
+  {
+   "id": 421,
+   "key": "FireworkFountainBlue"
+  },
+  {
+   "id": 422,
+   "key": "FireworkFountainRainbow"
+  },
+  {
+   "id": 423,
+   "key": "UFOMinion"
+  },
+  {
+   "id": 424,
+   "key": "Meteor1"
+  },
+  {
+   "id": 425,
+   "key": "Meteor2"
+  },
+  {
+   "id": 426,
+   "key": "Meteor3"
+  },
+  {
+   "id": 427,
+   "key": "VortexChainsaw"
+  },
+  {
+   "id": 428,
+   "key": "VortexDrill"
+  },
+  {
+   "id": 429,
+   "key": "NebulaChainsaw"
+  },
+  {
+   "id": 430,
+   "key": "NebulaDrill"
+  },
+  {
+   "id": 431,
+   "key": "SolarFlareChainsaw"
+  },
+  {
+   "id": 432,
+   "key": "SolarFlareDrill"
+  },
+  {
+   "id": 433,
+   "key": "UFOLaser"
+  },
+  {
+   "id": 434,
+   "key": "ScutlixLaserFriendly"
+  },
+  {
+   "id": 435,
+   "key": "MartianTurretBolt"
+  },
+  {
+   "id": 436,
+   "key": "BrainScramblerBolt"
+  },
+  {
+   "id": 437,
+   "key": "GigaZapperSpear"
+  },
+  {
+   "id": 438,
+   "key": "RayGunnerLaser"
+  },
+  {
+   "id": 439,
+   "key": "LaserMachinegun"
+  },
+  {
+   "id": 440,
+   "key": "LaserMachinegunLaser"
+  },
+  {
+   "id": 441,
+   "key": "ScutlixLaserCrosshair"
+  },
+  {
+   "id": 442,
+   "key": "ElectrosphereMissile"
+  },
+  {
+   "id": 443,
+   "key": "Electrosphere"
+  },
+  {
+   "id": 444,
+   "key": "Xenopopper"
+  },
+  {
+   "id": 445,
+   "key": "LaserDrill"
+  },
+  {
+   "id": 446,
+   "key": "AntiGravityHook"
+  },
+  {
+   "id": 447,
+   "key": "SaucerDeathray"
+  },
+  {
+   "id": 448,
+   "key": "SaucerMissile"
+  },
+  {
+   "id": 449,
+   "key": "SaucerLaser"
+  },
+  {
+   "id": 450,
+   "key": "SaucerScrap"
+  },
+  {
+   "id": 451,
+   "key": "InfluxWaver"
+  },
+  {
+   "id": 452,
+   "key": "PhantasmalEye"
+  },
+  {
+   "id": 453,
+   "key": "DrillMountCrosshair"
+  },
+  {
+   "id": 454,
+   "key": "PhantasmalSphere"
+  },
+  {
+   "id": 455,
+   "key": "PhantasmalDeathray"
+  },
+  {
+   "id": 456,
+   "key": "MoonLeech"
+  },
+  {
+   "id": 457,
+   "key": "PhasicWarpEjector"
+  },
+  {
+   "id": 458,
+   "key": "PhasicWarpDisc"
+  },
+  {
+   "id": 459,
+   "key": "ChargedBlasterOrb"
+  },
+  {
+   "id": 460,
+   "key": "ChargedBlasterCannon"
+  },
+  {
+   "id": 461,
+   "key": "ChargedBlasterLaser"
+  },
+  {
+   "id": 462,
+   "key": "PhantasmalBolt"
+  },
+  {
+   "id": 463,
+   "key": "ViciousPowder"
+  },
+  {
+   "id": 464,
+   "key": "CultistBossIceMist"
+  },
+  {
+   "id": 465,
+   "key": "CultistBossLightningOrb"
+  },
+  {
+   "id": 466,
+   "key": "CultistBossLightningOrbArc"
+  },
+  {
+   "id": 467,
+   "key": "CultistBossFireBall"
+  },
+  {
+   "id": 468,
+   "key": "CultistBossFireBallClone"
+  },
+  {
+   "id": 469,
+   "key": "BeeArrow"
+  },
+  {
+   "id": 470,
+   "key": "StickyDynamite"
+  },
+  {
+   "id": 471,
+   "key": "SkeletonBone"
+  },
+  {
+   "id": 472,
+   "key": "WebSpit"
+  },
+  {
+   "id": 473,
+   "key": "SpelunkerGlowstick"
+  },
+  {
+   "id": 474,
+   "key": "BoneArrowFromMerchant"
+  },
+  {
+   "id": 475,
+   "key": "VineRopeCoil"
+  },
+  {
+   "id": 476,
+   "key": "SoulDrain"
+  },
+  {
+   "id": 477,
+   "key": "CrystalDart"
+  },
+  {
+   "id": 478,
+   "key": "CursedDart"
+  },
+  {
+   "id": 479,
+   "key": "IchorDart"
+  },
+  {
+   "id": 480,
+   "key": "CursedDartFlame"
+  },
+  {
+   "id": 481,
+   "key": "ChainGuillotine"
+  },
+  {
+   "id": 482,
+   "key": "ClingerStaff"
+  },
+  {
+   "id": 483,
+   "key": "SeedlerNut"
+  },
+  {
+   "id": 484,
+   "key": "SeedlerThorn"
+  },
+  {
+   "id": 485,
+   "key": "Hellwing"
+  },
+  {
+   "id": 486,
+   "key": "TendonHook"
+  },
+  {
+   "id": 487,
+   "key": "ThornHook"
+  },
+  {
+   "id": 488,
+   "key": "IlluminantHook"
+  },
+  {
+   "id": 489,
+   "key": "WormHook"
+  },
+  {
+   "id": 490,
+   "key": "CultistRitual"
+  },
+  {
+   "id": 491,
+   "key": "FlyingKnife"
+  },
+  {
+   "id": 492,
+   "key": "MagicLantern"
+  },
+  {
+   "id": 493,
+   "key": "CrystalVileShardHead"
+  },
+  {
+   "id": 494,
+   "key": "CrystalVileShardShaft"
+  },
+  {
+   "id": 495,
+   "key": "ShadowFlameArrow"
+  },
+  {
+   "id": 496,
+   "key": "ShadowFlame"
+  },
+  {
+   "id": 497,
+   "key": "ShadowFlameKnife"
+  },
+  {
+   "id": 498,
+   "key": "Nail"
+  },
+  {
+   "id": 499,
+   "key": "BabyFaceMonster"
+  },
+  {
+   "id": 500,
+   "key": "CrimsonHeart"
+  },
+  {
+   "id": 501,
+   "key": "DrManFlyFlask"
+  },
+  {
+   "id": 502,
+   "key": "Meowmere"
+  },
+  {
+   "id": 503,
+   "key": "StarWrath"
+  },
+  {
+   "id": 504,
+   "key": "Spark"
+  },
+  {
+   "id": 505,
+   "key": "SilkRopeCoil"
+  },
+  {
+   "id": 506,
+   "key": "WebRopeCoil"
+  },
+  {
+   "id": 507,
+   "key": "JavelinFriendly"
+  },
+  {
+   "id": 508,
+   "key": "JavelinHostile"
+  },
+  {
+   "id": 509,
+   "key": "ButchersChainsaw"
+  },
+  {
+   "id": 510,
+   "key": "ToxicFlask"
+  },
+  {
+   "id": 511,
+   "key": "ToxicCloud"
+  },
+  {
+   "id": 512,
+   "key": "ToxicCloud2"
+  },
+  {
+   "id": 513,
+   "key": "ToxicCloud3"
+  },
+  {
+   "id": 514,
+   "key": "NailFriendly"
+  },
+  {
+   "id": 515,
+   "key": "BouncyGlowstick"
+  },
+  {
+   "id": 516,
+   "key": "BouncyBomb"
+  },
+  {
+   "id": 517,
+   "key": "BouncyGrenade"
+  },
+  {
+   "id": 518,
+   "key": "CoinPortal"
+  },
+  {
+   "id": 519,
+   "key": "BombFish"
+  },
+  {
+   "id": 520,
+   "key": "FrostDaggerfish"
+  },
+  {
+   "id": 521,
+   "key": "CrystalPulse"
+  },
+  {
+   "id": 522,
+   "key": "CrystalPulse2"
+  },
+  {
+   "id": 523,
+   "key": "ToxicBubble"
+  },
+  {
+   "id": 524,
+   "key": "IchorSplash"
+  },
+  {
+   "id": 525,
+   "key": "FlyingPiggyBank"
+  },
+  {
+   "id": 526,
+   "key": "CultistBossParticle"
+  },
+  {
+   "id": 527,
+   "key": "RichGravestone1"
+  },
+  {
+   "id": 528,
+   "key": "RichGravestone2"
+  },
+  {
+   "id": 529,
+   "key": "RichGravestone3"
+  },
+  {
+   "id": 530,
+   "key": "RichGravestone4"
+  },
+  {
+   "id": 531,
+   "key": "RichGravestone5"
+  },
+  {
+   "id": 532,
+   "key": "BoneGloveProj"
+  },
+  {
+   "id": 533,
+   "key": "DeadlySphere"
+  },
+  {
+   "id": 534,
+   "key": "Code1"
+  },
+  {
+   "id": 535,
+   "key": "MedusaHead"
+  },
+  {
+   "id": 536,
+   "key": "MedusaHeadRay"
+  },
+  {
+   "id": 537,
+   "key": "StardustSoldierLaser"
+  },
+  {
+   "id": 538,
+   "key": "Twinkle"
+  },
+  {
+   "id": 539,
+   "key": "StardustJellyfishSmall"
+  },
+  {
+   "id": 540,
+   "key": "StardustTowerMark"
+  },
+  {
+   "id": 541,
+   "key": "WoodYoyo"
+  },
+  {
+   "id": 542,
+   "key": "CorruptYoyo"
+  },
+  {
+   "id": 543,
+   "key": "CrimsonYoyo"
+  },
+  {
+   "id": 544,
+   "key": "JungleYoyo"
+  },
+  {
+   "id": 545,
+   "key": "Cascade"
+  },
+  {
+   "id": 546,
+   "key": "Chik"
+  },
+  {
+   "id": 547,
+   "key": "Code2"
+  },
+  {
+   "id": 548,
+   "key": "Rally"
+  },
+  {
+   "id": 549,
+   "key": "Yelets"
+  },
+  {
+   "id": 550,
+   "key": "RedsYoyo"
+  },
+  {
+   "id": 551,
+   "key": "ValkyrieYoyo"
+  },
+  {
+   "id": 552,
+   "key": "Amarok"
+  },
+  {
+   "id": 553,
+   "key": "HelFire"
+  },
+  {
+   "id": 554,
+   "key": "Kraken"
+  },
+  {
+   "id": 555,
+   "key": "TheEyeOfCthulhu"
+  },
+  {
+   "id": 556,
+   "key": "BlackCounterweight"
+  },
+  {
+   "id": 557,
+   "key": "BlueCounterweight"
+  },
+  {
+   "id": 558,
+   "key": "GreenCounterweight"
+  },
+  {
+   "id": 559,
+   "key": "PurpleCounterweight"
+  },
+  {
+   "id": 560,
+   "key": "RedCounterweight"
+  },
+  {
+   "id": 561,
+   "key": "YellowCounterweight"
+  },
+  {
+   "id": 562,
+   "key": "FormatC"
+  },
+  {
+   "id": 563,
+   "key": "Gradient"
+  },
+  {
+   "id": 564,
+   "key": "Valor"
+  },
+  {
+   "id": 565,
+   "key": "BrainOfConfusion"
+  },
+  {
+   "id": 566,
+   "key": "GiantBee"
+  },
+  {
+   "id": 567,
+   "key": "SporeTrap"
+  },
+  {
+   "id": 568,
+   "key": "SporeTrap2"
+  },
+  {
+   "id": 569,
+   "key": "SporeGas"
+  },
+  {
+   "id": 570,
+   "key": "SporeGas2"
+  },
+  {
+   "id": 571,
+   "key": "SporeGas3"
+  },
+  {
+   "id": 572,
+   "key": "SalamanderSpit"
+  },
+  {
+   "id": 573,
+   "key": "NebulaBolt"
+  },
+  {
+   "id": 574,
+   "key": "NebulaEye"
+  },
+  {
+   "id": 575,
+   "key": "NebulaSphere"
+  },
+  {
+   "id": 576,
+   "key": "NebulaLaser"
+  },
+  {
+   "id": 577,
+   "key": "VortexLaser"
+  },
+  {
+   "id": 578,
+   "key": "VortexVortexLightning"
+  },
+  {
+   "id": 579,
+   "key": "VortexVortexPortal"
+  },
+  {
+   "id": 580,
+   "key": "VortexLightning"
+  },
+  {
+   "id": 581,
+   "key": "VortexAcid"
+  },
+  {
+   "id": 582,
+   "key": "MechanicWrench"
+  },
+  {
+   "id": 583,
+   "key": "NurseSyringeHurt"
+  },
+  {
+   "id": 584,
+   "key": "NurseSyringeHeal"
+  },
+  {
+   "id": 585,
+   "key": "ClothiersCurse"
+  },
+  {
+   "id": 586,
+   "key": "DryadsWardCircle"
+  },
+  {
+   "id": 587,
+   "key": "PainterPaintball"
+  },
+  {
+   "id": 588,
+   "key": "PartyGirlGrenade"
+  },
+  {
+   "id": 589,
+   "key": "SantaBombs"
+  },
+  {
+   "id": 590,
+   "key": "TruffleSpore"
+  },
+  {
+   "id": 591,
+   "key": "MinecartMechLaser"
+  },
+  {
+   "id": 592,
+   "key": "MartianWalkerLaser"
+  },
+  {
+   "id": 593,
+   "key": "AncientDoomProjectile"
+  },
+  {
+   "id": 594,
+   "key": "BlowupSmoke"
+  },
+  {
+   "id": 595,
+   "key": "Arkhalis"
+  },
+  {
+   "id": 596,
+   "key": "DesertDjinnCurse"
+  },
+  {
+   "id": 597,
+   "key": "AmberBolt"
+  },
+  {
+   "id": 598,
+   "key": "BoneJavelin"
+  },
+  {
+   "id": 599,
+   "key": "BoneDagger"
+  },
+  {
+   "id": 600,
+   "key": "PortalGun"
+  },
+  {
+   "id": 601,
+   "key": "PortalGunBolt"
+  },
+  {
+   "id": 602,
+   "key": "PortalGunGate"
+  },
+  {
+   "id": 603,
+   "key": "Terrarian"
+  },
+  {
+   "id": 604,
+   "key": "TerrarianBeam"
+  },
+  {
+   "id": 605,
+   "key": "SpikedSlimeSpike"
+  },
+  {
+   "id": 606,
+   "key": "ScutlixLaser"
+  },
+  {
+   "id": 607,
+   "key": "SolarFlareRay"
+  },
+  {
+   "id": 608,
+   "key": "SolarCounter"
+  },
+  {
+   "id": 609,
+   "key": "StardustDrill"
+  },
+  {
+   "id": 610,
+   "key": "StardustChainsaw"
+  },
+  {
+   "id": 611,
+   "key": "SolarWhipSword"
+  },
+  {
+   "id": 612,
+   "key": "SolarWhipSwordExplosion"
+  },
+  {
+   "id": 613,
+   "key": "StardustCellMinion"
+  },
+  {
+   "id": 614,
+   "key": "StardustCellMinionShot"
+  },
+  {
+   "id": 615,
+   "key": "VortexBeater"
+  },
+  {
+   "id": 616,
+   "key": "VortexBeaterRocket"
+  },
+  {
+   "id": 617,
+   "key": "NebulaArcanum"
+  },
+  {
+   "id": 618,
+   "key": "NebulaArcanumSubshot"
+  },
+  {
+   "id": 619,
+   "key": "NebulaArcanumExplosionShot"
+  },
+  {
+   "id": 620,
+   "key": "NebulaArcanumExplosionShotShard"
+  },
+  {
+   "id": 621,
+   "key": "BloodWater"
+  },
+  {
+   "id": 622,
+   "key": "BlowupSmokeMoonlord"
+  },
+  {
+   "id": 623,
+   "key": "StardustGuardian"
+  },
+  {
+   "id": 624,
+   "key": "StardustGuardianExplosion"
+  },
+  {
+   "id": 625,
+   "key": "StardustDragon1"
+  },
+  {
+   "id": 626,
+   "key": "StardustDragon2"
+  },
+  {
+   "id": 627,
+   "key": "StardustDragon3"
+  },
+  {
+   "id": 628,
+   "key": "StardustDragon4"
+  },
+  {
+   "id": 629,
+   "key": "TowerDamageBolt"
+  },
+  {
+   "id": 630,
+   "key": "Phantasm"
+  },
+  {
+   "id": 631,
+   "key": "PhantasmArrow"
+  },
+  {
+   "id": 632,
+   "key": "LastPrismLaser"
+  },
+  {
+   "id": 633,
+   "key": "LastPrism"
+  },
+  {
+   "id": 634,
+   "key": "NebulaBlaze1"
+  },
+  {
+   "id": 635,
+   "key": "NebulaBlaze2"
+  },
+  {
+   "id": 636,
+   "key": "Daybreak"
+  },
+  {
+   "id": 637,
+   "key": "BouncyDynamite"
+  },
+  {
+   "id": 638,
+   "key": "MoonlordBullet"
+  },
+  {
+   "id": 639,
+   "key": "MoonlordArrow"
+  },
+  {
+   "id": 640,
+   "key": "MoonlordArrowTrail"
+  },
+  {
+   "id": 641,
+   "key": "MoonlordTurret"
+  },
+  {
+   "id": 642,
+   "key": "MoonlordTurretLaser"
+  },
+  {
+   "id": 643,
+   "key": "RainbowCrystal"
+  },
+  {
+   "id": 644,
+   "key": "RainbowCrystalExplosion"
+  },
+  {
+   "id": 645,
+   "key": "LunarFlare"
+  },
+  {
+   "id": 646,
+   "key": "LunarHookSolar"
+  },
+  {
+   "id": 647,
+   "key": "LunarHookVortex"
+  },
+  {
+   "id": 648,
+   "key": "LunarHookNebula"
+  },
+  {
+   "id": 649,
+   "key": "LunarHookStardust"
+  },
+  {
+   "id": 650,
+   "key": "SuspiciousTentacle"
+  },
+  {
+   "id": 651,
+   "key": "WireKite"
+  },
+  {
+   "id": 652,
+   "key": "StaticHook"
+  },
+  {
+   "id": 653,
+   "key": "CompanionCube"
+  },
+  {
+   "id": 654,
+   "key": "GeyserTrap"
+  },
+  {
+   "id": 655,
+   "key": "BeeHive"
+  },
+  {
+   "id": 656,
+   "key": "SandnadoFriendly"
+  },
+  {
+   "id": 657,
+   "key": "SandnadoHostile"
+  },
+  {
+   "id": 658,
+   "key": "SandnadoHostileMark"
+  },
+  {
+   "id": 659,
+   "key": "SpiritFlame"
+  },
+  {
+   "id": 660,
+   "key": "SkyFracture"
+  },
+  {
+   "id": 661,
+   "key": "BlackBolt"
+  },
+  {
+   "id": 662,
+   "key": "DD2JavelinHostile"
+  },
+  {
+   "id": 663,
+   "key": "DD2FlameBurstTowerT1"
+  },
+  {
+   "id": 664,
+   "key": "DD2FlameBurstTowerT1Shot"
+  },
+  {
+   "id": 665,
+   "key": "DD2FlameBurstTowerT2"
+  },
+  {
+   "id": 666,
+   "key": "DD2FlameBurstTowerT2Shot"
+  },
+  {
+   "id": 667,
+   "key": "DD2FlameBurstTowerT3"
+  },
+  {
+   "id": 668,
+   "key": "DD2FlameBurstTowerT3Shot"
+  },
+  {
+   "id": 669,
+   "key": "Ale"
+  },
+  {
+   "id": 670,
+   "key": "DD2OgreStomp"
+  },
+  {
+   "id": 671,
+   "key": "DD2DrakinShot"
+  },
+  {
+   "id": 672,
+   "key": "DD2ElderWins"
+  },
+  {
+   "id": 673,
+   "key": "DD2DarkMageRaise"
+  },
+  {
+   "id": 674,
+   "key": "DD2DarkMageHeal"
+  },
+  {
+   "id": 675,
+   "key": "DD2DarkMageBolt"
+  },
+  {
+   "id": 676,
+   "key": "DD2OgreSpit"
+  },
+  {
+   "id": 677,
+   "key": "DD2BallistraTowerT1"
+  },
+  {
+   "id": 678,
+   "key": "DD2BallistraTowerT2"
+  },
+  {
+   "id": 679,
+   "key": "DD2BallistraTowerT3"
+  },
+  {
+   "id": 680,
+   "key": "DD2BallistraProj"
+  },
+  {
+   "id": 681,
+   "key": "DD2GoblinBomb"
+  },
+  {
+   "id": 682,
+   "key": "DD2LightningBugZap"
+  },
+  {
+   "id": 683,
+   "key": "DD2OgreSmash"
+  },
+  {
+   "id": 684,
+   "key": "DD2SquireSonicBoom"
+  },
+  {
+   "id": 685,
+   "key": "DD2JavelinHostileT3"
+  },
+  {
+   "id": 686,
+   "key": "DD2BetsyFireball"
+  },
+  {
+   "id": 687,
+   "key": "DD2BetsyFlameBreath"
+  },
+  {
+   "id": 688,
+   "key": "DD2LightningAuraT1"
+  },
+  {
+   "id": 689,
+   "key": "DD2LightningAuraT2"
+  },
+  {
+   "id": 690,
+   "key": "DD2LightningAuraT3"
+  },
+  {
+   "id": 691,
+   "key": "DD2ExplosiveTrapT1"
+  },
+  {
+   "id": 692,
+   "key": "DD2ExplosiveTrapT2"
+  },
+  {
+   "id": 693,
+   "key": "DD2ExplosiveTrapT3"
+  },
+  {
+   "id": 694,
+   "key": "DD2ExplosiveTrapT1Explosion"
+  },
+  {
+   "id": 695,
+   "key": "DD2ExplosiveTrapT2Explosion"
+  },
+  {
+   "id": 696,
+   "key": "DD2ExplosiveTrapT3Explosion"
+  },
+  {
+   "id": 697,
+   "key": "MonkStaffT1"
+  },
+  {
+   "id": 698,
+   "key": "MonkStaffT1Explosion"
+  },
+  {
+   "id": 699,
+   "key": "MonkStaffT2"
+  },
+  {
+   "id": 700,
+   "key": "MonkStaffT2Ghast"
+  },
+  {
+   "id": 701,
+   "key": "DD2PetDragon"
+  },
+  {
+   "id": 702,
+   "key": "DD2PetGhost"
+  },
+  {
+   "id": 703,
+   "key": "DD2PetGato"
+  },
+  {
+   "id": 704,
+   "key": "DD2ApprenticeStorm"
+  },
+  {
+   "id": 705,
+   "key": "DD2PhoenixBow"
+  },
+  {
+   "id": 706,
+   "key": "DD2PhoenixBowShot"
+  },
+  {
+   "id": 707,
+   "key": "MonkStaffT3"
+  },
+  {
+   "id": 708,
+   "key": "MonkStaffT3_Alt"
+  },
+  {
+   "id": 709,
+   "key": "MonkStaffT3_AltShot"
+  },
+  {
+   "id": 710,
+   "key": "DD2BetsyArrow"
+  },
+  {
+   "id": 711,
+   "key": "ApprenticeStaffT3Shot"
+  },
+  {
+   "id": 712,
+   "key": "BookStaffShot"
+  },
+  {
+   "id": 713,
+   "key": "DD2Win"
+  },
+  {
+   "id": 714,
+   "key": "Celeb2Weapon"
+  },
+  {
+   "id": 715,
+   "key": "Celeb2Rocket"
+  },
+  {
+   "id": 716,
+   "key": "Celeb2RocketExplosive"
+  },
+  {
+   "id": 717,
+   "key": "Celeb2RocketLarge"
+  },
+  {
+   "id": 718,
+   "key": "Celeb2RocketExplosiveLarge"
+  },
+  {
+   "id": 719,
+   "key": "QueenBeeStinger"
+  },
+  {
+   "id": 720,
+   "key": "FallingStarSpawner"
+  },
+  {
+   "id": 721,
+   "key": "DirtGolfBall"
+  },
+  {
+   "id": 722,
+   "key": "GolfClubHelper"
+  },
+  {
+   "id": 723,
+   "key": "ManaCloakStar"
+  },
+  {
+   "id": 724,
+   "key": "BeeCloakStar"
+  },
+  {
+   "id": 725,
+   "key": "StarVeilStar"
+  },
+  {
+   "id": 726,
+   "key": "StarCloakStar"
+  },
+  {
+   "id": 727,
+   "key": "RollingCactus"
+  },
+  {
+   "id": 728,
+   "key": "SuperStar"
+  },
+  {
+   "id": 729,
+   "key": "SuperStarSlash"
+  },
+  {
+   "id": 730,
+   "key": "ThunderSpear"
+  },
+  {
+   "id": 731,
+   "key": "ThunderStaffShot"
+  },
+  {
+   "id": 732,
+   "key": "ThunderSpearShot"
+  },
+  {
+   "id": 733,
+   "key": "ToiletEffect"
+  },
+  {
+   "id": 734,
+   "key": "VoidLens"
+  },
+  {
+   "id": 735,
+   "key": "Terragrim"
+  },
+  {
+   "id": 736,
+   "key": "BlueDungeonDebris"
+  },
+  {
+   "id": 737,
+   "key": "GreenDungeonDebris"
+  },
+  {
+   "id": 738,
+   "key": "PinkDungeonDebris"
+  },
+  {
+   "id": 739,
+   "key": "GolfBallDyedBlack"
+  },
+  {
+   "id": 740,
+   "key": "GolfBallDyedBlue"
+  },
+  {
+   "id": 741,
+   "key": "GolfBallDyedBrown"
+  },
+  {
+   "id": 742,
+   "key": "GolfBallDyedCyan"
+  },
+  {
+   "id": 743,
+   "key": "GolfBallDyedGreen"
+  },
+  {
+   "id": 744,
+   "key": "GolfBallDyedLimeGreen"
+  },
+  {
+   "id": 745,
+   "key": "GolfBallDyedOrange"
+  },
+  {
+   "id": 746,
+   "key": "GolfBallDyedPink"
+  },
+  {
+   "id": 747,
+   "key": "GolfBallDyedPurple"
+  },
+  {
+   "id": 748,
+   "key": "GolfBallDyedRed"
+  },
+  {
+   "id": 749,
+   "key": "GolfBallDyedSkyBlue"
+  },
+  {
+   "id": 750,
+   "key": "GolfBallDyedTeal"
+  },
+  {
+   "id": 751,
+   "key": "GolfBallDyedViolet"
+  },
+  {
+   "id": 752,
+   "key": "GolfBallDyedYellow"
+  },
+  {
+   "id": 753,
+   "key": "AmberHook"
+  },
+  {
+   "id": 754,
+   "key": "MysticSnakeCoil"
+  },
+  {
+   "id": 755,
+   "key": "BatOfLight"
+  },
+  {
+   "id": 756,
+   "key": "SharpTears"
+  },
+  {
+   "id": 757,
+   "key": "DripplerFlail"
+  },
+  {
+   "id": 758,
+   "key": "VampireFrog"
+  },
+  {
+   "id": 759,
+   "key": "BabyBird"
+  },
+  {
+   "id": 760,
+   "key": "BobberBloody"
+  },
+  {
+   "id": 761,
+   "key": "PaperAirplaneA"
+  },
+  {
+   "id": 762,
+   "key": "PaperAirplaneB"
+  },
+  {
+   "id": 763,
+   "key": "RollingCactusSpike"
+  },
+  {
+   "id": 764,
+   "key": "UpbeatStar"
+  },
+  {
+   "id": 765,
+   "key": "SugarGlider"
+  },
+  {
+   "id": 766,
+   "key": "KiteBlue"
+  },
+  {
+   "id": 767,
+   "key": "KiteBlueAndYellow"
+  },
+  {
+   "id": 768,
+   "key": "KiteRed"
+  },
+  {
+   "id": 769,
+   "key": "KiteRedAndYellow"
+  },
+  {
+   "id": 770,
+   "key": "KiteYellow"
+  },
+  {
+   "id": 771,
+   "key": "KiteWyvern"
+  },
+  {
+   "id": 772,
+   "key": "Geode"
+  },
+  {
+   "id": 773,
+   "key": "ScarabBomb"
+  },
+  {
+   "id": 774,
+   "key": "SharkPup"
+  },
+  {
+   "id": 775,
+   "key": "BobberScarab"
+  },
+  {
+   "id": 776,
+   "key": "ClusterRocketI"
+  },
+  {
+   "id": 777,
+   "key": "ClusterGrenadeI"
+  },
+  {
+   "id": 778,
+   "key": "ClusterMineI"
+  },
+  {
+   "id": 779,
+   "key": "ClusterFragmentsI"
+  },
+  {
+   "id": 780,
+   "key": "ClusterRocketII"
+  },
+  {
+   "id": 781,
+   "key": "ClusterGrenadeII"
+  },
+  {
+   "id": 782,
+   "key": "ClusterMineII"
+  },
+  {
+   "id": 783,
+   "key": "ClusterFragmentsII"
+  },
+  {
+   "id": 784,
+   "key": "WetRocket"
+  },
+  {
+   "id": 785,
+   "key": "WetGrenade"
+  },
+  {
+   "id": 786,
+   "key": "WetMine"
+  },
+  {
+   "id": 787,
+   "key": "LavaRocket"
+  },
+  {
+   "id": 788,
+   "key": "LavaGrenade"
+  },
+  {
+   "id": 789,
+   "key": "LavaMine"
+  },
+  {
+   "id": 790,
+   "key": "HoneyRocket"
+  },
+  {
+   "id": 791,
+   "key": "HoneyGrenade"
+  },
+  {
+   "id": 792,
+   "key": "HoneyMine"
+  },
+  {
+   "id": 793,
+   "key": "MiniNukeRocketI"
+  },
+  {
+   "id": 794,
+   "key": "MiniNukeGrenadeI"
+  },
+  {
+   "id": 795,
+   "key": "MiniNukeMineI"
+  },
+  {
+   "id": 796,
+   "key": "MiniNukeRocketII"
+  },
+  {
+   "id": 797,
+   "key": "MiniNukeGrenadeII"
+  },
+  {
+   "id": 798,
+   "key": "MiniNukeMineII"
+  },
+  {
+   "id": 799,
+   "key": "DryRocket"
+  },
+  {
+   "id": 800,
+   "key": "DryGrenade"
+  },
+  {
+   "id": 801,
+   "key": "DryMine"
+  },
+  {
+   "id": 802,
+   "key": "GladiusStab"
+  },
+  {
+   "id": 803,
+   "key": "ClusterSnowmanRocketI"
+  },
+  {
+   "id": 804,
+   "key": "ClusterSnowmanRocketII"
+  },
+  {
+   "id": 805,
+   "key": "WetSnowmanRocket"
+  },
+  {
+   "id": 806,
+   "key": "LavaSnowmanRocket"
+  },
+  {
+   "id": 807,
+   "key": "HoneySnowmanRocket"
+  },
+  {
+   "id": 808,
+   "key": "MiniNukeSnowmanRocketI"
+  },
+  {
+   "id": 809,
+   "key": "MiniNukeSnowmanRocketII"
+  },
+  {
+   "id": 810,
+   "key": "DrySnowmanRocket"
+  },
+  {
+   "id": 811,
+   "key": "BloodShot"
+  },
+  {
+   "id": 812,
+   "key": "ShellPileFalling"
+  },
+  {
+   "id": 813,
+   "key": "BloodNautilusTears"
+  },
+  {
+   "id": 814,
+   "key": "BloodNautilusShot"
+  },
+  {
+   "id": 815,
+   "key": "LilHarpy"
+  },
+  {
+   "id": 816,
+   "key": "FennecFox"
+  },
+  {
+   "id": 817,
+   "key": "GlitteryButterfly"
+  },
+  {
+   "id": 818,
+   "key": "WhiteTigerPounce"
+  },
+  {
+   "id": 819,
+   "key": "BloodArrow"
+  },
+  {
+   "id": 820,
+   "key": "ChumBucket"
+  },
+  {
+   "id": 821,
+   "key": "BabyImp"
+  },
+  {
+   "id": 822,
+   "key": "KiteBoneSerpent"
+  },
+  {
+   "id": 823,
+   "key": "KiteWorldFeeder"
+  },
+  {
+   "id": 824,
+   "key": "KiteBunny"
+  },
+  {
+   "id": 825,
+   "key": "BabyRedPanda"
+  },
+  {
+   "id": 826,
+   "key": "KitePigron"
+  },
+  {
+   "id": 827,
+   "key": "KiteManEater"
+  },
+  {
+   "id": 828,
+   "key": "KiteJellyfishBlue"
+  },
+  {
+   "id": 829,
+   "key": "KiteJellyfishPink"
+  },
+  {
+   "id": 830,
+   "key": "KiteShark"
+  },
+  {
+   "id": 831,
+   "key": "StormTigerGem"
+  },
+  {
+   "id": 832,
+   "key": "StormTigerAttack"
+  },
+  {
+   "id": 833,
+   "key": "StormTigerTier1"
+  },
+  {
+   "id": 834,
+   "key": "StormTigerTier2"
+  },
+  {
+   "id": 835,
+   "key": "StormTigerTier3"
+  },
+  {
+   "id": 836,
+   "key": "DandelionSeed"
+  },
+  {
+   "id": 837,
+   "key": "BookOfSkullsSkull"
+  },
+  {
+   "id": 838,
+   "key": "KiteSandShark"
+  },
+  {
+   "id": 839,
+   "key": "KiteBunnyCorrupt"
+  },
+  {
+   "id": 840,
+   "key": "KiteBunnyCrimson"
+  },
+  {
+   "id": 841,
+   "key": "BlandWhip"
+  },
+  {
+   "id": 842,
+   "key": "RulerStab"
+  },
+  {
+   "id": 843,
+   "key": "KiteGoldfish"
+  },
+  {
+   "id": 844,
+   "key": "KiteAngryTrapper"
+  },
+  {
+   "id": 845,
+   "key": "KiteKoi"
+  },
+  {
+   "id": 846,
+   "key": "KiteCrawltipede"
+  },
+  {
+   "id": 847,
+   "key": "SwordWhip"
+  },
+  {
+   "id": 848,
+   "key": "MaceWhip"
+  },
+  {
+   "id": 849,
+   "key": "ScytheWhip"
+  },
+  {
+   "id": 850,
+   "key": "KiteSpectrum"
+  },
+  {
+   "id": 851,
+   "key": "ReleaseDoves"
+  },
+  {
+   "id": 852,
+   "key": "KiteWanderingEye"
+  },
+  {
+   "id": 853,
+   "key": "KiteUnicorn"
+  },
+  {
+   "id": 854,
+   "key": "Plantero"
+  },
+  {
+   "id": 855,
+   "key": "ReleaseLantern"
+  },
+  {
+   "id": 856,
+   "key": "SparkleGuitar"
+  },
+  {
+   "id": 857,
+   "key": "FirstFractal"
+  },
+  {
+   "id": 858,
+   "key": "DynamiteKitten"
+  },
+  {
+   "id": 859,
+   "key": "BabyWerewolf"
+  },
+  {
+   "id": 860,
+   "key": "ShadowMimic"
+  },
+  {
+   "id": 861,
+   "key": "Football"
+  },
+  {
+   "id": 862,
+   "key": "ClusterSnowmanFragmentsI"
+  },
+  {
+   "id": 863,
+   "key": "ClusterSnowmanFragmentsII"
+  },
+  {
+   "id": 864,
+   "key": "Smolstar"
+  },
+  {
+   "id": 865,
+   "key": "SquirrelHook"
+  },
+  {
+   "id": 866,
+   "key": "BouncingShield"
+  },
+  {
+   "id": 867,
+   "key": "Shroomerang"
+  },
+  {
+   "id": 868,
+   "key": "TreeGlobe"
+  },
+  {
+   "id": 869,
+   "key": "WorldGlobe"
+  },
+  {
+   "id": 870,
+   "key": "FairyGlowstick"
+  },
+  {
+   "id": 871,
+   "key": "HallowBossSplitShotCore"
+  },
+  {
+   "id": 872,
+   "key": "HallowBossLastingRainbow"
+  },
+  {
+   "id": 873,
+   "key": "HallowBossRainbowStreak"
+  },
+  {
+   "id": 874,
+   "key": "HallowBossDeathAurora"
+  },
+  {
+   "id": 875,
+   "key": "VoltBunny"
+  },
+  {
+   "id": 876,
+   "key": "ZapinatorLaser"
+  },
+  {
+   "id": 877,
+   "key": "JoustingLance"
+  },
+  {
+   "id": 878,
+   "key": "ShadowJoustingLance"
+  },
+  {
+   "id": 879,
+   "key": "HallowJoustingLance"
+  },
+  {
+   "id": 880,
+   "key": "ZoologistStrikeGreen"
+  },
+  {
+   "id": 881,
+   "key": "KingSlimePet"
+  },
+  {
+   "id": 882,
+   "key": "EyeOfCthulhuPet"
+  },
+  {
+   "id": 883,
+   "key": "EaterOfWorldsPet"
+  },
+  {
+   "id": 884,
+   "key": "BrainOfCthulhuPet"
+  },
+  {
+   "id": 885,
+   "key": "SkeletronPet"
+  },
+  {
+   "id": 886,
+   "key": "QueenBeePet"
+  },
+  {
+   "id": 887,
+   "key": "DestroyerPet"
+  },
+  {
+   "id": 888,
+   "key": "TwinsPet"
+  },
+  {
+   "id": 889,
+   "key": "SkeletronPrimePet"
+  },
+  {
+   "id": 890,
+   "key": "PlanteraPet"
+  },
+  {
+   "id": 891,
+   "key": "GolemPet"
+  },
+  {
+   "id": 892,
+   "key": "DukeFishronPet"
+  },
+  {
+   "id": 893,
+   "key": "LunaticCultistPet"
+  },
+  {
+   "id": 894,
+   "key": "MoonLordPet"
+  },
+  {
+   "id": 895,
+   "key": "FairyQueenPet"
+  },
+  {
+   "id": 896,
+   "key": "PumpkingPet"
+  },
+  {
+   "id": 897,
+   "key": "EverscreamPet"
+  },
+  {
+   "id": 898,
+   "key": "IceQueenPet"
+  },
+  {
+   "id": 899,
+   "key": "MartianPet"
+  },
+  {
+   "id": 900,
+   "key": "DD2OgrePet"
+  },
+  {
+   "id": 901,
+   "key": "DD2BetsyPet"
+  },
+  {
+   "id": 902,
+   "key": "CombatWrench"
+  },
+  {
+   "id": 903,
+   "key": "WetBomb"
+  },
+  {
+   "id": 904,
+   "key": "LavaBomb"
+  },
+  {
+   "id": 905,
+   "key": "HoneyBomb"
+  },
+  {
+   "id": 906,
+   "key": "DryBomb"
+  },
+  {
+   "id": 907,
+   "key": "OrnamentStar"
+  },
+  {
+   "id": 908,
+   "key": "TitaniumStormShard"
+  },
+  {
+   "id": 909,
+   "key": "RockGolemRock"
+  },
+  {
+   "id": 910,
+   "key": "DirtBomb"
+  },
+  {
+   "id": 911,
+   "key": "DirtStickyBomb"
+  },
+  {
+   "id": 912,
+   "key": "CoolWhip"
+  },
+  {
+   "id": 913,
+   "key": "FireWhip"
+  },
+  {
+   "id": 914,
+   "key": "ThornWhip"
+  },
+  {
+   "id": 915,
+   "key": "RainbowWhip"
+  },
+  {
+   "id": 916,
+   "key": "ScytheWhipProj"
+  },
+  {
+   "id": 917,
+   "key": "CoolWhipProj"
+  },
+  {
+   "id": 918,
+   "key": "FireWhipProj"
+  },
+  {
+   "id": 919,
+   "key": "FairyQueenLance"
+  },
+  {
+   "id": 920,
+   "key": "QueenSlimeMinionBlueSpike"
+  },
+  {
+   "id": 921,
+   "key": "QueenSlimeMinionPinkBall"
+  },
+  {
+   "id": 922,
+   "key": "QueenSlimeSmash"
+  },
+  {
+   "id": 923,
+   "key": "FairyQueenSunDance"
+  },
+  {
+   "id": 924,
+   "key": "FairyQueenHymn"
+  },
+  {
+   "id": 925,
+   "key": "StardustPunch"
+  },
+  {
+   "id": 926,
+   "key": "QueenSlimeGelAttack"
+  },
+  {
+   "id": 927,
+   "key": "PiercingStarlight"
+  },
+  {
+   "id": 928,
+   "key": "DripplerFlailExtraBall"
+  },
+  {
+   "id": 929,
+   "key": "ZoologistStrikeRed"
+  },
+  {
+   "id": 930,
+   "key": "SantankMountRocket"
+  },
+  {
+   "id": 931,
+   "key": "FairyQueenMagicItemShot"
+  },
+  {
+   "id": 932,
+   "key": "FairyQueenRangedItemShot"
+  },
+  {
+   "id": 933,
+   "key": "FinalFractal"
+  },
+  {
+   "id": 934,
+   "key": "QueenSlimePet"
+  },
+  {
+   "id": 935,
+   "key": "QueenSlimeHook"
+  },
+  {
+   "id": 936,
+   "key": "GelBalloon"
+  },
+  {
+   "id": 937,
+   "key": "VolatileGelatinBall"
+  },
+  {
+   "id": 938,
+   "key": "CopperShortswordStab"
+  },
+  {
+   "id": 939,
+   "key": "TinShortswordStab"
+  },
+  {
+   "id": 940,
+   "key": "IronShortswordStab"
+  },
+  {
+   "id": 941,
+   "key": "LeadShortswordStab"
+  },
+  {
+   "id": 942,
+   "key": "SilverShortswordStab"
+  },
+  {
+   "id": 943,
+   "key": "TungstenShortswordStab"
+  },
+  {
+   "id": 944,
+   "key": "GoldShortswordStab"
+  },
+  {
+   "id": 945,
+   "key": "PlatinumShortswordStab"
+  },
+  {
+   "id": 946,
+   "key": "EmpressBlade"
+  },
+  {
+   "id": 947,
+   "key": "Mace"
+  },
+  {
+   "id": 948,
+   "key": "FlamingMace"
+  },
+  {
+   "id": 949,
+   "key": "TorchGod"
+  },
+  {
+   "id": 950,
+   "key": "PrincessWeapon"
+  },
+  {
+   "id": 951,
+   "key": "FlinxMinion"
+  },
+  {
+   "id": 952,
+   "key": "BoneWhip"
+  },
+  {
+   "id": 953,
+   "key": "DaybreakExplosion"
+  },
+  {
+   "id": 954,
+   "key": "WandOfSparkingSpark"
+  },
+  {
+   "id": 955,
+   "key": "StarCannonStar"
+  },
+  {
+   "id": 956,
+   "key": "BerniePet"
+  },
+  {
+   "id": 957,
+   "key": "GlommerPet"
+  },
+  {
+   "id": 958,
+   "key": "DeerclopsPet"
+  },
+  {
+   "id": 959,
+   "key": "PigPet"
+  },
+  {
+   "id": 960,
+   "key": "ChesterPet"
+  },
+  {
+   "id": 961,
+   "key": "DeerclopsIceSpike"
+  },
+  {
+   "id": 962,
+   "key": "DeerclopsRangedProjectile"
+  },
+  {
+   "id": 963,
+   "key": "AbigailMinion"
+  },
+  {
+   "id": 964,
+   "key": "InsanityShadowFriendly"
+  },
+  {
+   "id": 965,
+   "key": "InsanityShadowHostile"
+  },
+  {
+   "id": 966,
+   "key": "HoundiusShootius"
+  },
+  {
+   "id": 967,
+   "key": "HoundiusShootiusFireball"
+  },
+  {
+   "id": 968,
+   "key": "PewMaticHornShot"
+  },
+  {
+   "id": 969,
+   "key": "WeatherPainShot"
+  },
+  {
+   "id": 970,
+   "key": "AbigailCounter"
+  },
+  {
+   "id": 971,
+   "key": "TentacleSpike"
+  },
+  {
+   "id": 972,
+   "key": "NightsEdge"
+  },
+  {
+   "id": 973,
+   "key": "TrueNightsEdge"
+  },
+  {
+   "id": 974,
+   "key": "LightsBane"
+  },
+  {
+   "id": 975,
+   "key": "BloodButcherer"
+  },
+  {
+   "id": 976,
+   "key": "BladeOfGrass"
+  },
+  {
+   "id": 977,
+   "key": "Muramasa"
+  },
+  {
+   "id": 978,
+   "key": "Volcano"
+  },
+  {
+   "id": 979,
+   "key": "WandOfFrostingFrost"
+  },
+  {
+   "id": 980,
+   "key": "VenomDartTrap"
+  },
+  {
+   "id": 981,
+   "key": "SilverBullet"
+  },
+  {
+   "id": 982,
+   "key": "Excalibur"
+  },
+  {
+   "id": 983,
+   "key": "TrueExcalibur"
+  },
+  {
+   "id": 984,
+   "key": "TerraBlade2"
+  },
+  {
+   "id": 985,
+   "key": "TerraBlade2Shot"
+  },
+  {
+   "id": 986,
+   "key": "FishingBobber"
+  },
+  {
+   "id": 987,
+   "key": "FishingBobberGlowingStar"
+  },
+  {
+   "id": 988,
+   "key": "FishingBobberGlowingLava"
+  },
+  {
+   "id": 989,
+   "key": "FishingBobberGlowingKrypton"
+  },
+  {
+   "id": 990,
+   "key": "FishingBobberGlowingXenon"
+  },
+  {
+   "id": 991,
+   "key": "FishingBobberGlowingArgon"
+  },
+  {
+   "id": 992,
+   "key": "FishingBobberGlowingViolet"
+  },
+  {
+   "id": 993,
+   "key": "FishingBobberGlowingRainbow"
+  },
+  {
+   "id": 994,
+   "key": "JunimoPet"
+  },
+  {
+   "id": 995,
+   "key": "JuminoStardropAnimation"
+  },
+  {
+   "id": 996,
+   "key": "MoonGlobe"
+  },
+  {
+   "id": 997,
+   "key": "TheHorsemansBlade"
+  },
+  {
+   "id": 998,
+   "key": "BlueChickenPet"
+  },
+  {
+   "id": 999,
+   "key": "HiveFive"
+  },
+  {
+   "id": 1000,
+   "key": "Trimarang"
+  },
+  {
+   "id": 1001,
+   "key": "HorsemanPumpkin"
+  },
+  {
+   "id": 1002,
+   "key": "TNTBarrel"
+  },
+  {
+   "id": 1003,
+   "key": "Spiffo"
+  },
+  {
+   "id": 1004,
+   "key": "CavelingGardener"
+  },
+  {
+   "id": 1005,
+   "key": "MiniBoulder"
+  },
+  {
+   "id": 1006,
+   "key": "ShimmerArrow"
+  },
+  {
+   "id": 1007,
+   "key": "GasTrap"
+  },
+  {
+   "id": 1008,
+   "key": "SpelunkerFlare"
+  },
+  {
+   "id": 1009,
+   "key": "CursedFlare"
+  },
+  {
+   "id": 1010,
+   "key": "RainbowFlare"
+  },
+  {
+   "id": 1011,
+   "key": "ShimmerFlare"
+  },
+  {
+   "id": 1012,
+   "key": "Waffle"
+  },
+  {
+   "id": 1013,
+   "key": "BouncyBoulder"
+  },
+  {
+   "id": 1014,
+   "key": "LifeCrystalBoulder"
+  },
+  {
+   "id": 1015,
+   "key": "SandSpray"
+  },
+  {
+   "id": 1016,
+   "key": "SnowSpray"
+  },
+  {
+   "id": 1017,
+   "key": "DirtSpray"
+  },
+  {
+   "id": 1018,
+   "key": "DirtiestBlock"
+  },
+  {
+   "id": 1019,
+   "key": "Fertilizer"
+  },
+  {
+   "id": 1020,
+   "key": "JimsDrone"
+  },
+  {
+   "id": 1021,
+   "key": "MoonBoulder"
+  },
+  {
+   "id": 1022,
+   "key": "DeadCellsMushroomBoiMinion"
+  },
+  {
+   "id": 1023,
+   "key": "DeadCellsBarrel"
+  },
+  {
+   "id": 1024,
+   "key": "DeadCellsKillingDeckCard"
+  },
+  {
+   "id": 1025,
+   "key": "DeadCellsBarnacle"
+  },
+  {
+   "id": 1026,
+   "key": "DeadCellsBarnacleShot"
+  },
+  {
+   "id": 1027,
+   "key": "DeadCellsSwarmBiter"
+  },
+  {
+   "id": 1028,
+   "key": "CobWhip"
+  },
+  {
+   "id": 1029,
+   "key": "CorruptWhip"
+  },
+  {
+   "id": 1030,
+   "key": "CrimsonWhip"
+  },
+  {
+   "id": 1031,
+   "key": "MeteorWhip"
+  },
+  {
+   "id": 1032,
+   "key": "FlowerWhip"
+  },
+  {
+   "id": 1033,
+   "key": "EelWhip"
+  },
+  {
+   "id": 1034,
+   "key": "ConstellationWhip"
+  },
+  {
+   "id": 1035,
+   "key": "MoonLordWhip"
+  },
+  {
+   "id": 1036,
+   "key": "CobWhipSpider"
+  },
+  {
+   "id": 1037,
+   "key": "MeteorWhipMeteor"
+  },
+  {
+   "id": 1038,
+   "key": "FlowerWhipPetal"
+  },
+  {
+   "id": 1039,
+   "key": "ConstellationStar"
+  },
+  {
+   "id": 1040,
+   "key": "DeadCellsFlint"
+  },
+  {
+   "id": 1041,
+   "key": "DeadCellsFlintShot"
+  },
+  {
+   "id": 1042,
+   "key": "ShimmerGunStream"
+  },
+  {
+   "id": 1043,
+   "key": "DeadCellsFlintSlash"
+  },
+  {
+   "id": 1044,
+   "key": "DeadCellsMushroomBoiMinionExplosion"
+  },
+  {
+   "id": 1045,
+   "key": "MoonLordWhipProc"
+  },
+  {
+   "id": 1046,
+   "key": "Pufferfish"
+  },
+  {
+   "id": 1047,
+   "key": "RainbowBoulder"
+  },
+  {
+   "id": 1048,
+   "key": "Poulder"
+  },
+  {
+   "id": 1049,
+   "key": "MeteorStormMeteor"
+  },
+  {
+   "id": 1050,
+   "key": "AxeFairyPet"
+  },
+  {
+   "id": 1051,
+   "key": "SuperFertilizer"
+  },
+  {
+   "id": 1052,
+   "key": "Axearang"
+  },
+  {
+   "id": 1053,
+   "key": "LavaBoulder"
+  },
+  {
+   "id": 1054,
+   "key": "SpiderBoulder"
+  },
+  {
+   "id": 1055,
+   "key": "Ghoulder"
+  },
+  {
+   "id": 1056,
+   "key": "BoulderPet"
+  },
+  {
+   "id": 1057,
+   "key": "BoulderThatSpawnsPet"
+  },
+  {
+   "id": 1058,
+   "key": "FlaironFlail"
+  },
+  {
+   "id": 1059,
+   "key": "BluePhaseblade"
+  },
+  {
+   "id": 1060,
+   "key": "RedPhaseblade"
+  },
+  {
+   "id": 1061,
+   "key": "GreenPhaseblade"
+  },
+  {
+   "id": 1062,
+   "key": "PurplePhaseblade"
+  },
+  {
+   "id": 1063,
+   "key": "WhitePhaseblade"
+  },
+  {
+   "id": 1064,
+   "key": "YellowPhaseblade"
+  },
+  {
+   "id": 1065,
+   "key": "BluePhasesaber"
+  },
+  {
+   "id": 1066,
+   "key": "RedPhasesaber"
+  },
+  {
+   "id": 1067,
+   "key": "GreenPhasesaber"
+  },
+  {
+   "id": 1068,
+   "key": "PurplePhasesaber"
+  },
+  {
+   "id": 1069,
+   "key": "WhitePhasesaber"
+  },
+  {
+   "id": 1070,
+   "key": "YellowPhasesaber"
+  },
+  {
+   "id": 1071,
+   "key": "OrangePhaseblade"
+  },
+  {
+   "id": 1072,
+   "key": "OrangePhasesaber"
+  },
+  {
+   "id": 1073,
+   "key": "PoisonDartShotFromSlimes"
+  },
+  {
+   "id": 1074,
+   "key": "Keybrand"
+  },
+  {
+   "id": 1075,
+   "key": "PinkPhaseblade"
+  },
+  {
+   "id": 1076,
+   "key": "PinkPhasesaber"
+  },
+  {
+   "id": 1077,
+   "key": "FreezeBomb"
+  },
+  {
+   "id": 1078,
+   "key": "MeteorOre"
+  },
+  {
+   "id": 1079,
+   "key": "PinkCounterweight"
+  },
+  {
+   "id": 1080,
+   "key": "BirdDroppings"
+  },
+  {
+   "id": 1081,
+   "key": "MudBallPlayer"
+  },
+  {
+   "id": 1082,
+   "key": "AntlionClaw"
+  },
+  {
+   "id": 1083,
+   "key": "StylistKilLaKillScissorsIWish"
+  },
+  {
+   "id": 1084,
+   "key": "TorchGodHelper"
+  },
+  {
+   "id": 1085,
+   "key": "PrettyMirror"
+  },
+  {
+   "id": 1086,
+   "key": "SuperBomb"
+  },
+  {
+   "id": 1087,
+   "key": "SuperStickyBomb"
+  },
+  {
+   "id": 1088,
+   "key": "AcornSlingshotAcorn"
+  },
+  {
+   "id": 1089,
+   "key": "RainbowGlowstick"
+  },
+  {
+   "id": 1090,
+   "key": "RainbowBoulderPet"
+  },
+  {
+   "id": 1091,
+   "key": "StormLightning"
+  },
+  {
+   "id": 1092,
+   "key": "LibrarianSkeletonBook"
+  },
+  {
+   "id": 1093,
+   "key": "PalworldMinionCattiva"
+  },
+  {
+   "id": 1094,
+   "key": "PalworldMinionFoxsparks"
+  },
+  {
+   "id": 1095,
+   "key": "PalworldPetChillet"
+  },
+  {
+   "id": 1096,
+   "key": "PalworldPetChilletIgnis"
+  },
+  {
+   "id": 1097,
+   "key": "PalworldMinionFoxsparksFireball"
+  },
+  {
+   "id": 1098,
+   "key": "PalworldDigtoise"
+  },
+  {
+   "id": 1099,
+   "key": "SoundGun"
+  },
+  {
+   "id": 1100,
+   "key": "TrueCopperShortsword"
+  },
+  {
+   "id": 1101,
+   "key": "RainbowPhaseblade"
+  },
+  {
+   "id": 1102,
+   "key": "RainbowPhasesaber"
+  },
+  {
+   "id": 1103,
+   "key": "SlimeSpear"
+  },
+  {
+   "id": 1104,
+   "key": "SlimeWhip"
+  },
+  {
+   "id": 1105,
+   "key": "RemoteControlCar"
+  },
+  {
+   "id": 1106,
+   "key": "PalworldMinionFoxsparksFlames"
+  },
+  {
+   "id": 1107,
+   "key": "ObsidianFire"
+  },
+  {
+   "id": 1108,
+   "key": "ObsidianFire2"
+  },
+  {
+   "id": 1109,
+   "key": "ObsidianFire3"
+  },
+  {
+   "id": 1110,
+   "key": "SkyDragonsFuryElectrosphere"
+  },
+  {
+   "id": 1111,
+   "key": "MeleeBone"
+  },
+  {
+   "id": 1112,
+   "key": "PalworldMinionTrustyCattiva"
+  },
+  {
+   "id": 1113,
+   "key": "PalworldMinionTrustyFoxsparks"
+  },
+  {
+   "id": 1114,
+   "key": "DaybloomStaffShot"
+  },
+  {
+   "id": 1115,
+   "key": "GlacierFangShot"
+  },
+  {
+   "id": 1116,
+   "key": "PetalstormShot"
+  },
+  {
+   "id": 1117,
+   "key": "LightningStrikeShot"
+  },
+  {
+   "id": 1118,
+   "key": "ClayPotMinion"
+  },
+  {
+   "id": 1119,
+   "key": "ForbiddenMinion"
+  },
+  {
+   "id": 1120,
+   "key": "ForbiddenMinionShot"
+  },
+  {
+   "id": 1121,
+   "key": "SnappingStoneEffect"
+  },
+  {
+   "id": 1122,
+   "key": "ArcSurge"
+  },
+  {
+   "id": 1123,
+   "key": "PalworldTrustyDigtoise"
+  },
+  {
+   "id": 1124,
+   "key": "BoneShard"
+  },
+  {
+   "id": 1125,
+   "key": "CascadeExplosion"
+  },
+  {
+   "id": 1126,
+   "key": "ChlorophyteClaymoreBlade"
+  },
+  {
+   "id": 1127,
+   "key": "ChlorophyteSaberStab"
+  },
+  {
+   "id": 1128,
+   "key": "ChlorophyteClaymoreSporeCloud"
+  },
+  {
+   "id": 1129,
+   "key": "ChlorophyteClaymoreBladeSlam"
+  },
+  {
+   "id": 1130,
+   "key": "TheEyeOfCthulhuDash"
+  },
+  {
+   "id": 1131,
+   "key": "SnappingStoneMeleeEffect"
+  },
+  {
+   "id": 1132,
+   "key": "SnappingStoneSummonEffect"
+  },
+  {
+   "id": 1133,
+   "key": "SnakeBandStarCloakTinkerStar"
+  },
+  {
+   "id": 1134,
+   "key": "CrystalShardMelee"
+  },
+  {
+   "id": 1135,
+   "key": "KrakenWave"
+  }
+ ]
+}
