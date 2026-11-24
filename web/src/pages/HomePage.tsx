@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { GalleryVerticalEnd, RefreshCw, Terminal } from 'lucide-react'
-import { COMMAND_CARD_BY_ID, homeCardIcon, type CommandCardId } from '@/components/home/commandCards'
+import { COMMAND_CARDS, COMMAND_CARD_BY_ID, homeCardIcon, type CommandCardId } from '@/components/home/commandCards'
 import { IconAction } from '@/components/IconAction'
 import {
   EventsCard,
@@ -55,11 +55,10 @@ import type { CommandResult, Dataset, HistoryEntry, TabId } from '@/types'
 const RECENT_LIMIT = 5
 
 /**
- * 默认**不自动执行**的内置卡片：世界信息 / 我的背包。
- * 它们变动频繁、只在需要时看，进页面顺手打两条指令不值（默认值而已：
- * 在「管理卡片」里打开自动执行后照旧生效）。
+ * 默认**不自动执行**的卡片：首页内置指令卡全部手动（进页面不掉一屏指令，想看哪张点哪张）。
+ * 自定义卡片同样默认手动，见下面的 `cardIsManual`。仍可在「管理卡片」里单张改成自动执行。
  */
-const MANUAL_BY_DEFAULT = new Set<string>(['world', 'lookbag'])
+const MANUAL_BY_DEFAULT = new Set<string>(COMMAND_CARDS.map((card) => card.id))
 
 interface HomePageProps {
   dataset: Dataset
@@ -164,7 +163,7 @@ export function HomePage({
     const sanitized = sanitizeHomeCards(storedPrefs)
     if (prefs.layoutVersion !== sanitized.layoutVersion) setPrefs(prefs)
   }, [prefs, storedPrefs, setPrefs])
-  // 卡片「手动执行」偏好（tswui:autoExec）；默认全部自动。
+  // 卡片「手动执行」偏好（tswui:autoExec）；首页指令卡默认全部手动。
   const [rawAutoExec, setAutoExec] = useLocalState(StorageKeys.autoExec, DEFAULT_AUTO_EXEC)
   const autoExec = useMemo(() => sanitizeAutoExec(rawAutoExec), [rawAutoExec])
   const setCardManual = useCallback(
@@ -296,16 +295,17 @@ export function HomePage({
   )
 
   /**
-   * 严格按首页实际卡片顺序入队（跳过隐藏、手动执行与无指令的卡片）。
-   * `skipMissing=false` 用于手动「刷新全部」：缺插件的卡片也重跑一次，装上插件后能立即恢复。
+   * 严格按首页实际卡片顺序入队（跳过隐藏、无指令的卡片）。
+   * `skipMissing=false` / `includeManual=true` 用于手动「刷新全部」：缺插件的卡片也重跑一次
+   * （装上插件后能立即恢复），手动执行的卡片也一并跑（这个按钮就是「现在全都跑一遍」）。
    */
-  const enqueueVisibleCommands = useCallback((skipMissing = true) => {
+  const enqueueVisibleCommands = useCallback((skipMissing = true, includeManual = false) => {
     const { order, hidden, custom } = prefsRef.current
     const customById = new Map(custom.map((c) => [c.id, c]))
     for (const id of order) {
       if (hidden[id]) continue
       if (skipMissing && pluginMissingRef.current(id)) continue
-      if (cardIsManualRef.current(id)) continue
+      if (!includeManual && cardIsManualRef.current(id)) continue
       if (isBuiltinCardId(id)) {
         const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
         if (!def) continue
@@ -324,30 +324,33 @@ export function HomePage({
     }
   }, [username, queueCommand, queueCustomCommand, dataset])
 
-  /** 按首页顺序收集所有会执行的指令（key 为结果存储键，与卡片 id 一致）。 */
-  const collectBatchEntries = useCallback((skipMissing = true): { key: string; cmd: string }[] => {
-    const { order, hidden, custom } = prefsRef.current
-    const customById = new Map(custom.map((c) => [c.id, c]))
-    const entries: { key: string; cmd: string }[] = []
-    for (const id of order) {
-      if (hidden[id]) continue
-      if (skipMissing && pluginMissingRef.current(id)) continue
-      if (cardIsManualRef.current(id)) continue
-      if (isBuiltinCardId(id)) {
-        const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
-        if (!def) continue
-        const cmd = def.cmd(username)
-        if (cmd) entries.push({ key: id, cmd })
-      } else if (isCustomCardId(id)) {
-        const card = customById.get(id)
-        if (!card) continue
-        if (needsUserInput(card)) continue
-        const run = cardRunState(dataset, card)
-        if (run.command) entries.push({ key: card.id, cmd: run.command })
+  /** 按首页顺序收集所有可执行的指令（key 为结果存储键，与卡片 id 一致）。 */
+  const collectBatchEntries = useCallback(
+    (skipMissing = true, includeManual = false): { key: string; cmd: string }[] => {
+      const { order, hidden, custom } = prefsRef.current
+      const customById = new Map(custom.map((c) => [c.id, c]))
+      const entries: { key: string; cmd: string }[] = []
+      for (const id of order) {
+        if (hidden[id]) continue
+        if (skipMissing && pluginMissingRef.current(id)) continue
+        if (!includeManual && cardIsManualRef.current(id)) continue
+        if (isBuiltinCardId(id)) {
+          const def = COMMAND_CARD_BY_ID.get(id as CommandCardId)
+          if (!def) continue
+          const cmd = def.cmd(username)
+          if (cmd) entries.push({ key: id, cmd })
+        } else if (isCustomCardId(id)) {
+          const card = customById.get(id)
+          if (!card) continue
+          if (needsUserInput(card)) continue
+          const run = cardRunState(dataset, card)
+          if (run.command) entries.push({ key: card.id, cmd: run.command })
+        }
       }
-    }
-    return entries
-  }, [username, dataset])
+      return entries
+    },
+    [username, dataset],
+  )
 
   /** 一次请求执行全部卡片指令，并把结果分发回各卡片。 */
   const runBatchEntries = useCallback(
@@ -382,8 +385,8 @@ export function HomePage({
   )
 
   const enqueueBatch = useCallback(
-    (skipMissing = true) => {
-      const entries = collectBatchEntries(skipMissing)
+    (skipMissing = true, includeManual = false) => {
+      const entries = collectBatchEntries(skipMissing, includeManual)
       if (entries.length === 0) return
       enqueue({
         key: 'home:__batch__',
@@ -415,9 +418,9 @@ export function HomePage({
       const scope = refreshScope(serverId, 'home')
       if (!force && !isRefreshDue(scope, refreshInterval)) return
       if (force) {
-        // 手动「刷新全部」= 重新探测一遍依赖插件的卡片：缺插件的卡片也重跑（下面 skipMissing=false），
-        // 并重探 PlayerManager。装上插件后不用刷新整个页面，点一下「刷新全部」卡片就回来；
-        // 仍然缺插件的卡片保持原标记（不隐藏再出现，避免闪一下）。
+        // 手动「刷新全部」= 现在把可见卡片全跑一遍（含设为手动的），并重探依赖插件的卡片：
+        // 缺插件的卡片也重跑（下面 skipMissing=false），装上插件后点一下就能回来，
+        // 不用刷新整个页面；仍然缺插件的卡片保持原标记（不隐藏再出现，避免闪一下）。
         setPluginProbeToken((n) => n + 1)
       }
       await loadStatus()
@@ -425,8 +428,8 @@ export function HomePage({
       // 页面数据刷新同时连带刷新服务器动态。
       setFeedToken((n) => n + 1)
       const { mode, plugin } = batchRef.current
-      if (mode && plugin === true) enqueueBatch(!force)
-      else enqueueVisibleCommands(!force)
+      if (mode && plugin === true) enqueueBatch(!force, force)
+      else enqueueVisibleCommands(!force, force)
     },
     [authenticated, serverId, refreshInterval, loadStatus, enqueueVisibleCommands, enqueueBatch],
   )
@@ -493,8 +496,8 @@ export function HomePage({
   )
 
   const customById = useMemo(() => new Map(prefs.custom.map((c) => [c.id, c])), [prefs.custom])
-  // 卡片是否「不自动执行」：内置卡默认自动，世界信息 / 我的背包默认手动，
-  // 用户添加的卡片默认手动（只能点卡片自己的按钮跑）。
+  // 卡片是否「不自动执行」：内置指令卡与用户添加的卡片都默认手动
+  //（只能点卡片自己的按钮，或「刷新全部」一次性跑全部）；参数卡片恒手动。
   const cardIsManual = useCallback(
     (id: string) => {
       const card = customById.get(id)
@@ -522,8 +525,6 @@ export function HomePage({
     unavailableText?: string
     emptyText?: string
     footerNote?: ReactNode
-    /** 卡片底部左下角常显「上次刷新 …」（只有「游戏时间」卡用）。 */
-    showLastRunAt?: boolean
     onRefresh?: () => void
   }) => (
     <CommandCard
@@ -542,7 +543,6 @@ export function HomePage({
         opts.emptyText ?? (cardIsManual(opts.id) ? t('home.customClickRefresh') : undefined)
       }
       collapseKey={`home:${opts.id}`}
-      showLastRunAt={opts.showLastRunAt}
       onRefresh={opts.onRefresh}
       className="max-h-[48rem]"
       itemsById={dataset.itemsById}
@@ -564,9 +564,6 @@ export function HomePage({
       loading: busy(`home:${id}`),
       unavailable: !authenticated || !cmd,
       onRefresh: cmd ? () => queueCommand(id, cmd) : undefined,
-      // 只有「游戏时间」卡左下角常显刷新时刻：游戏内时间一直在走，
-      // 要对着现实时间看才知道卡片里的「当前时间是…」新不新。
-      showLastRunAt: id === 'time',
       footerNote: def.noteKey ? (
         <span className="text-2xs text-muted-foreground">{t(def.noteKey)}</span>
       ) : undefined,

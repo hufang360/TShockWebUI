@@ -36,24 +36,25 @@ describe('sanitizeHomeCards', () => {
     }
   })
 
-  it('补齐缺失内置卡片、去重、丢弃未知 id', () => {
+  it('补齐缺失内置卡片、去重、丢弃未知 id（含已移除的「游戏时间」）', () => {
     const prefs = sanitizeHomeCards({
-      order: ['online', 'online', 'ghost', 'time'],
+      order: ['online', 'online', 'ghost', 'time', 'world'],
       hidden: { online: true, ghost: true },
       custom: [],
     })
-    expect(prefs.order.slice(0, 2)).toEqual(['online', 'time'])
+    expect(prefs.order.slice(0, 2)).toEqual(['online', 'world'])
     expect(new Set(prefs.order).size).toBe(prefs.order.length)
     expect(prefs.order).toContain('server')
     expect(prefs.order).not.toContain('ghost')
+    expect(prefs.order).not.toContain('time')
     expect(prefs.hidden).toEqual({ online: true })
   })
 
   it('保留自定义卡片并把它们补进顺序', () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
-    const prefs = sanitizeHomeCards({ order: ['time'], custom: [card] })
+    const prefs = sanitizeHomeCards({ order: ['world'], custom: [card] })
     expect(prefs.custom).toEqual([{ id: card.id, name: '钓鲈鱼', command: 'fish 鲈鱼' }])
-    expect(prefs.order.indexOf(card.id)).toBeGreaterThan(prefs.order.indexOf('time'))
+    expect(prefs.order.indexOf(card.id)).toBeGreaterThan(prefs.order.indexOf('world'))
     expect(prefs.order).toContain('server')
   })
 
@@ -161,6 +162,7 @@ describe('默认配置', () => {
 
 describe('upgradeHomeCardsLayout', () => {
   it('v4：老默认顺序被换成 v4 的视觉默认，隐藏态保留', () => {
+    // 老布局里还带着已移除的「游戏时间」：sanitize 时丢弃，不影响「原封未动」的识别。
     const prefs = sanitizeHomeCards({
       order: ['server', 'events', 'quick', 'online', 'bossinfo', 'world', 'lookbag', 'time', 'bossdamage', 'alldeath', 'recent'],
       hidden: { alldeath: true },
@@ -175,7 +177,6 @@ describe('upgradeHomeCardsLayout', () => {
       'world',
       'lookbag',
       'online',
-      'time',
       'alldeath',
       'bossdamage',
       'bossinfo',
@@ -185,7 +186,7 @@ describe('upgradeHomeCardsLayout', () => {
 
   it('v4：用户自己排过的顺序原样保留（v4 起拖拽才真正生效）', () => {
     const prefs = sanitizeHomeCards({
-      order: ['world', 'server', 'lookbag', 'events', 'quick', 'recent', 'online', 'time', 'alldeath', 'bossdamage', 'bossinfo'],
+      order: ['world', 'server', 'lookbag', 'events', 'quick', 'recent', 'online', 'alldeath', 'bossdamage', 'bossinfo'],
       layoutVersion: 0,
     })
     const upgraded = upgradeHomeCardsLayout(prefs)
@@ -197,7 +198,7 @@ describe('upgradeHomeCardsLayout', () => {
     const card = createCustomCard('钓鲈鱼', 'fish')
     const thing = createCustomCard('第二条', 'who')
     const prefs = sanitizeHomeCards({
-      order: ['server', 'events', 'quick', 'online', 'bossinfo', 'world', 'lookbag', 'time', 'bossdamage', 'alldeath', 'recent', card.id, thing.id],
+      order: ['server', 'events', 'quick', 'online', 'bossinfo', 'world', 'lookbag', 'bossdamage', 'alldeath', 'recent', card.id, thing.id],
       custom: [card, thing],
     })
     const upgraded = upgradeHomeCardsLayout(prefs)
@@ -220,20 +221,20 @@ describe('卡片宽度', () => {
     expect(defaultCardWidth('recent')).toBe('right')
     expect(defaultCardWidth('bossinfo')).toBe('full')
     expect(defaultCardWidth('world')).toBe('half')
-    expect(defaultCardWidth('time')).toBe('half')
+    expect(defaultCardWidth('lookbag')).toBe('half')
     // 用户添加的卡片默认「小」。
     expect(defaultCardWidth('c:123')).toBe('half')
   })
 
   it('用户设置优先，非法值丢弃', () => {
     const prefs = sanitizeHomeCards({
-      width: { world: 'full', time: 'right', online: 'huge', 'c:nope': 'half' },
+      width: { world: 'full', lookbag: 'right', online: 'huge', 'c:nope': 'half' },
     })
     expect(cardWidth(prefs, 'world')).toBe('full')
-    expect(cardWidth(prefs, 'time')).toBe('right')
+    expect(cardWidth(prefs, 'lookbag')).toBe('right')
     expect(cardWidth(prefs, 'online')).toBe('half') // 非法 → 默认
     expect(cardWidth(prefs, 'server')).toBe('right')
-    expect(prefs.width).toEqual({ world: 'full', time: 'right' })
+    expect(prefs.width).toEqual({ world: 'full', lookbag: 'right' })
   })
 })
 

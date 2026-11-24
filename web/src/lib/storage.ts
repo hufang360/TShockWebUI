@@ -68,6 +68,10 @@ export const StorageKeys = {
   tilesSearchHistory: 'tiles:searchHistory',
   /** 数据 ID 的 Buff 速查表「最近搜索」（统一规则：最多 10 条）。 */
   buffsSearchHistory: 'buffs:searchHistory',
+  /** 数据 ID 的油漆 / 涂料速查表「最近搜索」（统一规则：最多 10 条）。 */
+  paintsSearchHistory: 'paints:searchHistory',
+  /** 数据 ID 的射弹速查表「最近搜索」（统一规则：最多 10 条）。 */
+  projectilesSearchHistory: 'projectiles:searchHistory',
   /** 侧栏全局搜索「最近搜索」（统一规则：最多 10 条；与各页面的历史互不影响）。 */
   globalSearchHistory: 'global:searchHistory',
   itemsRecent: 'items:recent',

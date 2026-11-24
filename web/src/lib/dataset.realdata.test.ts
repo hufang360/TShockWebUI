@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadDataset } from './dataset'
 import { locText } from './loc'
-import type { Item, LocalizationBundle, Prefix, RecipesData } from '@/types'
+import type { Item, LocalizationBundle, Prefix, RecipesData, TileNamesData } from '@/types'
 
 /**
  * 真实生成数据的一致性测试：语言拆分后 items/prefixes 不再带名字，
@@ -584,5 +584,207 @@ describe('真实数据：权限节点 / 内置用户组（permissions.json）', 
   it('权限节点没有重复', () => {
     const nodes = permissionsData.permissions.map((p) => p.node)
     expect(nodes).toHaveLength(new Set(nodes).size)
+  })
+})
+
+describe('真实数据：油漆 / 涂料（数据 ID）', () => {
+  const paints = readJson<{
+    meta: { count: number; paintCount: number; coatingCount: number; skipped: { id: number }[] }
+    entries: Array<{ id: number; group: string; key: string; item: number }>
+  }>('paints.json')
+
+  it('两套 ID 空间各自连续：油漆 1–30、涂料 1–2', () => {
+    const ids = (group: string) =>
+      paints.entries.filter((e) => e.group === group).map((e) => e.id)
+    expect(ids('paint')).toEqual(Array.from({ length: 30 }, (_, i) => i + 1))
+    expect(ids('coating')).toEqual([1, 2])
+    expect(paints.meta.count).toBe(paints.entries.length)
+    expect(paints.meta.paintCount).toBe(30)
+    expect(paints.meta.coatingCount).toBe(2)
+    // 31（1.4 前的 IlluminantPaint 别名，没有物品）明确记为跳过，不是漏收录
+    expect(paints.meta.skipped.map((s) => s.id)).toEqual([31])
+  })
+
+  it('每种漆都能对上真实物品（名称 / 图标都取它）', () => {
+    for (const entry of paints.entries) {
+      expect(allItemIds.has(entry.item)).toBe(true)
+    }
+  })
+
+  it('中英都能解析出名称，且两套 ID 空间的内部名不重复', () => {
+    for (const entry of paints.entries) {
+      const item = items.find((it) => it.id === entry.item)!
+      expect(locZh.ItemName?.[item.key]).toBeTruthy()
+      expect(locEn.ItemName?.[item.key]).toBeTruthy()
+    }
+    const keys = paints.entries.map((e) => `${e.group}:${e.key}`)
+    expect(keys).toHaveLength(new Set(keys).size)
+  })
+
+  it('loadDataset 解析出油漆名称（取对应物品的本地化名）', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const rel = String(input).replace(/^.*\/data\//, '')
+        try {
+          return new Response(readFileSync(resolve(dataDir, rel)), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        } catch {
+          return new Response('not found', { status: 404 })
+        }
+      }),
+    )
+    const ds = await loadDataset('zh')
+    const red = ds.paints.find((p) => p.group === 'paint' && p.id === 1)
+    expect(red?.key).toBe('RedPaint')
+    expect(red?.name).toBe('红漆')
+    const glow = ds.paints.find((p) => p.group === 'coating' && p.id === 1)
+    expect(glow?.name).toBe('夜明涂料')
+  })
+})
+
+describe('真实数据：射弹（数据 ID）', () => {
+  const projectiles = readJson<{
+    meta: { count: number }
+    projectiles: Array<{ id: number; key: string }>
+  }>('projectiles.json')
+  const atlas = readJson<{
+    meta: {
+      count: number
+      missing: number
+      empty: number
+      width: number
+      height: number
+      box: number
+      hash?: string
+      sheet: string
+    }
+    regions: Record<string, [number, number, number, number]>
+  }>('projectile-atlas.json')
+
+  it('id 0–1135 连续且不重名（常量名唯一）', () => {
+    expect(projectiles.projectiles.map((p) => p.id)).toEqual(
+      Array.from({ length: 1136 }, (_, i) => i),
+    )
+    expect(projectiles.meta.count).toBe(1136)
+    // 0 = None（不是射弹）；其余常量名唯一
+    const keys = projectiles.projectiles.filter((p) => p.id > 0).map((p) => p.key)
+    expect(keys).toHaveLength(new Set(keys).size)
+  })
+
+  it('名称走官方本地化 ProjectileName，绝大多数能解析', () => {
+    const named = projectiles.projectiles.filter((p) => locZh.ProjectileName?.[p.key]).length
+    expect(named).toBeGreaterThan(1000)
+    expect(projectiles.projectiles.filter((p) => locEn.ProjectileName?.[p.key]).length).toBe(named)
+    expect(locZh.ProjectileName!.KrakenWave).toBe('克拉肯球')
+  })
+
+  it('图集覆盖除空贴图外的每个射弹，且裁切框都在图集内', () => {
+    expect(atlas.meta.missing).toBe(0)
+    expect(atlas.meta.count + atlas.meta.empty).toBe(1136)
+    for (const p of projectiles.projectiles) {
+      const region = atlas.regions[String(p.id)]
+      if (!region) continue // 1×1 占位贴图不收录
+      const [x, y, w, h] = region
+      // 1×1 占位贴图已排除；剩下的可能是一条 1px 宽的长条（激光类），但不会两边都 ≤1
+      expect(Math.max(w, h)).toBeGreaterThan(1)
+      // 等比缩进 box 方框（只缩不放）：不会超过 box
+      expect(Math.max(w, h)).toBeLessThanOrEqual(atlas.meta.box)
+      expect(x + w).toBeLessThanOrEqual(atlas.meta.width)
+      expect(y + h).toBeLessThanOrEqual(atlas.meta.height)
+    }
+    // 图集带内容哈希（防「旧坐标 + 新 PNG」错位）
+    expect(atlas.meta.hash).toBeTruthy()
+    expect(atlas.meta.sheet).toBe('projectile-atlas.webp')
+  })
+
+  it('loadDataset 解析出射弹名称；没有官方名的回退内部名', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const rel = String(input).replace(/^.*\/data\//, '')
+        try {
+          return new Response(readFileSync(resolve(dataDir, rel)), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        } catch {
+          return new Response('not found', { status: 404 })
+        }
+      }),
+    )
+    const ds = await loadDataset('zh')
+    expect(ds.projectilesById.get(1)?.name).toBe('木箭')
+    expect(ds.projectiles.length).toBe(1136)
+    // 内部 / 占位 ID 没有官方名（含空字符串，如 None）→ 名称就是内部名
+    const unnamed = ds.projectiles.filter((p) => !locZh.ProjectileName?.[p.key])
+    expect(unnamed.length).toBeGreaterThan(50)
+    for (const p of unnamed) expect(p.name).toBe(p.key)
+    expect(ds.projectilesById.get(0)?.name).toBe('None')
+  })
+})
+
+describe('真实数据：图格 / 墙的显示名（补给表补齐）', () => {
+  const tileEntries = readJson<{ entries: Array<{ id: number; key: string; item: number | null }> }>(
+    'tiles.json',
+  ).entries
+  const wallEntries = readJson<{ entries: Array<{ id: number; key: string; item: number | null }> }>(
+    'walls.json',
+  ).entries
+  const overrides = readJson<{
+    meta: { tileCount: number; wallCount: number; source: string }
+    tiles: Record<string, string>
+    walls: Record<string, string>
+  }>('tile-name-overrides.json')
+  const tileNames = readJson<TileNamesData>('tile-names.json')
+
+  /** 页面 / 地图分析共用的命名链（与 `web/src/lib/tiles.ts` 一致，这里按真实数据复算一遍）。 */
+  const tileName = (id: number, key: string, item: number | null): string => {
+    const objectKey = tileNames.objects?.[String(id)]
+    if (objectKey && locZh.MapObject?.[objectKey]) return locZh.MapObject[objectKey]
+    const legend = tileNames.items?.[String(id)]
+    for (const candidate of [legend, item]) {
+      if (candidate == null) continue
+      const it = items.find((row) => row.id === candidate)
+      const name = it ? locZh.ItemName?.[it.key] : undefined
+      if (name) return name
+    }
+    return overrides.tiles[String(id)] ?? key
+  }
+  const wallName = (id: number, key: string, item: number | null): string => {
+    const it = item != null ? items.find((row) => row.id === item) : undefined
+    const name = it ? locZh.ItemName?.[it.key] : undefined
+    return name ?? overrides.walls[String(id)] ?? key
+  }
+
+  it('补给表只收游戏内无名的 ID，且每条都能在 tiles/walls 里找到（防止版本差异留下死条目）', () => {
+    const tileIds = new Set(tileEntries.map((t) => String(t.id)))
+    const wallIds = new Set(wallEntries.map((w) => String(w.id)))
+    for (const id of Object.keys(overrides.tiles)) expect(tileIds.has(id)).toBe(true)
+    for (const id of Object.keys(overrides.walls)) expect(wallIds.has(id)).toBe(true)
+    expect(Object.keys(overrides.tiles)).toHaveLength(overrides.meta.tileCount)
+    expect(Object.keys(overrides.walls)).toHaveLength(overrides.meta.wallCount)
+  })
+
+  it('补给表里没有平台标注 / 脚注残留（如「(电脑版、主机版、和移动版)」「[1]」）', () => {
+    for (const [id, name] of Object.entries({ ...overrides.tiles, ...overrides.walls })) {
+      expect(name.trim(), `id ${id}`).not.toBe('')
+      expect(name, `id ${id}`).not.toMatch(/版/)
+      expect(name, `id ${id}`).not.toMatch(/\[[^\]]*\]/)
+    }
+  })
+
+  it('所有图格都有中文显示名（不再出现 `Vines` / `JunglePlants` 这类内部名）', () => {
+    const fallback = tileEntries.filter((t) => tileName(t.id, t.key, t.item) === t.key)
+    expect(fallback.map((t) => `${t.id}:${t.key}`)).toEqual([])
+  })
+
+  it('墙：除 0 号（None = 没有墙）外都有显示名', () => {
+    const fallback = wallEntries
+      .filter((w) => wallName(w.id, w.key, w.item) === w.key)
+      .map((w) => `${w.id}:${w.key}`)
+    expect(fallback).toEqual(['0:None'])
   })
 })

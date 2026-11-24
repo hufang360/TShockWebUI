@@ -9,6 +9,7 @@ import { PrefixPicker } from '@/components/items/PrefixPicker'
 import { RecipePanel } from '@/components/RecipePanel'
 import { Button, DialogHeader, DialogTitle, DrawerHeader, DrawerTitle } from '@/components/ui'
 import { copyText } from '@/lib/clipboard'
+import { giveCommand as giveCommandFor } from '@/lib/commandFormat'
 import { useI18n } from '@/lib/i18n'
 import { formatItemTag, wikiUrl } from '@/lib/items'
 import { rankPrefixes } from '@/lib/prefixes'
@@ -109,12 +110,7 @@ export function ItemDetailPanel({
     (dataset.shimmerFromById.get(item.id)?.length ?? 0) > 0
 
   /** `/give <物品> <玩家> [数量] [词缀]`；有词缀时必须带数量 1。未登录不显示。 */
-  const playerArg = username && /\s/.test(username) ? `"${username}"` : username
-  const giveCommand = username
-    ? prefixId
-      ? `/give ${item.id} ${playerArg} 1 ${prefixId}`
-      : `/give ${item.id} ${playerArg}`
-    : null
+  const giveCommand = username ? giveCommandFor(username, item.id, prefixId) : null
 
   const copy = useCallback(
     async (kind: 'id' | 'name') => {

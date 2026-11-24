@@ -1,4 +1,13 @@
-import type { CommandDef, Dataset, Item, TileNamesData, TileWallData } from '@/types'
+import type {
+  CommandDef,
+  Dataset,
+  Item,
+  PaintEntry,
+  Projectile,
+  TileNameOverridesData,
+  TileNamesData,
+  TileWallData,
+} from '@/types'
 import { resolveTileName } from '@/lib/tiles'
 import { extraParamSetsFor } from '@/lib/commandMeta'
 
@@ -30,6 +39,10 @@ export const testItems: Item[] = [
     sprite: [56, 56],
     tags: ['武器'],
   },
+  // 油漆 / 涂料的「对应物品」（数据 ID 页的油漆 tab 用）。
+  { id: 1073, key: 'RedPaint', name: '红漆', icon: 1073, frames: 1, sprite: [20, 20], tags: [] },
+  { id: 1099, key: 'GrayPaint', name: '灰漆', icon: 1099, frames: 1, sprite: [20, 20], tags: [] },
+  { id: 4668, key: 'GlowPaint', name: '夜明涂料', icon: 4668, frames: 1, sprite: [24, 24], tags: [] },
 ]
 
 export const testCommands: CommandDef[] = [
@@ -190,6 +203,19 @@ const testBuffs = [
   { id: 2, key: 'Regeneration', name: '再生', tip: '提供生命再生', items: [29, 75] },
 ]
 
+/** 油漆 / 涂料 fixture：油漆 1 与涂料 1 数字重复（验证分组不会串）；名称取对应物品。 */
+const testPaints: PaintEntry[] = [
+  { id: 1, group: 'paint', key: 'RedPaint', item: 1073, name: '红漆' },
+  { id: 2, group: 'paint', key: 'GrayPaint', item: 1099, name: '灰漆' },
+  { id: 1, group: 'coating', key: 'Glow', item: 4668, name: '夜明涂料' },
+]
+
+/** 射弹 fixture：1 号有本地化名，2 号没有（回退内部名）。 */
+const testProjectiles: Projectile[] = [
+  { id: 1, key: 'WoodenArrowFriendly', name: '木箭' },
+  { id: 2, key: 'FireArrow', name: 'FireArrow' },
+]
+
 export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
   const items = overrides.items ?? testItems
   const commands = withCommandMeta(overrides.commands ?? testCommands)
@@ -223,16 +249,35 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
     items: { '12': 29 },
     objects: {},
   }
+  const testTileNameOverrides: TileNameOverridesData = {
+    meta: {
+      gameVersion: '1.4.5.8',
+      source: 'test',
+      generatedBy: 'test',
+      tileCount: 1,
+      wallCount: 1,
+      note: '',
+    },
+    // 图格 5（Trees）与墙 1 都没有代表物品 → 只能靠补给表（验证命名链最后一步）
+    tiles: { '5': '树木' },
+    walls: { '1': '石墙' },
+  }
   const tiles = overrides.tiles ?? testTiles
   const tileNames = overrides.tileNames ?? testTileNames
+  const tileNameOverrides = overrides.tileNameOverrides ?? testTileNameOverrides
   const itemsById = new Map(items.map((it) => [it.id, it]))
-  // 与生产一致：按「MapObject → 图例物品 → 代表物品 → 常量名」预计算显示名
+  // 与生产一致：按「MapObject → 图例物品 → 代表物品 → 补给表 → 常量名」预计算显示名
   const tileNameById =
     overrides.tileNameById ??
     new Map(
       tiles.entries.map((tile) => [
         tile.id,
-        resolveTileName(tile, { tileNames, loc: overrides.loc ?? ({} as Dataset['loc']), itemsById }),
+        resolveTileName(tile, {
+          tileNames,
+          tileNameOverrides,
+          loc: overrides.loc ?? ({} as Dataset['loc']),
+          itemsById,
+        }),
       ]),
     )
 
@@ -300,6 +345,7 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
       entries: [{ id: 1, key: 'Stone', item: 29 }],
     },
     tileNames,
+    tileNameOverrides,
     tileNameById,
     permissions: overrides.permissions ?? {
       meta: {
@@ -352,8 +398,22 @@ export function makeDataset(overrides: Partial<Dataset> = {}): Dataset {
       ],
     ]),
     buffsById: overrides.buffsById ?? new Map(testBuffs.map((b) => [b.id, b])),
+    paints: overrides.paints ?? testPaints,
+    projectiles: overrides.projectiles ?? testProjectiles,
+    projectilesById:
+      overrides.projectilesById ??
+      new Map((overrides.projectiles ?? testProjectiles).map((p) => [p.id, p])),
     loc: {
-      ItemName: { LifeCrystal: '生命水晶', FallenStar: '坠落之星', Zenith: '天顶剑', Wood: '木材' },
+      ItemName: {
+        LifeCrystal: '生命水晶',
+        FallenStar: '坠落之星',
+        Zenith: '天顶剑',
+        Wood: '木材',
+        RedPaint: '红漆',
+        GrayPaint: '灰漆',
+        GlowPaint: '夜明涂料',
+      },
+      ProjectileName: { WoodenArrowFriendly: '木箭' },
       Prefix: { Legendary: '传奇' },
       NPCName: { BlueSlime: '蓝史莱姆', EyeOfCthulhu: '克苏鲁之眼' },
       BuffName: { ObsidianSkin: '黑曜石皮', Regeneration: '再生' },

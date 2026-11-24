@@ -27,6 +27,8 @@ export type SearchGroupId =
   | 'buffs'
   | 'tiles'
   | 'walls'
+  | 'paints'
+  | 'projectiles'
   | 'goods'
   | 'collections'
 
@@ -39,6 +41,8 @@ export const SEARCH_GROUP_ORDER: SearchGroupId[] = [
   'buffs',
   'tiles',
   'walls',
+  'paints',
+  'projectiles',
   'goods',
   'collections',
 ]
@@ -61,6 +65,7 @@ export type SearchHitIcon =
   | { kind: 'item'; itemId: number }
   | { kind: 'npc'; id: number }
   | { kind: 'buff'; id: number }
+  | { kind: 'projectile'; id: number }
   | { kind: 'lucide'; icon: LucideIcon }
 
 export interface SearchHit {
@@ -131,7 +136,25 @@ const PAGE_ALIASES: Partial<Record<TabId, string[]>> = {
   home: ['首页', '主页', 'home', 'homepage'],
   editor: ['指令', '命令', '终端', '聊天', 'command', 'console', 'chat'],
   items: ['物品', '图鉴', '合成', 'id', 'item', 'items', 'craft'],
-  dataid: ['数据', 'npc', '怪物', 'buff', '图格', '区块', '墙', 'tile', 'wall', 'id'],
+  dataid: [
+    '数据',
+    'npc',
+    '怪物',
+    'buff',
+    '图格',
+    '区块',
+    '墙',
+    'tile',
+    'wall',
+    '油漆',
+    '涂料',
+    'paint',
+    'coating',
+    '射弹',
+    '弹幕',
+    'projectile',
+    'id',
+  ],
   tables: [
     '表格',
     '种子',
@@ -418,6 +441,59 @@ function matchWalls(sources: GlobalSearchSources, q: string): SearchHit[] {
   return collect(rows).map((r) => r.hit)
 }
 
+/**
+ * 油漆 / 涂料（两套独立 ID 空间：油漆 1 与涂料 1 是两条，`id` 带 group 前缀）。
+ * 图标用对应物品（漆桶 / 涂料桶）。
+ */
+function matchPaints(sources: GlobalSearchSources, q: string): SearchHit[] {
+  const rows: Scored[] = []
+  for (const entry of sources.dataset.paints) {
+    const score = rank(q, entry.name, entry.key, String(entry.id), String(entry.item))
+    if (score < 0) continue
+    rows.push({
+      score,
+      order: entry.group === 'paint' ? entry.id : 1000 + entry.id,
+      hit: hit(
+        'paints',
+        `${entry.group}:${entry.id}`,
+        entry.name,
+        { kind: 'prefill', tab: 'dataid', intent: { kind: 'paint', query: entry.name } },
+        {
+          meta: `#${entry.id}`,
+          copy: String(entry.id),
+          icon: { kind: 'item', itemId: entry.item },
+        },
+      ),
+    })
+  }
+  return collect(rows).map((r) => r.hit)
+}
+
+/** 射弹（名称 / 内部名 / ID）；约 100 个内部 ID 没有官方名，名称就是内部名。 */
+function matchProjectiles(sources: GlobalSearchSources, q: string): SearchHit[] {
+  const rows: Scored[] = []
+  for (const entry of sources.dataset.projectiles) {
+    const score = rank(q, entry.name, entry.key, String(entry.id))
+    if (score < 0) continue
+    rows.push({
+      score,
+      order: entry.id,
+      hit: hit(
+        'projectiles',
+        String(entry.id),
+        entry.name,
+        { kind: 'prefill', tab: 'dataid', intent: { kind: 'projectile', query: entry.name } },
+        {
+          meta: `#${entry.id}`,
+          copy: String(entry.id),
+          icon: { kind: 'projectile', id: entry.id },
+        },
+      ),
+    })
+  }
+  return collect(rows).map((r) => r.hit)
+}
+
 function matchGoods(sources: GlobalSearchSources, q: string): SearchHit[] {
   const rows: Scored[] = []
   sources.goods.forEach((good, index) => {
@@ -470,6 +546,8 @@ const SEE_ALL: Partial<Record<SearchGroupId, { tab: TabId }>> = {
   buffs: { tab: 'dataid' },
   tiles: { tab: 'dataid' },
   walls: { tab: 'dataid' },
+  paints: { tab: 'dataid' },
+  projectiles: { tab: 'dataid' },
   goods: { tab: 'store' },
   collections: { tab: 'items' },
 }
@@ -481,6 +559,7 @@ function seeAllOf(group: SearchGroupId, q: string): SearchGroup['seeAll'] {
   if (group === 'collections') return { tab: 'items', intent: { query: q } }
   if (group === 'npcs' || group === 'buffs') return { tab: 'dataid', intent: { query: q } }
   if (group === 'tiles' || group === 'walls') return { tab: 'dataid', intent: { query: q } }
+  if (group === 'paints' || group === 'projectiles') return { tab: 'dataid', intent: { query: q } }
   if (group === 'goods') return { tab: 'store', intent: { query: q } }
   return { tab: target.tab, intent: { query: q } }
 }
@@ -511,6 +590,10 @@ function matcherFor(sources: GlobalSearchSources, group: SearchGroupId, q: strin
       return () => matchTiles(sources, q)
     case 'walls':
       return () => matchWalls(sources, q)
+    case 'paints':
+      return () => matchPaints(sources, q)
+    case 'projectiles':
+      return () => matchProjectiles(sources, q)
     case 'goods':
       return () => (sources.goods.length > 0 ? matchGoods(sources, q) : [])
     case 'collections':

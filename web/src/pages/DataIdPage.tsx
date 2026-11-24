@@ -21,6 +21,12 @@ import {
   NpcCell,
   NpcDetail,
   NpcTableLayout,
+  PaintDetail,
+  PaintGrid,
+  PaintTableLayout,
+  ProjectileDetail,
+  ProjectileGrid,
+  ProjectileTableLayout,
   TileIconGrid,
 } from '@/components/dataid/DataIdViews'
 import { BestiaryFilterIcon } from '@/components/BestiaryFilterIcon'
@@ -97,10 +103,12 @@ import {
   npcCollectionName,
 } from '@/lib/npcCollections'
 import { resolveIconGridSize, showsMetaToggle } from '@/lib/iconGridSize'
+import { wallDisplayName } from '@/lib/tiles'
 import { StorageKeys } from '@/lib/storage'
-import type { TileWallData, TileWallEntry } from '@/types'
+import type { Item, PaintGroup, TileWallData, TileWallEntry } from '@/types'
 
 const EMPTY_BESTIARY = new Map<number, never>()
+const EMPTY_ITEM_MAP = new Map<number, Item>()
 
 const EMPTY_TILEWALL: TileWallData = {
   meta: { gameVersion: '', count: 0, withItem: 0, source: '', generatedBy: '', note: '' },
@@ -108,30 +116,34 @@ const EMPTY_TILEWALL: TileWallData = {
 }
 
 /**
- * 数据ID（原「数据图鉴」，由「NPC 图鉴」+「数据 ID」合并）：**同一套网格 / 表格**浏览 NPC / 图格 / 墙 / Buff。
+ * 数据ID（原「数据图鉴」，由「NPC 图鉴」+「数据 ID」合并）：**同一套网格 / 表格**浏览
+ * NPC / 图格 / 墙 / Buff / 油漆 / 射弹。
  *
  * - 布局沿用物品图鉴：工具条一张卡片、中间是可滚动区域（不套白色卡片）；**无分页**，一次展示全部结果。
  * - 工具条：搜索框在第一行；下面一行左侧是数据源 `Tabs`（下划线样式），右侧是视图 checkbox + Wiki 链接。
- * - NPC / 图格 / 墙 / Buff 都支持**图标网格 / 表格**两种视图（checkbox 切换，默认图标）。
+ * - 六个数据源都支持**图标网格 / 表格**两种视图（checkbox 切换，默认图标）。
  * - 「两列表格」只在 `xl`（≥1280px）真的排成两列：小屏隐藏该开关并强制单列。
  * - 详情统一是右侧抽屉（`Sheet`，图标放大）；表格里**整行可点**（含键盘 Enter / 空格）。
  * - 搜索框进入页面即聚焦；**聚焦时不弹「最近搜索」**，打字（或点右侧历史按钮）才弹。
+ * - 油漆是**两套独立 ID 空间**（油漆 1 与涂料 1 是两条），所以工具行有「全部 / 油漆 / 涂料」分组。
  *
  * 只读页：不执行任何指令（`/sb` / `/sm` 都只能在游戏内执行）。
  *
- * **不探测权限**（与物品 ID 一致）：详情里的指令只按「能否拼出来」决定显示 —— `/gbuff` 需要知道
- * 当前玩家名，所以未登录时不显示；NPC 的相关指令一律显示（能不能执行由 TShock / 插件判）。
+ * **不探测权限**（与物品 ID 一致）：详情里的指令只按「能否拼出来」决定显示 —— `/gbuff`、`/give`
+ * 需要知道当前玩家名，所以未登录时不显示；NPC 的相关指令一律显示（能不能执行由 TShock / 插件判）。
  */
 export function DataIdPage({
   username = null,
 }: {
-  /** 当前登录玩家名（未登录传 null）：只用于拼 `/gbuff <玩家> <buffID>`。 */
+  /** 当前登录玩家名（未登录传 null）：只用于拼 `/gbuff <玩家> <buffID>` 与油漆的 `/give`。 */
   username?: string | null
 }) {
   const { t, lang } = useI18n()
   const dataset = useDataset()
   const npcs = useMemo(() => dataset?.npcs ?? [], [dataset])
   const buffs = useMemo(() => dataset?.buffs ?? [], [dataset])
+  const paints = useMemo(() => dataset?.paints ?? [], [dataset])
+  const projectiles = useMemo(() => dataset?.projectiles ?? [], [dataset])
   const bestiary = dataset?.bestiary
   const bestiaryByNpcId = dataset?.bestiaryByNpcId ?? EMPTY_BESTIARY
 
@@ -144,6 +156,8 @@ export function DataIdPage({
   const [queryKind, setQueryKind] = useState<DataIdKind>(initial.kind)
   // NPC 单行筛选：'' = 全部，'boss' = Boss，其余 = 分类 id。
   const [npcFilter, setNpcFilter] = useState(initial.npcFilter)
+  // 油漆分组：'' = 全部（油漆 + 涂料一起看），'paint' / 'coating' = 只看一种。
+  const [paintFilter, setPaintFilter] = useState<PaintGroup | ''>(initial.paintFilter)
   // 图格 / 墙 / Buff 表格是否排成左右两列（默认开）。
   const [hideMeta, setHideMeta] = useLocalState<boolean>(StorageKeys.dataIdHideMeta, false)
   // 图标大小三档：**没选过时按数据源给默认**（NPC 大、图格 / 墙 / Buff 中），选过就按选的来。
@@ -174,14 +188,24 @@ export function DataIdPage({
   const isMobileDetail = useIsMobile()
   const debounced = useDebouncedValue(query, 150)
 
-  // 「最近搜索」按数据源分开记（NPC / 图格·墙 / Buff，老记录不丢）。
+  // 「最近搜索」按数据源分开记（NPC / 图格·墙 / Buff / 油漆 / 射弹，老记录不丢）。
   const npcHistory = useSearchHistory(StorageKeys.npcsSearchHistory)
   const dataHistory = useSearchHistory(StorageKeys.tilesSearchHistory)
   const buffHistory = useSearchHistory(StorageKeys.buffsSearchHistory)
-  const searchHistory =
-    kind === 'npc' ? npcHistory.history : kind === 'buff' ? buffHistory.history : dataHistory.history
-  const removeSearchHistory =
-    kind === 'npc' ? npcHistory.remove : kind === 'buff' ? buffHistory.remove : dataHistory.remove
+  const paintHistory = useSearchHistory(StorageKeys.paintsSearchHistory)
+  const projectileHistory = useSearchHistory(StorageKeys.projectilesSearchHistory)
+  const kindHistory =
+    kind === 'npc'
+      ? npcHistory
+      : kind === 'buff'
+        ? buffHistory
+        : kind === 'paint'
+          ? paintHistory
+          : kind === 'projectile'
+            ? projectileHistory
+            : dataHistory
+  const searchHistory = kindHistory.history
+  const removeSearchHistory = kindHistory.remove
 
   const rootRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -215,6 +239,9 @@ export function DataIdPage({
           setKind(intent.kind)
           setSelected(null)
         }
+        // 从全局搜索跳进来时按名称定位：油漆要先把分组复位到「全部」，
+        // 否则上次停在「涂料」时搜一条油漆名会得到空列表。
+        if (intent.query != null && nextKind === 'paint') setPaintFilter('')
         if (intent.query != null) {
           setQuery(intent.query)
           setQueryKind(nextKind)
@@ -225,10 +252,10 @@ export function DataIdPage({
   )
 
   // 把当前状态存到 ref，卸载（切走）时一次性写回模块内存。
-  const stateRef = useRef({ kind, npcFilter, twoCols, tableView, detail: selected })
+  const stateRef = useRef({ kind, npcFilter, paintFilter, twoCols, tableView, detail: selected })
   useEffect(() => {
-    stateRef.current = { kind, npcFilter, twoCols, tableView, detail: selected }
-  }, [kind, npcFilter, twoCols, tableView, selected])
+    stateRef.current = { kind, npcFilter, paintFilter, twoCols, tableView, detail: selected }
+  }, [kind, npcFilter, paintFilter, twoCols, tableView, selected])
   useEffect(
     () => () => {
       rememberDataIdState({ ...stateRef.current, scrollTop: scrollTopRef.current })
@@ -287,16 +314,22 @@ export function DataIdPage({
     return sortNpcs(kept, bestiaryByNpcId, bestiarySort ? bestiarySortById(bestiarySort) : null, lang)
   }, [kind, npcBase, bestiaryByNpcId, bestiaryFilters, bestiarySort, lang])
 
-  // 图格 / 墙：名称取「放置它的代表物品」的本地化名，没有代表物品时回退内部名。
-  // 展开子 ID 时，优先用该样式的代表物品名。
+  // 图格 / 墙的显示名**统一走 `lib/tiles.ts` 的命名链**（MapObject → 图例物品 → 代表物品 → 补给表 → 常量名）：
+  // 图格用 `dataset.tileNameById`（预计算）、墙用 `wallDisplayName`。
+  // 以前这里只按「代表物品」取名，像 12 号生命水晶（无代表物品但有图例名）、藤蔓 / 未安全墙
+  // 这类就退回了 `Heart` / `Vines` 这种内部名。展开子 ID 时优先用该样式的代表物品名。
   const source = kind === 'wall' ? (dataset?.walls ?? EMPTY_TILEWALL) : (dataset?.tiles ?? EMPTY_TILEWALL)
   const nameOf = useMemo(
     () => (e: TileWallEntry) => {
-      const itemId = e.subId != null ? e.styleItem : e.item
-      if (itemId != null) return dataset?.itemsById.get(itemId)?.name ?? e.key
-      return e.subId != null ? `${e.key} · ${e.subId}` : e.key
+      const base =
+        kind === 'wall'
+          ? wallDisplayName(dataset, e.id)
+          : (dataset?.tileNameById.get(e.id) ?? e.key)
+      if (e.subId == null) return base
+      const styleItem = e.styleItem != null ? dataset?.itemsById.get(e.styleItem) : undefined
+      return styleItem?.name ?? `${base} · ${e.subId}`
     },
-    [dataset],
+    [dataset, kind],
   )
 
   const filteredData = useMemo(() => {
@@ -353,8 +386,43 @@ export function DataIdPage({
     )
   }, [kind, buffs, debounced])
 
+  // 油漆 / 涂料：分组 + 搜索（名称 / 内部名 / 数字 ID / 对应物品 id）。
+  const filteredPaints = useMemo(() => {
+    if (kind !== 'paint') return []
+    const q = debounced.trim().toLowerCase()
+    return paints.filter((entry) => {
+      if (paintFilter && entry.group !== paintFilter) return false
+      if (!q) return true
+      return (
+        String(entry.id) === q ||
+        String(entry.item) === q ||
+        entry.key.toLowerCase().includes(q) ||
+        entry.name.toLowerCase().includes(q)
+      )
+    })
+  }, [kind, paints, debounced, paintFilter])
+
+  // 射弹：搜索名称 / 内部名 / 数字 ID（约 100 个内部 ID 没有官方名，名称回退内部名）。
+  const filteredProjectiles = useMemo(() => {
+    if (kind !== 'projectile') return []
+    const q = debounced.trim().toLowerCase()
+    if (!q) return projectiles
+    return projectiles.filter(
+      (p) =>
+        String(p.id) === q || p.key.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
+    )
+  }, [kind, projectiles, debounced])
+
   const total =
-    kind === 'npc' ? filteredNpcs.length : kind === 'buff' ? filteredBuffs.length : filteredData.length
+    kind === 'npc'
+      ? filteredNpcs.length
+      : kind === 'buff'
+        ? filteredBuffs.length
+        : kind === 'paint'
+          ? filteredPaints.length
+          : kind === 'projectile'
+            ? filteredProjectiles.length
+            : filteredData.length
 
   // 换数据源 / 搜索 / 筛选 → 把列表滚动复位。
   // 跳过首次渲染：否则切回本页时会把上次记忆的滚动位置清掉。
@@ -366,19 +434,32 @@ export function DataIdPage({
     }
     scrollTopRef.current = 0
     scrollToTop()
-  }, [debounced, kind, npcFilter, tableView, scrollToTop])
+  }, [debounced, kind, npcFilter, paintFilter, tableView, scrollToTop])
 
   // 搜过的词进「最近搜索」（统一规则：最多 10 条），按当前数据源分别记。
   const rememberNpc = npcHistory.remember
   const rememberData = dataHistory.remember
   const rememberBuff = buffHistory.remember
+  const rememberPaint = paintHistory.remember
+  const rememberProjectile = projectileHistory.remember
   useEffect(() => {
     const q = debounced.trim()
     if (!q || queryKind !== kind) return
     if (kind === 'npc') rememberNpc(q)
     else if (kind === 'buff') rememberBuff(q)
+    else if (kind === 'paint') rememberPaint(q)
+    else if (kind === 'projectile') rememberProjectile(q)
     else rememberData(q)
-  }, [debounced, kind, queryKind, rememberNpc, rememberData, rememberBuff])
+  }, [
+    debounced,
+    kind,
+    queryKind,
+    rememberNpc,
+    rememberData,
+    rememberBuff,
+    rememberPaint,
+    rememberProjectile,
+  ])
 
   const changeQuery = (next: string) => {
     setQuery(next)
@@ -415,6 +496,17 @@ export function DataIdPage({
       : null
   const selectedNpc = selected?.kind === 'npc' ? dataset?.npcsById.get(selected.id) ?? null : null
   const selectedBuff = selected?.kind === 'buff' ? dataset?.buffsById.get(selected.id) ?? null : null
+  // 油漆要分组才唯一（油漆 1 ≠ 涂料 1）。
+  const selectedPaint =
+    selected?.kind === 'paint'
+      ? (dataset?.paints.find(
+          (p) => p.id === selected.id && p.group === (selected.group ?? 'paint'),
+        ) ?? null)
+      : null
+  const selectedProjectile =
+    selected?.kind === 'projectile'
+      ? dataset?.projectilesById.get(selected.id) ?? null
+      : null
   const selectedKind: DataIdKind = selected?.kind ?? 'tile'
 
   // Boss 分类：贴图 / 格子 / 图标区按档位各放大一倍（大档即原来的 128 / 144）。
@@ -434,7 +526,11 @@ export function DataIdPage({
         ? wiki('图格_ID', 'Tile_IDs')
         : kind === 'wall'
           ? wiki('墙_ID', 'Wall_IDs')
-          : wiki('增益_ID', 'Buff_IDs')
+          : kind === 'paint'
+            ? wiki('油漆和涂料 ID', 'Paint and coating IDs')
+            : kind === 'projectile'
+              ? wiki('射弹_ID', 'Projectile_IDs')
+              : wiki('增益_ID', 'Buff_IDs')
   const kindWikiButton = (
     <Button variant="ghost" size="sm" asChild className="shrink-0">
       <a href={kindWikiHref} target="_blank" rel="noreferrer noopener">
@@ -448,6 +544,8 @@ export function DataIdPage({
     { href: wiki('图格_ID', 'Tile_IDs'), label: t('dataId.wiki.tile') },
     { href: wiki('墙_ID', 'Wall_IDs'), label: t('dataId.wiki.wall') },
     { href: wiki('增益_ID', 'Buff_IDs'), label: t('dataId.wiki.buff') },
+    { href: wiki('油漆和涂料 ID', 'Paint and coating IDs'), label: t('dataId.wiki.paint') },
+    { href: wiki('射弹_ID', 'Projectile_IDs'), label: t('dataId.wiki.projectile') },
   ]
 
   const exportCurrentTable = () => {
@@ -465,6 +563,19 @@ export function DataIdPage({
     } else if (kind === 'buff') {
       headers = ['ID', 'Name', 'InternalName']
       rows = filteredBuffs.map((buff) => [String(buff.id), buff.name, buff.key])
+    } else if (kind === 'paint') {
+      // 漆种列放最前：两套 ID 空间合在同一张表里时，光看 ID 分不清是哪种。
+      headers = ['Group', 'ID', 'Name', 'ItemID', 'InternalName']
+      rows = filteredPaints.map((entry) => [
+        entry.group,
+        String(entry.id),
+        entry.name,
+        String(entry.item),
+        entry.key,
+      ])
+    } else if (kind === 'projectile') {
+      headers = ['ID', 'Name', 'InternalName']
+      rows = filteredProjectiles.map((p) => [String(p.id), p.name, p.key])
     } else {
       headers = ['ID', 'Name', 'InternalName']
       if (kind === 'tile') headers.splice(2, 0, 'Size')
@@ -666,7 +777,7 @@ export function DataIdPage({
     </Popover>
   )
 
-  /** 搜索框本体：NPC 贴行尾，图格 / 墙 / Buff 排最左。 */
+  /** 搜索框本体：NPC 贴行尾，图格 / 墙 / Buff / 油漆 / 射弹排最左。 */
   const searchField = (
     <SearchInput
       ref={searchRef}
@@ -679,7 +790,11 @@ export function DataIdPage({
             ? t('dataId.search.tile')
             : kind === 'wall'
               ? t('dataId.search.wall')
-              : t('dataId.search.buff')
+              : kind === 'buff'
+                ? t('dataId.search.buff')
+                : kind === 'paint'
+                  ? t('dataId.search.paint')
+                  : t('dataId.search.projectile')
       }
       aria-label={t('nav.dataId')}
       history={searchHistory}
@@ -853,14 +968,20 @@ export function DataIdPage({
                 <TabsTrigger value="npc" className="flex-none">
                   {t('dataId.tab.npc')}
                 </TabsTrigger>
+                <TabsTrigger value="buff" className="flex-none">
+                  {t('dataId.tab.buff')}
+                </TabsTrigger>
                 <TabsTrigger value="tile" className="flex-none">
                   {t('dataId.tab.tile')}
                 </TabsTrigger>
                 <TabsTrigger value="wall" className="flex-none">
                   {t('dataId.tab.wall')}
                 </TabsTrigger>
-                <TabsTrigger value="buff" className="flex-none">
-                  {t('dataId.tab.buff')}
+                <TabsTrigger value="paint" className="flex-none">
+                  {t('dataId.tab.paint')}
+                </TabsTrigger>
+                <TabsTrigger value="projectile" className="flex-none">
+                  {t('dataId.tab.projectile')}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -873,7 +994,8 @@ export function DataIdPage({
           >
             {/* 工具行：不再套卡片，直接铺在页面上。
                 NPC：分类（幽灵按钮组，同「物品 ID」）│ 分组 / 排序 │ 前往 Wiki …… 搜索在行尾；
-                图格 / 墙 / Buff：搜索居左、Wiki 紧贴它右边。 */}
+                油漆：分组（全部 / 油漆 / 涂料）…… 搜索居左、Wiki 紧贴它右边；
+                图格 / 墙 / Buff / 射弹：搜索居左、Wiki 紧贴它右边。 */}
             <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-1">
               {kind === 'npc' ? (
                 <>
@@ -911,6 +1033,36 @@ export function DataIdPage({
                     />
                   )}
                   <div className="ml-auto w-full min-w-0 sm:w-64">{searchField}</div>
+                </>
+              ) : kind === 'paint' ? (
+                <>
+                  {/* 两套 ID 空间（油漆 1 ≠ 涂料 1）：分组是单选，默认「全部」混看。 */}
+                  <div className="flex min-w-0 max-w-full items-center overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <ToggleGroup
+                      variant="ghost"
+                      size="sm"
+                      type="single"
+                      aria-label={t('dataId.paint.group')}
+                      data-testid="paint-group-tabs"
+                      value={paintFilter || 'all'}
+                      onValueChange={(value) =>
+                        setPaintFilter(!value || value === 'all' ? '' : (value as PaintGroup))
+                      }
+                      className="flex-nowrap"
+                    >
+                      {[
+                        { id: 'all', name: t('dataId.paint.all') },
+                        { id: 'paint', name: t('dataId.paint.paint') },
+                        { id: 'coating', name: t('dataId.paint.coating') },
+                      ].map((item) => (
+                        <ToggleGroupItem key={item.id} value={item.id} className="flex-none px-2">
+                          {item.name}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  </div>
+                  <div className="min-w-0 flex-1 sm:w-64 sm:flex-none">{searchField}</div>
+                  {kindWikiButton}
                 </>
               ) : (
                 <>
@@ -970,6 +1122,42 @@ export function DataIdPage({
               mobile={mobileGrid}
               hideMeta={hideMeta}
               onSelect={(buff) => setSelected({ kind: 'buff', id: buff.id })}
+            />
+          )
+        ) : kind === 'paint' ? (
+          tableView ? (
+            <PaintTableLayout
+              rows={filteredPaints}
+              twoCols={effectiveTwoCols}
+              itemsById={dataset?.itemsById ?? EMPTY_ITEM_MAP}
+              atlas={dataset?.atlas}
+              onSelect={(entry) => setSelected({ kind: 'paint', id: entry.id, group: entry.group })}
+            />
+          ) : (
+            <PaintGrid
+              rows={filteredPaints}
+              itemsById={dataset?.itemsById ?? EMPTY_ITEM_MAP}
+              atlas={dataset?.atlas}
+              size={iconSize}
+              mobile={mobileGrid}
+              hideMeta={hideMeta}
+              onSelect={(entry) => setSelected({ kind: 'paint', id: entry.id, group: entry.group })}
+            />
+          )
+        ) : kind === 'projectile' ? (
+          tableView ? (
+            <ProjectileTableLayout
+              rows={filteredProjectiles}
+              twoCols={effectiveTwoCols}
+              onSelect={(entry) => setSelected({ kind: 'projectile', id: entry.id })}
+            />
+          ) : (
+            <ProjectileGrid
+              rows={filteredProjectiles}
+              size={iconSize}
+              mobile={mobileGrid}
+              hideMeta={hideMeta}
+              onSelect={(entry) => setSelected({ kind: 'projectile', id: entry.id })}
             />
           )
         ) : (kind === 'tile' || kind === 'wall') && !tableView ? (
@@ -1049,6 +1237,16 @@ export function DataIdPage({
                     atlas={dataset?.atlas}
                     onFilled={() => setSelected(null)}
                   />
+                ) : selectedPaint ? (
+                  <PaintDetail
+                    entry={selectedPaint}
+                    item={dataset?.itemsById.get(selectedPaint.item)}
+                    atlas={dataset?.atlas}
+                    username={username}
+                    onFilled={() => setSelected(null)}
+                  />
+                ) : selectedProjectile ? (
+                  <ProjectileDetail projectile={selectedProjectile} />
                 ) : selectedData ? (
                   <DataDetail
                     entry={selectedData}

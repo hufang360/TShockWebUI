@@ -17,7 +17,7 @@ export interface SearchIntent {
   /** 预填搜索词（各页面的搜索框）。 */
   query?: string
   /** 数据 ID 页的数据源。 */
-  kind?: 'npc' | 'tile' | 'wall' | 'buff'
+  kind?: 'npc' | 'tile' | 'wall' | 'buff' | 'paint' | 'projectile'
   /** 物品图鉴要应用的集合 id。 */
   collectionId?: string
   /** 鱼店：选中某件商品时带上编号，落到货架后直接打开它的详情。 */

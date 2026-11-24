@@ -41,6 +41,12 @@ export const LINK_GROUPS: LinkGroup[] = [
       wiki('wiki-tile', '图格_ID', 'Tile_IDs', both('图格 ID', 'Tile IDs')),
       wiki('wiki-wall', '墙_ID', 'Wall_IDs', both('墙 ID', 'Wall IDs')),
       wiki('wiki-buff', '增益_ID', 'Buff_IDs', both('增益 ID', 'Buff IDs')),
+      wiki(
+        'wiki-paint',
+        '油漆和涂料 ID',
+        'Paint_and_coating_IDs',
+        both('油漆与涂料 ID', 'Paint and coating IDs'),
+      ),
       wiki('wiki-projectile', 'Projectile_IDs', 'Projectile_IDs', both('射弹 ID', 'Projectile IDs')),
       wiki(
         'wiki-secret-seeds',

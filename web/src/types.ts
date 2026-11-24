@@ -131,6 +131,85 @@ export interface BestiaryFilter {
   icon: { texture: 'tags' | 'rank' }
 }
 
+/** 油漆 / 涂料的 ID 空间：**两套独立编号**（图格的 `paintColor` 与 `paintCoating`），数字会重复。 */
+export type PaintGroup = 'paint' | 'coating'
+
+/** 油漆 / 涂料条目（`data/paints.json`）。 */
+export interface PaintEntry {
+  id: number
+  /** `paint` = 油漆（1–30，图格 / 墙的 `paintColor`）；`coating` = 涂料（1–2，`paintCoating`）。 */
+  group: PaintGroup
+  /** `PaintID` / `PaintCoatingID` 常量名。 */
+  key: string
+  /** 对应物品 id（名称 / 图标来源：`loc.ItemName` + 物品图集）；没有对应物品的 ID 不收录。 */
+  item: number
+  /** 物品的本地化名（运行期从 `loc.ItemName` 解析；缺名时回退 `key`）。 */
+  name: string
+}
+
+/** `data/paints.json`：油漆 / 涂料 ID 表。 */
+export interface PaintData {
+  meta: {
+    gameVersion: string
+    count: number
+    paintCount: number
+    coatingCount: number
+    source: string
+    generatedBy: string
+    /** 没有对应物品、因此不收录的 ID（如 `PaintID.IlluminantPaint = 31`）。 */
+    skipped: { id: number; key: string }[]
+    /** 0 号（None = 不上漆）的常量名。 */
+    none: { paint: string[]; coating: string[] }
+    note: string
+  }
+  entries: Omit<PaintEntry, 'name'>[]
+}
+
+/** 射弹（`data/projectiles.json`）。 */
+export interface Projectile {
+  id: number
+  /** `ProjectileID` 常量名（也是 `loc.ProjectileName` 的 key）。 */
+  key: string
+  /** 官方本地化名；没有的（内部 / 占位 ID）回退内部名。 */
+  name: string
+}
+
+/** `data/projectiles.json`：射弹 ID 表。 */
+export interface ProjectileData {
+  meta: {
+    gameVersion: string
+    count: number
+    source: string
+    generatedBy: string
+    note: string
+  }
+  projectiles: Omit<Projectile, 'name'>[]
+}
+
+/** 射弹图标图集（`data/projectile-atlas.json`）：`regions[projectileId] = [x, y, w, h]`（首帧）。 */
+export interface ProjectileAtlas {
+  meta: {
+    gameVersion: string
+    width: number
+    height: number
+    limitWidth: number
+    padding: number
+    /** 单张贴图的最大边长（等比缩放后的方框）。 */
+    box: number
+    count: number
+    missing: number
+    /** 1×1 占位贴图（不收录）的个数。 */
+    empty: number
+    sheet: string
+    /** 图集 PNG 内容哈希（缓存失效用）。 */
+    hash?: string
+    generatedBy: string
+    source: string
+    note: string
+  }
+  regions: AtlasRegions
+}
+
 /** 单个 NPC 的图鉴数据（负值变体沿用母体条目）。 */
 export interface BestiaryNpc {
   /** 「怪物图鉴ID」排序键（游戏 `NpcBestiarySortingId`）。 */
@@ -544,6 +623,28 @@ export interface TileNamesData {
   objects: Record<string, string>
 }
 
+/**
+ * `data/tile-name-overrides.json`：图格 / 墙的中文名**补齐表**。
+ *
+ * 游戏里只有三条命名来源（`MapObject` 图例名 / 图例物品 / 代表物品），世界里生成、玩家不能放置的
+ * 那些（藤蔓、草丛、苔藓砖、未安全墙…）都没有官方名。本表按中文 Wiki 补齐，只在上面三条都落空时生效，
+ * 由 `tools/gen-tile-name-overrides.mjs` 生成（逐条校验内部常量名）。
+ */
+export interface TileNameOverridesData {
+  meta: {
+    gameVersion: string
+    source: string
+    generatedBy: string
+    tileCount: number
+    wallCount: number
+    note: string
+  }
+  /** 图格 id → 中文名 */
+  tiles: Record<string, string>
+  /** 墙 id → 中文名 */
+  walls: Record<string, string>
+}
+
 /** `data/prefix-mods.json`。 */
 export interface PrefixModsData {
   meta: { count: number; source: string; generatedBy: string; note: string }
@@ -574,13 +675,21 @@ export interface Dataset {
   walls: TileWallData
   /** `data/tile-names.json`：图格 → 地图图例名来源 */
   tileNames: TileNamesData
+  /** `data/tile-name-overrides.json`：图格 / 墙的中文名补齐表（游戏内无名的那些） */
+  tileNameOverrides: TileNameOverridesData
   /** tiles.id -> tile */
   tilesById: Map<number, TileWallEntry>
-  /** tiles.id -> 显示名（MapObject → 代表物品名 → 常量名，与游戏地图图例口径一致） */
+  /** tiles.id -> 显示名（MapObject → 图例物品 → 代表物品 → 补丁表 → 常量名，与游戏地图图例口径一致） */
   tileNameById: Map<number, string>
   /** walls.id -> wall */
   wallsById: Map<number, TileWallEntry>
   buffs: Buff[]
+  /** `data/paints.json`：油漆 / 涂料 ID 表（名称已解析） */
+  paints: PaintEntry[]
+  /** `data/projectiles.json`：射弹 ID 表（名称已解析） */
+  projectiles: Projectile[]
+  /** projectileId -> projectile */
+  projectilesById: Map<number, Projectile>
   /** `data/npc-bestiary.json`：怪物图鉴筛选器 / 排序数据 */
   bestiary: BestiaryData
   /** `data/bestiary-icons.json`：筛选器图标裁切表 */

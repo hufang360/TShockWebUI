@@ -21,7 +21,6 @@ export const BUILTIN_CARD_IDS = [
   'world',
   'lookbag',
   'online',
-  'time',
   'alldeath',
   'bossdamage',
   'bossinfo',
@@ -44,20 +43,18 @@ export const BUILTIN_CARD_META: Record<BuiltinCardId, BuiltinCardMeta> = {
   bossinfo: { id: 'bossinfo', command: '/bossinfo', titleKey: 'home.bossinfo' },
   world: { id: 'world', command: '/worldinfo', titleKey: 'home.world' },
   lookbag: { id: 'lookbag', command: '/lookbag <我>', titleKey: 'home.lookbag' },
-  time: { id: 'time', command: '/time', titleKey: 'home.time' },
   bossdamage: { id: 'bossdamage', command: '/bossdamage', titleKey: 'home.bossdamage' },
   alldeath: { id: 'alldeath', command: '/alldeath', titleKey: 'home.alldeath' },
   recent: { id: 'recent', command: null, titleKey: 'home.recent' },
   quick: { id: 'quick', command: null, titleKey: 'home.quick' },
 }
 
-/** 会自动执行的内置指令卡片（顺序即执行顺序）。 */
+/** 内置指令卡片 id（顺序即执行顺序）。 */
 export const BUILTIN_COMMAND_IDS: BuiltinCardId[] = [
   'online',
   'bossinfo',
   'world',
   'lookbag',
-  'time',
   'bossdamage',
   'alldeath',
 ]
@@ -120,6 +117,9 @@ const PINNED_CARD_POSITIONS: { id: BuiltinCardId; index: number }[] = [
  * v3 及以前的本机默认顺序（这些版本里左栏顺序由代码写死，用户拖拽只影响自定义卡片位置）。
  * v4 迁移时拿它判断「顺序是不是原封未动」：原封未动 → 换成 v4 的视觉默认；
  * 用户自己排过 → 保留他的顺序（v4 起拖拽才真正生效，别把他的排版弄乱）。
+ *
+ * 注意：比较对象是 `sanitizeHomeCards` 之后的 order（已删掉的卡片会被丢弃），
+ * 所以这里也不能再带已移除的 id，否则「原封未动」永远识别不出来。
  */
 const LEGACY_DEFAULT_ORDER: string[] = [
   'server',
@@ -129,7 +129,6 @@ const LEGACY_DEFAULT_ORDER: string[] = [
   'bossinfo',
   'world',
   'lookbag',
-  'time',
   'bossdamage',
   'alldeath',
   'recent',

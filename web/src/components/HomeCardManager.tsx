@@ -30,7 +30,7 @@ interface HomeCardManagerProps {
   onChange: (next: HomeCardsPrefs) => void
   /** 卡片依赖的信使插件未安装时返回 true（首页不展示，此处置灰标记）。 */
   pluginMissing?: (id: string) => boolean
-  /** 该卡片是否为「手动执行」（不随自动/刷新全部执行）。 */
+  /** 该卡片是否为「手动执行」（不随页面打开 / 定时刷新自动执行；首页「刷新全部」仍会跑它）。 */
   isManual?: (id: string) => boolean
   /** 卡片图标（与页面上那张卡一致）。 */
   cardIcon?: (id: string) => ReactNode

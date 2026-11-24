@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import {
   Activity,
   Backpack,
-  Clock,
   Crown,
   Globe2,
   History,
@@ -16,12 +15,12 @@ import {
 import type { BuiltinCardId } from '@/lib/homeCards'
 
 /**
- * 首页「会自动执行、可获取数据」的内置指令卡片定义（从 `HomePage` 抽出，见 docs/TODO.md U6）。
+ * 首页内置指令卡片定义（从 `HomePage` 抽出，见 docs/TODO.md U6）。
  * 仅数据 + 图标，不含状态；`cmd` 按当前用户名生成要执行的指令（返回 null 表示缺必要信息）。
  */
 export type CommandCardId = Extract<
   BuiltinCardId,
-  'online' | 'time' | 'world' | 'bossinfo' | 'bossdamage' | 'alldeath' | 'lookbag'
+  'online' | 'world' | 'bossinfo' | 'bossdamage' | 'alldeath' | 'lookbag'
 >
 
 export interface CommandCardDef {
@@ -35,7 +34,6 @@ export interface CommandCardDef {
 
 export const COMMAND_CARDS: CommandCardDef[] = [
   { id: 'online', icon: <Users />, cmd: () => '/who' },
-  { id: 'time', icon: <Clock />, cmd: () => '/time' },
   { id: 'world', icon: <Globe2 />, cmd: () => '/worldinfo' },
   { id: 'bossinfo', icon: <Crown />, cmd: () => '/bossinfo' },
   { id: 'bossdamage', icon: <Swords />, cmd: () => '/bossdamage' },

@@ -279,6 +279,52 @@ it('记住密码：登录后写入 tswui:login，重新打开自动回填账号�
   expect((within(dialog).getByPlaceholderText('输入玩家名') as HTMLInputElement).value).toBe('Alice')
 })
 
+/** 本机记住了账密（重启后希望自动回填）。 */
+function seedLoginMemory() {
+  localStorage.setItem('tswui:login', JSON.stringify({ username: 'Alice', remember: true }))
+  localStorage.setItem('tswui:passwords', JSON.stringify({ default: 'pw' }))
+}
+
+it('有记住的账密：停在首页时照旧主动弹登录框', async () => {
+  mockFetch()
+  seedLoginMemory()
+  render(<App transport={new MockTransport()} />)
+
+  const dialog = await screen.findByRole('dialog')
+  expect((within(dialog).getByPlaceholderText('输入玩家名') as HTMLInputElement).value).toBe('Alice')
+})
+
+it('公开工具页不主动弹登录框（记住的账密也不弹）', async () => {
+  mockFetch()
+  seedLoginMemory()
+  window.history.replaceState(null, '', '#/items')
+  render(<App transport={new MockTransport()} />)
+
+  // 物品 ID 是公开工具：页面正常打开；等会话探测落地后也不弹登录框。
+  expect(await screen.findByLabelText('物品 ID')).toBeTruthy()
+  await new Promise((resolve) => setTimeout(resolve, 120))
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it('公开工具页切换服务器后不主动弹登录框', async () => {
+  mockFetch()
+  const target = { id: 'http://1.2.3.4:7878', scheme: 'http', host: '1.2.3.4', port: 7878 }
+  localStorage.setItem('tswui:servers', JSON.stringify([target]))
+  localStorage.setItem('tswui:server', JSON.stringify(target.id))
+  window.history.replaceState(null, '', '#/items')
+  render(<App transport={new MockTransport()} />)
+  expect(await screen.findByLabelText('物品 ID')).toBeTruthy()
+
+  await clickAccountItem('切换TShock服务器')
+  const switcher = await screen.findByRole('dialog')
+  // 切回未登录的内置上游：公开页不补弹登录框，继续查东西。
+  fireEvent.click(within(switcher).getByRole('button', { name: /127\.0\.0\.1:7878/ }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  await new Promise((resolve) => setTimeout(resolve, 120))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByLabelText('物品 ID')).toBeTruthy()
+})
+
 it('退出需二次确认，取消后仍保持登录', async () => {
   mockFetch()
   render(<App transport={new MockTransport()} />)

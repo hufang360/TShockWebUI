@@ -5,7 +5,8 @@
  * 1. `MapObject` 键（树 / 铁 / 罐子 / 门…）→ `loc.MapObject` 的本地化名；
  * 2. 否则看有没有「图例物品」（`data/tile-names.json` 的 `items`）→ 该物品的本地化名；
  * 3. 再否则用「代表物品」（`data/tiles.json` 的 `item`，能力上等价：游戏里放置它的物品）；
- * 4. 都没有才回退常量名（`Heart` / `Pots`…）。
+ * 4. 再否则查**补给表**（`data/tile-name-overrides.json`，中文 Wiki 补齐：藤蔓 / 草丛 / 苔藓砖…）；
+ * 5. 都没有才回退常量名（`Heart` / `Pots`…）。
  *
  * 这条链让「生命水晶」（图格 12，没有代表物品，但 `Lang.cs` 把它指到物品 29）能显示中文名。
  */
@@ -14,7 +15,7 @@ import type { Dataset, TileWallEntry } from '@/types'
 /** 解析单个图格的显示名（`dataset.tileNameById` 就是按这个规则预先算好的）。 */
 export function resolveTileName(
   tile: TileWallEntry | undefined,
-  dataset: Pick<Dataset, 'tileNames' | 'loc' | 'itemsById'>,
+  dataset: Pick<Dataset, 'tileNames' | 'tileNameOverrides' | 'loc' | 'itemsById'>,
 ): string {
   if (!tile) return ''
   const names = dataset.tileNames
@@ -32,6 +33,8 @@ export function resolveTileName(
     const item = dataset.itemsById.get(tile.item)
     if (item?.name) return item.name
   }
+  const override = dataset.tileNameOverrides?.tiles?.[String(tile.id)]
+  if (override) return override
   return tile.key
 }
 
@@ -103,6 +106,9 @@ export function wallDisplayName(dataset: Dataset | null, id: number): string {
     const item = dataset?.itemsById.get(wall.item)
     if (item?.name) return item.name
   }
+  // 墙没有地图图例名，未安全墙这类只能靠补给表（中文 Wiki），见 data/README.md。
+  const override = dataset?.tileNameOverrides?.walls?.[String(id)]
+  if (override) return override
   return wall.key
 }
 

@@ -122,7 +122,7 @@ function renderPage(transport: BackendTransport) {
 const shopOf = (goods: FishGood[]): FishShop => ({ name: 'Mock 鱼店', total: goods.length, goods })
 
 /** 页头的鱼店搜索框（`SearchInput` 是 text + aria-label，不是 `type=search`）。 */
-const fishSearch = () => screen.getByLabelText('搜索商品：编号 / 名称 / 说明')
+const fishSearch = () => screen.getByLabelText('搜索商品')
 
 /** 打开「分组」下拉（Radix DropdownMenu 由 ArrowDown 触发）。 */
 function openCategories() {
@@ -403,7 +403,7 @@ describe('FishShopPage', () => {
     renderPage(fakeTransport({ fishList: async () => shopOf([GOOD]) }))
 
     // 先等搜索框出现（货架是异步拉的）。
-    const input = await screen.findByRole('textbox', { name: '搜索商品：编号 / 名称 / 说明' })
+    const input = await screen.findByRole('textbox', { name: '搜索商品' })
     const group = input.closest('[data-slot="input-group"]') as HTMLElement
     // 失焦且没内容：右侧让位给 `/` 快捷键提示（点一下或按 / 才聚焦输入框）。
     expect(within(group).getByText('/')).toBeTruthy()
@@ -434,6 +434,22 @@ describe('FishShopPage', () => {
     const rightColumn = document.querySelector('[class*="xl:sticky"]') as HTMLElement | null
     expect(rightColumn?.className).toContain('xl:top-12')
     expect(within(rightColumn!).getByText('钓鱼信息')).toBeTruthy()
+  })
+
+  it('搜索命中别名（插件 map）与商品物品的名字（内部名也算）', async () => {
+    renderPage(fakeTransport({ fishList: async () => shopOf([GOOD, ARG_GOOD, POND_GOOD]) }))
+    await screen.findByRole('button', { name: '生命水晶' })
+    const input = fishSearch()
+
+    // 别名：`map` 里的词直接带货架过滤（不只看名称 / 说明）
+    fireEvent.change(input, { target: { value: 'find' } })
+    await waitFor(() => expect(screen.queryByRole('button', { name: '生命水晶' })).toBeNull())
+    expect(screen.getByRole('button', { name: '地图上找' })).toBeTruthy()
+
+    // 商品名 ≠ 物品名：物品的内部名（Zenith 这类英文名）也能搜到那件商品
+    fireEvent.change(input, { target: { value: 'LifeCrystal' } })
+    await waitFor(() => expect(screen.queryByRole('button', { name: '地图上找' })).toBeNull())
+    expect(screen.getByRole('button', { name: '生命水晶' })).toBeTruthy()
   })
 
   it('词缀：格子在商品名前显示词缀名（warning 色），悬停图标提示也带词缀', async () => {
@@ -1746,7 +1762,7 @@ describe('FishShopPage 最近购买 / 页面设置', () => {
     expect(screen.getByTestId('fish-category').textContent).toContain('地牢')
 
     // 搜索 + 分组 = 且：搜「生命」在「地牢」里没有命中
-    const search = screen.getByRole('textbox', { name: '搜索商品：编号 / 名称 / 说明' })
+    const search = screen.getByRole('textbox', { name: '搜索商品' })
     fireEvent.change(search, { target: { value: '生命' } })
     await screen.findByText('这个分组下暂时没有商品')
 

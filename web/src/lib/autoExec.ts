@@ -3,7 +3,8 @@
  *
  * - key 形如 `home:<cardId>` / `world:fixed:/relive` / `m:<id>:<cardId>`；
  * - 默认值由调用方给出：首页卡片默认**自动**；世界管理的 `/relive`、`/cleartomb` 默认**手动**（不主动跑）；
- * - `manual = true` 的卡片：自动刷新、以及「刷新全部」都不会执行它，只能点卡片自己的按钮手动执行。
+ * - `manual = true` 的卡片：自动刷新（进页面 / 定时）不会执行它，只能点卡片自己的按钮；
+ *   「刷新全部」要不要把它一并跑掉由调用方决定（首页 = 全跑一遍；模块 / 鱼店 = 只跑自动的）。
  */
 
 export interface AutoExecPrefs {

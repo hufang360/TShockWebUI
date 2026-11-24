@@ -55,7 +55,7 @@ import {
 } from '@/lib/modules'
 import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
 import { StorageKeys, removeKey, removeLegacyKey } from '@/lib/storage'
-import { readTabFromHash, tabHash } from '@/lib/routes'
+import { isPublicTab, readTabFromHash, tabHash } from '@/lib/routes'
 import {
   BUILTIN_ID,
   addServerTarget,
@@ -304,6 +304,13 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     return raw
   })()
 
+  // 当前 tab 的实时值：登录相关回调只在事件发生时读一次，所以走 ref——
+  // 把 activeTab 放进它们的依赖里会让启动探测 / 切服回调随每次导航重建。
+  const activeTabRef = useRef<TabId>(activeTab)
+  useEffect(() => {
+    activeTabRef.current = activeTab
+  }, [activeTab])
+
   useEffect(() => {
     const nextHash = tabHash(activeTab, customModules)
     if (window.location.hash !== nextHash) {
@@ -495,8 +502,9 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         setMe({ username: s.username, savedAt: Date.now() })
       } else if (!s.authenticated) {
         // 本机记住了账密 → 说明玩家希望重启后自动重登，直接弹出登录框。
+        // 但停在公开工具页（查物品 / 看存档）时不弹：玩家只是来查东西，不想被登录框拦住。
         const memory = loadLoginMemory(readActiveTargetId())
-        if (memory.remember && memory.username && memory.password) {
+        if (memory.remember && memory.username && memory.password && !isPublicTab(activeTabRef.current)) {
           setLoginReason('app.sessionExpired')
           setLoginOpen(true)
         }
@@ -701,8 +709,11 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         setMe({ username: next.username, savedAt: Date.now() })
         return
       }
-      setLoginReason('servers.switched')
-      setLoginOpen(true)
+      // 停在公开工具页时补登录不弹框：这些页面本来就不需要会话，别打断浏览。
+      if (!isPublicTab(activeTabRef.current)) {
+        setLoginReason('servers.switched')
+        setLoginOpen(true)
+      }
     },
     [activeServerId, transport, clearLocalUser, settings.language, setMe],
   )

@@ -15,6 +15,7 @@ import type { ItemDetailRecipeOptions } from '@/hooks/useItemDetailRecipeOptions
 import { ItemIcon } from '@/components/ItemIcon'
 import { RichText } from '@/components/RichText'
 import { NpcSprite } from '@/components/NpcSprite'
+import { ProjectileIcon } from '@/components/ProjectileIcon'
 import { CommandOutput } from '@/components/ResultPanel'
 import {
   Button,
@@ -92,6 +93,8 @@ const GROUP_LABEL: Record<SearchGroupId, string> = {
   npcs: 'search.group.npcs',
   buffs: 'search.group.buffs',
   tiles: 'search.group.tiles',
+  paints: 'search.group.paints',
+  projectiles: 'search.group.projectiles',
   walls: 'search.group.walls',
   goods: 'search.group.goods',
   collections: 'search.group.collections',
@@ -141,6 +144,7 @@ function HitIcon({ hit, sources }: { hit: SearchHit; sources: GlobalSearchSource
   }
   if (icon.kind === 'npc') return <NpcSprite id={icon.id} size={24} />
   if (icon.kind === 'buff') return <BuffIcon id={icon.id} size={24} />
+  if (icon.kind === 'projectile') return <ProjectileIcon id={icon.id} size={24} />
   const LucideGlyph = icon.icon
   return <LucideGlyph aria-hidden className="size-4 shrink-0 text-muted-foreground" />
 }

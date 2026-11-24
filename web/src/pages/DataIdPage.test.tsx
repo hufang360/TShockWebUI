@@ -92,6 +92,21 @@ describe('DataIdPage', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
   })
 
+  it('数据源 tab 顺序：NPC / Buff / 图格 / 墙 / 油漆 / 射弹', () => {
+    renderPage()
+    const tabs = within(
+      screen.getByRole('tablist', { name: 'NPC / Buff / 图格 / 墙 / 油漆 / 射弹' }),
+    ).getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent?.trim())).toEqual([
+      'NPC',
+      'Buff',
+      '图格',
+      '墙',
+      '油漆',
+      '射弹',
+    ])
+  })
+
   it('默认展示 NPC 网格（名称 + ID），进入即聚焦搜索框', () => {
     renderPage()
     expect(screen.getByTitle('蓝史莱姆 #1')).toBeTruthy()
@@ -99,7 +114,7 @@ describe('DataIdPage', () => {
     expect(screen.getByText(/\d+ 条结果/)).toBeTruthy()
     expect(document.activeElement).toBe(screen.getByLabelText('数据 ID'))
     // 数据源是 shadcn Tabs（role=tablist），下划线样式，且位于工具条最顶部
-    const tablist = screen.getByRole('tablist', { name: 'NPC / 图格 / 墙 / Buff' })
+    const tablist = screen.getByRole('tablist', { name: 'NPC / Buff / 图格 / 墙 / 油漆 / 射弹' })
     expect(tablist).toBeTruthy()
     // 主 Tab 与工具行都不套卡片：搜索、结果数、NPC 分类和右侧页面操作直接铺在页面上。
     expect(document.querySelector('[data-slot="card"]')).toBeNull()
@@ -349,7 +364,7 @@ describe('DataIdPage', () => {
     expect(page.className).toContain('fixed')
     expect(page.className).toContain('inset-0')
     expect(screen.queryByLabelText('数据 ID')).toBeNull()
-    expect(screen.queryByRole('tablist', { name: 'NPC / 图格 / 墙 / Buff' })).toBeNull()
+    expect(screen.queryByRole('tablist', { name: 'NPC / Buff / 图格 / 墙 / 油漆 / 射弹' })).toBeNull()
     // 全屏不再显示「页面设置」（要看设置先退出全屏）
     expect(screen.queryByRole('button', { name: '页面设置' })).toBeNull()
     const exit = screen.getByRole('button', { name: /退出全屏/ })
@@ -362,7 +377,7 @@ describe('DataIdPage', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(page.dataset.fullscreen).toBeUndefined()
-    expect(screen.getByRole('tablist', { name: 'NPC / 图格 / 墙 / Buff' })).toBeTruthy()
+    expect(screen.getByRole('tablist', { name: 'NPC / Buff / 图格 / 墙 / 油漆 / 射弹' })).toBeTruthy()
   })
 
   it('页面设置中的 Wiki 链接按数据源与语言切换', () => {
@@ -465,7 +480,9 @@ describe('DataIdPage', () => {
     renderPage()
     fireEvent.mouseDown(screen.getByRole('tab', { name: '图格' }))
     expect(screen.getByTitle('Dirt #0')).toBeTruthy()
-    expect(screen.getByTitle('Trees #5')).toBeTruthy()
+    // 5 号没有代表物品 → 名称来自补给表（夹具里是「树木」），不再是内部名 `Trees`
+    expect(screen.getByTitle('树木 #5')).toBeTruthy()
+    // 12 号有「图例物品」（物品 29）→ 显示物品名而不是 `Heart`
     expect(screen.getByTitle('生命水晶 #1')).toBeTruthy()
     // 默认图标网格：没有表格
     expect(screen.queryByRole('table')).toBeNull()
@@ -1137,5 +1154,155 @@ describe('DataIdPage', () => {
     renderPage()
     expect(screen.queryByRole('table')).toBeNull()
     expect(screen.getByTitle('蓝史莱姆 #1')).toBeTruthy()
+  })
+
+  /** 数据源 tab / 油漆分组的点击（shadcn Tabs 用 mouseDown 触发，见其它用例）。 */
+  function tab(name: string) {
+    fireEvent.mouseDown(screen.getByRole('tab', { name }))
+  }
+
+  function paintGroup(name: string) {
+    fireEvent.click(within(screen.getByTestId('paint-group-tabs')).getByRole('radio', { name }))
+  }
+
+  it('油漆 tab：默认「全部」同时列油漆与涂料（ID 数字重复，靠名称区分，不加多余标签）', async () => {
+    renderPage()
+    tab('油漆')
+    expect(await screen.findByTitle('红漆 #1')).toBeTruthy()
+    expect(screen.getByTitle('灰漆 #2')).toBeTruthy()
+    // 油漆 1 与涂料 1 是两条不同的 ID 空间，各自一行
+    const coating = screen.getByTitle('夜明涂料 #1')
+    expect(coating).toBeTruthy()
+    // 行内只有 ID 与名称，不再挂「油漆 / 涂料」字样
+    expect(within(coating).queryByText('涂料')).toBeNull()
+    expect(within(screen.getByTitle('红漆 #1')).queryByText('油漆')).toBeNull()
+  })
+
+  it('油漆分组：只看油漆 / 只看涂料', async () => {
+    renderPage()
+    tab('油漆')
+    await screen.findByTitle('红漆 #1')
+    paintGroup('油漆')
+    expect(screen.getByTitle('红漆 #1')).toBeTruthy()
+    expect(screen.queryByTitle('夜明涂料 #1')).toBeNull()
+    paintGroup('涂料')
+    await waitFor(() => expect(screen.queryByTitle('红漆 #1')).toBeNull())
+    expect(screen.getByTitle('夜明涂料 #1')).toBeTruthy()
+  })
+
+  it('油漆搜索按名称 / 内部名 / ID / 对应物品 ID；历史单独记（tswui:paints:searchHistory）', async () => {
+    renderPage()
+    tab('油漆')
+    await screen.findByTitle('红漆 #1')
+    // 内部名（`PaintID` 常量名）
+    fireEvent.change(screen.getByLabelText('数据 ID'), { target: { value: 'RedPaint' } })
+    await waitFor(() => expect(screen.queryByTitle('夜明涂料 #1')).toBeNull())
+    expect(screen.getByTitle('红漆 #1')).toBeTruthy()
+    // 对应物品 id 也能搜
+    fireEvent.change(screen.getByLabelText('数据 ID'), { target: { value: '4668' } })
+    await waitFor(() => expect(screen.getByTitle('夜明涂料 #1')).toBeTruthy())
+    await waitFor(() =>
+      expect(window.localStorage.getItem('tswui:paints:searchHistory')).toContain('4668'),
+    )
+    expect(window.localStorage.getItem('tswui:tiles:searchHistory') ?? '').not.toContain('4668')
+  })
+
+  it('油漆详情：图标取对应物品，显示漆种与代表物品；知道玩家名才给 /give', async () => {
+    renderPage(makeDataset(), 'zh', 'Alice')
+    tab('油漆')
+    fireEvent.click(await screen.findByTitle('红漆 #1'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(detail.getAttribute('data-kind')).toBe('paint')
+    expect(within(detail).getByText('PaintID #1')).toBeTruthy()
+    expect(within(detail).getByText('RedPaint')).toBeTruthy()
+    expect(within(detail).getByText('红漆 #1073')).toBeTruthy()
+    expect(within(detail).getByText('/give 1073 Alice')).toBeTruthy()
+  })
+
+  it('油漆详情：未登录（不知道玩家名）时不给 /give', async () => {
+    renderPage()
+    tab('油漆')
+    fireEvent.click(await screen.findByTitle('夜明涂料 #1'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(within(detail).getByText('PaintCoatingID #1')).toBeTruthy()
+    expect(within(detail).queryByText('相关指令')).toBeNull()
+  })
+
+  it('油漆表格：列与表头一一对应，导出 CSV 带漆种与物品 ID', async () => {
+    renderPage()
+    tab('油漆')
+    await screen.findByTitle('红漆 #1')
+    enableTable()
+    expect(headers()).toEqual(['ID', '图标', '名称', '物品', '内部名'])
+    expect(columnCount()).toBe(5)
+
+    const created: Blob[] = []
+    const spy = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob: Blob | MediaSource) => {
+      created.push(blob as Blob)
+      return 'blob:test'
+    })
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    fireEvent.click(within(openSettings()).getByRole('button', { name: '导出表格' }))
+    const text = await created[0]!.text()
+    expect(text).toContain('"Group","ID","Name","ItemID","InternalName"')
+    expect(text).toContain('"paint","1","红漆","1073","RedPaint"')
+    spy.mockRestore()
+  })
+
+  it('射弹 tab：首帧图标 + ID + 名称；没有本地化名的回退内部名', async () => {
+    renderPage()
+    tab('射弹')
+    expect(await screen.findByTitle('木箭 #1')).toBeTruthy()
+    expect(screen.getByTitle('FireArrow #2')).toBeTruthy()
+  })
+
+  it('射弹搜索按名称 / 内部名 / ID；历史单独记（tswui:projectiles:searchHistory）', async () => {
+    renderPage()
+    tab('射弹')
+    await screen.findByTitle('木箭 #1')
+    fireEvent.change(screen.getByLabelText('数据 ID'), { target: { value: '木箭' } })
+    await waitFor(() => expect(screen.queryByTitle('FireArrow #2')).toBeNull())
+    expect(screen.getByTitle('木箭 #1')).toBeTruthy()
+    await waitFor(() =>
+      expect(window.localStorage.getItem('tswui:projectiles:searchHistory')).toContain('木箭'),
+    )
+  })
+
+  it('射弹详情：首帧图标放大 + 射弹ID + 内部名（没有相关指令）', async () => {
+    renderPage()
+    tab('射弹')
+    fireEvent.click(await screen.findByTitle('木箭 #1'))
+    const detail = await screen.findByTestId('dataid-detail')
+    expect(detail.getAttribute('data-kind')).toBe('projectile')
+    expect(within(detail).getByText('ProjectileID #1')).toBeTruthy()
+    expect(within(detail).getByText('WoodenArrowFriendly')).toBeTruthy()
+    expect(within(detail).queryByText('相关指令')).toBeNull()
+  })
+
+  it('Wiki 按钮跟着数据源走：油漆 → 油漆和涂料 ID，射弹 → 射弹 ID', async () => {
+    renderPage()
+    tab('油漆')
+    expect(
+      screen
+        .getByRole('link', { name: '前往 Wiki' })
+        .getAttribute('href'),
+    ).toBe('https://terraria.wiki.gg/zh/wiki/%E6%B2%B9%E6%BC%86%E5%92%8C%E6%B6%82%E6%96%99%20ID')
+    tab('射弹')
+    expect(screen.getByRole('link', { name: '前往 Wiki' }).getAttribute('href')).toBe(
+      'https://terraria.wiki.gg/zh/wiki/%E5%B0%84%E5%BC%B9_ID',
+    )
+  })
+
+  it('记忆油漆分组：切走再回来仍是上次选的分组', async () => {
+    const first = renderPage()
+    tab('油漆')
+    await screen.findByTitle('红漆 #1')
+    paintGroup('涂料')
+    await waitFor(() => expect(screen.queryByTitle('红漆 #1')).toBeNull())
+    first.unmount()
+    renderPage()
+    expect(screen.getByTitle('夜明涂料 #1')).toBeTruthy()
+    expect(screen.queryByTitle('红漆 #1')).toBeNull()
   })
 })

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import type { CommandResult } from '@/types'
@@ -8,7 +8,7 @@ beforeEach(() => {
   window.localStorage.clear()
 })
 
-function renderCard(result?: CommandResult, onRefresh = vi.fn(), showLastRunAt = false) {
+function renderCard(result?: CommandResult, onRefresh = vi.fn()) {
   render(
     <I18nProvider lang="zh">
       <CommandCard
@@ -16,7 +16,6 @@ function renderCard(result?: CommandResult, onRefresh = vi.fn(), showLastRunAt =
         command="/time"
         result={result}
         onRefresh={onRefresh}
-        showLastRunAt={showLastRunAt}
       />
     </I18nProvider>,
   )
@@ -43,34 +42,64 @@ describe('CommandCard 刷新按钮提示', () => {
     expect(screen.queryByText(/执行于/)).toBeNull()
   })
 
-  it('showLastRunAt：底部**左下角**常显「上次刷新 HH:MM:SS」（手动执行的卡说「执行于」）', () => {
+  it('手动执行的卡：底部**左下角**常显「执行于 HH:MM:SS」', () => {
     const ts = new Date(2026, 0, 2, 13, 32, 50).getTime()
-    const { unmount } = render(
-      <I18nProvider lang="zh">
-        <CommandCard title="游戏时间" result={{ status: 'ok', output: ['ok'], ts }} showLastRunAt />
-      </I18nProvider>,
-    )
-    const label = screen.getByText(/上次刷新/)
-    expect(label.textContent).toContain('13:32:50')
-    // 左下角：它是底部那一行的第一个子元素（后面才是备注），不是靠右的尾巴。
-    expect(label.parentElement?.firstElementChild).toBe(label)
-    unmount()
-
-    // action='run'（手动执行卡）用「执行于」。
     render(
       <I18nProvider lang="zh">
         <CommandCard
-          title="游戏时间"
+          title="在线玩家"
           result={{ status: 'ok', output: ['ok'], ts }}
-          showLastRunAt
           action="run"
         />
       </I18nProvider>,
     )
-    expect(screen.getByText(/执行于/).textContent).toContain('13:32:50')
+    const label = screen.getByText(/执行于/)
+    expect(label.textContent).toContain('13:32:50')
+    // 左下角：它是底部那一行的第一个子元素（后面才是备注），不是靠右的尾巴。
+    expect(label.parentElement?.firstElementChild).toBe(label)
   })
 
-  it('手动执行卡（action="run"）不传 showLastRunAt 也常显「执行于 …」，超过一天标 warning', async () => {
+  it('手动执行的卡：执行按钮常显（有结果也不淡出，折叠也还在）', () => {
+    const onRefresh = vi.fn()
+    render(
+      <I18nProvider lang="zh">
+        <CommandCard
+          title="在线玩家"
+          action="run"
+          result={{ status: 'ok', output: ['ok'], ts: Date.now() }}
+          onRefresh={onRefresh}
+        />
+      </I18nProvider>,
+    )
+    const card = screen.getByText('在线玩家').closest('[data-slot="card"]') as HTMLElement
+    const button = within(card).getByRole('button', { name: '执行' })
+    // 按钮所在的右上角容器不能带 hover 才显示的那套 opacity 类。
+    expect(button.parentElement?.className).not.toContain('opacity-0')
+    // 折叠起来也保留按钮：常显 = 不靠 hover、也不靠展开。
+    fireEvent.click(within(card).getByText('在线玩家'))
+    expect(within(card).queryByText('ok')).toBeNull()
+    fireEvent.click(within(card).getByRole('button', { name: '执行' }))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+    // 点执行不会顺手把卡片展开。
+    expect(within(card).queryByText('ok')).toBeNull()
+  })
+
+  it('自动刷新的卡：有结果时按钮仍然 hover 才出现', () => {
+    // 自动刷新的卡有结果时仍然 hover 才出现（正文有内容，按钮不必抢眼）。
+    render(
+      <I18nProvider lang="zh">
+        <CommandCard
+          title="在线玩家"
+          result={{ status: 'ok', output: ['ok'], ts: Date.now() }}
+          onRefresh={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    const refresh = screen.getByRole('button', { name: '刷新' })
+    expect(refresh.parentElement?.className).toContain('opacity-0')
+  })
+
+  it('手动执行卡（action="run"）常显「执行于 …」，超过一天标 warning', async () => {
     const view = (ts: number, command = '/who') => (
       <I18nProvider lang="zh">
         <CommandCard

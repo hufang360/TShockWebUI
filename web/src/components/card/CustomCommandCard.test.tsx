@@ -52,14 +52,22 @@ describe('CustomCommandCard', () => {
     expect(input.className).toContain('w-24')
   })
 
-  it('参数卡片：渲染需要现场填的参数，页脚显示拼好的指令', () => {
+  it('参数卡片：渲染需要现场填的参数，指令在左、参数在右', () => {
     const { container } = renderCard()
-    expect(screen.getByTestId('card-param-form')).toBeTruthy()
+    const form = screen.getByTestId('card-param-form')
     expect(screen.getByLabelText('参数1')).toBeTruthy()
     expect(screen.getByLabelText('参数2')).toBeTruthy()
     // 可选参数默认不传：卡片上没有它们的输入框。
     expect(screen.queryByLabelText('参数3')).toBeNull()
     expect(container.querySelector('[data-command]')?.getAttribute('data-command')).toBe('/give')
+
+    // 参数在右：指令预览排在输入区之前（同一行，输入区拿右侧空间）。
+    const preview = screen.getByTestId('card-command-preview')
+    expect(preview.parentElement).toBe(form.parentElement)
+    expect(
+      preview.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(preview.className).toContain('flex-1')
   })
 
   it('必填参数没填：按钮置灰 + 提示还缺什么；填完就能执行', () => {
@@ -80,20 +88,19 @@ describe('CustomCommandCard', () => {
     expect(onRun).toHaveBeenCalledWith('/give 29 Alice')
   })
 
-  it('指令预览在输入框下面一行（不在页脚右下角）', () => {
+  it('指令预览与输入区同一行（左侧指令、右侧参数），不再单独占一行', () => {
     const { container } = renderCard()
     const preview = screen.getByTestId('card-command-preview')
     const form = screen.getByTestId('card-param-form')
-    // 两者在同一个正文容器里，且预览排在输入区之后。
+    // 两者是同一个横向 flex 容器的子项（不在页脚，也不是上下两行）。
     expect(preview.parentElement).toBe(form.parentElement)
-    expect(
-      form.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expect(preview.parentElement?.className).toContain('flex')
+    expect(preview.parentElement?.className).not.toContain('flex-col')
     const body = container.querySelector('[data-slot="card-body"]')
     expect(body?.contains(preview)).toBe(true)
   })
 
-  it('页脚显示最终会执行的指令（填完先看一眼再点执行）', () => {
+  it('左侧指令随参数实时拼好（没填时就是指令本身）', () => {
     renderCard()
     const preview = screen.getByTestId('card-command-preview')
     expect(preview.textContent).toBe('/give')

@@ -23,7 +23,7 @@ describe('常用链接', () => {
 
   it('wiki 条目中英分别走 /zh/wiki/ 与 /wiki/', () => {
     const wikiGroup = LINK_GROUPS.find((group) => group.id === 'wiki')!
-    expect(wikiGroup.links).toHaveLength(9)
+    expect(wikiGroup.links).toHaveLength(10)
     for (const link of wikiGroup.links) {
       expect(link.href.zh).toMatch(/^https:\/\/terraria\.wiki\.gg\/zh\/wiki\//)
       expect(link.href.en).toMatch(/^https:\/\/terraria\.wiki\.gg\/wiki\//)

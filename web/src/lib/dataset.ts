@@ -21,9 +21,14 @@ import type {
   Lang,
   LocalizationBundle,
   Npc,
+  PaintData,
+  PaintEntry,
   Prefix,
+  Projectile,
+  ProjectileData,
   RecipesData,
   TileWallData,
+  TileNameOverridesData,
   TileNamesData,
   PermissionsData,
 } from '@/types'
@@ -95,7 +100,7 @@ function withCommandMeta(base: Dataset): Dataset {
 export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBundle): Promise<Dataset> {
   const culture = cultureOf(lang)
   const overrideActive = overrides != null && Object.keys(overrides).length > 0
-  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, baseLoc, tiles, walls, drops, tileNames, permissions, buffItemsFile, bestiaryFile, bestiaryIconsFile] = await Promise.all([
+  const [itemsFile, prefixesFile, npcsFile, buffsFile, commandsFile, meta, atlas, recipes, stats, tips, groups, shimmer, prefixMods, prefixSets, baseLoc, tiles, walls, drops, tileNames, permissions, buffItemsFile, bestiaryFile, bestiaryIconsFile, paintsFile, projectilesFile, tileNameOverrides] = await Promise.all([
     fetchJson<{ items: Omit<Item, 'name'>[] }>('items.json'),
     fetchJson<{ prefixes: Omit<Prefix, 'name'>[] }>('prefixes.json'),
     fetchJson<{ npcs: Omit<Npc, 'name'>[] }>('npcs.json'),
@@ -120,6 +125,9 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
     fetchJson<BuffItemsData>('buff-items.json'),
     fetchJson<BestiaryData>('npc-bestiary.json'),
     fetchJson<BestiaryIconsData>('bestiary-icons.json'),
+    fetchJson<PaintData>('paints.json'),
+    fetchJson<ProjectileData>('projectiles.json'),
+    fetchJson<TileNameOverridesData>('tile-name-overrides.json'),
   ])
 
   const loc: LocalizationBundle = overrideActive ? mergeLocBundle(baseLoc, overrides) : baseLoc
@@ -165,6 +173,20 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
   }
   // 物品 id → 物品（`tileWand` 提示行要用目标物品名；下面的 tips 重算也要用）。
   const itemsById = new Map(items.map((it) => [it.id, it]))
+
+  // 油漆 / 涂料：名称 / 图标都取「对应物品」（`loc.ItemName`），与图格 / 墙同一口径。
+  const paints: PaintEntry[] = paintsFile.entries.map((entry) => ({
+    ...entry,
+    name: itemsById.get(entry.item)?.name ?? entry.key,
+  }))
+
+  // 射弹：名称取官方本地化 `ProjectileName`。约 100 个内部 / 占位 ID 没有名字，且它们的条目
+  // 有的是**空字符串**（如 `None`）—— 用 `||` 而不是 `??`，否则界面上是一条空白名。
+  const projectileName = loc.ProjectileName ?? {}
+  const projectiles: Projectile[] = projectilesFile.projectiles.map((p) => ({
+    ...p,
+    name: projectileName[p.key] || p.key,
+  }))
   if (overrideActive) {
     const nameOf = (id: number) => itemsById.get(id)?.name
     for (const it of items) {
@@ -202,7 +224,10 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
   // 放进 dataset 预计算，页面/搜索/导出都能直接用（754 条，成本可忽略）。
   const tileNameById = new Map<number, string>()
   for (const tile of tiles.entries) {
-    tileNameById.set(tile.id, resolveTileName(tile, { tileNames, loc, itemsById }))
+    tileNameById.set(
+      tile.id,
+      resolveTileName(tile, { tileNames, tileNameOverrides, loc, itemsById }),
+    )
   }
 
   const itemDropsById = new Map<number, ItemDropEntry[]>()
@@ -218,6 +243,7 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
     tiles,
     /** `data/tile-names.json`：图格 → 地图图例名来源 */
     tileNames,
+    tileNameOverrides,
     /** `data/permissions.json`：权限节点 + 内置用户组（补全用） */
     permissions,
     /** `data/walls.json`：墙 ID 表 */
@@ -229,6 +255,9 @@ export async function loadDataset(lang: Lang = 'zh', overrides?: LocalizationBun
     /** walls.id -> wall */
     wallsById: new Map(walls.entries.map((w) => [w.id, w])),
     buffs,
+    paints,
+    projectiles,
+    projectilesById: new Map(projectiles.map((p) => [p.id, p])),
     bestiary: bestiaryFile,
     bestiaryIcons: bestiaryIconsFile,
     bestiaryByNpcId,

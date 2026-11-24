@@ -63,14 +63,6 @@ export interface CommandCardProps {
   paramForm?: ReactNode
   /** 折叠状态记忆 key（不传则不持久化）；如 `home:status` / `world:relive` / `fish:rank`。 */
   collapseKey?: string
-  /**
-   * 卡片底部**左下角**是否显示「上次刷新 13:32:50」。
-   *
-   * `action="run"`（手动执行）的卡片**自动开启**：它不会自己跑，不给时间就无从判断这份数据是刚才的还是上次打开页面时的。
-   * 自动刷新的卡片默认不显示（只看刷新按钮的 Tooltip）；目前只有首页「游戏时间」额外传 `true`：
-   * 游戏内时间一直在走，看到现实里的刷新时刻才能判断卡片里的「当前时间是…」是不是已经过时了。
-   */
-  showLastRunAt?: boolean
   /** 结果里 [i:ID] 渲染图标所需的索引。 */
   itemsById?: Map<number, Item>
   prefixesById?: Map<number, Prefix>
@@ -98,7 +90,6 @@ export function CommandCard({
   runDisabled,
   paramForm,
   collapseKey,
-  showLastRunAt = false,
   itemsById,
   prefixesById,
   atlas,
@@ -110,8 +101,9 @@ export function CommandCard({
   const lastRun = result?.ts ? new Date(result.ts) : null
   // 页面久开着不做任何事时，「过时」也要自己变红灯，不能等用户点一下才刷新配色。
   const now = useNow(30_000)
-  // 手动执行的卡片（含用户加的自定义卡片）左下角常显执行时间。
-  const showTime = showLastRunAt || action === 'run'
+  // 手动执行的卡片（含用户加的自定义卡片）左下角常显「执行于 …」：它不会自己跑，
+  // 不给时间就无从判断这份数据是刚才的还是上次打开页面时的。自动刷新的卡片不占这行（只看按钮 Tooltip）。
+  const showTime = action === 'run'
   const stale =
     action === 'run' &&
     lastRun != null &&
@@ -209,13 +201,15 @@ export function CommandCard({
                 {loading ? t('home.refreshing') : (emptyText ?? t('home.notRun'))}
               </span>
             )}
-            {/* 操作按钮固定在右上角：没有结果时常显（这时它是卡片唯一的主操作），
-                有结果 / 加载中才 hover 出现（正文有内容，按钮不必抢眼）。折叠时不显示。 */}
-            {open && onRefresh && (
+            {/* 操作按钮固定在右上角：手动执行的卡片**常显**（按钮就是这张卡的主操作，
+                折叠起来也保留——收起只是想省地方，不该把「执行」也藏掉）；
+                自动刷新卡没有结果时常显，有结果 / 加载中才 hover 出现（正文有内容，按钮不必抢眼）。 */}
+            {(open || action === 'run') && onRefresh && (
               <div
                 className={cn(
                   'flex shrink-0 touch-visible items-center gap-1',
-                  (result || loading) &&
+                  action !== 'run' &&
+                    (result || loading) &&
                     'opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100',
                 )}
                 onClick={(e) => e.stopPropagation()}

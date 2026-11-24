@@ -34,7 +34,6 @@ export interface CustomCommandCardProps {
   players?: string[]
   runtimeValues?: { regions?: string[]; warps?: string[] }
   footerNote?: ReactNode
-  showLastRunAt?: boolean
   itemsById?: Map<number, Item>
   prefixesById?: Map<number, Prefix>
   atlas?: Atlas
@@ -64,7 +63,6 @@ export function CustomCommandCard({
   players = [],
   runtimeValues,
   footerNote,
-  showLastRunAt,
   itemsById,
   prefixesById,
   atlas,
@@ -135,7 +133,6 @@ export function CustomCommandCard({
         footerNote={footerNote}
         action={action}
         collapseKey={collapseKey}
-        showLastRunAt={showLastRunAt}
         onRefresh={unavailable ? undefined : () => onRun(state.command as string)}
         itemsById={itemsById}
         prefixesById={prefixesById}
@@ -194,11 +191,19 @@ export function CustomCommandCard({
       }
       action={action}
       collapseKey={collapseKey}
-      showLastRunAt={showLastRunAt}
       runDisabled={!ready}
       paramForm={
         showForm ? (
-          <div className="flex min-w-0 flex-col gap-1">
+          // 参数在右、指令在左：一行就能读完「这张卡跑什么 + 还有哪些值要填」，
+          // 所以不再另起一行放完整指令预览。左边跟随草稿实时拼出最终指令（没填参数时就是 `/help` 本身）。
+          <div className="flex min-w-0 items-center gap-2">
+            <code
+              className="min-w-20 flex-1 truncate font-pixel text-2xs text-muted-foreground"
+              data-testid="card-command-preview"
+              title={built.command}
+            >
+              {built.command}
+            </code>
             <CardParamForm
               dataset={dataset}
               command={resolved.def}
@@ -210,14 +215,6 @@ export function CustomCommandCard({
               missing={built.missing}
               disabled={unavailable}
             />
-            {/* 最终会执行的那条指令就贴在输入框下面：填完先看一眼再点右上角的执行。 */}
-            <code
-              className="min-w-0 truncate font-pixel text-2xs text-muted-foreground"
-              data-testid="card-command-preview"
-              title={built.command}
-            >
-              {built.command}
-            </code>
           </div>
         ) : undefined
       }

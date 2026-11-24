@@ -10,6 +10,7 @@ import {
   rank,
   commandInvocation,
   searchEverything,
+  groupPageExit,
   searchGroup,
   type GlobalSearchSources,
 } from './globalSearch'
@@ -303,5 +304,51 @@ describe('searchGroup', () => {
     const help = searchGroup(sources(), 'commands', 'help').hits.find((hit) => hit.name === '/help')
     expect(help?.runnable).toBe(true)
     expect(help?.needsArgs).toBe(false)
+  })
+})
+
+describe('油漆 / 射弹（数据 ID 的两个新数据源）', () => {
+  it('油漆：名称 / 内部名 / ID / 对应物品 ID 都能命中，主操作是带着油漆 tab 进数据 ID 页', () => {
+    // 物品组也会命中（红漆是物品 1073）；油漆组是另一个数据源，单独断言。
+    const group = searchEverything(sources(), '红漆').find((g) => g.id === 'paints')!
+    expect(group.hits[0]).toMatchObject({
+      name: '红漆',
+      meta: '#1',
+      copy: '1',
+      icon: { kind: 'item', itemId: 1073 },
+      action: { kind: 'prefill', tab: 'dataid', intent: { kind: 'paint', query: '红漆' } },
+    })
+    // 内部名同样命中
+    expect(searchEverything(sources(), 'RedPaint').map((g) => g.id)).toContain('paints')
+    // 对应物品 ID 也能命中（1073 = 红漆）
+    expect(searchEverything(sources(), '1073').map((g) => g.id)).toContain('paints')
+  })
+
+  it('油漆 / 涂料是两组 ID：同号的两条结果 id 不冲突', () => {
+    const group = searchEverything(sources(), '漆').find((g) => g.id === 'paints')
+    if (!group) return
+    const keys = ids(group.hits)
+    // 组内唯一（`paint:1` 与 `coating:1` 不会互相覆盖）
+    expect(keys).toHaveLength(new Set(keys).size)
+  })
+
+  it('射弹：按名称 / 内部名 / ID 命中，图标走射弹图集', () => {
+    const group = searchEverything(sources(), '木箭').find((g) => g.id === 'projectiles')!
+    expect(group.hits[0]).toMatchObject({
+      name: '木箭',
+      meta: '#1',
+      copy: '1',
+      icon: { kind: 'projectile', id: 1 },
+      action: { kind: 'prefill', tab: 'dataid', intent: { kind: 'projectile', query: '木箭' } },
+    })
+    expect(searchEverything(sources(), 'FireArrow').map((g) => g.id)).toContain('projectiles')
+  })
+
+  it('「前往页面」出口带上搜索词（与图格 / 墙同一套出口）', () => {
+    expect(groupPageExit('paints', ' 红漆 ')).toEqual({ tab: 'dataid', intent: { query: '红漆' } })
+    expect(groupPageExit('projectiles', '木箭')).toEqual({
+      tab: 'dataid',
+      intent: { query: '木箭' },
+    })
   })
 })

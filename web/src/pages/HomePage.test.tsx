@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n'
 import { CommandResultsProvider } from '@/lib/commandResults'
@@ -33,6 +33,21 @@ function fakeTransport(runCommand: (cmd: string) => Promise<CommandResult>): Bac
 
 function seedHomeCards(value: unknown) {
   localStorage.setItem('tswui:homeCards', JSON.stringify(value))
+}
+
+/** 首页内置指令卡默认手动：需要走「自动执行」路径的用例显式把这些卡片改成自动。 */
+function seedAutoExec(ids: string[]) {
+  localStorage.setItem(
+    'tswui:autoExec',
+    JSON.stringify({ manual: Object.fromEntries(ids.map((id) => [`home:${id}`, false])) }),
+  )
+}
+
+/** 点右上角「刷新全部」：等状态探测 / 上一轮执行结束（按钮可用）再点。 */
+async function clickRefreshAll() {
+  const button = await screen.findByRole('button', { name: '刷新全部' })
+  await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false))
+  fireEvent.click(button)
 }
 
 function renderPage(
@@ -105,12 +120,12 @@ describe('HomePage 卡片管理', () => {
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
     // 内置卡片行：有尺寸徽标与指令，且不可编辑（没有「笔」图标就没有编辑按钮）。
-    const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
-    expect(within(timeRow).getByLabelText('左·小')).toBeTruthy()
-    expect(within(timeRow).getByText('/time')).toBeTruthy()
-    expect(within(timeRow).queryByRole('button', { name: '编辑' })).toBeNull()
-    expect(within(timeRow).queryByRole('textbox')).toBeNull()
-    expect(within(timeRow).queryByRole('button', { name: '删除卡片' })).toBeNull()
+    const worldRow = within(dialog).getByRole('listitem', { name: '世界信息' })
+    expect(within(worldRow).getByLabelText('左·小')).toBeTruthy()
+    expect(within(worldRow).getByText('/worldinfo')).toBeTruthy()
+    expect(within(worldRow).queryByRole('button', { name: '编辑' })).toBeNull()
+    expect(within(worldRow).queryByRole('textbox')).toBeNull()
+    expect(within(worldRow).queryByRole('button', { name: '删除卡片' })).toBeNull()
   })
 
   it('内置卡片可隐藏，隐藏后首页不再渲染', async () => {
@@ -119,16 +134,16 @@ describe('HomePage 卡片管理', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
     const dialog = screen.getByRole('dialog')
-    const timeRow = within(dialog).getByRole('listitem', { name: '游戏时间' })
+    const worldRow = within(dialog).getByRole('listitem', { name: '世界信息' })
     // 显示 / 隐藏就是行内那个眼睛徽标。
-    fireEvent.click(within(timeRow).getByLabelText('显示中'))
+    fireEvent.click(within(worldRow).getByLabelText('显示中'))
     // 行内出现闭眼图标。
     expect(
-      within(within(dialog).getByRole('listitem', { name: '游戏时间' })).getByLabelText('已隐藏'),
+      within(within(dialog).getByRole('listitem', { name: '世界信息' })).getByLabelText('已隐藏'),
     ).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
 
-    await waitFor(() => expect(screen.queryByText('游戏时间')).toBeNull())
+    await waitFor(() => expect(screen.queryByText('世界信息')).toBeNull())
     // 其余卡片仍在。
     expect(screen.getByText('在线玩家')).toBeTruthy()
   })
@@ -136,6 +151,8 @@ describe('HomePage 卡片管理', () => {
   it('自定义卡片按名称与指令渲染，但默认不自动执行', async () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
     seedHomeCards({ ...DEFAULT_HOME_CARDS, order: [...DEFAULT_HOME_CARDS.order, card.id], custom: [card] })
+    // 内置卡片改成自动，确认自定义卡不跟着跑。
+    seedAutoExec(['online', 'world', 'bossinfo', 'bossdamage', 'alldeath', 'lookbag'])
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: ['ok'] })
     renderPage(fakeTransport(runCommand))
 
@@ -227,47 +244,46 @@ describe('HomePage 卡片管理', () => {
     expect(stored.byServer?.builtin.custom).toHaveLength(0)
   })
 
-  it('自动刷新只跑「自动执行」的卡片（世界信息 / 我的背包默认手动）', async () => {
+  it('只有设为「自动执行」的卡片会随页面跑（其余默认手动）', async () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
     seedHomeCards({ ...DEFAULT_HOME_CARDS, order: [card.id, ...DEFAULT_HOME_CARDS.order], custom: [card] })
+    seedAutoExec(['online', 'world'])
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    // 等最后一条自动卡片执行完，检查整体调用顺序（按首页卡片顺序）。
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
-    const calls = runCommand.mock.calls.map((c) => c[0])
-    expect(calls).toEqual(['/who', '/time', '/alldeath', '/bossdamage', '/bossinfo'])
-    // 世界信息 / 我的背包默认手动、自定义卡片默认手动：自动刷新都不碰。
-    expect(calls).not.toContain('/worldinfo')
-    expect(calls).not.toContain('/lookbag Alice')
-    expect(calls).not.toContain('/fish 鲈鱼')
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/who'))
+    // 按首页卡片顺序：世界信息排在在线玩家之前；没打开自动执行的卡不跑。
+    expect(runCommand.mock.calls.map((c) => c[0])).toEqual(['/worldinfo', '/who'])
   })
 
-  it('世界信息 / 我的背包默认手动：卡片显示「执行」，点了才跑', async () => {
+  it('默认全部手动：进页面不跑任何指令卡，卡片显示「等待执行…」', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
+    // 服务器状态 / 动态自己刷新（不是指令卡），指令卡要等人点。
+    await waitFor(() => expect(screen.getByText('服务器状态')).toBeTruthy())
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(runCommand).not.toHaveBeenCalled()
+
     const worldCard = screen.getByText('世界信息').closest('[data-slot="card"]') as HTMLElement
     expect(within(worldCard).getByText('等待执行…')).toBeTruthy()
-    fireEvent.click(within(worldCard).getByRole('button', { name: '执行' }))
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/worldinfo'))
-    expect(runCommand.mock.calls.some(([cmd]) => cmd === '/lookbag Alice')).toBe(false)
+    expect(within(worldCard).getByRole('button', { name: '执行' })).toBeTruthy()
   })
 
-  it('不自动执行的卡片没结果时显示「等待执行…」', async () => {
-    // 把「游戏时间」改成手动执行（tswui:autoExec）。
-    localStorage.setItem('tswui:autoExec', JSON.stringify({ manual: { 'home:time': true } }))
+  it('手动卡片：点卡片上的「执行」只跑这一张', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    const timeCard = (await screen.findByText('游戏时间')).closest('[data-slot="card"]') as HTMLElement
-    // 手动卡片不会自己跑，空态提示「等待执行…」而不是「尚未执行」。
-    expect(within(timeCard).getByText('等待执行…')).toBeTruthy()
-    expect(await screen.findByText('在线玩家')).toBeTruthy()
+    const worldCard = (await screen.findByText('世界信息')).closest(
+      '[data-slot="card"]',
+    ) as HTMLElement
+    fireEvent.click(within(worldCard).getByRole('button', { name: '执行' }))
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/worldinfo'))
+    expect(runCommand).toHaveBeenCalledTimes(1)
   })
 
   it('2 分钟内的重复进入不会再次自动刷新卡片', async () => {
+    seedAutoExec(['online'])
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     const transport = fakeTransport(runCommand)
     const first = renderPage(transport)
@@ -281,40 +297,30 @@ describe('HomePage 卡片管理', () => {
     expect(runCommand.mock.calls.length).toBe(callsAfterFirst)
   })
 
-  it('自定义卡片默认手动：刷新全部也不执行，打开「自动执行」后才跑', async () => {
+  it('「刷新全部」把可见卡片全跑一遍（含默认手动的内置卡与自定义卡）', async () => {
     const card = createCustomCard('钓鲈鱼', 'fish 鲈鱼')
     seedHomeCards({ ...DEFAULT_HOME_CARDS, order: [...DEFAULT_HOME_CARDS.order, card.id], custom: [card] })
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
 
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/alldeath'))
-    // 等初始批次跑完，按钮恢复可点。
-    await waitFor(() => screen.getByRole('button', { name: '刷新全部' }))
-    fireEvent.click(screen.getByRole('button', { name: '刷新全部' }))
+    await clickRefreshAll()
     await waitFor(() =>
-      expect(runCommand.mock.calls.some(([cmd]) => cmd === '/who')).toBe(true),
+      expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish 鲈鱼')).toBe(true),
     )
-    expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish 鲈鱼')).toBe(false)
-
-    // 在「管理卡片」里把它改成自动执行，再刷新全部就会跑。
-    fireEvent.click(screen.getByRole('button', { name: '管理卡片' }))
-    const dialog = screen.getByRole('dialog')
-    fireEvent.click(
-      within(within(dialog).getByRole('listitem', { name: '钓鲈鱼' })).getByLabelText('不自动执行'),
-    )
-    fireEvent.click(within(dialog).getByRole('button', { name: '完成' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-
-    // 第二次「刷新全部」（等上一轮跑完按钮才可点）。
-    const refreshBtn = await screen.findByRole('button', { name: '刷新全部' }, { timeout: 4000 })
-    fireEvent.click(refreshBtn)
-    await waitFor(
-      () => expect(runCommand.mock.calls.some(([cmd]) => cmd === '/fish 鲈鱼')).toBe(true),
-      { timeout: 4000 },
-    )
+    // 按首页卡片顺序：默认手动的世界信息 / 我的背包也在内。
+    expect(runCommand.mock.calls.map((c) => c[0])).toEqual([
+      '/worldinfo',
+      '/lookbag Alice',
+      '/who',
+      '/alldeath',
+      '/bossdamage',
+      '/bossinfo',
+      '/fish 鲈鱼',
+    ])
   })
 
   it('切走再切回：后台继续执行，结果仍在', async () => {
+    seedAutoExec(['online', 'alldeath'])
     let release = () => {}
     const gate = new Promise<void>((resolve) => {
       release = resolve
@@ -435,30 +441,6 @@ describe('HomePage 卡片管理', () => {
     expect(tooltip.textContent).toBe(long)
   })
 
-  it('只有「游戏时间」卡左下角常显「上次刷新 HH:MM:SS」，其他卡不占这行', async () => {
-    const runCommand = vi.fn().mockImplementation((cmd: string): Promise<CommandResult> =>
-      Promise.resolve(
-        cmd === '/time'
-          ? { status: 'ok', output: ['当前时间是20:41。'] }
-          : { status: 'ok', output: ['其他结果'] },
-      ),
-    )
-    renderPage(fakeTransport(runCommand))
-
-    // 先等结果落地（卡片会从「空态行」重渲染成完整卡片）。
-    await waitFor(() => expect(screen.getByText('当前时间是20:41。')).toBeTruthy())
-    const timeCard = screen.getByText('游戏时间').closest('[data-slot="card"]') as HTMLElement
-    // 现实里的刷新时刻，格式与顶栏 / 服务器状态卡一致（HH:MM:SS）。
-    expect(within(timeCard).getByText(/^上次刷新 \d{2}:\d{2}:\d{2}$/)).toBeTruthy()
-
-    // 其他指令卡片没有这行（尤其不要把「执行于」硬塞到所有卡片上）。
-    for (const title of ['在线玩家', 'Boss 战伤害']) {
-      const card = screen.getByText(title).closest('[data-slot="card"]') as HTMLElement
-      expect(within(card).queryByText(/上次刷新/)).toBeNull()
-      expect(within(card).queryByText(/执行于/)).toBeNull()
-    }
-  })
-
   it('两栏布局：概览卡在右栏，指令卡在左栏', async () => {
     const runCommand = vi.fn().mockResolvedValue({ status: 'ok', output: [] })
     renderPage(fakeTransport(runCommand))
@@ -481,7 +463,7 @@ describe('HomePage 卡片管理', () => {
     expect(onlineWrapper.className).not.toContain('self-start')
   })
 
-  it('插件指令不存在（command_not_found）→ 卡片隐藏且只探测一次；装上插件后「刷新全部」恢复', async () => {
+  it('插件指令不存在（command_not_found）→ 卡片隐藏；装上插件后「刷新全部」恢复', async () => {
     // 第一次 /bossinfo 判为「指令不存在」（插件没装），之后模拟装上了插件。
     let planned = true
     const runCommand = vi.fn().mockImplementation((cmd: string): Promise<CommandResult> => {
@@ -499,8 +481,10 @@ describe('HomePage 卡片管理', () => {
     })
     renderPage(fakeTransport(runCommand))
 
-    // 首次刷新执行到 /bossinfo，判定插件未安装 → 首页不再渲染该卡片。
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
+    // 默认手动：卡片先都在（进页面不跑）。
+    expect(screen.getByText('Boss 进度')).toBeTruthy()
+    await clickRefreshAll()
+    // 判为插件未安装 → 首页不再渲染该卡片。
     await waitFor(() => expect(screen.queryByText('Boss 进度')).toBeNull())
     // 其它卡片不受影响。
     expect(screen.getByText('Boss 战伤害')).toBeTruthy()
@@ -515,7 +499,7 @@ describe('HomePage 卡片管理', () => {
 
     // 装上插件后点「刷新全部」→ 重新探测（缺插件标记清掉），卡片带着结果回来。
     planned = false
-    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    await clickRefreshAll()
     await waitFor(() => expect(screen.getByText('Boss 进度：已击败 3 个')).toBeTruthy())
     expect(screen.getByText('Boss 进度')).toBeTruthy()
   })
@@ -534,8 +518,14 @@ describe('HomePage 卡片管理', () => {
           ),
         ),
       )
-    renderPage({ ...fakeTransport(runCommand), runBatch })
+    const base = fakeTransport(runCommand)
+    const capabilities = vi.fn(base.capabilities)
+    renderPage({ ...base, capabilities, runBatch })
 
+    // 等能力矩阵探完（批量通道可用），再点「刷新全部」。
+    await waitFor(() => expect(capabilities).toHaveBeenCalled())
+    await act(async () => {})
+    await clickRefreshAll()
     await waitFor(() => expect(screen.queryByText('Boss 进度')).toBeNull())
     expect(screen.getByText('Boss 战伤害')).toBeTruthy()
   })
@@ -553,7 +543,7 @@ describe('HomePage 卡片管理', () => {
     })
     renderPage(fakeTransport(runCommand))
 
-    await waitFor(() => expect(runCommand).toHaveBeenCalledWith('/bossinfo'))
+    await clickRefreshAll()
     await waitFor(() => expect(screen.getByText('权限不足，无法执行该指令')).toBeTruthy())
     expect(screen.getByText('Boss 进度')).toBeTruthy()
   })
@@ -571,7 +561,7 @@ describe('HomePage 卡片管理', () => {
     })
 
     await waitFor(() => expect(screen.queryByText('我的背包')).toBeNull())
-    // 依赖 PlayerManager 的卡片不参与自动刷新。
+    // 依赖 PlayerManager 的卡片不会因为「刷新全部」而白跑（自动刷新也不碰）。
     expect(runCommand.mock.calls.map((c) => c[0])).not.toContain('/lookbag Alice')
   })
 
@@ -583,17 +573,23 @@ describe('HomePage 卡片管理', () => {
       .mockImplementation((cmds: string[]): Promise<CommandResult[]> =>
         Promise.resolve(cmds.map(() => ({ status: 'ok', output: [] }))),
       )
-    renderPage({ ...fakeTransport(runCommand), runBatch })
+    const base = fakeTransport(runCommand)
+    const capabilities = vi.fn(base.capabilities)
+    renderPage({ ...base, capabilities, runBatch })
 
+    // 等能力矩阵探完（批量通道可用），再点「刷新全部」。
+    await waitFor(() => expect(capabilities).toHaveBeenCalled())
+    await act(async () => {})
+    await clickRefreshAll()
     await waitFor(() => expect(runBatch).toHaveBeenCalled())
     const cmds = runBatch.mock.calls[0][0] as string[]
     expect(cmds).toContain('/who')
-    expect(cmds).toContain('/time')
+    expect(cmds).toContain('/worldinfo')
     // 批量模式下不应再逐条调用 runCommand。
     expect(runCommand).not.toHaveBeenCalled()
 
     const before = runBatch.mock.calls.length
-    fireEvent.click(await screen.findByRole('button', { name: '刷新全部' }))
+    await clickRefreshAll()
     await waitFor(() => expect(runBatch.mock.calls.length).toBeGreaterThan(before))
   })
 })

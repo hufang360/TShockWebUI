@@ -2,6 +2,7 @@ import { BuffIcon } from '@/components/BuffIcon'
 import { CommandLine } from '@/components/CommandLine'
 import { ItemIcon } from '@/components/ItemIcon'
 import { NpcSprite } from '@/components/NpcSprite'
+import { ProjectileIcon } from '@/components/ProjectileIcon'
 import { Badge } from '@/components/ui'
 import { RowTip } from '@/components/RowTip'
 import { cn } from '@/lib/cn'
@@ -13,12 +14,20 @@ import {
   type IconGridSize,
 } from '@/lib/iconGridSize'
 import { useI18n } from '@/lib/i18n'
-import { gbuffCommand } from '@/lib/commandFormat'
+import { gbuffCommand, giveCommand } from '@/lib/commandFormat'
 import { useDataset } from '@/lib/datasetContext'
 import { npcRelatedCommands } from '@/lib/npcRelatedCommands'
 import { selectableRow } from '@/lib/rowSelect'
 import type { CSSProperties } from 'react'
-import type { Atlas, Buff, Item, Npc, TileWallEntry } from '@/types'
+import type {
+  Atlas,
+  Buff,
+  Item,
+  Npc,
+  PaintEntry,
+  Projectile,
+  TileWallEntry,
+} from '@/types'
 
 /**
  * 数据ID的**只读视图组件**（从 `DataIdPage` 抽出，见 docs/TODO.md U6）。
@@ -92,6 +101,8 @@ export const DATA_ID_DEFAULT_SIZES: Record<DataIdKind, IconGridSize> = {
   tile: 'row',
   wall: 'row',
   buff: 'row',
+  paint: 'row',
+  projectile: 'row',
 }
 
 /** 图标网格的容器样式：列宽 = 格子宽（`large` 时翻倍），间距按档位给。 */
@@ -985,6 +996,377 @@ export function BuffDetail({
           onFilled={onFilled}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * 油漆 / 涂料图标网格（默认视图）：图标取**对应物品**（复用物品图集），ID + 名称。
+ * 油漆 1 与涂料 1 数字会重复，但名称本身就是区分的（红漆 / 夜明涂料），所以不额外挂漆种标签。
+ */
+export function PaintGrid({
+  rows,
+  itemsById,
+  atlas,
+  size = DEFAULT_ICON_GRID_SIZE,
+  mobile = false,
+  hideMeta = false,
+  onSelect,
+}: {
+  rows: PaintEntry[]
+  itemsById: Map<number, Item>
+  atlas: Atlas | undefined
+  size?: IconGridSize
+  mobile?: boolean
+  hideMeta?: boolean
+  onSelect: (entry: PaintEntry) => void
+}) {
+  const spec = DATA_ID_SIZES[size]
+  const row = size === 'row'
+  const showMeta = row || (spec.showMeta && !hideMeta)
+  return (
+    <div className="grid" style={iconGridStyle(size, { mobile })}>
+      {rows.map((entry) => {
+        const item = itemsById.get(entry.item)
+        return (
+          <button
+            key={`${entry.group}:${entry.id}`}
+            type="button"
+            title={`${entry.name} #${entry.id}`}
+            onClick={() => onSelect(entry)}
+            className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, row ? ROW_HOVER : CELL_HOVER)}
+            style={{ width: row ? '100%' : spec.cell }}
+          >
+            <span
+              data-testid="dataid-icon-surface"
+              className={iconSurfaceClass(size)}
+              style={{ width: spec.surface, height: spec.surface }}
+            >
+              <ItemIcon item={item} atlas={atlas} size={spec.icon} name={entry.name} tooltip={false} />
+            </span>
+            {row ? (
+              <RowMeta id={entry.id} name={entry.name} />
+            ) : (
+              showMeta && (
+                <>
+                  <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+                    {entry.id}
+                  </span>
+                  <span className="w-full truncate text-xs leading-4 text-foreground">
+                    {entry.name}
+                  </span>
+                </>
+              )
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** 油漆 / 涂料表格：ID / 图标 / 名称 / 物品 / 内部名（物品 id 就是 `/give` 要填的那个）。 */
+export function PaintTableLayout({
+  rows,
+  twoCols,
+  itemsById,
+  atlas,
+  onSelect,
+}: {
+  rows: PaintEntry[]
+  twoCols: boolean
+  itemsById: Map<number, Item>
+  atlas: Atlas | undefined
+  onSelect: (entry: PaintEntry) => void
+}) {
+  const [left, right] = splitRows(rows, twoCols)
+  const table = (list: PaintEntry[]) => (
+    <PaintTable rows={list} itemsById={itemsById} atlas={atlas} onSelect={onSelect} />
+  )
+  return (
+    <div className={cn('grid gap-x-6 gap-y-3', right.length > 0 && 'xl:grid-cols-2')}>
+      {table(left)}
+      {right.length > 0 && table(right)}
+    </div>
+  )
+}
+
+function PaintTable({
+  rows,
+  itemsById,
+  atlas,
+  onSelect,
+}: {
+  rows: PaintEntry[]
+  itemsById: Map<number, Item>
+  atlas: Atlas | undefined
+  onSelect: (entry: PaintEntry) => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="overflow-clip rounded-control border border-border/60">
+      <table className="w-full table-fixed border-collapse text-sm">
+        <colgroup>
+          <col className="w-14" />
+          <col className="w-10" />
+          <col />
+          <col className="w-16" />
+          <col />
+        </colgroup>
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
+            <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
+            <th className="px-3 py-2 text-left font-medium">{t('dataId.table.name')}</th>
+            <th className="px-2 py-2 text-right font-medium">{t('dataId.table.item')}</th>
+            <th className="px-3 py-2 text-left font-medium">{t('dataId.table.key')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((entry) => {
+            const item = itemsById.get(entry.item)
+            return (
+              <tr
+                key={`${entry.group}:${entry.id}`}
+                title={`${entry.name} #${entry.id}`}
+                tabIndex={0}
+                {...selectableRow(() => onSelect(entry))}
+                className={ROW_CLASS}
+              >
+                <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                  {entry.id}
+                </td>
+                <td className="px-1 py-0.5">
+                  <span className="inline-flex items-center justify-center">
+                    <ItemIcon item={item} atlas={atlas} size={24} name={entry.name} tooltip={false} />
+                  </span>
+                </td>
+                <td className="truncate px-3 py-2 text-foreground" title={entry.name}>
+                  {entry.name}
+                </td>
+                <td className="px-2 py-2 text-right font-mono text-xs text-muted-foreground">
+                  #{entry.item}
+                </td>
+                <td
+                  className="truncate px-3 py-2 font-mono text-xs text-muted-foreground"
+                  title={entry.key}
+                >
+                  {entry.key}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** 油漆详情：图标（对应物品）+ 名称 + `油漆ID/涂料ID #n` + 内部名 + 代表物品 + `/give`。 */
+export function PaintDetail({
+  entry,
+  item,
+  atlas,
+  username = null,
+  onFilled,
+}: {
+  entry: PaintEntry
+  item: Item | undefined
+  atlas: Atlas | undefined
+  /** 当前登录玩家名：`/give` 要填玩家名，未登录就不显示这一行。 */
+  username?: string | null
+  onFilled?: () => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex size-40 items-center justify-center rounded-container bg-accent">
+          <ItemIcon item={item} atlas={atlas} size={64} name={entry.name} tooltip={false} />
+        </div>
+        <div className="text-center">
+          <div className="text-base font-semibold text-foreground">{entry.name}</div>
+          <div className="font-pixel text-xs text-muted-foreground">
+            {entry.group === 'paint' ? 'PaintID' : 'PaintCoatingID'} #{entry.id}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <DetailRow label={t('dataId.field.internal')} value={entry.key} mono />
+        <div className="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 text-xs">
+          {/* 油漆的「对应物品」就是漆桶本身（不像图格 / 墙那样是放置物），所以文案单独一条 */}
+          <span className="text-muted-foreground">{t('dataId.field.paintItem')}</span>
+          <span className="flex min-w-0 items-center justify-end gap-2">
+            <ItemIcon item={item} atlas={atlas} size={20} name={entry.name} />
+            <span className="truncate text-foreground">
+              {entry.name} #{entry.item}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {username && (
+        <CommandLine
+          label={t('commandLine.related')}
+          commands={[giveCommand(username, entry.item)]}
+          onFilled={onFilled}
+        />
+      )}
+    </div>
+  )
+}
+
+/** 射弹图标网格（默认视图）：首帧贴图 + 射弹 ID + 名称。 */
+export function ProjectileGrid({
+  rows,
+  size = DEFAULT_ICON_GRID_SIZE,
+  mobile = false,
+  hideMeta = false,
+  onSelect,
+}: {
+  rows: Projectile[]
+  size?: IconGridSize
+  mobile?: boolean
+  hideMeta?: boolean
+  onSelect: (projectile: Projectile) => void
+}) {
+  const spec = DATA_ID_SIZES[size]
+  const row = size === 'row'
+  const showMeta = row || (spec.showMeta && !hideMeta)
+  return (
+    <div className="grid" style={iconGridStyle(size, { mobile })}>
+      {rows.map((entry) => (
+        <button
+          key={entry.id}
+          type="button"
+          title={`${entry.name} #${entry.id}`}
+          onClick={() => onSelect(entry)}
+          className={cn(row ? cn(ROW_CELL_CLASS, ROW_PLATE_CLASS) : CELL_CLASS, row ? ROW_HOVER : CELL_HOVER)}
+          style={{ width: row ? '100%' : spec.cell }}
+        >
+          <span
+            data-testid="dataid-icon-surface"
+            className={iconSurfaceClass(size)}
+            style={{ width: spec.surface, height: spec.surface }}
+          >
+            <ProjectileIcon id={entry.id} size={spec.icon} name={entry.name} />
+          </span>
+          {row ? (
+            <RowMeta id={entry.id} name={entry.name} />
+          ) : (
+            showMeta && (
+              <>
+                <span className="w-full truncate font-pixel text-2xs leading-none text-muted-foreground">
+                  {entry.id}
+                </span>
+                <span className="w-full truncate text-xs leading-4 text-foreground">
+                  {entry.name}
+                </span>
+              </>
+            )
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** 射弹表格：ID / 图标 / 名称 / 内部名。 */
+export function ProjectileTableLayout({
+  rows,
+  twoCols,
+  onSelect,
+}: {
+  rows: Projectile[]
+  twoCols: boolean
+  onSelect: (projectile: Projectile) => void
+}) {
+  const [left, right] = splitRows(rows, twoCols)
+  const table = (list: Projectile[]) => <ProjectileTable rows={list} onSelect={onSelect} />
+  return (
+    <div className={cn('grid gap-x-6 gap-y-3', right.length > 0 && 'xl:grid-cols-2')}>
+      {table(left)}
+      {right.length > 0 && table(right)}
+    </div>
+  )
+}
+
+function ProjectileTable({
+  rows,
+  onSelect,
+}: {
+  rows: Projectile[]
+  onSelect: (projectile: Projectile) => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="overflow-clip rounded-control border border-border/60">
+      <table className="w-full table-fixed border-collapse text-sm">
+        <colgroup>
+          <col className="w-14" />
+          <col className="w-10" />
+          <col />
+          <col />
+        </colgroup>
+        <thead className="sticky top-[var(--page-sticky-top,0px)] z-10 bg-background/90 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-3 py-2 text-right font-medium">{t('dataId.table.id')}</th>
+            <th className="px-1 py-2 text-center font-medium">{t('dataId.table.icon')}</th>
+            <th className="px-3 py-2 text-left font-medium">{t('dataId.table.name')}</th>
+            <th className="px-3 py-2 text-left font-medium">{t('dataId.table.key')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((entry) => (
+            <tr
+              key={entry.id}
+              title={`${entry.name} #${entry.id}`}
+              tabIndex={0}
+              {...selectableRow(() => onSelect(entry))}
+              className={ROW_CLASS}
+            >
+              <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                {entry.id}
+              </td>
+              <td className="px-1 py-0.5">
+                <span className="inline-flex items-center justify-center">
+                  <ProjectileIcon id={entry.id} size={24} name={entry.name} />
+                </span>
+              </td>
+              <td className="truncate px-3 py-2 text-foreground" title={entry.name}>
+                {entry.name}
+              </td>
+              <td
+                className="truncate px-3 py-2 font-mono text-xs text-muted-foreground"
+                title={entry.key}
+              >
+                {entry.key}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** 射弹详情：首帧贴图 + 名称 + `射弹ID #n` + 内部名。 */
+export function ProjectileDetail({ projectile }: { projectile: Projectile }) {
+  const { t } = useI18n()
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex size-40 items-center justify-center rounded-container bg-accent">
+          <ProjectileIcon id={projectile.id} size={96} name={projectile.name} />
+        </div>
+        <div className="text-center">
+          <div className="text-base font-semibold text-foreground">{projectile.name}</div>
+          <div className="font-pixel text-xs text-muted-foreground">ProjectileID #{projectile.id}</div>
+        </div>
+        <Badge tone="neutral">{t('dataId.tab.projectile')}</Badge>
+      </div>
+      <DetailRow label={t('dataId.field.internal')} value={projectile.key} mono />
     </div>
   )
 }

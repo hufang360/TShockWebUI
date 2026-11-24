@@ -18,8 +18,8 @@ function Harness({ initial = DEFAULT_HOME_CARDS }: { initial?: HomeCardsPrefs })
         onOpenChange={() => {}}
         prefs={prefs}
         onChange={setPrefs}
-        // 与首页一致：用户添加的卡片默认「不自动执行」。
-        isManual={(id) => manual[id] ?? id.startsWith('c:')}
+        // 与首页一致：内置卡片与用户添加的卡片都默认「不自动执行」。
+        isManual={(id) => manual[id] ?? true}
         onToggleManual={(id, value) => setManual((prev) => ({ ...prev, [id]: value }))}
         dataset={makeDataset()}
         ingame={NO_INGAME}
@@ -49,9 +49,9 @@ describe('HomeCardManager', () => {
     // 抽屉里没有内联表单。
     expect(screen.queryByTestId('card-editor-panel')).toBeNull()
 
-    // 内置卡片默认自动执行 → 行内是「自动执行」徽标。
-    const row = screen.getByRole('listitem', { name: '游戏时间' })
-    expect(within(row).getByLabelText('自动执行')).toBeTruthy()
+    // 首页卡片默认不自动执行 → 行内是「不自动执行」徽标。
+    const row = screen.getByRole('listitem', { name: '世界信息' })
+    expect(within(row).getByLabelText('不自动执行')).toBeTruthy()
     // 菜单里不再有「自动执行 / 是否显示 / 宽度」这三类项。
     const menu = await openRowMenu(row)
     expect(within(menu).queryByRole('menuitemcheckbox')).toBeNull()
@@ -76,18 +76,18 @@ describe('HomeCardManager', () => {
     await waitFor(() => expect(screen.queryByTestId('card-editor-panel')).toBeNull())
   })
 
-  it('点行内「自动执行」徽标即可切换成「不自动执行」', () => {
+  it('点行内徽标即可在「不自动执行 / 自动执行」之间切换', () => {
     render(<Harness />)
-    const row = screen.getByRole('listitem', { name: '游戏时间' })
-    fireEvent.click(within(row).getByLabelText('自动执行'))
+    const row = screen.getByRole('listitem', { name: '世界信息' })
+    fireEvent.click(within(row).getByLabelText('不自动执行'))
 
-    const toggled = screen.getByRole('listitem', { name: '游戏时间' })
-    expect(within(toggled).getByLabelText('不自动执行')).toBeTruthy()
+    const toggled = screen.getByRole('listitem', { name: '世界信息' })
+    expect(within(toggled).getByLabelText('自动执行')).toBeTruthy()
   })
 
   it('点行内尺寸徽标循环切换：左·小 → 左·大 → 右栏 → 左·小', () => {
     render(<Harness />)
-    const size = () => screen.getByRole('listitem', { name: '游戏时间' })
+    const size = () => screen.getByRole('listitem', { name: '世界信息' })
     const clickCurrent = (name: string) => fireEvent.click(within(size()).getByLabelText(name))
 
     clickCurrent('左·小')
@@ -116,7 +116,7 @@ describe('HomeCardManager', () => {
     expect(screen.queryByRole('button', { name: '帮助' })).toBeNull()
 
     const title = screen.getByText('使用说明')
-    expect(screen.getByText(/设置成「自动执行」的卡片，会随自动刷新和「刷新全部」执行/)).toBeTruthy()
+    expect(screen.getByText(/「自动执行」的卡片会随打开页面自动刷新/)).toBeTruthy()
     expect(screen.getByText(/自定义卡片数据，按服务器分开存在本机/)).toBeTruthy()
 
     // 顺序：全部卡片都在说明之前（说明在列表下方）。
@@ -153,10 +153,10 @@ describe('HomeCardManager', () => {
 
   it('点行内眼睛徽标即可隐藏 / 重新显示（不变灰、编辑按钮隐藏）', () => {
     render(<Harness />)
-    const row = screen.getByRole('listitem', { name: '游戏时间' })
+    const row = screen.getByRole('listitem', { name: '世界信息' })
     fireEvent.click(within(row).getByLabelText('显示中'))
 
-    const hiddenRow = screen.getByRole('listitem', { name: '游戏时间' })
+    const hiddenRow = screen.getByRole('listitem', { name: '世界信息' })
     expect(within(hiddenRow).getByLabelText('已隐藏')).toBeTruthy()
     // 尺寸 / 自动执行徽标仍在（三件套始终显示），只是不可编辑。
     expect(within(hiddenRow).getByLabelText('左·小')).toBeTruthy()
@@ -165,13 +165,13 @@ describe('HomeCardManager', () => {
     // 再点一次又显示回来。
     fireEvent.click(within(hiddenRow).getByLabelText('已隐藏'))
     expect(
-      within(screen.getByRole('listitem', { name: '游戏时间' })).getByLabelText('显示中'),
+      within(screen.getByRole('listitem', { name: '世界信息' })).getByLabelText('显示中'),
     ).toBeTruthy()
   })
 
   it('内置卡片不再有「内置」徽标（有笔图标的才是自己加的）', async () => {
     render(<Harness />)
-    const builtinRow = screen.getByRole('listitem', { name: '游戏时间' })
+    const builtinRow = screen.getByRole('listitem', { name: '世界信息' })
     expect(within(builtinRow).queryByText('内置')).toBeNull()
     expect(within(builtinRow).queryByRole('button', { name: '编辑' })).toBeNull()
 
@@ -185,7 +185,7 @@ describe('HomeCardManager', () => {
 
   it('使用说明可以收起：收起后常驻 ⓘ 入口，点开又能看到，且三处共享同一份状态', async () => {
     // 说明块用正文判定（ⓘ 按钮里也藏着 aria-label 文本，别用 getByText('使用说明')）。
-    const blockText = /设置成「自动执行」的卡片，会随自动刷新和「刷新全部」执行/
+    const blockText = /「自动执行」的卡片会随打开页面自动刷新/
     const first = render(<Harness />)
     // 默认展开，页脚没有 ⓘ。
     expect(screen.getByText(blockText)).toBeTruthy()
@@ -229,11 +229,11 @@ describe('HomeCardManager', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
 
     render(<Harness />)
-    const row = screen.getByRole('listitem', { name: '游戏时间' })
+    const row = screen.getByRole('listitem', { name: '世界信息' })
     const menu = await openRowMenu(row)
     fireEvent.click(within(menu).getByRole('menuitem', { name: '复制指令' }))
 
-    expect(writeText).toHaveBeenCalledWith('/time')
+    expect(writeText).toHaveBeenCalledWith('/worldinfo')
     // 复制后菜单项短暂变成「已复制」（菜单不关，方便连续操作）。
     expect(await within(menu).findByRole('menuitem', { name: '已复制' })).toBeTruthy()
 

@@ -4,13 +4,19 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { makeDataset } from '@/test/fixtures'
 import { resolveTileName, searchTargets, searchTiles, wallDisplayName } from './tiles'
-import type { Dataset, LocalizationBundle, TileNamesData } from '@/types'
+import type {
+  Dataset,
+  LocalizationBundle,
+  TileNameOverridesData,
+  TileNamesData,
+} from '@/types'
 
 const dataDir = resolve(process.cwd(), '../data')
 const readJson = <T>(file: string): T =>
   JSON.parse(readFileSync(resolve(dataDir, file), 'utf8')) as T
 
 const tileNames = readJson<TileNamesData>('tile-names.json')
+const tileNameOverrides = readJson<TileNameOverridesData>('tile-name-overrides.json')
 const locZh = readJson<LocalizationBundle>('loc.zh-Hans.json')
 const items = readJson<{ items: { id: number; key: string }[] }>('items.json').items
 const locItems = locZh.ItemName ?? {}
@@ -27,6 +33,7 @@ function realDataset(): Dataset {
   return {
     ...makeDataset(),
     tileNames,
+    tileNameOverrides,
     loc: { ...makeDataset().loc, MapObject: locZh.MapObject },
     itemsById: itemsById as never,
     tiles: { ...makeDataset().tiles, entries },
@@ -51,9 +58,38 @@ describe('图格名（口径 = 游戏地图图例）', () => {
     expect(resolveTileName(dataset.tilesById.get(5), dataset)).toBe('树')
   })
 
+  it('没有代表物品的图格用补给表（中文 Wiki）的名字：52 藤蔓 / 24 腐化植物', () => {
+    expect(resolveTileName(dataset.tilesById.get(52), dataset)).toBe('常规藤蔓')
+    expect(resolveTileName(dataset.tilesById.get(24), dataset)).toBe('矮野生腐化植物')
+  })
+
+  it('补给表不覆盖游戏内的名字（生命水晶 / 铁 / 树仍走原链）', () => {
+    expect(tileNameOverrides.tiles['12']).toBeUndefined()
+    expect(tileNameOverrides.tiles['6']).toBeUndefined()
+    expect(tileNameOverrides.tiles['5']).toBeUndefined()
+  })
+
   it('没有任何名字来源时回退常量名', () => {
     const name = resolveTileName({ id: 999, key: 'MysteryTile', item: null }, dataset)
     expect(name).toBe('MysteryTile')
+  })
+})
+
+describe('墙名（代表物品 → 补给表 → 常量名）', () => {
+  const dataset = realDataset()
+
+  it('有代表物品的墙用物品名', () => {
+    // 2 号 DirtUnsafe 的代表物品是「天然土墙」
+    expect(wallDisplayName(dataset, 2)).toBe('天然土墙')
+  })
+
+  it('未安全墙没有代表物品 → 用补给表的名字', () => {
+    expect(wallDisplayName(dataset, 3)).toBe('黑檀石墙')
+    expect(wallDisplayName(dataset, 70)).toBe('神圣草墙')
+  })
+
+  it('0 号（None = 没有墙）没有名字来源，保持内部名', () => {
+    expect(wallDisplayName(dataset, 0)).toBe('None')
   })
 })
 
@@ -97,12 +133,11 @@ describe('统一搜索：图格 / 墙 / 液体', () => {
     expect(hits[0]).toMatchObject({ kind: 'liquid', id: 2, name: '岩浆' })
   })
 
-  it('搜墙：常量名能命中（墙的 key 是 Stone / DirtUnsafe 这类）', () => {
-    // 用真实数据：墙 40 的常量名是 SnowWallUnsafe
+  it('搜墙：常量名能命中（墙的 key 是 Stone / DirtUnsafe 这类），显示名用补给表', () => {
+    // 用真实数据：墙 40 的常量名是 SnowWallUnsafe（雪墙没有代表物品，名字来自补给表）
     const hits = searchTargets(dataset, 'SnowWallUnsafe', t)
     expect(hits.some((h) => h.kind === 'wall' && h.id === 40)).toBe(true)
-    // 没有代表物品时回退常量名
-    expect(wallDisplayName(dataset, 40)).toBe('SnowWallUnsafe')
+    expect(wallDisplayName(dataset, 40)).toBe('雪墙')
   })
 
   it('结果按上限截断，且不会重复灌入同一目标', () => {

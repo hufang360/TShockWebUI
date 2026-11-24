@@ -52,6 +52,7 @@ import { cn } from '@/lib/cn'
 import type { IngamePolicy } from '@/lib/ingame'
 import { showsMetaToggle } from '@/lib/iconGridSize'
 import { splitFishArgs } from '@/lib/fishArgs'
+import { matchFishGood } from '@/lib/fishSearch'
 import {
   FISH_CATEGORIES,
   matchFishCategories,
@@ -655,14 +656,8 @@ export function FishShopPage({
           ? favoriteRows.map((row) => row.good)
           : shelfGoods
     if (!keyword) return list
-    return list.filter(
-      (g) =>
-        g.name.toLowerCase().includes(keyword) ||
-        String(g.serial).includes(keyword) ||
-        g.desc.toLowerCase().includes(keyword) ||
-        g.map.some((m) => m.toLowerCase().includes(keyword)),
-    )
-  }, [tab, boughtRows, favoriteRows, shelfGoods, keyword])
+    return list.filter((good) => matchFishGood(good, keyword, dataset))
+  }, [tab, boughtRows, favoriteRows, shelfGoods, keyword, dataset])
   /** 每件商品的分组只算一次：下拉里的条数与列表筛选共用。 */
   const categoriesOf = useMemo(
     () => new Map(sourceGoods.map((good) => [good, matchFishCategories(good)])),

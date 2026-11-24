@@ -19,3 +19,12 @@ export function quoteArg(arg: string): string {
 export function gbuffCommand(player: string, buffId: number): string {
   return `/gbuff ${quoteArg(player)} ${buffId}`
 }
+
+/**
+ * `/give <物品ID> <玩家>`（TShock `Give()`）：用数字 ID，不依赖服务器语言。
+ * 带词缀时要补数量（`/give <物品> <玩家> 1 <词缀>`），所以词缀单独传。
+ */
+export function giveCommand(player: string, itemId: number, prefixId?: number | null): string {
+  const base = `/give ${itemId} ${quoteArg(player)}`
+  return prefixId ? `${base} 1 ${prefixId}` : base
+}
