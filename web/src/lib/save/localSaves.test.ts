@@ -37,6 +37,7 @@ import { findMatches } from './worldFind'
 import { applyWorldEdits } from './worldWrite'
 import { draftFromWorld, isWorldDraftDirty } from './worldEdit'
 import { draftFromPlayer, isDraftDirty, validatePlrDraft } from './plrEdit'
+import { PLR_CONVERT_MIN_RELEASE } from './plrConvert'
 
 /** 全部物品的内部键名（研究进度里的 persistentId 就是它）。 */
 const itemKeys = new Set(
@@ -404,7 +405,17 @@ describe.skipIf(players.length === 0)('真实角色存档', () => {
     it(`解析 / 往返 / 改写：${path.split('/').pop()}`, () => {
       const raw = new Uint8Array(readFileSync(path))
       const track = {} as PlrTrack
-      const p = parsePlr(raw, track)
+      let p: ReturnType<typeof parsePlr>
+      try {
+        p = parsePlr(raw, track)
+      } catch (err) {
+        // 已知脏档：TShock `PlayerManager/20260307-2346-02` 那批文件比正常存档多 16 字节、
+        // 属性值也是坏的（实测 9 份，269 与 318 各一半），不是解析器的 bug。
+        // 这套用例验证的是「能解出来的存档」的不变量，所以这里只跳过并留痕，不静默通过。
+        if (!(err instanceof SaveFormatError)) throw err
+        console.warn(`跳过无法解析的存档：${path}（${err.message}）`)
+        return
+      }
       expect(p.name.length).toBeGreaterThan(0)
 
       // 配装（≥262）：有解析结果就必须是 3 套、下标 0–2、物品 id 合法，
@@ -475,8 +486,15 @@ describe.skipIf(players.length === 0)('真实角色存档', () => {
           },
         ]),
       )
+      // 布尔位正常只有 0/1；被第三方改过的存档里见过别的值（实测 0x14），写回只会写 1/0，
+      // 那种字节不参与「原样写回必须逐字节相同」的比对（否则测的是存档本身不规范）。
+      // 另外「生态火把解锁 / 启用」两位是**联动写**的（见 `applyPlrEdits`），只有两者一致时才做回写比对。
+      const paired = rawU8(track.boosts.unlockedBiomeTorches) === rawU8(track.boosts.usingBiomeTorches)
       const boosts = Object.fromEntries(
-        Object.entries(track.boosts).map(([key, pos]) => [key, (rawU8(pos) ?? 0) !== 0]),
+        Object.entries(track.boosts)
+          .filter(([, pos]) => rawU8(pos) === 0 || rawU8(pos) === 1)
+          .filter(([key]) => paired || key !== 'unlockedBiomeTorches')
+          .map(([key, pos]) => [key, (rawU8(pos) ?? 0) !== 0]),
       )
       const echo = applyPlrEdits(raw, track, {
         statLife: rawI32(track.statLife),
@@ -500,11 +518,20 @@ describe.skipIf(players.length === 0)('真实角色存档', () => {
 
       // 装备区（装备 / 时装 / 染料 / 杂项）：把现有 id + prefix 原样写回 → 必须逐字节不变。
       // 这条能证明装备区的偏移表是对的（错了就会把别的字节写坏）。
+      // 同样要用**原始字节**：被改过的存档里装备槽可能有垃圾 id（实测 33554432），
+      // 解析时 `normalize()` 会把它当空槽，拿解析值回写就变了。
+      const equipEcho = (slots: { id: number; prefix: number }[] | undefined) =>
+        Object.fromEntries(
+          (slots ?? []).map((slot, i) => [
+            i,
+            { id: rawI32(slot.id) ?? 0, stack: 0, prefix: rawU8(slot.prefix) ?? 0 },
+          ]),
+        )
       const equipmentEcho = {
-        armor: Object.fromEntries(p.armor.map((it, i) => [i, { id: it.id, stack: 0, prefix: it.prefix }])),
-        dye: Object.fromEntries(p.dye.map((it, i) => [i, { id: it.id, stack: 0, prefix: it.prefix }])),
-        miscEquips: Object.fromEntries(p.miscEquips.map((it, i) => [i, { id: it.id, stack: 0, prefix: it.prefix }])),
-        miscDyes: Object.fromEntries(p.miscDyes.map((it, i) => [i, { id: it.id, stack: 0, prefix: it.prefix }])),
+        armor: equipEcho(track.equipment.armor),
+        dye: equipEcho(track.equipment.dye),
+        miscEquips: equipEcho(track.equipment.miscEquips),
+        miscDyes: equipEcho(track.equipment.miscDyes),
       }
       expect(Buffer.from(applyPlrEdits(raw, track, { equipment: equipmentEcho })).equals(Buffer.from(raw))).toBe(true)
 
@@ -567,17 +594,59 @@ describe.skipIf(players.length === 0)('真实角色存档', () => {
 
 
 /**
- * 版本段表（`isSameReleaseLayout` / 59 个 `release >= N` 门槛）的正确性：
- * 同段内改版本号 → 重新解析必须**除 release 外逐字段相同**（布局真的没变）；
- * 跨段 → 校验层必须报 `releaseLayout`（否则就是允许跨布局写版本，等于毁档）。
+ * 每个 `PlrPlayer` 字段从哪个 release 开始存在（对照 `Player.Deserialize` 的门槛）。
+ * 转换到更低版本时，目标版本没有的字段不参与「字段是否变了」的比较。
+ */
+const PLAYER_FIELD_GATE: Partial<Record<string, number>> = {
+  difficulty: 17,
+  playTimeTicks: 138,
+  hairDye: 82,
+  skinVariant: 107,
+  extraAccessory: 125,
+  unlockedBiomeTorches: 229,
+  usingBiomeTorches: 229,
+  ateArtisanBread: 256,
+  usedAegisCrystal: 260,
+  usedAegisFruit: 260,
+  usedArcaneCrystal: 260,
+  usedGalaxyPearl: 260,
+  usedGummyWorm: 260,
+  usedAmbrosia: 260,
+  taxMoney: 128,
+  deathsPve: 254,
+  deathsPvp: 254,
+  anglerQuests: 98,
+  golferScore: 206,
+  lastSavedTicks: 202,
+  researchedCount: 218,
+  research: 218,
+  currentLoadoutIndex: 262,
+  unlockedSuperCart: 253,
+  enabledSuperCart: 253,
+  dye: 47,
+  miscEquips: 117,
+  miscDyes: 117,
+  forge: 182,
+  voidVault: 198,
+}
+
+/**
+ * 版本段表（`isSameReleaseLayout` / 59 个 `release >= N` 门槛）与转换规则的正确性：
+ * - 同段内改版本号 → 重新解析必须**除 release 外逐字段相同**（布局真的没变）；
+ * - 降级（跨段往低处）→ 支持（删掉目标版本没有的字段），只有 <1.4.0.1 才报 `releaseTargetTooOld`；
+ * - 升级（→ 更高）→ 放行，写回后除 release 外逐字段相同（只插入新字段）；
+ * - 升级太老的（<262）→ 报 `releaseTooOld`。
  *
  * 每个 release 取一份真实存档来验证（同版本布局一致，不必重复）。
  */
-describe.skipIf(players.length === 0)('真实存档：版本段表', () => {
-  it('同段改版本号不改变任何其它字段；跨段被拦下', () => {
+describe.skipIf(players.length === 0)('真实存档：版本段表与双向转换', () => {
+  it('同段改数字字段不变；升降都保持目标版本里存在的字段', () => {
     const seen = new Set<number>()
     let sameSegment = 0
-    let crossRejected = 0
+    let upgradeOk = 0
+    let downgradeOk = 0
+    let downgradeRejected = 0
+    let upgradeRejected = 0
     const failures: string[] = []
     const catalog = {
       hasItem: (id: number) => id > 0 && id < 7000,
@@ -599,44 +668,159 @@ describe.skipIf(players.length === 0)('真实存档：版本段表', () => {
       if (seen.has(player.release)) continue
       seen.add(player.release)
 
+      const repr = (value: unknown) => (typeof value === 'bigint' ? `${value}n` : JSON.stringify(value))
+      /**
+       * 写回后除 release 外逐字段比较；有任何差异就记一条失败。
+       * 源版本 <262 时配装（`loadouts`）是升级时**整段新增**的：只要求它是 3 套空配装。
+       */
+      const compare = (label: string, target: number, after: ReturnType<typeof parsePlr>) => {
+        if (after.release !== target) {
+          failures.push(`${label}: 写回 release=${after.release}`)
+        }
+        for (const key of Object.keys(player) as (keyof typeof player)[]) {
+          if (key === 'release') continue
+          const gate = PLAYER_FIELD_GATE[String(key)]
+          if (gate != null && gate > target) continue // 目标版本没有这个字段
+          if (key === 'loadouts') {
+            // 配装段（≥262）：目标 <262 时整段被删；源 <262 而目标 ≥262 时是新增的空配装；
+            // 两边都有时才逐项比较。
+            if (target < 262) {
+              if (after.loadouts.length !== 0) failures.push(`${label}: 配装段没删干净`)
+              continue
+            }
+            if (player.release < 262) {
+              const empty =
+                after.loadouts.length === 3 &&
+                after.loadouts.every((lo) => [...lo.armor, ...lo.dye].every((it) => it.id === 0))
+              if (!empty) failures.push(`${label}: 新增的配装不是 3 套空配装`)
+              continue
+            }
+          }
+          if (repr(player[key]) !== repr(after[key])) failures.push(`${label}: 字段 ${String(key)} 变了`)
+        }
+      }
+
       for (const v of PLAYER_VERSIONS) {
         if (v.release === player.release) continue
         const inSegment = isSameReleaseLayout(player.release, v.release)
-        const draft = { ...draftFromPlayer(player, track), release: v.release }
-        const rejected = validatePlrDraft(draft, { catalog, original: player }).some(
-          (i) => i.messageKey === 'save.edit.err.releaseLayout',
-        )
-        if (inSegment === rejected) {
-          failures.push(`rel ${player.release} → ${v.release}: inSegment=${inSegment} rejected=${rejected}`)
-        }
-        if (!inSegment) {
-          crossRejected++
+        const keys = validatePlrDraft({ ...draftFromPlayer(player, track), release: v.release }, {
+          catalog,
+          original: player,
+          track,
+        }).map((i) => i.messageKey)
+        const label = `rel ${player.release} → ${v.release}`
+
+        if (inSegment) {
+          if (keys.length > 0) failures.push(`${label}: 同段却被拦 ${keys.join(',')}`)
+          compare(label, v.release, parsePlr(applyPlrEdits(raw, track, { release: v.release })))
+          sameSegment++
           continue
         }
-        const after = parsePlr(applyPlrEdits(raw, track, { release: v.release }))
-        if (after.release !== v.release) failures.push(`rel ${player.release} → ${v.release}: 写回 release=${after.release}`)
-        for (const key of Object.keys(player) as (keyof typeof player)[]) {
-          if (key === 'release') continue
-          const a = player[key]
-          const b = after[key]
-          const ja = typeof a === 'object' ? JSON.stringify(a) : String(a)
-          const jb = typeof b === 'object' ? JSON.stringify(b) : String(b)
-          if (ja !== jb) failures.push(`rel ${player.release} → ${v.release}: 字段 ${String(key)} 变了`)
+        if (v.release < player.release) {
+          // 降级现在也支持（删掉目标版本没有的字段）；只有 <1.4.0.1 才拒绝。
+          const tooOld = v.release < PLR_CONVERT_MIN_RELEASE
+          if (tooOld !== keys.includes('save.edit.err.releaseTargetTooOld')) {
+            failures.push(`${label}: 降级判断不对（${keys.join(',') || '无'}）`)
+          }
+          if (tooOld) {
+            downgradeRejected++
+            continue
+          }
+          try {
+            compare(label, v.release, parsePlr(applyPlrEdits(raw, track, { release: v.release })))
+            downgradeOk++
+          } catch (err) {
+            // 尾部读不出来的存档（第三方改过 / 无前导 bool 的 SSC 档）不能转换，属预期。
+            if (track.tailUnparsed || track.anchors.tailStart == null) downgradeRejected++
+            else failures.push(`${label}: ${(err as Error).message}`)
+          }
+          continue
         }
-        sameSegment++
+        // 升级：≥262 且尾部读得出来才放行（<262 要插入整段字段，不做）。
+        const canUpgrade = player.release >= PLR_CONVERT_MIN_RELEASE && !track.tailUnparsed
+        if (!canUpgrade) {
+          const want = player.release < PLR_CONVERT_MIN_RELEASE ? 'releaseTooOld' : 'releaseUnreadable'
+          if (!keys.some((k) => k.endsWith(want))) failures.push(`${label}: 应报 ${want}（${keys.join(',') || '无'}）`)
+          upgradeRejected++
+          continue
+        }
+        if (keys.length > 0) {
+          failures.push(`${label}: 应该允许升级却被拦 ${keys.join(',')}`)
+          continue
+        }
+        compare(label, v.release, parsePlr(applyPlrEdits(raw, track, { release: v.release })))
+        upgradeOk++
       }
     }
-    expect({ versions: seen.size, sameSegment, crossRejected, failures: failures.slice(0, 8) }).toEqual({
+    expect({
       versions: seen.size,
       sameSegment,
-      crossRejected,
+      upgradeOk,
+      downgradeOk,
+      downgradeRejected,
+      upgradeRejected,
+      failures: failures.slice(0, 8),
+    }).toEqual({
+      versions: seen.size,
+      sameSegment,
+      upgradeOk,
+      downgradeOk,
+      downgradeRejected,
+      upgradeRejected,
       failures: [],
     })
     expect(sameSegment).toBeGreaterThan(0)
-    expect(crossRejected).toBeGreaterThan(0)
+    expect(upgradeOk).toBeGreaterThan(0)
+    expect(downgradeOk).toBeGreaterThan(0)
+    // 被拒的只可能是「尾部读不出来」的存档（`tailUnparsed`），不该有别的理由。
   })
 })
 
+
+/**
+ * 升级的「插入量」核对（每个来源版本的插入字节数见下面 `expected` 表）：
+ * - 1.4.0.2（226）→ 1.4.5.8：补 229/230/252/253/254/255/256/260/262 各段 + 280…324，共 1218；
+ * - 1.4.0.5–1.4.3.6（230 段）：少 229，共 1212；
+ * - 1.4.4.x（269–279）：只差 280/281/282/283/300/310/322/324，共 136；
+ * - 1.4.5.x（315/318）：只差 322 与 324，共 121。
+ *
+ * 数字写死是有意的：插入模型（`plrConvert.ts` 的表）一旦算错，这里立刻红。
+ */
+describe.skipIf(players.length === 0)('真实存档：升级插入量', () => {
+  it('每个来源版本补的字节数与插入表一致', () => {
+    const deltas = new Map<number, Set<number>>()
+    for (const path of players) {
+      const raw = new Uint8Array(readFileSync(path))
+      const track = {} as PlrTrack
+      let player: ReturnType<typeof parsePlr>
+      try {
+        player = parsePlr(raw, track)
+      } catch {
+        continue
+      }
+      if (player.release >= 324 || player.release < PLR_CONVERT_MIN_RELEASE || track.tailUnparsed) continue
+      const out = applyPlrEdits(raw, track, { release: 326 })
+      const set = deltas.get(player.release) ?? new Set<number>()
+      set.add(out.length - raw.length)
+      deltas.set(player.release, set)
+    }
+    // 每个来源版本补多少字节（插入量 + 重新补位），写死是为了让插入表算错时立刻红：
+    // 226（1.4.0.2）补 1218、230（1.4.0.5–1.4.3.6 同段）补 1212、
+    // 269/279（1.4.4.x）补 136、315/318（1.4.5.x）补 121。
+    const expected = new Map<number, number>([
+      [226, 1232],
+      [230, 1216],
+      [269, 144],
+      [279, 144],
+      [315, 128],
+      [318, 128],
+    ])
+    for (const [rel, set] of deltas) {
+      expect({ release: rel, deltas: [...set] }).toEqual({ release: rel, deltas: [expected.get(rel)] })
+    }
+    expect([...deltas.keys()].some((rel) => rel >= 220 && rel <= 248)).toBe(true)
+  })
+})
 
 /**
  * 写回路径的**确定性随机**压测（LCG 固定种子，结果可复现）：

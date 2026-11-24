@@ -17,11 +17,14 @@
 import { aes128CbcEncrypt, PLR_AES_KEY } from './aes'
 import {
   decryptPlr,
+  isSameReleaseLayout,
+  parsePlr,
   type PlrBoostField,
   type PlrEquipContainer,
   type PlrStorageContainer,
   type PlrTrack,
 } from './plr'
+import { convertPlr } from './plrConvert'
 
 /** 一个背包槽位的目标状态（`id = 0` 表示清空）。 */
 export interface PlrItemEdit {
@@ -75,7 +78,17 @@ export function applyPlrEdits(
   track: PlrTrack,
   edits: PlrEdits,
 ): Uint8Array {
-  const plain = decryptPlr(data).slice()
+  const source = decryptPlr(data)
+  const from = new DataView(source.buffer, source.byteOffset, source.byteLength).getInt32(0, true)
+  // 跨布局段改版本号 = 版本转换：先按门槛插入（升）或删除（降）字段，
+  // 再拿新偏移表打补丁（`track` 的偏移会整体平移）。
+  if (edits.release != null && edits.release !== from && !isSameReleaseLayout(from, edits.release)) {
+    const upgraded = convertPlr(data, track, edits.release)
+    const nextTrack = {} as PlrTrack
+    parsePlr(upgraded, nextTrack)
+    return applyPlrEdits(upgraded, nextTrack, { ...edits, release: undefined })
+  }
+  const plain = source.slice()
   const need = (pos: number | undefined, name: string): number => {
     if (pos == null) throw new Error(`${name}：这份存档没有这个字段，无法编辑`)
     return pos

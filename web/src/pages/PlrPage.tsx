@@ -127,7 +127,15 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
     setNotice(null)
     try {
       const bytes = new Uint8Array(await saveFile.arrayBuffer())
-      const track: PlrTrack = { release: 0, boosts: {}, inventory: [], equipment: {}, storage: {}, loadouts: [] }
+      const track: PlrTrack = {
+        release: 0,
+        boosts: {},
+        anchors: {},
+        inventory: [],
+        equipment: {},
+        storage: {},
+        loadouts: [],
+      }
       const player = parsePlr(bytes, track)
       setEdit({ bytes, player, track, draft: draftFromPlayer(player, track) })
       if (!limits) {
@@ -150,7 +158,9 @@ export function PlrPage({ serverId, transport }: PlrPageProps) {
     blocked: (id) => limits?.noInventory.has(id) ?? false,
     prefixes: (id) => dataset?.rollablePrefixesById.get(id),
   }
-  const issues = edit ? validatePlrDraft(edit.draft, { catalog, original: edit.player }) : []
+  const issues = edit
+    ? validatePlrDraft(edit.draft, { catalog, original: edit.player, track: edit.track })
+    : []
   const dirty = edit ? isDraftDirty(edit.player, edit.track, edit.draft) : false
   // `limits` 没就绪时不能保存：堆叠上限 / 禁入背包名单都在里面，缺了校验就会「写进去被游戏截断」。
   // （`limitsFailed` 另外单独拦：加载失败时同样不允许存。）

@@ -8,8 +8,9 @@
  * - 文件头：`Terraria.IO/FileMetadata`（release >= 135 时 20 字节：8 魔数+类型、revision、收藏位）。
  * - 颜色：`Terraria/Utils.cs` 的 `ReadRGB`（R、G、B 各一字节）。
  *
- * 只解析到「游戏时间 / Golf 分数」为止（见 `parsePlr` 末尾的说明），够展示外观 / 属性 / 背包 / 装备 / 银行 / BUFF；
- * 之后的**研究进度、临时槽、旅途创意能力、配装、声音、退款队列**未读（见 `docs/TODO.md`）。
+ * 解析到「三套配装的结尾」为止（研究进度 / 临时槽 / 旅途创意能力 / 矿车升级包 / 配装都读），
+ * 够展示与编辑外观 / 属性 / 各容器 / 永久增强；只把**声音变体、退款队列、一次性对话**留空不读
+ * （它们只影响展示，位置由 `PlrTrack.anchors` 记下来给版本升级用，见 `plrConvert.ts`）。
  */
 import type { PlayerItem, PlayerLook } from '@/lib/tshock'
 import { aes128CbcDecrypt, PLR_AES_KEY } from './aes'
@@ -18,7 +19,8 @@ import { playerGameVersion } from './playerVersions'
 
 const FILE_MAGIC = 'relogic' // 文件头低 7 字节（`FileMetadata.Read` 的魔数）
 const FILE_TYPE_PLAYER = 3
-const MAX_RELEASE = 326 // Main.curRelease（1.4.5.8）
+export const PLR_MAX_RELEASE = 326 // Main.curRelease（1.4.5.8）
+const MAX_RELEASE = PLR_MAX_RELEASE
 const MIN_RELEASE = 135 // 有 FileMetadata 的最早版本
 const MAX_ITEM_ID = 10000 // 宽松上界：超过按空槽处理
 
@@ -83,6 +85,11 @@ export interface PlrTrack {
   golferScore?: number
   /** 永久增强布尔位（各 1 字节）。 */
   boosts: Partial<Record<PlrBoostField, number>>
+  /**
+   * 版本升级的锚点（`lib/save/plrConvert.ts` 用）。旧版本升级到新版本时，新版本多出来的字段
+   * 就插在这些位置——位置来自解析，不靠猜。
+   */
+  anchors: PlrAnchors
   /** 矿车升级包的位图字节（≥253）：bit0 已解锁 / bit1 已启用。 */
   superCartBits?: number
   /**
@@ -98,6 +105,38 @@ export interface PlrTrack {
   storage: Partial<Record<PlrStorageContainer, PlrSlotOffsets[]>>
   /** 三套配装：每套 20 装备（前 10 装备 / 后 10 时装）+ 10 染料，物品结构同背包。 */
   loadouts: { armor: PlrSlotOffsets[]; dye: PlrSlotOffsets[] }[]
+}
+
+/** 升级用的插入点（全部是「新字节插在这个偏移之前」）。 */
+export interface PlrAnchors {
+  /** `hairDye` 之后：≥283 的 `team` 插在这里。 */
+  afterHairDye?: number
+  /** 研究进度段起点：≥282 的前导 `bool` 插在这里。 */
+  researchStart?: number
+  /** `skinVariant` 的位置（≥107）：升级时要按它推出 `voiceVariant`（男 1 / 女 2）。 */
+  skinVariant?: number
+  /** `taxMoney` 之后：≥254 的 PVE / PVP 死亡次数插在这里。 */
+  afterTaxMoney?: number
+  /** `builderAccStatus` 段之后：≥230 从这里多一个 int32。 */
+  builderAccEnd?: number
+  /** 当前 BUFF 段之后：≥252 容量 22 → 44，从这往后追加 22 个空位。 */
+  buffsEnd?: number
+  /** 变长尾段起点：矿车升级包 / 配装块的起点（创意能力之后）。 */
+  tailStart?: number
+  /** 声音变体位置（≥280）：也就是配装段的结尾。 */
+  voiceAt?: number
+  /** 音调位置（≥281）。 */
+  pitchAt?: number
+  /** 退款队列条数的位置（≥300）；`count > 0` 时条目长度不可靠（见 `refundCount`）。 */
+  refundsAt?: number
+  /** 退款队列条数（≥300）。 */
+  refundCount?: number
+  /** 一次性对话条数的位置（≥310）。 */
+  dialoguesAt?: number
+  /** 尾段最后一个字段之后（声音 / 音调 / 退款队列 / 一次性对话 / 配装，取最后存在的那个）。 */
+  tailEnd?: number
+  /** 三套配装段结束：≥280 的声音变体 / 音调 / 退款队列 / 一次性对话从这里往后**追加**。 */
+  loadoutsEnd?: number
 }
 
 /** 一个“当前生效”的 BUFF（`buffTime` 单位是 tick，60 tick = 1 秒）。 */
@@ -288,6 +327,7 @@ export function decryptPlr(data: ArrayBuffer | Uint8Array): Uint8Array {
 
 /**
  * `Player.Deserialize` 里所有 `release >= N` / `release < N` 的门槛（1.4.5.8，去重升序）。
+ * 280/281/300/310 落在「声音 / 退款队列 / 一次性对话」段（本工具不读，但升级要按它们插入）。
  *
  * 用途：判断两个存档版本号「字段布局是否完全相同」。**同段内改版本号是安全的**（读出来的字段一样），
  * 跨段改就必然读偏 —— 那种「升降级」要重写整份存档，不属于本工具范围。
@@ -295,7 +335,7 @@ export function decryptPlr(data: ArrayBuffer | Uint8Array): Uint8Array {
 export const PLAYER_RELEASE_GATES: readonly number[] = [
   6, 10, 11, 15, 16, 17, 20, 36, 38, 47, 58, 74, 81, 82, 83, 98, 107, 114, 115, 117, 119, 124, 125,
   128, 136, 138, 161, 162, 164, 167, 181, 182, 197, 198, 199, 200, 202, 206, 210, 214, 218, 220, 229,
-  230, 249, 252, 253, 254, 255, 256, 260, 262, 280, 281, 283, 300, 310, 322, 324,
+  230, 249, 252, 253, 254, 255, 256, 260, 262, 280, 281, 282, 283, 300, 310, 322, 324,
 ]
 
 /** 某个 release 所在的「同布局段」：`[lo, hi]`（含两端）。 */
@@ -328,6 +368,7 @@ export function parsePlr(data: ArrayBuffer | Uint8Array, track?: PlrTrack): PlrP
   if (track) {
     track.release = 0
     track.boosts = {}
+    track.anchors = {}
     track.inventory = []
     track.equipment = {}
     track.storage = {}
@@ -359,11 +400,15 @@ export function parsePlr(data: ArrayBuffer | Uint8Array, track?: PlrTrack): PlrP
   p.hair = r.i32()
   if (p.hair >= 228) p.hair = 0
   if (release >= 82) p.hairDye = r.u8()
+  if (track) track.anchors.afterHairDye = r.pos
   if (release >= 283) r.skip(1) // team
   if (release >= 124) r.skip(2) // 隐藏装备位（12 位）
   else if (release >= 83) r.skip(1)
   if (release >= 119) r.skip(1) // hideMisc
-  if (release >= 107) p.skinVariant = r.u8()
+  if (release >= 107) {
+    if (track) track.anchors.skinVariant = r.pos
+    p.skinVariant = r.u8()
+  }
 
   at('statLife', r.pos)
   p.statLife = r.i32()
@@ -404,7 +449,10 @@ export function parsePlr(data: ArrayBuffer | Uint8Array, track?: PlrTrack): PlrP
     }
   }
   if (release >= 182) r.skip(1) // downedDD2EventAnyDifficulty
-  if (release >= 128) p.taxMoney = r.i32()
+  if (release >= 128) {
+    p.taxMoney = r.i32()
+    if (track) track.anchors.afterTaxMoney = r.pos
+  }
   if (release >= 254) {
     p.deathsPve = r.i32()
     p.deathsPvp = r.i32()
@@ -481,6 +529,8 @@ export function parsePlr(data: ArrayBuffer | Uint8Array, track?: PlrTrack): PlrP
     }
   }
 
+  if (track) track.anchors.buffsEnd = r.pos
+
   // 重生点：按世界分开存（`spX == -1` 表示列表结束）。
   for (let i = 0; i < 200; i++) {
     const x = r.i32()
@@ -498,6 +548,7 @@ export function parsePlr(data: ArrayBuffer | Uint8Array, track?: PlrTrack): PlrP
   if (release >= 164) {
     const count = release >= 230 ? 12 : release >= 197 ? 11 : release >= 167 ? 10 : 8
     r.skip(count * 4) // builderAccStatus
+    if (track) track.anchors.builderAccEnd = r.pos
   }
   if (release >= 181) r.skip(4) // bartenderQuestLog
   if (release >= 200) {
@@ -527,6 +578,7 @@ export function parsePlr(data: ArrayBuffer | Uint8Array, track?: PlrTrack): PlrP
 function readPlrTail(r: ByteReader, p: PlrPlayer, track: PlrTrack | undefined, release: number): void {
   // 研究进度（`ItemsSacrificedUnlocksTracker`）：[bool 若 ≥282] + int32 条数 + 条数 ×(string + int32)。
   if (release >= 218) {
+    if (track) track.anchors.researchStart = r.pos
     if (release >= 282) r.skip(1)
     const count = r.i32()
     if (count < 0 || count > 20000) throw new SaveFormatError('存档数据不完整（研究进度条数异常）')
@@ -553,6 +605,7 @@ function readPlrTail(r: ByteReader, p: PlrPlayer, track: PlrTrack | undefined, r
       else break // 未知 id：游戏自己也会 break，再往后位置就不可信了
     }
   }
+  if (track) track.anchors.tailStart = r.pos
   if (release >= 253) {
     if (track) track.superCartBits = r.pos
     const bits = r.u8()
@@ -586,7 +639,34 @@ function readPlrTail(r: ByteReader, p: PlrPlayer, track: PlrTrack | undefined, r
       p.loadouts.push({ armor, dye, hide })
     }
   }
-  // 再往后还有三套配装（Loadouts）、声音变体、退款队列、一次性对话 —— 本功能不展示也不编辑，故不读。
+  if (track && release >= 262) track.anchors.loadoutsEnd = r.pos
+  // 再往后的字段不展示也不编辑，但**要记下起止位置**：降级时得知道删到哪儿。
+  // 声音变体 / 音调（≥280 / ≥281）
+  if (release >= 280) {
+    if (track) track.anchors.voiceAt = r.pos
+    r.skip(1)
+  }
+  if (release >= 281) {
+    if (track) track.anchors.pitchAt = r.pos
+    r.skip(4)
+  }
+  // 退款队列（≥300）：int32 条数 + 每条 Item（id/stack/prefix，≥322 可能多一个收藏位）。
+  if (release >= 300) {
+    if (track) track.anchors.refundsAt = r.pos
+    const count = r.i32()
+    if (track) track.anchors.refundCount = count
+    if (count < 0 || count > 5000) throw new SaveFormatError('存档数据不完整（退款队列条数异常）')
+    r.skip(count * (release >= 322 ? 10 : 9))
+  }
+  // 一次性对话（≥310）：int32 条数 + 每条字符串（自带长度，能安全跳过）
+  if (release >= 310) {
+    if (track) track.anchors.dialoguesAt = r.pos
+    const count = r.i32()
+    if (count < 0 || count > 5000) throw new SaveFormatError('存档数据不完整（一次性对话条数异常）')
+    for (let i = 0; i < count; i++) r.str()
+  }
+  // 尾段最后一个字段之后（降级时删到这儿）
+  if (track) track.anchors.tailEnd = r.pos
 }
 
 /**

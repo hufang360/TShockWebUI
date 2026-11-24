@@ -101,6 +101,20 @@ export function SelectItem({
   )
 }
 
+/**
+ * 分组标题（shadcn 的 `SelectPrimitive.Label`）。不参与键盘选择，只做视觉分组 ——
+ * 版本下拉这种「同段 + 多个升级目标」的长列表靠它才读得动。
+ */
+export function SelectLabel({ className, ...props }: ComponentProps<typeof SelectPrimitive.Label>) {
+  return (
+    <SelectPrimitive.Label
+      data-slot="select-label"
+      className={cn('px-2 py-1.5 text-2xs text-muted-foreground', className)}
+      {...props}
+    />
+  )
+}
+
 export function SelectSeparator({
   className,
   ...props

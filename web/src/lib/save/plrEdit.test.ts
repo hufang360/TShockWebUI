@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { parsePlr, type PlrTrack } from './plr'
+import { isSameReleaseLayout, parsePlr, type PlrTrack } from './plr'
+import { applyPlrEdits } from './plrWrite'
 import {
   buildPlrEdits,
   draftFromPlayer,
@@ -98,13 +99,50 @@ describe('.plr 编辑校验', () => {
     )
   })
 
-  it('版本号只允许在同一布局段内改', () => {
+  it('版本号：同段改数字放行、1.4.0.1 起双向转换、更老的目标拦住', () => {
     const { draft, original } = draftFor(demo())
     const ctx = ctxOf(original)
     expect(validatePlrDraft({ ...draft, release: 228 }, ctx)).toEqual([]) // 226 → 1.4.0.4 同段
-    expect(validatePlrDraft({ ...draft, release: 230 }, ctx).map((i) => i.messageKey)).toContain(
-      'save.edit.err.releaseLayout',
+    // 226（1.4.0.2）→ 1.4.0.5 + 更高：靠插入字段补齐，放行。
+    expect(validatePlrDraft({ ...draft, release: 230 }, ctx)).toEqual([])
+
+    // 281 / 282 是不同布局（282 起研究进度段多一个前导 bool），不能互相改。
+    expect(isSameReleaseLayout(281, 282)).toBe(false)
+    expect(isSameReleaseLayout(282, 283)).toBe(false)
+    expect(isSameReleaseLayout(280, 281)).toBe(false)
+
+    const newer = draftFor(fixture326())
+    const newerCtx = { ...ctxOf(newer.original), track: newer.track }
+    // 降级现在也支持（删掉目标版本没有的字段），只有低于 1.4.0.1 才拦。
+    expect(validatePlrDraft({ ...newer.draft, release: 269 }, newerCtx)).toEqual([])
+    expect(validatePlrDraft({ ...newer.draft, release: 248 }, newerCtx)).toEqual([])
+    expect(
+      validatePlrDraft({ ...newer.draft, release: 219 }, newerCtx).map((i) => i.messageKey),
+    ).toContain('save.edit.err.releaseTargetTooOld')
+  })
+
+  it('存档里原本就超出原版上限的数值不拦保存，改了才拦', () => {
+    // 真实 SSC 存档里见过生命 1000 / 30000（服务器插件给的额外生命），这些不该让整份存档存不出去。
+    const raw = demo()
+    const { track, player } = parseWithTrack(raw)
+    const bloated = applyPlrEdits(raw, track, { statLife: 1000 })
+    const { track: t2, player: p2 } = parseWithTrack(bloated)
+    const ctx = { ...ctxOf(p2), track: t2 }
+    expect(p2.statLife).toBe(1000)
+
+    const draft = draftFromPlayer(p2, t2)
+    // 原样不动：不报错，可以改别的东西
+    expect(validatePlrDraft(draft, ctx)).toEqual([])
+    expect(
+      validatePlrDraft({ ...draft, inventory: { 0: { id: 75, stack: 5, prefix: 0 } } }, ctx),
+    ).toEqual([])
+    // 往上改超上限 → 报错
+    expect(validatePlrDraft({ ...draft, statLife: 1200 }, ctx).map((i) => i.messageKey)).toContain(
+      'save.edit.err.range',
     )
+    // 往下改到原版范围内 → 放行
+    expect(validatePlrDraft({ ...draft, statLife: 400 }, ctx)).toEqual([])
+    expect(player.statLife).toBe(400)
   })
 
   it('「矿车升级包」只在有该字段的存档上可改', () => {

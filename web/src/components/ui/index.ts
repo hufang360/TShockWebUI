@@ -50,6 +50,7 @@ export type { ToggleGroupProps, ToggleGroupItemProps } from './ToggleGroup'
 export {
   Select,
   SelectGroup,
+  SelectLabel,
   SelectValue,
   SelectTrigger,
   SelectContent,

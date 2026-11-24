@@ -6,17 +6,19 @@
  *   （超出部分游戏会截断，所以这里直接拦）。
  * - `Item.FixAgainstExploit()`：`stack ≤ maxStack`、词缀必须 ∈ `Item.GetRollablePrefixes()`
  *   （= `data/prefix-sets.json`）、`ItemID.Sets.ItemsThatShouldNotBeInInventory` 里的物品会被变成空气。
- * - `release`：只允许在**同一布局段**内改（跨段会读偏，等于毁档）。
+ * - `release`：同一布局段内直接改数字；跨段走版本转换（`plrConvert.ts`）——
+ *   往高插入目标版本多出来的字段，往低删掉目标版本没有的字段（丢的是那些内容本身，UI 会提示）。
+ * - 标量数值（生命 / 魔力 / 渔夫 / Golf…）只校验**用户改过的**：存档里原本就可能超出原版上限
+ *   （SSC 服务器给过额外生命），原样保留不该让整份存档存不出去。
  */
 import {
-  isSameReleaseLayout,
   type PlrBoostField,
   type PlrEquipContainer,
   type PlrPlayer,
   type PlrStorageContainer,
   type PlrTrack,
-  releaseSegment,
 } from './plr'
+import { checkPlrConvert } from './plrConvert'
 import type { PlrEdits, PlrItemEdit } from './plrWrite'
 
 /** 存档里能写死的硬上限（与游戏一致）。 */
@@ -49,6 +51,16 @@ export interface PlrEditDraft {
   /** 三套配装（键 = 配装下标，0–2）：`armor` 20 格 / `dye` 10 格，结构同背包。 */
   loadouts: Record<number, { armor: Record<number, PlrItemEdit>; dye: Record<number, PlrItemEdit> }>
 }
+
+/** 校验时按「只查改动」处理的标量字段（`PlrPlayer` 上同名的就是存档原值）。 */
+type PlrScalarField =
+  | 'statLife'
+  | 'statLifeMax'
+  | 'statMana'
+  | 'statManaMax'
+  | 'anglerQuests'
+  | 'golferScore'
+  | 'difficulty'
 
 /** 物品校验需要的最小目录（UI 用 dataset + `data/item-limits.json` 适配；测试里可以给假数据）。 */
 export interface PlrItemCatalog {
@@ -133,7 +145,7 @@ const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInt
  */
 export function validatePlrDraft(
   draft: PlrEditDraft,
-  ctx: { catalog: PlrItemCatalog; original: PlrPlayer },
+  ctx: { catalog: PlrItemCatalog; original: PlrPlayer; track?: PlrTrack },
 ): PlrEditIssue[] {
   const issues: PlrEditIssue[] = []
   const { catalog, original } = ctx
@@ -149,27 +161,43 @@ export function validatePlrDraft(
     return true
   }
 
-  num('statLifeMax', draft.statLifeMax, 0, PLR_LIMITS.lifeMax)
-  num('statLife', draft.statLife, 0, PLR_LIMITS.lifeMax)
-  if (draft.statLife > draft.statLifeMax) {
+  /**
+   * 标量字段只在**用户改过**时校验：真实存档（尤其 SSC / 插件给过额外生命的服）里
+   * 本来就可能有超过原版上限的值（实测生命 600 / 1000 / 30000），原样保留不该让
+   * 整份存档都存不出去 —— 与物品槽位「只校验改过的格子」是同一口径。
+   */
+  const scalar = (field: PlrScalarField, min: number, max: number) => {
+    if ((draft[field] as number) === (original[field] as number)) return false
+    return num(field, draft[field] as number, min, max)
+  }
+  const lifeMaxChanged = scalar('statLifeMax', 0, PLR_LIMITS.lifeMax)
+  const lifeChanged = scalar('statLife', 0, PLR_LIMITS.lifeMax)
+  // 关系检查也只看改动：存档原本就是 1000 生命 / 500 上限（游戏读的时候会夹上限），不该报错。
+  if ((lifeChanged || lifeMaxChanged) && draft.statLife > draft.statLifeMax) {
     issues.push({ field: 'statLife', messageKey: 'save.edit.err.lifeOverMax' })
   }
-  num('statManaMax', draft.statManaMax, 0, PLR_LIMITS.manaMax)
-  num('statMana', draft.statMana, 0, PLR_LIMITS.manaValueMax)
-  num('anglerQuests', draft.anglerQuests, 0, PLR_LIMITS.anglerMax)
-  num('golferScore', draft.golferScore, 0, 2_147_483_647)
-  num('difficulty', draft.difficulty, 0, 3)
+  scalar('statManaMax', 0, PLR_LIMITS.manaMax)
+  scalar('statMana', 0, PLR_LIMITS.manaValueMax)
+  scalar('anglerQuests', 0, PLR_LIMITS.anglerMax)
+  scalar('golferScore', 0, 2_147_483_647)
+  scalar('difficulty', 0, 3)
 
   if (!isInt(draft.release)) {
     issues.push({ field: 'release', messageKey: 'save.edit.err.int' })
-  } else if (!isSameReleaseLayout(original.release, draft.release)) {
-    // 跨布局段：字段结构不同，读回去就是错的（UI 里这些选项本来就是禁用的）。
-    const seg = releaseSegment(original.release)
-    issues.push({
-      field: 'release',
-      messageKey: 'save.edit.err.releaseLayout',
-      vars: { lo: seg.lo, hi: seg.hi === Number.MAX_SAFE_INTEGER ? original.release : seg.hi },
-    })
+  } else if (draft.release !== original.release) {
+    // 双向：往高走插入新字段，往低走删掉目标版本没有的字段（会丢内容，UI 负责提示）。
+    const problem = checkPlrConvert(original.release, draft.release, ctx.track)
+    if (problem === 'sourceTooOld') {
+      issues.push({ field: 'release', messageKey: 'save.edit.err.releaseTooOld' })
+    } else if (problem === 'targetTooOld') {
+      issues.push({ field: 'release', messageKey: 'save.edit.err.releaseTargetTooOld' })
+    } else if (problem === 'tooNew') {
+      issues.push({ field: 'release', messageKey: 'save.edit.err.releaseTooNew' })
+    } else if (problem === 'tailUnreadable') {
+      issues.push({ field: 'release', messageKey: 'save.edit.err.releaseUnreadable' })
+    } else if (problem === 'refundsPresent') {
+      issues.push({ field: 'release', messageKey: 'save.edit.err.releaseRefunds' })
+    }
   }
 
   for (const [key, item] of Object.entries(draft.inventory)) {

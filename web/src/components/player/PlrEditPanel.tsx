@@ -13,7 +13,9 @@ import {
   Label,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui'
@@ -24,8 +26,9 @@ import { PERMANENT_BOOSTERS } from '@/lib/playerBoosts'
 import { LOADOUT_KEYS } from '@/lib/playerSlots'
 import type { PlrBoostField, PlrEquipContainer, PlrPlayer, PlrStorageContainer, PlrTrack } from '@/lib/save/plr'
 import type { PlrEditDraft, PlrEditIssue } from '@/lib/save/plrEdit'
-import { releaseSegment } from '@/lib/save/plr'
-import { playerGameVersion, versionOptionsFor } from '@/lib/save/playerVersions'
+import { isSameReleaseLayout, releaseSegment } from '@/lib/save/plr'
+import { checkPlrConvert } from '@/lib/save/plrConvert'
+import { PLAYER_VERSIONS, playerGameVersion, versionOptionsFor } from '@/lib/save/playerVersions'
 import type { PlrItemEdit } from '@/lib/save/plrWrite'
 import { cn } from '@/lib/cn'
 
@@ -148,7 +151,36 @@ export function PlrEditPanel({
       ? t('save.edit.boostUnreadable')
       : t('save.edit.boostUnsupported', { version: saveVersionLabel })
   const versionOptions = versionOptionsFor(player.release)
+  /**
+   * 跨布局段的目标版本（升或降都能转）：靠插入 / 删除字段补齐，[1.4.0.1, 最新] 内双向。
+   * 其余版本不进下拉 —— 与其让人选了再报错，不如不出现。
+   */
+  const convertTargets = PLAYER_VERSIONS.filter(
+    (v) =>
+      !versionOptions.some((o) => o.release === v.release) &&
+      checkPlrConvert(player.release, v.release, track) == null,
+  )
+  /**
+   * 按**目标版本的布局段**分组：1.4.0.2 那份存档能转到 33 个跨段版本，
+   * 平铺就是一个读不动的长列表。
+   */
+  const targetGroups: { key: number; range: string; options: typeof convertTargets }[] = []
+  for (const v of convertTargets) {
+    const key = releaseSegment(v.release).lo
+    const found = targetGroups.find((g) => g.key === key)
+    if (found) found.options.push(v)
+    else targetGroups.push({ key, range: '', options: [v] })
+  }
+  for (const group of targetGroups) {
+    const first = group.options[0]
+    const last = group.options[group.options.length - 1]
+    const a = playerGameVersion(first.release) ?? String(first.release)
+    const b = playerGameVersion(last.release) ?? String(last.release)
+    group.range = a === b ? a : `${a} – ${b}`
+  }
   const releaseIssue = err('release')
+  const crossing = !isSameReleaseLayout(player.release, draft.release)
+  const downgrade = draft.release < player.release
 
   return (
     <div className="flex flex-col gap-4">
@@ -199,10 +231,25 @@ export function PlrEditPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {versionOptions.map((v) => (
-                    <SelectItem key={v.release} value={String(v.release)}>
-                      {v.gameVersion}（{v.release}）
-                    </SelectItem>
+                  <SelectGroup>
+                    <SelectLabel>{t('save.edit.versionGroupSame')}</SelectLabel>
+                    {versionOptions.map((v) => (
+                      <SelectItem key={v.release} value={String(v.release)}>
+                        {v.gameVersion}（{v.release}）
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  {targetGroups.map((group) => (
+                    <SelectGroup key={group.key}>
+                      <SelectLabel>
+                        {t('save.edit.versionGroupUpgrade', { range: group.range })}
+                      </SelectLabel>
+                      {group.options.map((v) => (
+                        <SelectItem key={v.release} value={String(v.release)}>
+                          {v.gameVersion}（{v.release}）
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                   {versionOptions.every((v) => v.release !== player.release) && (
                     <SelectItem value={String(player.release)}>
@@ -213,6 +260,16 @@ export function PlrEditPanel({
               </Select>
               {releaseIssue ? (
                 <p className="text-2xs text-destructive">{releaseIssue}</p>
+              ) : crossing ? (
+                <p className="text-2xs text-muted-foreground">
+                  {downgrade
+                    ? t('save.edit.versionDowngradeHint', {
+                        version: playerGameVersion(draft.release) ?? String(draft.release),
+                      })
+                    : t('save.edit.versionUpgradeHint', {
+                        version: playerGameVersion(draft.release) ?? String(draft.release),
+                      })}
+                </p>
               ) : (
                 <p className="text-2xs text-muted-foreground">
                   {t('save.edit.versionHint', {

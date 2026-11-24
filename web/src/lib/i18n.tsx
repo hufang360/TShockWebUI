@@ -958,7 +958,13 @@ const zh: Dict = {
   'save.edit.manaMax': '魔力上限',
   'save.edit.manaMaxHint': '0–200',
   'save.edit.difficultyWarn': '改成硬核 / 旅途会影响角色规则，确认再保存。',
-  'save.edit.versionHint': '只能在这个区间内改（{lo} – {hi}）：同区间的字段结构一致，跨区间需要重写整份存档。',
+  'save.edit.versionHint': '只能在这个区间内改（{lo} – {hi}）：同区间的字段结构一致。',
+  'save.edit.versionGroupSame': '同布局段（可自由改）',
+  'save.edit.versionGroupUpgrade': '升级到 {range}',
+  'save.edit.versionDowngradeHint':
+    '保存时会降到 {version}：该版本没有的字段（收藏位 / 配装 / 退款队列 / 一次性对话 / 声音…）会被删除，删掉的内容无法恢复。原文件不会被覆盖。',
+  'save.edit.versionUpgradeHint':
+    '保存时会顺带升级到 {version}：只补新版本多出来的字段（声音 / 收藏位 / 退款队列…），其它内容一字节不动，原文件不会被覆盖。',
   'save.edit.boostUnsupported': '这份存档（{version}）没有这个字段',
   'save.edit.boostUnsupportedHint':
     '灰色项是 {version} 时的存档还没有的字段：用新版游戏把角色存一次（存档随之升级）后就能改。',
@@ -1001,7 +1007,13 @@ const zh: Dict = {
   'save.edit.err.blockedItem': '这件物品不能放进背包（游戏加载时会把它清空）',
   'save.edit.err.stackRange': '数量必须在 1 – {max}',
   'save.edit.err.badPrefix': '这件物品不支持这个词缀',
-  'save.edit.err.releaseLayout': '只能改成同一字段布局段内的版本（{lo} – {hi}）',
+  'save.edit.err.releaseTargetTooOld':
+    '只能转换到 1.4.0.1 及更新的版本：更早的版本要整段增删容器（虚空袋 / 熔炉 / 隐藏信息位…）',
+  'save.edit.err.releaseRefunds': '这份存档的退款队列里还有物品（长度无法确认），不能降到 1.4.5 之前',
+  'save.edit.err.releaseTooOld':
+    '这份存档比 1.4.0.1 更老：升级要补整段字段（虚空袋 / 熔炉 / 隐藏信息位…），请先在游戏里打开并保存一次',
+  'save.edit.err.releaseTooNew': '目标版本比本工具支持的更新，暂不支持',
+  'save.edit.err.releaseUnreadable': '这份存档的尾部读不出来（被第三方改过），不能升级',
   'save.edit.err.noLimits': '物品数量规则（data/item-limits.json）加载失败，暂时不能编辑背包。',
   'players.demo': '来个 Demo',
   'players.err.demoFailed': 'Demo 存档加载失败（静态资源可能不完整），请重试或手动选择文件。',
@@ -2442,7 +2454,13 @@ const en: Dict = {
   'save.edit.manaMax': 'Max mana',
   'save.edit.manaMaxHint': '0–200',
   'save.edit.difficultyWarn': 'Hardcore / Journey changes the character rules — make sure you mean it.',
-  'save.edit.versionHint': 'Only versions with the same field layout can be picked ({lo} – {hi}); anything else needs a full rewrite.',
+  'save.edit.versionHint': 'Only versions in the same field-layout range can be picked ({lo} – {hi}).',
+  'save.edit.versionGroupSame': 'Same field layout',
+  'save.edit.versionGroupUpgrade': 'Upgrade to {range}',
+  'save.edit.versionDowngradeHint':
+    'Saving converts the file down to {version}: fields that version does not have (favourites, loadouts, refund queue, one-time dialogue, voice…) are removed, and that content cannot be recovered. The original file is untouched.',
+  'save.edit.versionUpgradeHint':
+    'Saving also upgrades the file to {version}: only the fields newer versions added are appended (voice, favourites, refund queue…). Everything else stays byte-identical and the original file is untouched.',
   'save.edit.boostUnsupported': 'This save ({version}) has no such field',
   'save.edit.boostUnsupportedHint':
     'Greyed-out entries did not exist in a {version} save — load & save the character once in a newer game version to upgrade it.',
@@ -2485,7 +2503,13 @@ const en: Dict = {
   'save.edit.err.blockedItem': 'This item cannot sit in the inventory (the game clears it on load)',
   'save.edit.err.stackRange': 'Amount must be 1 – {max}',
   'save.edit.err.badPrefix': 'This item does not accept that prefix',
-  'save.edit.err.releaseLayout': 'Only versions in the same field-layout range ({lo} – {hi})',
+  'save.edit.err.releaseTargetTooOld':
+    'Can only convert to 1.4.0.1 or newer: older versions need whole containers added/removed (void vault, forge, hidden info…)',
+  'save.edit.err.releaseRefunds': 'This save still has items pending in its refund queue, so it cannot be lowered below 1.4.5',
+  'save.edit.err.releaseTooOld':
+    'This save is older than 1.4.0.1: upgrading would mean inserting whole sections (void vault, forge, hidden info…). Open and re-save it in game first',
+  'save.edit.err.releaseTooNew': 'The target version is newer than this tool supports',
+  'save.edit.err.releaseUnreadable': "This save's tail cannot be read (modified by a third party), so it cannot be upgraded",
   'save.edit.err.noLimits': 'Item stack limits (data/item-limits.json) failed to load — inventory editing is disabled.',
   'players.demo': 'Try the demo',
   'players.err.demoFailed':

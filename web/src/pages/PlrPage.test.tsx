@@ -9,6 +9,7 @@ import { parsePlr, parsePlrFile } from '@/lib/save/plr'
 import type { BackendTransport } from '@/lib/tshock'
 import type { Dataset } from '@/types'
 import { makeDataset } from '@/test/fixtures'
+import { stripTo144 } from '@/test/plrSave'
 import { playerStubs } from '@/test/playerStubs'
 import { PlayerInfoPanel } from '@/components/player/PlayerLookView'
 import { PlayerLookPanel } from '@/components/player/PlayerLookPanel'
@@ -241,7 +242,7 @@ describe('PlrPage（玩家存档）', () => {
     }
   })
 
-  it('版本下拉只提供同一字段布局段内的版本', async () => {
+  it('版本下拉 = 同布局段 + 可升级的更高版本（没有降级目标）', async () => {
     vi.stubGlobal('fetch', itemLimitsFetch())
     try {
       renderPage(makeTransport())
@@ -257,10 +258,56 @@ describe('PlrPage（玩家存档）', () => {
       const releases = labels
         .map((text) => Number(/（(\d+)）/.exec(text)?.[1]))
         .filter((n) => Number.isFinite(n))
-      // Joy 是 release 226，同段是 [220,228]
+      // Joy 是 release 226：同段 [220,228] 全在，外加能升级的更高版本（1.4.4 起）。
       expect(releases.length).toBeGreaterThan(0)
-      expect(releases.every((v) => v >= 220 && v <= 228)).toBe(true)
       expect(releases).toContain(226)
+      expect(releases.filter((v) => v <= 228).every((v) => v >= 220)).toBe(true)
+      expect(releases).toContain(326)
+      expect(releases.every((v) => v >= 220)).toBe(true) // 没有比它更低的
+      expect(new Set(releases).size).toBe(releases.length)
+
+      // 跨段目标按目标布局段分组，否则平铺成几十项读不动。
+      expect(screen.getByText('同布局段（可自由改）')).toBeTruthy()
+      expect(screen.getByText('升级到 1.4.0.5 – 1.4.3.6')).toBeTruthy()
+      expect(screen.getByText('升级到 1.4.4 – 1.4.4.9')).toBeTruthy()
+      expect(screen.getByText('升级到 1.4.5.7 – 1.4.5.8')).toBeTruthy()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('1.4.4 存档的版本下拉：同段 + 可升/可降的跨段目标，并说明丢什么', async () => {
+    vi.stubGlobal('fetch', itemLimitsFetch())
+    try {
+      const { bytes } = stripTo144()
+      renderPage(makeTransport())
+      fireEvent.change(screen.getByTestId('players-plr-input'), {
+        target: { files: [new File([bytes.slice().buffer as ArrayBuffer], 'old.plr')] },
+      })
+      // 1.4.4 存档的角色名与 326 fixture 相同（只改了版本与字段布局）
+      expect(await screen.findByText(parsePlr(bytes).name)).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: /编辑$/ }))
+
+      fireEvent.click(await screen.findByLabelText('版本'))
+      const releases = (await screen.findAllByRole('option'))
+        .map((o) => Number(/（(\d+)）/.exec(o.textContent ?? '')?.[1]))
+        .filter((n) => Number.isFinite(n))
+      // 同段 [262,279] + 往上（315/326）与往下（225/248）的跨段目标
+      expect(releases).toContain(269)
+      expect(releases).toContain(326)
+      expect(releases).toContain(315)
+      expect(releases).toContain(248)
+      expect(releases.every((v) => v >= 220)).toBe(true) // 低于 1.4.0.1 不出现
+      expect(new Set(releases).size).toBe(releases.length) // 同段 + 跨段目标不重复
+
+      // 往上升：说明只补字段
+      fireEvent.click(screen.getByRole('option', { name: '1.4.5.8（326）' }))
+      expect(await screen.findByText(/保存时会顺带升级到 1\.4\.5\.8/)).toBeTruthy()
+
+      // 往下降：说明会丢内容
+      fireEvent.click(await screen.findByLabelText('版本'))
+      fireEvent.click(screen.getByRole('option', { name: '1.4.3.6（248）' }))
+      expect(await screen.findByText(/保存时会降到 1\.4\.3\.6/)).toBeTruthy()
     } finally {
       vi.unstubAllGlobals()
     }
