@@ -45,6 +45,7 @@ import { loadItemLimits, type ItemLimits } from '@/lib/itemLimits'
 import { useDataset } from '@/lib/datasetContext'
 import { parseWorldSections, type WorldSections } from '@/lib/save/worldStats'
 import { applyWorldEdits } from '@/lib/save/worldWrite'
+import { scanTileEntityMax } from '@/lib/save/worldConvert'
 import { worldThumbnailBlob, worldImageFilename } from '@/lib/save/worldImage'
 import {
   cacheWorld,
@@ -200,7 +201,13 @@ export function WorldPage({ serverId }: WorldPageProps) {
     }
     let npc = 0
     for (const entry of sections?.npcList ?? []) if (entry.netId > npc) npc = entry.netId
-    return { tile: maxKey(edit.stats.tiles), wall: maxKey(edit.stats.walls), item, npc }
+    let entity = 0
+    try {
+      entity = scanTileEntityMax(edit.bytes, edit.track)
+    } catch {
+      // 走不动就交给保存时的权威检查报错；这里不拦。
+    }
+    return { tile: maxKey(edit.stats.tiles), wall: maxKey(edit.stats.walls), item, npc, entity }
   }, [edit, sections])
 
   const issues = edit

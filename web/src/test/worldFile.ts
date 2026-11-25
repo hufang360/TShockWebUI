@@ -27,6 +27,16 @@ export interface ChestSpec {
   items?: [id: number, stack: number, prefix?: number][]
 }
 
+/** 第 6 段的一条图格实体（`extra` 按源版本自己写；`displayDoll` 会自动按 release 写 2/3/4 字节）。 */
+export interface TileEntitySpec {
+  type?: number
+  id?: number
+  x?: number
+  y?: number
+  extra?: number[]
+  displayDoll?: boolean
+}
+
 export interface WorldSpec {
   width: number
   height: number
@@ -37,8 +47,8 @@ export interface WorldSpec {
   signs?: { x: number; y: number; text: string }[]
   /** 城镇 NPC（第 5 段）：只写类型 + 名字，够统计数量。 */
   npcs?: { netId: number; name: string }[]
-  /** 图格实体数量（第 6 段只有一个 int32）。 */
-  tileEntities?: number
+  /** 图格实体（第 6 段）：数字 = 只写数量；数组 = 写完整记录。 */
+  tileEntities?: number | TileEntitySpec[]
   name?: string
   seed?: string
   release?: number
@@ -192,13 +202,13 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   w.i32(width)
   w.i32(1) // GameMode：专家
   w.bool(true) // drunk
-  w.bool(false) // worthy
-  w.bool(false) // anniversary
-  w.bool(false) // dontStarve
-  w.bool(false) // notTheBees
-  w.bool(false) // remix
-  w.bool(false) // noTraps
-  w.bool(false) // zenith
+  if (release >= 227) w.bool(false) // worthy
+  if (release >= 238) w.bool(false) // anniversary
+  if (release >= 239) w.bool(false) // dontStarve
+  if (release >= 241) w.bool(false) // notTheBees
+  if (release >= 249) w.bool(false) // remix
+  if (release >= 266) w.bool(false) // noTraps
+  if (release >= 267) w.bool(false) // zenith
   if (release >= 302) w.bool(false) // skyblock
 
   // 与现实一致：CreationTime 是 DateTime.Now（本地 Kind），最后游玩是 DateTime.UtcNow（UTC Kind）
@@ -231,7 +241,7 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   w.u8(0) // shadowOrbCount
   w.i32(3) // altarCount
   w.bool(true) // IsHardMode
-  w.bool(false) // partyOfDoom
+  if (release >= 257) w.bool(false) // partyOfDoom
   w.i32(0) // invasionDelay
   w.i32(0) // invasionSize
   w.i32(0) // invasionType
@@ -292,14 +302,16 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   for (let i = 0; i < 3; i++) w.bool(false) // 猫 / 狗 / 兔
   w.bool(false) // 光之女皇
   w.bool(false) // 史莱姆皇后
-  w.bool(false) // 独眼巨鹿
-  w.bool(false) // 蓝史莱姆
-  for (let i = 0; i < 8; i++) w.bool(false) // 8 个 NPC 解锁
-  w.bool(false) // 战斗手册 2
-  w.bool(false) // 商贩背包
-  for (let i = 0; i < 7; i++) w.bool(false) // 7 种史莱姆
-  w.bool(false) // 日晷
-  w.u8(0) // 月晷冷却
+  if (release >= 240) w.bool(false) // 独眼巨鹿
+  if (release >= 250) w.bool(false) // 蓝史莱姆
+  if (release >= 251) for (let i = 0; i < 8; i++) w.bool(false) // 8 个 NPC 解锁
+  if (release >= 259) w.bool(false) // 战斗手册 2
+  if (release >= 260) w.bool(false) // 商贩背包
+  if (release >= 261) for (let i = 0; i < 7; i++) w.bool(false) // 7 种史莱姆
+  if (release >= 264) {
+    w.bool(false) // 日晷
+    w.u8(0) // 月晷冷却
+  }
   if (release >= 287) {
     w.bool(false) // 永久万圣节
     w.bool(false) // 永久圣诞节
@@ -395,8 +407,29 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   w.bool(false) // 第二个循环直接结束
   pointers.push(w.length)
 
-  // ---- 第 6 段：图格实体（只写数量，够统计）----
-  w.i32(spec.tileEntities ?? 0)
+  // ---- 第 6 段：图格实体 ----
+  const entities = spec.tileEntities ?? 0
+  if (typeof entities === 'number') {
+    w.i32(entities)
+  } else {
+    w.i32(entities.length)
+    entities.forEach((entity, index) => {
+      const type = entity.displayDoll ? 3 : (entity.type ?? 7)
+      w.u8(type)
+      w.i32(entity.id ?? index)
+      w.i16(entity.x ?? 5)
+      w.i16(entity.y ?? 5)
+      if (entity.displayDoll) {
+        // 假人：bits1 / bits2（无装备）+ [pose ≥307] + [bits3 ≥308]
+        w.u8(0)
+        w.u8(0)
+        if (release >= 307) w.u8(0)
+        if (release >= 308) w.u8(0)
+      } else {
+        for (const byte of entity.extra ?? []) w.u8(byte)
+      }
+    })
+  }
   pointers.push(w.length)
 
   // ---- 第 7–11 段：内容对解析器/编辑器都是不透明字节，给几个可辨识的桩数据 ----

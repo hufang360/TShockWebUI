@@ -38,22 +38,29 @@ describe('世界版本表', () => {
   it('只提供 1.4.4.9–1.4.6.1 的目标，且 release 不重复', () => {
     const releases = WORLD_VERSIONS.map((v) => v.release)
     expect(new Set(releases).size).toBe(releases.length)
-    expect(releases[0]).toBe(279)
+    expect(releases[0]).toBe(225) // 1.4.0.1
     expect(releases.at(-1)).toBe(329)
+    expect(releases).toContain(230)
+    expect(releases).toContain(248)
+    expect(releases).toContain(269)
     expect(releases).toContain(315)
     expect(releases).toContain(326)
   })
 
-  it('同布局段：315–322 / 323–327 / 328+；294 / 315 也算分段边界', () => {
+  it('同布局段：段边界覆盖头部 / 箱子 / NPC / 图格实体 / 闪电 / 蜘蛛', () => {
     expect(isSameWorldLayout(315, 319)).toBe(true)
     expect(isSameWorldLayout(326, 325)).toBe(true)
     expect(isSameWorldLayout(329, 329)).toBe(true)
-    // 294（箱子）、315（NPC）、323（闪电）、328（蜘蛛）都是边界
+    // 268（NPC 微光）、294（箱子）、307/308（假人）、315（NPC despawn）、323、328 都是边界
+    expect(isSameWorldLayout(267, 268)).toBe(false)
     expect(isSameWorldLayout(293, 294)).toBe(false)
+    expect(isSameWorldLayout(306, 307)).toBe(false)
+    expect(isSameWorldLayout(307, 308)).toBe(false)
     expect(isSameWorldLayout(314, 315)).toBe(false)
     expect(isSameWorldLayout(322, 323)).toBe(false)
     expect(isSameWorldLayout(327, 328)).toBe(false)
-    expect(worldReleaseSegment(279)).toEqual({ lo: 279, hi: 283 })
+    expect(worldReleaseSegment(225)).toEqual({ lo: 225, hi: 226 })
+    expect(worldReleaseSegment(279)).toEqual({ lo: 268, hi: 283 })
   })
 
   it('下拉：同段的已知版本 + 当前版本', () => {
@@ -65,13 +72,19 @@ describe('世界版本表', () => {
 })
 
 describe('转换可行性判断', () => {
-  it('范围 / 未知目标', () => {
+  it('范围 / 升级不设下限，降级到 1.4.4（269）为止', () => {
+    expect(checkWorldConvert(225, 329)).toBeNull() // 1.4.0.1 升到 1.4.6.1
+    expect(checkWorldConvert(230, 329)).toBeNull()
     expect(checkWorldConvert(279, 329)).toBeNull()
-    expect(checkWorldConvert(329, 279)).toBeNull()
-    expect(checkWorldConvert(230, 329)).toBe('sourceTooOld')
-    expect(checkWorldConvert(279, 230)).toBe('targetTooOld')
+    expect(checkWorldConvert(329, 269)).toBeNull() // 降级下限 1.4.4
+    expect(checkWorldConvert(329, 248)).toBe('downgradeTooOld')
+    expect(checkWorldConvert(279, 230)).toBe('downgradeTooOld')
+    expect(checkWorldConvert(224, 329)).toBe('sourceTooOld')
+    expect(checkWorldConvert(305, 329)).toBe('sourceUnknown') // 预览版不做转换
     expect(checkWorldConvert(279, 340)).toBe('targetTooNew')
     expect(checkWorldConvert(279, 320)).toBe('unknownTarget') // 非正式版本不作为目标
+    // 同布局段内改版本不涉及格式（也允许低于降级下限）
+    expect(checkWorldConvert(242, 248)).toBeNull()
   })
 })
 
@@ -155,16 +168,10 @@ describe('.wld 版本转换（合成世界）', () => {
     )
   })
 
-  it('305（299–312，带废弃 u32）只能当源：升到 329 会删掉废弃字段；不能当目标', () => {
+  it('预览版（305）不能当源：段格式（尤其假人 311）没做转换验证', () => {
     const src = buildWorld(smallSpec({ release: 305 }))
     const { track } = tracked(src)
-    const up = convertWorld(src, track, 329)
-    const parsed = parseWorld(up, {} as WorldTrack)
-    expect(parsed.info.release).toBe(329)
-    // 305 → 329：删 4 字节废弃 u32，补 323 的两个位 + 328 的一位 → 净 -1
-    expect(up.length).toBe(src.length - 1)
-    // 299–312 不是正式版本，不能作为转换目标
-    expect(checkWorldConvert(329, 305)).toBe('unknownTarget')
+    expect(() => convertWorld(src, track, 329)).toThrow(/sourceUnknown/)
   })
 
   it('同布局段（325 → 326）：只改 4 字节版本号，Revision 不变', () => {
@@ -230,11 +237,86 @@ describe('.wld 版本转换（合成世界）', () => {
     expect(usage.npc).toBe(17)
   })
 
+  it('1.4.0.1（225）→ 1.4.6.1：名字 / 箱子 / NPC 保留，NPC 微光列表被补上', () => {
+    const src = buildWorld(
+      smallSpec({
+        release: 225,
+        name: '一点四零',
+        chests: [{ x: 4, y: 5, name: '箱', items: [[50, 3, 0]] }],
+        npcs: [{ netId: 17, name: '商人' }],
+      }),
+    )
+    const { track } = tracked(src)
+    const out = convertWorld(src, track, 329)
+    const after = tracked(out)
+    expect(after.parsed.info.release).toBe(329)
+    expect(after.parsed.info.name).toBe('一点四零')
+
+    const before = parseWorldSections(src, track, 225)
+    const now = parseWorldSections(out, after.track, 329)
+    expect(now.chests).toBe(1)
+    expect(now.chestList?.[0].items).toEqual(before.chestList?.[0].items)
+    expect(now.npcs).toBe(1)
+    expect(now.npcList?.[0].netId).toBe(17)
+    // 225 没有微光列表（段首 4 字节），329 有；用「段长度增量」间接验证已经补上
+    expect(after.track.pointers[5] - after.track.pointers[4]).toBe(
+      track.pointers[5] - track.pointers[4] + 4 + 1, // 微光列表 4 字节 + 每个城镇 NPC 的 despawn 1 字节
+    )
+  })
+
+  it('1.4.4（269）→ 329 → 269：除 Revision 外逐字节回到原文件（含假人）', () => {
+    const src = buildWorld(
+      smallSpec({
+        release: 269,
+        tileEntities: [{ displayDoll: true, id: 0, x: 6, y: 6 }],
+      }),
+    )
+    const { track } = tracked(src)
+    const up = convertWorld(src, track, 329)
+    const upTrack = {} as WorldTrack
+    parseWorld(up, upTrack)
+    const back = convertWorld(up, upTrack, 269)
+
+    const a = src.slice()
+    const b = back.slice()
+    a.set(b.subarray(track.revisionAt, track.revisionAt + 4), track.revisionAt)
+    expect(Array.from(b)).toEqual(Array.from(a))
+  })
+
+  it('假人（TEDisplayDoll）：307 / 308 各多 1 字节，升级时补、降级时删', () => {
+    const src = buildWorld(
+      smallSpec({ release: 269, tileEntities: [{ displayDoll: true, id: 0, x: 6, y: 6 }] }),
+    )
+    const { track } = tracked(src)
+    const entityLen = (t: WorldTrack) => t.pointers[6] - t.pointers[5]
+    const beforeLen = entityLen(track)
+
+    const up = convertWorld(src, track, 329)
+    const upTrack = {} as WorldTrack
+    parseWorld(up, upTrack)
+    expect(entityLen(upTrack)).toBe(beforeLen + 2) // pose + bits3
+
+    const back = convertWorld(up, upTrack, 269)
+    const backTrack = {} as WorldTrack
+    parseWorld(back, backTrack)
+    expect(entityLen(backTrack)).toBe(beforeLen)
+  })
+
+  it('降级遇到目标版本没有的图格实体类型：拒绝并报出类型 ID', () => {
+    // 8 = DeadCellsDisplayJar（1.4.5 才有；1.4.4.9 只到 7）
+    const src = buildWorld(
+      smallSpec({ release: 329, tileEntities: [{ type: 8, extra: [0, 0, 0, 0, 0] }] }),
+    )
+    const { track } = tracked(src)
+    expect(collectWorldUsage(src, track).entity).toBe(8)
+    expect(() => convertWorld(src, track, 279)).toThrow(/图格实体 ID 8/)
+  })
+
   it('内容兼容性判断按类别给出最大 ID', () => {
     const target = WORLD_VERSIONS.find((v) => v.release === 279)!
-    expect(worldContentIssues(target, { tile: 693, wall: 0, item: 0, npc: 0 })).toEqual([
+    expect(worldContentIssues(target, { tile: 693, wall: 0, item: 0, npc: 0, entity: 0 })).toEqual([
       { kind: 'tile', id: 693, max: 692 },
     ])
-    expect(worldContentIssues(target, { tile: 692, wall: 346, item: 5455, npc: 687 })).toEqual([])
+    expect(worldContentIssues(target, { tile: 692, wall: 346, item: 5455, npc: 687, entity: 7 })).toEqual([])
   })
 })

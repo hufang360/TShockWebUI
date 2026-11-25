@@ -43,7 +43,7 @@ describe('.wld 编辑校验', () => {
     )
     const blocked = validateWorldDraft(
       { ...draftFromWorld(newer.info, newer.track), release: 279 },
-      { info: newer.info, track: newer.track, usage: { tile: 700, wall: 0, item: 0, npc: 0 } },
+      { info: newer.info, track: newer.track, usage: { tile: 700, wall: 0, item: 0, npc: 0, entity: 0 } },
     )
     expect(blocked.map((i) => i.messageKey)).toContain('wld.edit.err.releaseContent.tile')
   })

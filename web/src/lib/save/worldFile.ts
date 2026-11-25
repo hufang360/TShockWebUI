@@ -357,15 +357,23 @@ function readDifficulty(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
     ['noTraps', 266],
   ]
   for (const [key, from] of seeds) {
-    if (w.release >= from && r.boolean()) w.specialSeeds.push(key)
+    const present = w.release >= from
+    // 222（醉汉）低于转换下限，不需要锚点；其余记下来给版本转换用。
+    if (present && from >= 227) {
+      markChange(r, track, from, true, () => {
+        if (r.boolean()) w.specialSeeds.push(key)
+      })
+    } else if (present) {
+      if (r.boolean()) w.specialSeeds.push(key)
+    } else if (from >= 227) {
+      markChange(r, track, from, false, () => {})
+    }
   }
   // 天顶世界：267 起单独存一位，之前由「醉汉 + 颠倒」推导。
-  let zenith: boolean
-  if (w.release >= 267) {
+  let zenith = w.specialSeeds.includes('drunk') && w.specialSeeds.includes('remix')
+  markChange(r, track, 267, w.release >= 267, () => {
     zenith = r.boolean()
-  } else {
-    zenith = w.specialSeeds.includes('drunk') && w.specialSeeds.includes('remix')
-  }
+  })
   if (zenith) w.specialSeeds.push('zenith')
   markChange(r, track, 302, w.release >= 302, () => {
     if (r.boolean()) w.specialSeeds.push('skyblock')
@@ -438,7 +446,7 @@ function readProgress(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
   r.skip(2 + 1 + 4)
   if (track) track.hardmode = r.pos
   w.hardmode = r.boolean()
-  flag(r, release, 257) // afterPartyOfDoom
+  markChange(r, track, 257, release >= 257, () => r.boolean()) // afterPartyOfDoom
   // invasionDelay / invasionSize / invasionType / invasionX / slimeRainTime / sundialCooldown。
   r.skip(4 * 3 + 8 + 8 + 1)
   // raining / rainTime / maxRain / 矿石梯队 3 / 背景 8 / cloudBgActive / numClouds / windSpeed。
@@ -524,13 +532,13 @@ function consumeTail(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
   skip(216, 4 * 4) // 铜/铁/银/金梯队
   skip(217, 3) // 猫 / 狗 / 兔
   skip(223, 2) // 光之女皇 / 史莱姆皇后
-  skip(240, 1) // 独眼巨鹿
-  skip(250, 1) // 蓝史莱姆
-  skip(251, 8) // 8 个 NPC 解锁
-  skip(259, 1) // 战斗手册 2
-  skip(260, 1) // 商贩背包
-  skip(261, 7) // 7 种史莱姆
-  skip(264, 1 + 1) // 日晷 + 月晷冷却
+  markChange(r, track, 240, release >= 240, () => r.skip(1)) // 独眼巨鹿
+  markChange(r, track, 250, release >= 250, () => r.skip(1)) // 蓝史莱姆
+  markChange(r, track, 251, release >= 251, () => r.skip(8)) // 8 个 NPC 解锁
+  markChange(r, track, 259, release >= 259, () => r.skip(1)) // 战斗手册 2
+  markChange(r, track, 260, release >= 260, () => r.skip(1)) // 商贩背包
+  markChange(r, track, 261, release >= 261, () => r.skip(7)) // 7 种史莱姆
+  markChange(r, track, 264, release >= 264, () => r.skip(1 + 1)) // 日晷 + 月晷冷却
   markChange(r, track, 287, release >= 287, () => r.skip(2)) // 永久万圣节 / 圣诞节
   markChange(r, track, 288, release >= 288, () => r.skip(1)) // 吸血鬼种子
   markChange(r, track, 296, release >= 296, () => r.skip(1)) // 感染种子
