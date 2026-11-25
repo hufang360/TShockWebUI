@@ -1,7 +1,7 @@
 /**
  * 本地 `.wld` 世界存档解析（**纯浏览器端**，文件不上传服务器）。
  *
- * 事实来源（反编译源码 Terraria 1.4.5.8）：
+ * 事实来源（反编译源码 Terraria 1.4.5.8；1.4.6.1 只多一个头部标志位 `noSpidersSeed`，见 `consumeTail`）：
  * - 文件头：`Terraria.IO/WorldFile.cs` 的 `LoadFileFormatHeader` +
  *   `Terraria.IO/FileMetadata.cs` 的 `FileMetadata.Read`（7 字节魔数 `relogic` + 文件类型、
  *   `Revision`、收藏位）。**段指针记录的是「各段结束位置」**：`pointers[1]` 即图格段起点。
@@ -9,13 +9,13 @@
  * - 图格流：`WorldFile.LoadWorldTiles` / `MapHelper.DecompressTileData`（RLE 同列向下重复）。
  * - 创建 / 最后游玩时间：`DateTime.ToBinary()`（100ns ticks，高 2 位是 Kind）。
  *
- * 版本支持：**140 … 326**（1.2.4 ~ 1.4.5.8）。更旧的是 V1 格式（没有 `relogic` 文件头、
+ * 版本支持：**140 … 329**（1.2.4 ~ 1.4.6.1）。更旧的是 V1 格式（没有 `relogic` 文件头、
  * 字段完全不同），明确拒绝并提示在游戏里重新保存。
  */
 import { ByteReader, dotnetBinaryToIso, SaveFormatError } from './bytes'
 
 const MIN_RELEASE = 140
-const MAX_RELEASE = 326
+const MAX_RELEASE = 329
 const MAX_SIDE = 32768
 const FILE_TYPE_WORLD = 2 // FileType：None=0 / Map=1 / World=2 / Player=3
 const MAGIC = 'relogic'
@@ -43,7 +43,7 @@ export interface WorldInfo {
   height: number
   /** 0 普通 / 1 专家 / 2 大师 / 3 旅途。 */
   gameMode: number
-  /** 特殊种子标记：drunk / worthy / anniversary / dontStarve / notTheBees / remix / noTraps / zenith / skyblock。 */
+  /** 特殊种子标记：drunk / worthy / anniversary / dontStarve / notTheBees / remix / noTraps / zenith / skyblock / noSpiders。 */
   specialSeeds: string[]
   /** corruption / crimson。 */
   evil: 'corruption' | 'crimson'
@@ -110,6 +110,13 @@ export interface WorldTrack {
   hardmode?: number
   /** Boss / 事件位（键与 `WorldInfo.bossesDowned` 一致）。 */
   bosses: Partial<Record<string, number>>
+  /**
+   * 版本转换用的**门槛锚点**（release ≥ 279 才有；键是 `WORLD_RELEASE_GATES` 里的门槛）。
+   * `start..end` 是文件里的绝对偏移；`present` = 源版本是否有这一块（没有时 `start === end` 就是插入点）。
+   */
+  changePoints?: Record<number, { start: number; end: number; present: boolean }>
+  /** 创建时间（DateTime.ToBinary）的偏移：升级到 ≥284 时用它填 `lastPlayed`。 */
+  createdAtAt?: number
 }
 
 /** 解析结果：`info` 给页面展示，`tilesAt` / `frameImportant` 给缩略图渲染。 */
@@ -175,7 +182,7 @@ export function parseWorld(data: ArrayBuffer | Uint8Array, track?: WorldTrack): 
   if (release > MAX_RELEASE) {
     throw bad(
       magicOk
-        ? `世界文件版本 ${release} 高于本工具支持的 ${MAX_RELEASE}（1.4.5.8）`
+        ? `世界文件版本 ${release} 高于本工具支持的 ${MAX_RELEASE}（1.4.6.1）`
         : '不是 Terraria PC 世界存档（文件头不匹配）',
     )
   }
@@ -294,8 +301,11 @@ function readHeaderFlags(r: ByteReader, w: WorldInfo, track?: WorldTrack): void 
   readDifficulty(r, w, track)
 
   // 创建 / 最后游玩时间（DateTime.ToBinary）。
+  if (track) track.createdAtAt = r.pos
   if (w.release >= 141) w.createdAt = dotnetBinaryToIso(r.i64b())
-  if (w.release >= 284) w.lastPlayed = dotnetBinaryToIso(r.i64b())
+  markChange(r, track, 284, w.release >= 284, () => {
+    w.lastPlayed = dotnetBinaryToIso(r.i64b())
+  })
 
   // moonType + 背景树 7 + 洞穴背景 8 + 冰/丛林/地狱背景 2（不展示，只消费）。
   r.skip(1 + 7 * 4 + 8 * 4 + 2 * 4)
@@ -357,7 +367,9 @@ function readDifficulty(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
     zenith = w.specialSeeds.includes('drunk') && w.specialSeeds.includes('remix')
   }
   if (zenith) w.specialSeeds.push('zenith')
-  if (w.release >= 302 && r.boolean()) w.specialSeeds.push('skyblock')
+  markChange(r, track, 302, w.release >= 302, () => {
+    if (r.boolean()) w.specialSeeds.push('skyblock')
+  })
 }
 
 /**
@@ -446,11 +458,11 @@ function readProgress(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
   const banners = r.i16()
   if (banners < 0) throw bad('击杀横幅表异常')
   r.skip(banners * 4)
-  if (release >= 289) {
+  markChange(r, track, 289, release >= 289, () => {
     const claimable = r.i16()
     if (claimable < 0) throw bad('可领取横幅表异常')
     r.skip(claimable * 2)
-  }
+  })
 
   // fastForwardTimeToDawn / fishron / martians / ancientCultist / moonlord。
   skipFlag()
@@ -460,11 +472,28 @@ function readProgress(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
   // 四柱已击败 4 + 四柱激活 4 + 末日事件 1。
   for (let i = 0; i < 9; i++) skipFlag()
 
-  consumeTail(r, release)
+  consumeTail(r, w, track)
 }
 
-/** 消费头部收尾字段（不展示）：结束位置必须正好等于段指针，这本身就是对齐校验。 */
-function consumeTail(r: ByteReader, release: number): void {
+/**
+ * 记录一个「版本门槛块」的区间：`present` 为真时执行 `consume` 并记下区间；
+ * 为假时只记下当前位置（= 升级时要插入的锚点）。
+ */
+function markChange(
+  r: ByteReader,
+  track: WorldTrack | undefined,
+  gate: number,
+  present: boolean,
+  consume: () => void,
+): void {
+  const start = r.pos
+  if (present) consume()
+  if (track) (track.changePoints ??= {})[gate] = { start, end: r.pos, present }
+}
+
+/** 消费头部收尾字段（大部分不展示）：结束位置必须正好等于段指针，这本身就是对齐校验。 */
+function consumeTail(r: ByteReader, w: WorldInfo, track?: WorldTrack): void {
+  const release = w.release
   const skip = (from: number, n: number) => {
     if (release >= from) r.skip(n)
   }
@@ -502,19 +531,23 @@ function consumeTail(r: ByteReader, release: number): void {
   skip(260, 1) // 商贩背包
   skip(261, 7) // 7 种史莱姆
   skip(264, 1 + 1) // 日晷 + 月晷冷却
-  skip(287, 2) // 永久万圣节 / 圣诞节
-  skip(288, 1) // 吸血鬼种子
-  skip(296, 1) // 感染种子
-  skip(291, 4 + 4) // 流星雨 / 金币雨
-  if (release >= 297) {
+  markChange(r, track, 287, release >= 287, () => r.skip(2)) // 永久万圣节 / 圣诞节
+  markChange(r, track, 288, release >= 288, () => r.skip(1)) // 吸血鬼种子
+  markChange(r, track, 296, release >= 296, () => r.skip(1)) // 感染种子
+  markChange(r, track, 291, release >= 291, () => r.skip(4 + 4)) // 流星雨 / 金币雨
+  markChange(r, track, 297, release >= 297, () => {
     r.skip(1) // 团队出生点种子
     const n = r.u8()
     r.skip(n * 4) // 每个出生点 int16 × 2
-  }
-  skip(304, 1) // 双地牢种子
-  skip(323, 2) // 更多闪电 / 无闪电
-  if (release >= 299 && release < 313) r.skip(4) // 已废弃字段
-  if (release >= 299) r.str() // WorldManifestData
+  })
+  markChange(r, track, 304, release >= 304, () => r.skip(1)) // 双地牢种子
+  markChange(r, track, 323, release >= 323, () => r.skip(2)) // 更多闪电 / 无闪电
+  // 1.4.6（328+）：无蜘蛛种子（Arachnophobia）。游戏只把“原本无蜘蛛洞”写成一个位。
+  markChange(r, track, 328, release >= 328, () => {
+    if (r.boolean()) w.specialSeeds.push('noSpiders')
+  })
+  markChange(r, track, 313, release >= 299 && release < 313, () => r.skip(4)) // 已废弃字段
+  markChange(r, track, 299, release >= 299, () => r.str()) // WorldManifestData
 }
 
 /** 取值范围校验：解析错位时这些值几乎必然离谱。 */

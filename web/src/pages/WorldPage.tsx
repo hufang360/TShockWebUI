@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Camera, Download, Pencil, Sparkles, Upload, ZoomIn } from 'lucide-react'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import { IconAction } from '@/components/IconAction'
@@ -182,8 +182,29 @@ export function WorldPage({ serverId }: WorldPageProps) {
     }
   }, [file, limits, t])
 
+  /**
+   * 版本兼容性预检用的「世界里用到的最大 ID」：图格 / 墙来自缩略图统计，
+   * 物品来自箱子草稿（含用户刚改的），NPC 来自解析出的城镇 NPC 列表。
+   * 保存时 `convertWorld` 还会做一次权威扫描（覆盖微光列表 / 第二个 NPC 循环）。
+   */
+  const usage = useMemo(() => {
+    if (!edit) return undefined
+    const maxKey = (map: Map<number, number>): number => {
+      let max = 0
+      for (const key of map.keys()) if (key > max) max = key
+      return max
+    }
+    let item = 0
+    for (const chest of edit.content.chests) {
+      for (const entry of chest.items) if (entry && entry.id > item) item = entry.id
+    }
+    let npc = 0
+    for (const entry of sections?.npcList ?? []) if (entry.netId > npc) npc = entry.netId
+    return { tile: maxKey(edit.stats.tiles), wall: maxKey(edit.stats.walls), item, npc }
+  }, [edit, sections])
+
   const issues = edit
-    ? validateWorldDraft(edit.draft, { info: edit.info, track: edit.track })
+    ? validateWorldDraft(edit.draft, { info: edit.info, track: edit.track, usage })
     : []
   const dirty = edit ? isWorldDraftDirty(edit.info, edit.track, edit.draft) : false
 

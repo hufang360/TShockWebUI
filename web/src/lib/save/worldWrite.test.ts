@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parseWorld, type WorldTrack } from './worldFile'
 import { applyWorldEdits, encodeDotNetString } from './worldWrite'
+import { buildWorld } from '@/test/worldFile'
 
 const demo = () => new Uint8Array(readFileSync('public/demo/world.wld'))
 
@@ -120,6 +121,45 @@ describe('.wld 写回', () => {
     expect(Array.from(out.subarray(afterTrack.pointers[1], afterTrack.footerAt))).toEqual(
       Array.from(raw.subarray(track.pointers[1], track.footerAt)),
     )
+  })
+
+  it('改版本（跨段）：先转换格式，再应用改名等补丁', () => {
+    const raw = buildWorld({ width: 16, height: 16, tiles: () => ({ typ: -1 }), release: 279, name: '旧名' })
+    const { track } = parseTracked(raw)
+    const out = applyWorldEdits(raw, track, { release: 329, name: '新名字' })
+    const { parsed: after } = parseTracked(out)
+    expect(after.info.release).toBe(329)
+    expect(after.info.name).toBe('新名字')
+    expect(after.info.lastPlayed).not.toBeNull()
+  })
+
+  it('改版本（同段）：只改 4 字节版本号，文件长度不变', () => {
+    const raw = buildWorld({ width: 16, height: 16, tiles: () => ({ typ: -1 }), release: 325 })
+    const { track } = parseTracked(raw)
+    const out = applyWorldEdits(raw, track, { release: 326 })
+    expect(out.length).toBe(raw.length)
+    expect(parseTracked(out).parsed.info.release).toBe(326)
+  })
+
+  it('1.4.6.1（329）：改名重排段指针后，版本号与 noSpidersSeed 都保留', () => {
+    const raw = buildWorld({
+      width: 24,
+      height: 24,
+      tiles: () => ({ typ: 1 }),
+      release: 329,
+      noSpiders: true,
+      name: '旧名',
+    })
+    const { track } = parseTracked(raw)
+    const out = applyWorldEdits(raw, track, { name: '新名字' })
+    const { parsed: after, track: afterTrack } = parseTracked(out)
+
+    expect(after.info.release).toBe(329)
+    expect(after.info.name).toBe('新名字')
+    expect(after.info.specialSeeds).toContain('noSpiders')
+    // 段指针一致（解析器的 headerEnd == pointers[0] 保证新标志位占位正确）。
+    expect(afterTrack.pointers[0]).toBe(track.pointers[0])
+    expect(footerName(out, afterTrack)).toBe('新名字')
   })
 
   it('真实世界文件：一次改完名字 / 种子 / 难度 / 出生点 / 时间 / 月相 / 困难 / Boss', () => {

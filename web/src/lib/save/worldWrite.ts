@@ -11,11 +11,18 @@
  * 1. 只改定长字段 → 就地打补丁（段不动、指针不动、footer 不动、`Revision` 也不动）；
  * 2. 要改名字 / 种子 → 重建头部段（拼接字符串）→ 平移后续段 → 重写指针表 → 重写 footer → `Revision++`。
  */
-import type { WorldTrack } from './worldFile'
+import { encodeDotNetString } from './bytes'
+import { parseWorld, type WorldTrack } from './worldFile'
+import { isSameWorldLayout } from './worldVersions'
 import { encodeChestsSection, encodeSignsSection, type ChestWrite, type SignWrite } from './worldSections'
+import { convertWorld } from './worldConvert'
+
+export { encodeDotNetString }
 
 /** 用户要做的一组世界改动（只放要改的字段）。 */
 export interface WorldEdits {
+  /** 目标存档版本（跨布局段时先做格式转换；同段只改 4 字节版本号）。 */
+  release?: number
   name?: string
   seed?: string
   gameMode?: number
@@ -34,26 +41,6 @@ export interface WorldEdits {
   chests?: ChestWrite[]
   /** 招牌段（完整列表，数量不变）：只改文本。长度可能变化 → 会重排段指针。 */
   signs?: SignWrite[]
-}
-
-/** .NET `BinaryWriter.Write(string)`：7 位变长长度 + UTF-8。 */
-export function encodeDotNetString(value: string): Uint8Array {
-  const utf8 = new TextEncoder().encode(value)
-  const prefix: number[] = []
-  let n = utf8.length
-  for (;;) {
-    const b = n & 0x7f
-    n >>= 7
-    if (n > 0) prefix.push(b | 0x80)
-    else {
-      prefix.push(b)
-      break
-    }
-  }
-  const out = new Uint8Array(prefix.length + utf8.length)
-  out.set(prefix, 0)
-  out.set(utf8, prefix.length)
-  return out
 }
 
 function concat(parts: Uint8Array[]): Uint8Array {
@@ -82,6 +69,26 @@ export function applyWorldEdits(
   edits: WorldEdits,
 ): Uint8Array {
   const src = data instanceof Uint8Array ? data : new Uint8Array(data)
+
+  // 版本跨布局段：先转换（头部 / 箱子段 / NPC 段），再在转换后的文件上应用其它改动。
+  if (
+    edits.release != null &&
+    edits.release !== track.release &&
+    !isSameWorldLayout(track.release, edits.release)
+  ) {
+    const converted = convertWorld(src, track, edits.release)
+    const nextTrack = {} as WorldTrack
+    parseWorld(converted, nextTrack)
+    return applyWorldEdits(converted, nextTrack, { ...edits, release: undefined })
+  }
+
+  /** 同布局段的版本改动：最后把 4 字节版本号写掉（不重建结构）。 */
+  const withRelease = (out: Uint8Array): Uint8Array => {
+    if (edits.release != null && edits.release !== track.release) {
+      new DataView(out.buffer, out.byteOffset, out.byteLength).setInt32(0, edits.release, true)
+    }
+    return out
+  }
   const need = (pos: number | undefined, name: string): number => {
     if (pos == null) throw new Error(`${name}：这份存档没有这个字段，无法编辑`)
     return pos
@@ -120,7 +127,7 @@ export function applyWorldEdits(
   if (!rename && !reseed && !rewriteChests && !rewriteSigns) {
     const out = src.slice()
     patchFixed(out)
-    return out
+    return withRelease(out)
   }
 
   // ---- 情况 2：有变长字段要改（名字 / 种子 / 箱子段 / 招牌段）→ 按段重建 + 重排指针 ----
@@ -200,7 +207,7 @@ export function applyWorldEdits(
   newPointers.forEach((p, i) => dv.setInt32(track.pointersAt + i * 4, p, true))
   // Revision++（游戏自己保存世界时也这么做，云存档冲突检测会用）。
   dv.setUint32(track.revisionAt, (dv.getUint32(track.revisionAt, true) + 1) >>> 0, true)
-  return out
+  return withRelease(out)
 }
 
 /** footer = `bool true` + 世界名 + `int32 worldId`（加载时两者都会与头部比较）。 */

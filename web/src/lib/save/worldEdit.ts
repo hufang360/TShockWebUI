@@ -9,12 +9,20 @@
  */
 import type { WorldInfo, WorldTrack } from './worldFile'
 import type { WorldEdits } from './worldWrite'
+import {
+  checkWorldConvert,
+  worldContentIssues,
+  type WorldContentUsage,
+} from './worldConvert'
+import { worldVersionInfo } from './worldVersions'
 
 /** 世界名上限（游戏建世界时的限制）。 */
 export const WORLD_NAME_MAX = 20
 
 /** 编辑草稿：所有可编辑字段的目标值。 */
 export interface WorldEditDraft {
+  /** 目标存档版本（跨布局段时保存会做格式转换）。 */
+  release: number
   name: string
   seed: string
   gameMode: number
@@ -46,6 +54,7 @@ export function draftFromWorld(info: WorldInfo, track: WorldTrack): WorldEditDra
   for (const key of Object.keys(track.bosses)) bosses[key] = false
   for (const key of info.bossesDowned) bosses[key] = true
   return {
+    release: info.release,
     name: info.name,
     seed: info.seed,
     gameMode: info.gameMode,
@@ -64,10 +73,28 @@ export function draftFromWorld(info: WorldInfo, track: WorldTrack): WorldEditDra
 /** 校验草稿；返回空数组 = 可以保存。 */
 export function validateWorldDraft(
   draft: WorldEditDraft,
-  ctx: { info: WorldInfo; track: WorldTrack },
+  ctx: { info: WorldInfo; track: WorldTrack; usage?: WorldContentUsage },
 ): WorldEditIssue[] {
   const issues: WorldEditIssue[] = []
-  const { info, track } = ctx
+  const { info, track, usage } = ctx
+
+  // 版本：范围 / 目标合法 + （有内容统计时）目标版本是否认识世界里的图格 / 物品 / NPC。
+  if (draft.release !== info.release) {
+    const problem = checkWorldConvert(info.release, draft.release)
+    if (problem) {
+      issues.push({ field: 'release', messageKey: `wld.edit.err.release.${problem}` })
+    } else if (usage) {
+      const target = worldVersionInfo(draft.release)
+      const issue = target ? worldContentIssues(target, usage)[0] : undefined
+      if (target && issue) {
+        issues.push({
+          field: 'release',
+          messageKey: `wld.edit.err.releaseContent.${issue.kind}`,
+          vars: { version: target.gameVersion, id: issue.id, max: issue.max },
+        })
+      }
+    }
+  }
 
   // 世界名：**只在真的改名时校验**。
   // 存档里的名字可能是别的工具写的超长名字（游戏自己建世界限 20 字符，但不代表文件里一定 ≤ 20），
@@ -116,6 +143,8 @@ export function buildWorldEdits(
   draft: WorldEditDraft,
 ): WorldEdits {
   const edits: WorldEdits = {}
+
+  if (draft.release !== info.release) edits.release = draft.release
 
   // 两边都按 trim 后比较：存档里的世界名可能带首尾空格（TEdit 等工具写的），
   // 只 trim 写入端会造成「一进编辑态就报有未保存改动」，而且一保存就把名字里的空格吃掉。

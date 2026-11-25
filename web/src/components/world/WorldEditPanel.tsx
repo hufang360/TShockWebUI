@@ -6,13 +6,24 @@ import {
   Label,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui'
 import { useI18n } from '@/lib/i18n'
 import { WORLD_NAME_MAX, type WorldEditDraft, type WorldEditIssue } from '@/lib/save/worldEdit'
 import { WORLD_BOSS_KEYS, type WorldInfo, type WorldTrack } from '@/lib/save/worldFile'
+import {
+  isSameWorldLayout,
+  worldConvertTargets,
+  worldReleaseSegment,
+  worldVersionInfo,
+  worldVersionOptions,
+  type WorldVersionInfo,
+} from '@/lib/save/worldVersions'
+import { checkWorldConvert } from '@/lib/save/worldConvert'
 import { bossKey, formatWorldClock, worldSizeKey } from '@/lib/worldPage'
 
 interface WorldEditPanelProps {
@@ -61,11 +72,86 @@ export function WorldEditPanel({ info, track, draft, issues, onChange }: WorldEd
   const nameIssue = err('name')
   const seedIssue = err('seed')
 
+  // 版本下拉：同布局段（只改 4 字节）+ 跨段目标（真正转换），按目标布局段分组。
+  const versionOptions = worldVersionOptions(info.release)
+  const targetGroups: { key: number; range: string; options: WorldVersionInfo[] }[] = []
+  for (const v of worldConvertTargets(info.release)) {
+    if (isSameWorldLayout(info.release, v.release)) continue
+    if (checkWorldConvert(info.release, v.release) != null) continue
+    const key = worldReleaseSegment(v.release).lo
+    const found = targetGroups.find((g) => g.key === key)
+    if (found) found.options.push(v)
+    else targetGroups.push({ key, range: '', options: [v] })
+  }
+  for (const group of targetGroups) {
+    const first = group.options[0].gameVersion
+    const last = group.options[group.options.length - 1].gameVersion
+    group.range = first === last ? first : `${first} – ${last}`
+  }
+  const releaseIssue = err('release')
+  const releaseSameLayout = isSameWorldLayout(info.release, draft.release)
+  const releaseDowngrade = draft.release < info.release
+  const releaseVersion =
+    worldVersionInfo(draft.release)?.gameVersion ??
+    versionOptions.find((v) => v.release === draft.release)?.gameVersion ??
+    String(draft.release)
+
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <CardBody className="flex flex-col gap-4 pt-4">
           <div className="grid gap-4 @[720px]:grid-cols-[repeat(2,minmax(0,1fr))]">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="wld-edit-version">{t('wld.version')}</Label>
+              <Select
+                value={String(draft.release)}
+                onValueChange={(next) => onChange({ ...draft, release: Number(next) })}
+              >
+                <SelectTrigger id="wld-edit-version" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>{t('save.edit.versionGroupSame')}</SelectLabel>
+                    {versionOptions.map((v) => (
+                      <SelectItem key={v.release} value={String(v.release)}>
+                        {v.gameVersion}（{v.release}）
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  {targetGroups.map((group) => (
+                    <SelectGroup key={group.key}>
+                      <SelectLabel>
+                        {t('wld.edit.versionGroupTarget', { range: group.range })}
+                      </SelectLabel>
+                      {group.options.map((v) => (
+                        <SelectItem key={v.release} value={String(v.release)}>
+                          {v.gameVersion}（{v.release}）
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+              {releaseIssue ? (
+                <p className="text-2xs text-destructive">{releaseIssue}</p>
+              ) : draft.release === info.release ? (
+                <p className="text-2xs text-muted-foreground">{t('wld.edit.versionHint')}</p>
+              ) : releaseSameLayout ? (
+                <p className="text-2xs text-muted-foreground">
+                  {t('wld.edit.versionSameHint', { version: releaseVersion })}
+                </p>
+              ) : releaseDowngrade ? (
+                <p className="text-2xs text-muted-foreground">
+                  {t('wld.edit.versionDowngradeHint', { version: releaseVersion })}
+                </p>
+              ) : (
+                <p className="text-2xs text-muted-foreground">
+                  {t('wld.edit.versionUpgradeHint', { version: releaseVersion })}
+                </p>
+              )}
+            </div>
+
             <div className="flex flex-col gap-2">
               <Label htmlFor="wld-edit-name">{t('wld.name')}</Label>
               <Input

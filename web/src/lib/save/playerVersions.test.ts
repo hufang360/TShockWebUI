@@ -5,6 +5,7 @@ import { PLAYER_VERSIONS, playerGameVersion, versionOptionsFor } from './playerV
 describe('存档版本 → 游戏版本 / 下拉选项', () => {
   it('已知版本能映射到游戏版本', () => {
     expect(playerGameVersion(326)).toBe('1.4.5.8')
+    expect(playerGameVersion(329)).toBe('1.4.6.0+')
     expect(playerGameVersion(226)).toBe('1.4.0.2')
     expect(playerGameVersion(9999)).toBeNull()
   })
@@ -14,6 +15,7 @@ describe('存档版本 → 游戏版本 / 下拉选项', () => {
     // 段的起点是 324（再往前的 322 是另一个布局段）
     expect(options.every((r) => r >= 324)).toBe(true)
     expect(options).toContain(326)
+    expect(options).toContain(329) // 1.4.6.x 与 326 同布局，可直接切
     // 跨段的不出现
     expect(options).not.toContain(319)
   })

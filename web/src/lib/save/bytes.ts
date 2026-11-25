@@ -211,3 +211,28 @@ function civilFromDays(days: number): { y: number; m: number; d: number } {
   const m = mp + (mp < 10 ? 3 : -9)
   return { y: y + (m <= 2 ? 1 : 0), m, d }
 }
+
+/**
+ * .NET `BinaryWriter.Write(string)`：7 位变长长度前缀 + UTF-8。
+ *
+ * 放在这里是因为 `.wld` 写回（`worldWrite`）与箱子段编码（`worldSections`）都要用，
+ * 而 `worldSections` 不能再反向依赖 `worldWrite`（会造成循环导入）。
+ */
+export function encodeDotNetString(value: string): Uint8Array {
+  const utf8 = new TextEncoder().encode(value)
+  const prefix: number[] = []
+  let n = utf8.length
+  for (;;) {
+    const b = n & 0x7f
+    n >>= 7
+    if (n > 0) prefix.push(b | 0x80)
+    else {
+      prefix.push(b)
+      break
+    }
+  }
+  const out = new Uint8Array(prefix.length + utf8.length)
+  out.set(prefix, 0)
+  out.set(utf8, prefix.length)
+  return out
+}

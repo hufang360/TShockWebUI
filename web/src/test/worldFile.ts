@@ -1,6 +1,6 @@
 /**
- * 测试用的合成世界存档（`.wld`）构造器：按游戏 `WorldFile.SaveWorld` 的写序生成 release 326 的
- * 一份最小世界（11 段，图格段只有我们关心的图格）。
+ * 测试用的合成世界存档（`.wld`）构造器：按游戏 `WorldFile.SaveWorld` 的写序生成一份最小世界
+ * （11 段，图格段只有我们关心的图格；默认 release 326，可传 329 验证 1.4.6.x 的新头部位）。
  *
  * 只给单测用：让解析器在 CI 里也能被逐字段验证（真实世界文件太大，不入库）。
  * 字段顺序与 `web/src/lib/save/worldFile.ts` 的读取顺序一一对应。
@@ -42,6 +42,8 @@ export interface WorldSpec {
   name?: string
   seed?: string
   release?: number
+  /** 1.4.6（release ≥ 328）的 `noSpidersSeed` 头部位；更早的版本不会写。 */
+  noSpiders?: boolean
   /** 地表 / 岩石层深度（默认按高度比例，方便缩略图分区测试）。 */
   groundLevel?: number
   rockLevel?: number
@@ -153,6 +155,7 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
     name = '合成世界',
     seed = 'seed-42',
     release = 326,
+    noSpiders = false,
     groundLevel = Math.round(height * 0.3),
     rockLevel = Math.round(height * 0.6),
   } = spec
@@ -196,11 +199,11 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   w.bool(false) // remix
   w.bool(false) // noTraps
   w.bool(false) // zenith
-  w.bool(false) // skyblock
+  if (release >= 302) w.bool(false) // skyblock
 
   // 与现实一致：CreationTime 是 DateTime.Now（本地 Kind），最后游玩是 DateTime.UtcNow（UTC Kind）
   w.u64(dotnetTicks('2024-05-06T07:08:09Z', 'local'))
-  w.u64(dotnetTicks('2025-01-02T03:04:05Z'))
+  if (release >= 284) w.u64(dotnetTicks('2025-01-02T03:04:05Z')) // LastPlayed
 
   w.u8(0) // MoonType
   for (let i = 0; i < 7; i++) w.i32(0) // TreeX ×3 + TreeStyle ×4
@@ -252,7 +255,7 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   w.i32(0) // invasionSizeStart
   w.i32(0) // cultistDelay
   w.i16(0) // 击杀横幅
-  w.i16(0) // 可领取横幅
+  if (release >= 289) w.i16(0) // 可领取横幅
   w.bool(false) // fastForwardTime
   w.bool(true) // dukeFishron
   w.bool(false) // martians
@@ -297,18 +300,28 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
   for (let i = 0; i < 7; i++) w.bool(false) // 7 种史莱姆
   w.bool(false) // 日晷
   w.u8(0) // 月晷冷却
-  w.bool(false) // 永久万圣节
-  w.bool(false) // 永久圣诞节
-  w.bool(false) // 吸血鬼种子
-  w.bool(false) // 感染种子
-  w.i32(0) // 流星雨
-  w.i32(0) // 金币雨
-  w.bool(false) // 团队出生点种子
-  w.u8(0) // 团队出生点数量
-  w.bool(false) // 双地牢种子
-  w.bool(false) // 更多闪电
-  w.bool(false) // 无闪电
-  w.str('') // WorldManifestData
+  if (release >= 287) {
+    w.bool(false) // 永久万圣节
+    w.bool(false) // 永久圣诞节
+  }
+  if (release >= 288) w.bool(false) // 吸血鬼种子
+  if (release >= 296) w.bool(false) // 感染种子
+  if (release >= 291) {
+    w.i32(0) // 流星雨
+    w.i32(0) // 金币雨
+  }
+  if (release >= 297) {
+    w.bool(false) // 团队出生点种子
+    w.u8(0) // 团队出生点数量
+  }
+  if (release >= 304) w.bool(false) // 双地牢种子
+  if (release >= 323) {
+    w.bool(false) // 更多闪电
+    w.bool(false) // 无闪电
+  }
+  if (release >= 328) w.bool(noSpiders) // 无蜘蛛种子
+  if (release >= 299 && release < 313) w.u32(0) // 已废弃字段
+  if (release >= 299) w.str('') // WorldManifestData
 
   const section2 = w.length
 
@@ -376,7 +389,7 @@ export function buildWorld(spec: WorldSpec): Uint8Array {
     w.i32(20) // homeTileY
     w.u8(1) // BitsByte：bit0 = townNPC
     w.i32(0) // townNpcVariationIndex
-    w.bool(false) // homelessDespawn
+    if (release >= 315) w.bool(false) // homelessDespawn
   }
   w.bool(false)
   w.bool(false) // 第二个循环直接结束

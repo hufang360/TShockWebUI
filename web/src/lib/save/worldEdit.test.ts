@@ -21,6 +21,33 @@ function tracked(bytes: Uint8Array) {
 }
 
 describe('.wld 编辑校验', () => {
+  it('版本：同段 / 跨段可改，未知版本与不兼容内容被拦', () => {
+    const raw = buildWorld({ width: 24, height: 24, tiles: () => ({ typ: -1 }), release: 279 })
+    const { info, track } = tracked(raw)
+    const draft = draftFromWorld(info, track)
+    expect(draft.release).toBe(279)
+    expect(validateWorldDraft(draft, { info, track })).toEqual([])
+
+    // 跨段升级到 1.4.6.1：没有内容统计时按「可行」放行，保存时再权威检查
+    const up = { ...draft, release: 329 }
+    expect(validateWorldDraft(up, { info, track })).toEqual([])
+    expect(buildWorldEdits(info, track, up)).toEqual({ release: 329 })
+
+    // 非正式版本不能当目标
+    const unknown = validateWorldDraft({ ...draft, release: 320 }, { info, track })
+    expect(unknown.map((i) => i.messageKey)).toContain('wld.edit.err.release.unknownTarget')
+
+    // 有内容统计时：1.4.6.1 的世界降到 1.4.4.9，图格 700 是目标版本没有的（最高 692）
+    const newer = tracked(
+      buildWorld({ width: 24, height: 24, tiles: () => ({ typ: -1 }), release: 329 }),
+    )
+    const blocked = validateWorldDraft(
+      { ...draftFromWorld(newer.info, newer.track), release: 279 },
+      { info: newer.info, track: newer.track, usage: { tile: 700, wall: 0, item: 0, npc: 0 } },
+    )
+    expect(blocked.map((i) => i.messageKey)).toContain('wld.edit.err.releaseContent.tile')
+  })
+
   it('原样草稿没有问题，也没有差异', () => {
     const { info, track } = tracked(demo())
     const draft = draftFromWorld(info, track)

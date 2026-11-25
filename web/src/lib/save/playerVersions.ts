@@ -4,7 +4,7 @@ import { isSameReleaseLayout } from './plr'
  * 角色存档版本号（`.plr` 的 `release`）→ 游戏版本号。
  *
  * 数据来源：TEdit 仓库 `src/TEdit.Terraria/Data/versions.json` 的 `gameVersionToSaveVersion`
- * 反向表（文件头标注与 Terraria 1.4.5.8 对齐）。同一个存档版本对应多个游戏版本时（如
+ * 反向表（文件头标注与 Terraria 1.4.6.1 对齐）。同一个存档版本对应多个游戏版本时（如
  * 1.4.5.0 / 1.4.5.1 / 1.4.5.2 都是 315），显示成 `1.4.5.0+`（存档里只有版本号，无法再细分）。
  *
  * 只读映射，不需要重新生成；游戏出新版时按 `docs/开发速查.md` 重新生成这一张表。
@@ -94,6 +94,7 @@ const SAVE_VERSION_TO_GAME_VERSION: Record<number, string> = {
   319: '1.4.5.6',
   325: '1.4.5.7',
   326: '1.4.5.8',
+  329: '1.4.6.0+', // 1.4.6.0 / 1.4.6.1（字段布局与 326 相同）
 }
 
 /** 全部已知版本（按 release 升序），给「选择存档版本」下拉用。 */

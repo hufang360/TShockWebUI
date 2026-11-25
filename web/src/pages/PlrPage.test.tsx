@@ -263,6 +263,7 @@ describe('PlrPage（玩家存档）', () => {
       expect(releases).toContain(226)
       expect(releases.filter((v) => v <= 228).every((v) => v >= 220)).toBe(true)
       expect(releases).toContain(326)
+      expect(releases).toContain(329)
       expect(releases.every((v) => v >= 220)).toBe(true) // 没有比它更低的
       expect(new Set(releases).size).toBe(releases.length)
 
@@ -270,7 +271,7 @@ describe('PlrPage（玩家存档）', () => {
       expect(screen.getByText('同布局段（可自由改）')).toBeTruthy()
       expect(screen.getByText('升级到 1.4.0.5 – 1.4.3.6')).toBeTruthy()
       expect(screen.getByText('升级到 1.4.4 – 1.4.4.9')).toBeTruthy()
-      expect(screen.getByText('升级到 1.4.5.7 – 1.4.5.8')).toBeTruthy()
+      expect(screen.getByText('升级到 1.4.5.7 – 1.4.6.0+')).toBeTruthy()
     } finally {
       vi.unstubAllGlobals()
     }

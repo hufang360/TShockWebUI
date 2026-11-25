@@ -67,6 +67,23 @@ describe('.plr 写回（补丁 + 重新加密）', () => {
     }
   })
 
+  it('1.4.6.1（329）：同布局段只改版本号，长度不变、其它明文字节不动', () => {
+    const raw = new Uint8Array(readFileSync('src/lib/save/fixtures/webui-326.plr'))
+    const { track, player } = parseWithTrack(raw)
+    const out = applyPlrEdits(raw, track, { release: 329 })
+    const after = parseWithTrack(out)
+
+    expect(after.player.release).toBe(329)
+    expect(out.length).toBe(raw.length)
+    // 326 = 0x146 / 329 = 0x149：小端只有最低字节变。
+    expect(changedPlainOffsets(raw, out)).toEqual([track.release])
+    // 其它字段一律原样。
+    expect(after.player.name).toBe(player.name)
+    expect(after.player.inventory).toEqual(player.inventory)
+    expect(after.player.statLife).toBe(player.statLife)
+    expect(after.player.buffs).toEqual(player.buffs)
+  })
+
   it('改背包槽位（数量 / 词缀 / 清空）后能重新解析出来', () => {
     const raw = demo()
     const { track, player } = parseWithTrack(raw)

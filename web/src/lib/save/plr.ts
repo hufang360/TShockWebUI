@@ -1,7 +1,7 @@
 /**
  * 本地 `.plr` 角色存档解析（**纯浏览器端**，不上传服务器）。
  *
- * 事实来源（反编译源码 Terraria 1.4.5.8）：
+ * 事实来源（反编译源码 Terraria 1.4.5.8；1.4.6.1 的 `Deserialize` 门槛与读取顺序逐项比对无变化）：
  * - 加密：`Terraria/Player.cs` 的 `LoadPlayer` —— AES-128-CBC（`PaddingMode.None`），
  *   key 与 IV 均为 `ENCRYPTION_KEY`（`"h3y_gUyZ"` 的 UTF-16LE 字节）。
  * - 字段顺序：`Terraria/Player.cs` 的 `Deserialize`（release 门槛逐条对照）。
@@ -19,7 +19,7 @@ import { playerGameVersion } from './playerVersions'
 
 const FILE_MAGIC = 'relogic' // 文件头低 7 字节（`FileMetadata.Read` 的魔数）
 const FILE_TYPE_PLAYER = 3
-export const PLR_MAX_RELEASE = 326 // Main.curRelease（1.4.5.8）
+export const PLR_MAX_RELEASE = 329 // Main.curRelease（1.4.6.1）
 const MAX_RELEASE = PLR_MAX_RELEASE
 const MIN_RELEASE = 135 // 有 FileMetadata 的最早版本
 const MAX_ITEM_ID = 10000 // 宽松上界：超过按空槽处理
@@ -326,7 +326,7 @@ export function decryptPlr(data: ArrayBuffer | Uint8Array): Uint8Array {
 }
 
 /**
- * `Player.Deserialize` 里所有 `release >= N` / `release < N` 的门槛（1.4.5.8，去重升序）。
+ * `Player.Deserialize` 里所有 `release >= N` / `release < N` 的门槛（对照 1.4.5.8 与 1.4.6.1，去重升序）。
  * 280/281/300/310 落在「声音 / 退款队列 / 一次性对话」段（本工具不读，但升级要按它们插入）。
  *
  * 用途：判断两个存档版本号「字段布局是否完全相同」。**同段内改版本号是安全的**（读出来的字段一样），

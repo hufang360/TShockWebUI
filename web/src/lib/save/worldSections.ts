@@ -14,7 +14,7 @@
  * 招牌段：`int16 数量` → 每块 `string 文本`、`int32 x`、`int32 y`。
  */
 import type { ChestItemDetail } from './worldStats'
-import { encodeDotNetString } from './worldWrite'
+import { encodeDotNetString } from './bytes'
 
 /** 要写进箱子段的一个箱子（`items` 只看 `slot / id / stack / prefix`，`slot < capacity`）。 */
 export interface ChestWrite {

@@ -219,6 +219,36 @@ describe('WorldPage（世界存档）', () => {
     ).toBeTruthy()
   })
 
+  it('改存档版本（1.4.4.9 → 1.4.6.1）：保存出的文件 release 变为 329', async () => {
+    renderPage()
+    const bytes = buildWorld({
+      width: 40,
+      height: 40,
+      name: '老世界',
+      release: 279,
+      tiles: () => ({ typ: -1 }),
+    })
+    fireEvent.change(screen.getByTestId('world-wld-input'), {
+      target: { files: [new File([bytes.slice().buffer as ArrayBuffer], 'old.wld')] },
+    })
+    expect(await screen.findByRole('heading', { name: '老世界' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /^编辑$/ }))
+    fireEvent.click(await screen.findByLabelText('存档版本'))
+    fireEvent.click(await screen.findByRole('option', { name: /1\.4\.6\.0\+（329）/ }))
+    expect(await screen.findByText(/升级到 1\.4\.6\.0\+/)).toBeTruthy()
+
+    const save = screen.getByRole('button', { name: /保存并下载 \.wld/ }) as HTMLButtonElement
+    await waitFor(() => expect(save.disabled).toBe(false))
+    fireEvent.click(save)
+
+    const blob = (URL.createObjectURL as unknown as { mock: { calls: [Blob][] } }).mock
+      .calls.at(-1)![0]
+    const parsed = parseWorld(new Uint8Array(await blob.arrayBuffer()))
+    expect(parsed.info.release).toBe(329)
+    expect(parsed.info.name).toBe('老世界')
+  })
+
   it('世界名清空时禁止保存并给出原因', async () => {
     renderPage()
     fireEvent.change(screen.getByTestId('world-wld-input'), {

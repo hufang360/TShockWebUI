@@ -202,6 +202,35 @@ describe('.wld 头部解析', () => {
     // release 999（未来版本）→ 高于支持版本。
     expect(() => parseWorld(withRelease(999))).toThrow(/高于本工具支持的/)
   })
+
+  it('1.4.6.1（329）：新头部位 noSpidersSeed 读成特殊种子，其它字段照旧', () => {
+    const on = buildWorld({
+      width: 64,
+      height: 64,
+      tiles: () => ({ typ: -1 }),
+      release: 329,
+      noSpiders: true,
+      name: '蜘蛛世界',
+    })
+    const { info, tilesAt } = parseWorld(on)
+    expect(info.release).toBe(329)
+    expect(info.name).toBe('蜘蛛世界')
+    expect(info.specialSeeds).toContain('noSpiders')
+    expect(tilesAt).toBeGreaterThan(0)
+
+    const off = buildWorld({
+      width: 64,
+      height: 64,
+      tiles: () => ({ typ: -1 }),
+      release: 329,
+      noSpiders: false,
+    })
+    expect(parseWorld(off).info.specialSeeds).not.toContain('noSpiders')
+
+    // 326 的文件没有这个字节：旧存档解析不受影响。
+    const old = buildWorld({ width: 64, height: 64, tiles: () => ({ typ: -1 }), release: 326 })
+    expect(parseWorld(old).info.specialSeeds).not.toContain('noSpiders')
+  })
 })
 
 describe('.plr → PlayerLook 的本地专用字段', () => {
