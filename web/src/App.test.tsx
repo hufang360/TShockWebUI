@@ -285,11 +285,17 @@ function seedLoginMemory() {
   localStorage.setItem('tswui:passwords', JSON.stringify({ default: 'pw' }))
 }
 
-it('有记住的账密：停在首页时照旧主动弹登录框', async () => {
+it('有记住的账密：停在首页也不主动弹登录框，点占位卡的「登录」才弹（已回填）', async () => {
   mockFetch()
   seedLoginMemory()
   render(<App transport={new MockTransport()} />)
 
+  // 会话探测落地后也不弹框：首页只显示「请先登录！」占位卡，别一进来就拦住玩家。
+  const card = (await screen.findByText('请先登录！')).closest('[data-slot="card"]') as HTMLElement
+  await new Promise((resolve) => setTimeout(resolve, 120))
+  expect(screen.queryByRole('dialog')).toBeNull()
+
+  fireEvent.click(within(card).getByRole('button', { name: '登录' }))
   const dialog = await screen.findByRole('dialog')
   expect((within(dialog).getByPlaceholderText('输入玩家名') as HTMLInputElement).value).toBe('Alice')
 })
@@ -306,6 +312,24 @@ it('公开工具页不主动弹登录框（记住的账密也不弹）', async (
   expect(screen.queryByRole('dialog')).toBeNull()
 })
 
+it('首页切换服务器后不主动弹登录框', async () => {
+  mockFetch()
+  const target = { id: 'http://1.2.3.4:7878', scheme: 'http', host: '1.2.3.4', port: 7878 }
+  localStorage.setItem('tswui:servers', JSON.stringify([target]))
+  localStorage.setItem('tswui:server', JSON.stringify(target.id))
+  render(<App transport={new MockTransport()} />)
+  expect(await screen.findByText('请先登录！')).toBeTruthy()
+
+  await clickAccountItem('切换TShock服务器')
+  const switcher = await screen.findByRole('dialog')
+  // 切到未登录的内置上游：只给「已切换服务器」提示，登录框等玩家自己点。
+  fireEvent.click(within(switcher).getByRole('button', { name: /127\.0\.0\.1:7878/ }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  await new Promise((resolve) => setTimeout(resolve, 120))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByText('请先登录！')).toBeTruthy()
+})
+
 it('公开工具页切换服务器后不主动弹登录框', async () => {
   mockFetch()
   const target = { id: 'http://1.2.3.4:7878', scheme: 'http', host: '1.2.3.4', port: 7878 }
@@ -317,7 +341,7 @@ it('公开工具页切换服务器后不主动弹登录框', async () => {
 
   await clickAccountItem('切换TShock服务器')
   const switcher = await screen.findByRole('dialog')
-  // 切回未登录的内置上游：公开页不补弹登录框，继续查东西。
+  // 切回未登录的内置上游：照样继续查东西，不补弹登录框。
   fireEvent.click(within(switcher).getByRole('button', { name: /127\.0\.0\.1:7878/ }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   await new Promise((resolve) => setTimeout(resolve, 120))

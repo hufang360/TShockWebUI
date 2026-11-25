@@ -55,7 +55,7 @@ import {
 } from '@/lib/modules'
 import { sanitizeCustomModules, type CustomModule } from '@/lib/customModules'
 import { StorageKeys, removeKey, removeLegacyKey } from '@/lib/storage'
-import { isPublicTab, readTabFromHash, tabHash } from '@/lib/routes'
+import { readTabFromHash, tabHash } from '@/lib/routes'
 import {
   BUILTIN_ID,
   addServerTarget,
@@ -304,13 +304,6 @@ export default function App({ transport: transportProp }: AppProps = {}) {
     return raw
   })()
 
-  // 当前 tab 的实时值：登录相关回调只在事件发生时读一次，所以走 ref——
-  // 把 activeTab 放进它们的依赖里会让启动探测 / 切服回调随每次导航重建。
-  const activeTabRef = useRef<TabId>(activeTab)
-  useEffect(() => {
-    activeTabRef.current = activeTab
-  }, [activeTab])
-
   useEffect(() => {
     const nextHash = tabHash(activeTab, customModules)
     if (window.location.hash !== nextHash) {
@@ -500,15 +493,10 @@ export default function App({ transport: transportProp }: AppProps = {}) {
       setSession(s)
       if (s.authenticated && s.username) {
         setMe({ username: s.username, savedAt: Date.now() })
-      } else if (!s.authenticated) {
-        // 本机记住了账密 → 说明玩家希望重启后自动重登，直接弹出登录框。
-        // 但停在公开工具页（查物品 / 看存档）时不弹：玩家只是来查东西，不想被登录框拦住。
-        const memory = loadLoginMemory(readActiveTargetId())
-        if (memory.remember && memory.username && memory.password && !isPublicTab(activeTabRef.current)) {
-          setLoginReason('app.sessionExpired')
-          setLoginOpen(true)
-        }
       }
+      // 未登录时不在这里弹登录框（本机记住账密也不弹）：玩家可能只是看看首页 / 查资料，
+      // 一进来就被弹框拦住最劝退。需要登录的页面显示「请先登录！」占位卡，点它的按钮才弹；
+      // 自动弹只留给「指令因 token 失效」这种被动重登（requireLogin）。
     })()
     return () => {
       cancelled = true
@@ -688,7 +676,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
   /**
    * 选中某个上游。各服的会话在后端彼此独立（按上游分开的 Cookie），
    * 所以切换后**按新上游重新探测登录态**：这台服之前登录过就直接进去，
-   * 没登录过才弹登录框；既不会串用别的服的 token，也不会把别的服踢下线。
+   * 没登录过就停在未登录态（页面给「请先登录！」占位），不主动弹登录框；
+   * 既不会串用别的服的 token，也不会把别的服踢下线。
    */
   const selectServer = useCallback(
     async (id: string) => {
@@ -709,11 +698,8 @@ export default function App({ transport: transportProp }: AppProps = {}) {
         setMe({ username: next.username, savedAt: Date.now() })
         return
       }
-      // 停在公开工具页时补登录不弹框：这些页面本来就不需要会话，别打断浏览。
-      if (!isPublicTab(activeTabRef.current)) {
-        setLoginReason('servers.switched')
-        setLoginOpen(true)
-      }
+      // 不补弹登录框：切换提示（servers.switched）已经把状态说清楚了，
+      // 还没登录时该页面自然显示登录占位卡，玩家要登录自己点按钮。
     },
     [activeServerId, transport, clearLocalUser, settings.language, setMe],
   )

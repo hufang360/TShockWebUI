@@ -54,25 +54,6 @@ const SEGMENT_TAB: Record<string, TabId> = {
   codex: 'dataid',
 }
 
-/**
- * 公开工具页：只读内嵌数据集或纯本地文件（`.plr` / `.wld` 都在浏览器里解析），
- * 页面里没有任何需要 token 的功能，未登录也能完整使用。
- *
- * 停在这些页面时**不主动弹登录框**（启动时的「记住密码」重登 / 切服后的补登录都不弹）——
- * 玩家可能只是来查物品或看存档，不该一进来就被登录框拦住。
- */
-export const PUBLIC_TABS: ReadonlySet<TabId> = new Set<TabId>([
-  'items',
-  'dataid',
-  'tables',
-  'save',
-  'worldview',
-])
-
-export function isPublicTab(tab: string): boolean {
-  return PUBLIC_TABS.has(tab as TabId)
-}
-
 /** 自定义模块的「主指令」token（去掉前导 `/`，取第一个词）。 */
 export function customModuleToken(mod: CustomModule): string {
   return (mod.command ?? '').trim().replace(/^\/+/, '').split(/\s+/)[0]?.toLowerCase() ?? ''

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { consumeEditorView } from '@/lib/editorView'
-import { readTabFromHash, tabHash, isPublicTab } from '@/lib/routes'
+import { readTabFromHash, tabHash } from '@/lib/routes'
 import type { CustomModule } from '@/lib/customModules'
 
 function withHash(hash: string) {
@@ -22,17 +22,6 @@ const chest: CustomModule = {
 const mods = [clip, chest]
 
 describe('routes', () => {
-  it('公开工具页（免登录）的清单', () => {
-    // 物品 ID / 数据 ID / 常用表格 / 玩家存档 / 世界存档：只读静态数据或纯本地文件。
-    for (const tab of ['items', 'dataid', 'tables', 'save', 'worldview']) {
-      expect(isPublicTab(tab)).toBe(true)
-    }
-    // 需要 token 的页面不能误判成公开页。
-    for (const tab of ['home', 'editor', 'players', 'world', 'store', 'settings']) {
-      expect(isPublicTab(tab)).toBe(false)
-    }
-  })
-
   it('内置页面使用短名 hash', () => {
     expect(tabHash('editor')).toBe('#/cmd')
     expect(tabHash('save')).toBe('#/plr')
