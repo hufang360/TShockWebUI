@@ -1,13 +1,17 @@
 # 数据 ID（DataIdPage）
 
-文档版本：1.11
+文档版本：1.12
 对应页面：`web/src/pages/DataIdPage.tsx`（导航「数据 ID」，tab id `dataid`）
 相关数据：`data/npcs.json`、`data/tiles.json`、`data/walls.json`、`data/buffs.json`、`data/items.json`、
+`data/paints.json`、`data/projectiles.json`、`data/projectile-atlas.json` / `projectile-atlas.webp`、
+`data/tile-name-overrides.json`、
 `data/npc-variants.json`、`data/npc-bestiary.json`、`data/bestiary-icons.json` / `bestiary-tags.webp` / `bestiary-rank.webp`、
 `data/buff-items.json`、
 `data/loc.<culture>.json`（`NPCName` / `ItemName` / `BuffName` / `BuffDescription` / `BestiaryInfo` / `Bestiary_Biomes` 等）、
 `data/npc-atlas.json` / `npc-atlas.webp`、`data/buff-atlas.json` / `buff-atlas.webp`
 相关代码：`web/src/components/NpcSprite.tsx`、`web/src/components/ItemIcon.tsx`、`web/src/components/BuffIcon.tsx`、
+`web/src/components/ProjectileIcon.tsx`、`web/src/components/dataid/DataIdViews.tsx`（油漆 / 射弹的网格、表格与详情）、
+`web/src/lib/projectileAtlas.ts`、
 `web/src/components/BestiaryFilterIcon.tsx`、`web/src/lib/npcAtlas.ts`、`web/src/lib/buffAtlas.ts`、
 `web/src/lib/npcCollections.ts`、`web/src/lib/bestiary.ts`、`web/src/components/SearchInput.tsx`、
 `web/src/hooks/usePageScroll.ts`、`web/src/hooks/useSearchHistory.ts`
@@ -19,7 +23,7 @@
 
 ## 1. 定位与范围
 
-玩家侧的**只读浏览工具**：在同一个页面里切换 NPC / 图格 / 墙 / Buff，按网格 / 表格浏览，点开看详情。
+玩家侧的**只读浏览工具**：在同一个页面里切换 NPC / 图格 / 墙 / Buff / 油漆 / 射弹，按网格 / 表格浏览，点开看详情。
 
 - **不是**生成 / 管理后台；本页**不执行任何指令**（只读浏览），唯一请求是登录后拉一次 `GET /api/me`
   （只用于 Buff 详情的 `/gbuff`：那条要填「你的玩家名」，未登录时填不出来）。
@@ -29,6 +33,9 @@
 - 图格 / 墙是 `TileID` / `WallID` 速查：ID、代表物品（图标 + 名称）、摆放尺寸、内部名。
 - Buff 是 `BuffID` 速查：ID、图标、本地化名称、内部名、**游戏内描述**（`BuffDescription`）与**能获得它的物品**
   （图标取自游戏 `Content/Images/Buff_<id>.png`，见 §2）。
+- 油漆是 `PaintID` / `PaintCoatingID` 速查：ID、内部名、名称、**对应物品**（放涂料要用哪件物品）。
+  30 个油漆 + 2 个涂料（夜明 / 回声）分两组，工具行最左的幽灵按钮组切「全部 / 油漆 / 涂料」。
+- 射弹是 `ProjectileID` 速查：ID、首帧图标、本地化名称（`ProjectileName`，不落盘）、内部名。
 - NPC 除 `NPCID` 正数常量，还收录 **-1..-65 的变体 id**（史莱姆颜色 / 僵尸与骷髅体型 / 黄蜂变种…）：
   没有自己的名字时显示母体名，贴图用母体贴图按 `scale` 缩放（见 §2）。
 - **怪物图鉴的「分组」与「排序」**是本页独有的参考数据：分组 = 游戏图鉴的 59 个筛选器（Boss / 稀有 / 各生物群系与事件，
@@ -48,7 +55,7 @@
 | NPC 相关指令 | `web/src/lib/npcRelatedCommands.ts` | 详情「相关指令」的拼装 + 可切换解救状态的 NPC id（来源见该文件注释） |
 | 图格 | `data/tiles.json` | `{ id, key, item, size?, frameImportant? }`，754 条 |
 | 墙 | `data/walls.json` | `{ id, key, item }`，367 条（墙没有尺寸概念） |
-| 图格 / 墙名称 | `data/loc.<culture>.json` | 代表物品的 `ItemName.<key>`；没有代表物品时回退内部名 |
+| 图格 / 墙名称 | `data/loc.<culture>.json` + `data/tile-name-overrides.json` | 解析链见 `lib/tiles.ts` 注释：图例名（`MapObject`）→ 图例物品 → 代表物品 → 补齐表（70 图格 / 74 墙的中文 Wiki 名）→ 常量名 |
 | NPC 英文名 | `data/npcs.json` 的 `en`（生成自 `loc.en-US` 的 `NPCName`） | NPC 表格最后一列 / 详情里的英文名；缺失回退内部名 |
 | 图格 / 墙图标 | `data/items-atlas.{json,png}` | 由代表物品 `item` → 物品图标（复用物品图集，不新增资源） |
 | Buff | `data/buffs.json` | `{ id, key }`，400 条；名称不落盘 |
@@ -56,6 +63,9 @@
 | Buff 图标 | `data/buff-atlas.{json,png}` | 游戏原图 `Buff_<id>.png`（32×32 静态图标，400 个）拼成的图集；懒加载 |
 | Buff 描述 | `data/loc.<culture>.json` | 官方本地化 `BuffDescription.<key>`，按界面语言加载；`{$BuffName.xxx}` 这类引用在运行期展开 |
 | Buff 来源物品 | `data/buff-items.json` | `items[buffId] = [物品 id…]`（升序），221 个 buff / 303 对；来源见 §2 下方 |
+| 油漆 / 涂料 | `data/paints.json` | `{ meta, entries: [{ id, group: 'paint' \| 'coating', key, item }] }`，30 + 2（`id` 在同一 group 内唯一，`item` 是对应物品） |
+| 射弹 | `data/projectiles.json` | `{ id, key, name? }`，1136 条；名称不落盘，取 `loc.ProjectileName.<key>` |
+| 射弹图标 | `data/projectile-atlas.json` / `.webp` | `regions[projectileId] = [x, y, w, h]`，1117 个首帧等比缩进 48px 框，懒加载 |
 | NPC 负值变体 | `data/npc-variants.json` | `{ id, key, baseId, scale, color }`，65 条；`npcs.json` 已合并这些 id、图集按母体贴图缩放 |
 | 图鉴分组 / 排序数据 | `data/npc-bestiary.json` | 59 个筛选器（顺序 + 图标贴图）+ 761 个 NPC 的 `sortId` / `rarity` / 攻击·防御·钱币·生命 / 命中的筛选器 |
 | 图鉴筛选器图标 | `data/bestiary-icons.{json}` + `bestiary-tags.webp` / `bestiary-rank.webp` | 游戏原图 `Icon_Tags_Shadow`（16×5、每格 30×30）与 `Icon_Rank_Light`；帧号解析自构造参数，带内容 hash |
@@ -108,7 +118,7 @@
 
 ```
 ┌ 数据源 Tabs（不在 Card 内）─────────────────────────────────────┐
-│ NPC │ 图格 │ 墙 │ Buff                                            │
+│ NPC │ 图格 │ 墙 │ Buff │ 油漆 │ 射弹                                    │
 └──────────────────────────────────────────────────────────────────┘
 ┌ 工具行（不套卡片，直接铺在页面上）────────────────────────────┐
 │ [全部 Boss NPC 小动物] │ [分组] [×]                    ……  搜索框 │
@@ -135,7 +145,10 @@
   窄屏分类组横向滚动（隐藏滚动条），搜索框单独占一行。
   **「排序」与「前往 Wiki」收在「分组」弹层里**（不在工具行上），弹层从下到上依次是
   分组图标网格 →（分割线）→ 排序按钮组 →（分割线）→ 前往 Wiki。
-- **工具行（图格 / 墙 / Buff）**：搜索框居左、`前往 Wiki` 紧贴它右边。
+- **工具行（图格 / 墙 / Buff / 射弹）**：搜索框居左、`前往 Wiki` 紧贴它右边。
+- **工具行（油漆）**：幽灵按钮组 `全部 / 油漆 / 涂料`（`data-testid="paint-group-tabs"`）居左、搜索框与 `前往 Wiki` 在右侧；
+  分组只影响当前 tab，与搜索是「且」的关系；从全局搜索跳进来时会先清掉分组，否则可能「跳进来一条都不显示」。
+  涂料与油漆的 `id` 各自从 1 开始编号，所以**详情与选中态都带 `group`**（同一 id 可能是两件东西）。
 - 搜索行吸在顶栏下面（`sticky top-12`），表头再吸在它下面。
 - **怪物图鉴「分组」**：按钮 → 弹层里的 59 格图标网格（`flex-wrap`，桌面一行 12 格，窄屏自动换行，纵向滚动、不出横向滚动条）；
   每格 30×30 游戏原图图标 + 手型光标 + 悬停提示（分组名 + 该分组条数），多选、选中项右下角打勾，**并集**生效；
@@ -149,7 +162,7 @@
   「页面设置」不再出现在全屏里（要看设置先退出）。
 - **回到顶部**：向下滚过 480px 后右下角出现圆形按钮（`components/ScrollToTop.tsx`），点了回列表顶部；全屏里同样可用。
 
-- **NPC / 图格 / 墙 / Buff 都支持两种视图**：默认**图标网格**；在同一个「页面设置」Popover 中勾选「表格视图」后切为表格。
+- **NPC / 图格 / 墙 / Buff / 油漆 / 射弹都支持两种视图**：默认**图标网格**；在同一个「页面设置」Popover 中勾选「表格视图」后切为表格。
 - 所有页面设置（**图标大小** / 表格视图 / 导出表格 / 两列表格 / 展开子 ID / 全部 Wiki 链接）都在**同一个 Popover**，不再按 tab 分开展示或切换内容。
   标题栏右侧是「恢复默认」图标按钮：把图标大小 / 隐藏 ID 和名称 / 表格视图 / 两列表格 / 展开子 ID 一次性改回默认（数据源 tab、搜索词、分类不动）；打开弹框时焦点落在第一个设置项（图标大小下拉）上。
 - 网格图标保留低对比背景格；**表格视图图标不铺背景、不加描边**。
@@ -158,7 +171,7 @@
   一律用主题的 `secondary`（亮暗跟随，不写死色值、不加描边）；小档 / 横条亮暗都有底板，中 / 大档只在暗色垫；
   hover 有底板处亮色压深 10% / 暗色提亮 10%。规则集中在 `lib/iconGridSize` 的 `iconPlateClass`（与物品 ID / 鱼店共用）。
 - **横条档悬停提示覆盖整条**（`components/RowTip.tsx`）：有代表物品的（图格）弹物品提示，NPC / Buff 弹「`#ID` + 名称」。
-- **图标大小四档**（页面设置「视图」第一行的 `Select`，存 `tswui:dataId:iconSize`；**没选过时四种数据源一律「横条」**，
+- 图标大小四档**（页面设置「视图」第一行的 `Select`，存 `tswui:dataId:iconSize`；**没选过时六种数据源一律「横条」**，
   选过就按选的来、切数据源也一样；像素唯一定义在 `components/dataid/DataIdViews.tsx` 的 `DATA_ID_SIZES`，
   档位名与物品 ID / 鱼店共用 `lib/iconGridSize`）：
 
@@ -423,8 +436,12 @@ NPC 详情 / Buff 详情用 `components/CommandLine.tsx` 列一块 **「相关�
 - NPC 排序默认按 ID 升序；在分组弹层里选「攻击」等项后按该项倒序；再点同一项回到默认。
 - NPC 列表含 -1..-65 的变体（在「全部」里能看到，名字是母体名如「僵尸」「黄蜂」，贴图按 scale 缩放）。
 - Buff 详情显示游戏内描述（如 1 号「对熔岩免疫」）与「代表物品」（1 号 → 288 黑曜石皮药水）；多来源时列出全部并可滚动。
-- 「图格」「墙」默认都是图标网格，在页面设置中勾选「表格视图」后为表格；图格还可勾选「展开子 ID」平铺样式。墙图标使用代表物品，名称使用物品本地化名，无代表物品时显示斜体内部名；
+- 「图格」「墙」默认都是图标网格，在页面设置中勾选「表格视图」后为表格；图格还可勾选「展开子 ID」平铺样式。墙图标使用代表物品，名称使用物品本地化名，无代表物品时回退补齐表（如 52 → 「常规藤蔓」）、再无则斜体内部名；
   Buff 默认图标网格（96×96，图标底同上），勾选「表格视图」后为 `ID / 图标 / 名称 / 内部名` 表格。
+- 「油漆」工具行是 `[全部 / 油漆 / 涂料] …… [搜索框] [前往 Wiki]`；两组 `id` 都从 1 起，
+  切分组后详情与选中态不会串（带 `group`）；导表列 `ID / 图标 / 名称 / 对应物品 / 内部名`。
+- 「射弹」默认横条网格，图标是图集首帧（有图 1117 / 共 1136，缺图的显占位）；名称随界面语言；
+  导表列 `ID / 图标 / 名称 / 内部名`；搜索与最近搜索和 NPC / 图格各记一份。
 - 无翻页器：全部结果一次展示；搜索 / 切 tab / 切筛选都会回到顶部。
 - 全屏后仅保留右侧操作坞（页面设置 / 退出全屏，数秒后收成竖条）；图标网格横向铺满。
 - 图标网格点击 → 打开右侧抽屉，NPC / Buff 的图标放大到 128×128；图格 / 墙详情的大图底也是 `bg-accent`（与输入框同色）。

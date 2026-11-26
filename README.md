@@ -45,15 +45,15 @@ TShock 伴侣，面向服主，也面向玩家！
 - `tshock.rest.useapi`：允许创建 token（登录）
 - `tshock.rest.command`：允许执行指令
 
-安装信使插件：[WebUI-0.1.0-rc.13.dll](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.13/WebUI-0.1.0-rc.13.dll)。
+安装信使插件：[WebUI-0.1.0-rc.14.dll](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.14/WebUI-0.1.0-rc.14.dll)。
 
 ---
 
 **电脑端**
 下载电脑版本，例如：
 
-- Windows是 [tswui-0.1.0-rc.13-windows-amd64.exe](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.13/tswui-0.1.0-rc.13-windows-amd64.exe)
-- macOS是 [tswui-0.1.0-rc.13-darwin-arm64](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.13/tswui-0.1.0-rc.13-darwin-arm64)
+- Windows是 [tswui-0.1.0-rc.14-windows-amd64.exe](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.14/tswui-0.1.0-rc.14-windows-amd64.exe)
+- macOS是 [tswui-0.1.0-rc.14-darwin-arm64](https://github.com/hufang360/TShockWebUI/releases/download/v0.1.0-rc.14/tswui-0.1.0-rc.14-darwin-arm64)
 
 双击启动后，会弹出一个命令行窗口，不要关！
 
@@ -80,8 +80,8 @@ TShock 伴侣，面向服主，也面向玩家！
 
 ```bash
 # 拉取镜像
-# docker pull hufang360/tshockwebui:0.1.0-rc.13
-docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.13
+# docker pull hufang360/tshockwebui:0.1.0-rc.14
+docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.14
 
 # 启动容器
 # http://服务器ip:18080
@@ -92,7 +92,7 @@ docker pull ghcr.io/hufang360/tshockwebui:0.1.0-rc.13
 docker run -d --name tswui -p 18080:18080 \
   -e TSHOCK_URL=http://host.docker.internal:7878 \
   -e TSHOCK_ALLOW_CUSTOM_TARGETS=true \
-  ghcr.io/hufang360/tshockwebui:0.1.0-rc.13
+  ghcr.io/hufang360/tshockwebui:0.1.0-rc.14
 ```
 
 ## 架构
